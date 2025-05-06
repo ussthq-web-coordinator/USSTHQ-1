@@ -1,4 +1,5 @@
-<style type="text/css">
+.btn.btn-gold {border-color:#f2c75d;color:#f2c75d}
+
 .navItem-link {
   display: none !important; 
   }
@@ -66,7 +67,7 @@
     display: flex;
     flex-direction: column;
     flex: 1;
-      min-width 70%;
+    min-width: 70%;
 }
 .mtk-controls audio {
     width: 90%;
@@ -96,4 +97,3 @@
     padding-right:10px;
   }
 }
-</style>
