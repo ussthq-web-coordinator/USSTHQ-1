@@ -1,9 +1,30 @@
 .btn-gold {
-  border-color:#f2c75d;
-  color:#f2c75d;
+  background-color: #f2c75d;
+  border: 1px solid #f2c75d;
+  color: #fff;
+  padding: 0.5em 1.25em;
+  font-weight: 600;
+  text-align: center;
+  text-decoration: none;
+  display: inline-block;
+  border-radius: 6px;
+  transition: background-color 0.3s ease, color 0.3s ease;
 }
 
-.btn.btn-gold,input.btn-gold[type=submit]{border-color:#f2c75d;color:#f2c75d}.btn-gold.rowDonate-btn a,.btn-gold.rowDonate-submit a,.btn-gold.submit a,.btn.btn-gold a,input.btn-gold[type=submit] a{color:#f2c75d}.btn-gold.rowDonate-btn:hover,.btn-gold.rowDonate-submit:hover,.btn-gold.submit:hover,.btn.btn-gold:hover,input.btn-gold[type=submit]:hover{background-color:#f2c75d;color:#fff;border-color:#f2c75d}.btn-gold.rowDonate-btn:hover a,.btn-gold.rowDonate-submit:hover a,.btn-gold.submit:hover a,.btn.btn-gold:hover a,input.btn-gold[type=submit]:hover a{color:#fff}.btn-gold.btn-solid.rowDonate-btn,.btn-gold.btn-solid.submit,.btn-gold.rowDonate-submit,.btn.btn-gold.btn-solid,input.btn-gold.btn-solid[type=submit]{background-color:#f2c75d;color:#fff}.btn-gold.btn-solid.rowDonate-btn a,.btn-gold.btn-solid.submit a,.btn-gold.rowDonate-btn.rowDonate-submit a,.btn-gold.rowDonate-submit a,.btn-gold.submit.rowDonate-submit a,.btn.btn-gold.btn-solid a,input.btn-gold.btn-solid[type=submit] a,input.btn-gold[type=submit].rowDonate-submit a{color:#fff}.btn-gold.btn-solid.rowDonate-btn:hover,.btn-gold.btn-solid.submit:hover,.btn-gold.rowDonate-submit:hover,.btn.btn-gold.btn-solid:hover,input.btn-gold.btn-solid[type=submit]:hover{color:#f2c75d;background-color:#fff}.btn-gold.btn-solid.rowDonate-btn:hover a,.btn-gold.btn-solid.submit:hover a,.btn-gold.rowDonate-btn.rowDonate-submit:hover a,.btn-gold.rowDonate-submit:hover a,.btn-gold.submit.rowDonate-submit:hover a,.btn.btn-gold.btn-solid:hover a,input.btn-gold.btn-solid[type=submit]:hover a,input.btn-gold[type=submit].rowDonate-submit:hover a{color:#f2c75d}.btn-gold.btn-inverse.rowDonate-btn,.btn-gold.btn-inverse.rowDonate-submit,.btn-gold.btn-inverse.submit,.btn.btn-gold.btn-inverse,input.btn-gold.btn-inverse[type=submit]{background-color:transparent;border-color:#f2c75d;color:#f2c75d}.btn-gold.btn-inverse.rowDonate-btn a,.btn-gold.btn-inverse.rowDonate-submit a,.btn-gold.btn-inverse.submit a,.btn.btn-gold.btn-inverse a,input.btn-gold.btn-inverse[type=submit] a{color:#f2c75d}.no-touchevents .btn-gold.btn-inverse.rowDonate-btn:hover,.no-touchevents .btn-gold.btn-inverse.rowDonate-submit:hover,.no-touchevents .btn-gold.btn-inverse.submit:hover,.no-touchevents .btn.btn-gold.btn-inverse:hover,.no-touchevents input.btn-gold.btn-inverse[type=submit]:hover{background-color:#f2c75d;color:#fff}.no-touchevents .btn-gold.btn-inverse.rowDonate-btn:hover a,.no-touchevents .btn-gold.btn-inverse.rowDonate-submit:hover a,.no-touchevents .btn-gold.btn-inverse.submit:hover a,.no-touchevents .btn.btn-gold.btn-inverse:hover a,.no-touchevents input.btn-gold.btn-inverse[type=submit]:hover a{color:#fff}
+/* Hover and focus */
+.btn-gold:hover,
+.btn-gold:focus {
+  background-color: #e5b844; /* Slightly darker gold */
+  color: #fff;
+  border-color: #e5b844;
+}
+
+/* Optional active state */
+.btn-gold:active {
+  background-color: #d6a830;
+  border-color: #d6a830;
+}
+
 
 .navItem-link {
   display: none !important; 
