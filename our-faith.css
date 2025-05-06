@@ -1,4 +1,7 @@
-.btn.btn-gold {border-color:#f2c75d;color:#f2c75d}
+.btn-gold {
+  border-color:#f2c75d;
+  color:#f2c75d;
+}
 
 .navItem-link {
   display: none !important; 
