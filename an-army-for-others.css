@@ -223,7 +223,7 @@
               border-radius: 1rem;
               box-shadow: 0 1rem 2rem rgba(239, 62, 66, 0.2);
               padding: 3rem; 
-    }
+            }
           .panel-content {
               max-height: 210px;
               overflow: hidden;
