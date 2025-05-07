@@ -222,14 +222,7 @@
             .tp-panel {
               border-radius: 1rem;
               box-shadow: 0 1rem 2rem rgba(239, 62, 66, 0.2);
-              padding: 3rem;
-                background: radial-gradient(
-    ellipse at center,
-    #ffffff 78%,
-    #132230 80%,
-    #132230 100%
-  );
-  
+              padding: 3rem; 
     }
           .panel-content {
               max-height: 210px;
