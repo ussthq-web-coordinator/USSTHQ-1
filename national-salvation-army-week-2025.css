@@ -1,0 +1,185 @@
+.eventDetails {
+    display:none !important;
+    }
+    .eventTitle {
+    display:none !important;
+    }
+      .mainImage {
+      padding-top: 20px;
+      padding-bottom: 15px;
+  }
+    div .mainImage {
+      display:none !important;
+      border-radius: 15px;
+      max-width: 120%;
+      height: 729px;
+      margin: -150px;
+    }
+      .padding-top-xl {
+    display:none !important;
+    }
+    .row.padding-top-xl {
+      display: none;
+        padding-bottom: 20px;
+  }
+    .globalFooter {
+    background: #122231;
+  }
+  .globalFooter-input {
+    background-color: #333333;
+  }
+  .givingToolbar-toolbar {
+    background: #122231;
+  }
+  .flyoutNav {
+    background: #122231;
+  }
+  @media only screen and (min-width: 761px) {
+    .col-sm-8 {
+    width: 100%
+    }
+    }
+  @media only screen and (min-width: 761px) {
+    .span {
+    padding-left: 30px;
+    padding-right: 30px
+    }
+    }
+  @media only screen and (min-width: 971px) {
+    .col-sm-offset-2 {
+    padding-right: 35%
+    }
+    }
+    /*CSS for Card Groups */
+    .image-section-nsaw {
+        background-size: cover;
+        background-position: center;
+        min-height: 400px;
+        height: 100%;
+        border-radius: 1rem;
+      }
+    
+      .overlay-card-nsaw {
+        background-color: #F5F6F2;
+        color: #111;
+        border-radius: 1rem;
+        box-shadow: 0 1rem 2rem rgba(239, 62, 66, 0.2);
+        padding: 2rem;
+        z-index: 2;
+        position: relative;
+        max-width: 500px;
+      }
+    
+      .card-dark-nsaw {
+        background-color: #132230;
+        color: #f1f5f9;
+      }
+    
+      .card-dark-nsaw .btn {
+        border-color: #f1f5f9;
+        color: #f1f5f9;
+      }
+    
+      .card-dark-nsaw .btn:hover {
+        background-color: #f1f5f9;
+        color: #1e293b;
+      }
+    
+      .row-flex-nsaw {
+        display: flex;
+        flex-wrap: nowrap;
+        justify-content: center;
+        align-items: center;
+        margin-bottom: 5rem;
+        gap: 0;
+        position: relative;
+      }
+    
+      .image-col-nsaw {
+        flex: 0 0 65%;
+      }
+    
+      .text-col-nsaw {
+        flex: 0 0 35%;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+      }
+    
+      .overlap-left-nsaw {
+        margin-left: -15%;
+      }
+    
+      .overlap-right-nsaw {
+        margin-right: -15%;
+      }
+    
+      @media (max-width: 767.98px) {
+        .row-flex-nsaw {
+          flex-direction: column;
+          align-items: center;
+          gap: 1.5rem;
+        }
+    
+        .image-col-nsaw,
+        .text-col-nsaw {
+          width: 100%;
+          max-width: 100%;
+        }
+    
+        .image-section-nsaw {
+          height: 250px; /* Ensure image is visible on mobile */
+          border-radius: 1rem;
+        }
+    
+        .overlay-card-nsaw {
+          width: 90%;
+          margin: 0 auto;
+          text-align: center;
+        }
+    
+        .overlap-left-nsaw,
+        .overlap-right-nsaw {
+          margin: 0; /* Remove overlap on mobile */
+        }
+    
+        .overlap-container-nsaw {
+          margin-top: -3.5rem; /* Reintroduce the overlap */
+          width: 90%;
+          z-index: 3;
+        }
+      }
+      /* CSS for Video Embed */
+      .video-wrapper-nsaw {
+        position: relative;
+        width: 100%;
+        max-width: 1920px;
+        margin: 4rem auto 5rem auto; /* spacing above and below */
+        height: 0;
+        padding-bottom: 56.25%; /* ~55% original height (16:9 is 56.25%, so this is ~25% shorter total) */
+        border-radius: 1rem;
+        overflow: hidden;
+        animation: shadowPulse 6s infinite alternate ease-in-out;
+      }
+    
+      .video-wrapper-nsaw iframe {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        border: none;
+        margin-bottom: -45px;
+      }
+    
+      @keyframes shadowPulse {
+        0% {
+          box-shadow: 0 1rem 2rem rgba(30, 41, 59, 0.6); /* navy */
+        }
+        50% {
+          box-shadow: 0 1rem 2rem rgba(220, 38, 38, 0.6); /* red */
+        }
+        100% {
+          box-shadow: 0 1rem 2rem rgba(30, 41, 59, 0.6); /* navy */
+        }
+      }
