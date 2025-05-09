@@ -13,6 +13,7 @@
   @media (min-width: 1024px) {
     .podcast-panel {
       width: 1080px; /* 3x the original 360px */
+      height: 550px;
     }
   }
   
