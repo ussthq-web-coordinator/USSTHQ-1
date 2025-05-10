@@ -1,4 +1,20 @@
 document.addEventListener('DOMContentLoaded', function () {
+  const video = document.getElementById('video-element');
+  const thumbnail = document.getElementById('video-thumbnail');
+  const playButton = document.getElementById('custom-play-button');
+
+  function startVideo() {
+    thumbnail.style.display = 'none';
+    playButton.style.display = 'none';
+    video.style.display = 'block';
+    video.play();
+  }
+
+  thumbnail.addEventListener('click', startVideo);
+  playButton.addEventListener('click', startVideo);
+});
+
+document.addEventListener('DOMContentLoaded', function () {
   const videoWrapper = document.getElementById('video-wrapper');
   const video = document.getElementById('video-element');
   const thumbnailContainer = document.getElementById('video-thumbnail-container');
