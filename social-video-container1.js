@@ -2,14 +2,13 @@ document.addEventListener('DOMContentLoaded', function () {
   const videoWrapper = document.getElementById('video-wrapper');
   const video = document.getElementById('video-element');
   const thumbnailContainer = document.getElementById('video-thumbnail-container');
-  const playButton = document.getElementById('play-button');
   const overlay = document.getElementById('overlay-ui');
-  overlay.style.display = 'none'; // Hide social UI initially
   const moreActionsToggle = document.getElementById('more-actions-toggle');
   const moreActionsMenu = document.getElementById('more-actions-menu');
   const likeEl = document.getElementById('like-count');
   const commentEl = document.getElementById('comment-count');
   const commentFeed = document.getElementById('comments-feed');
+  const playButton = document.getElementById('custom-play-button');
 
   let commentIndex = 0;
   const comments = [
@@ -20,6 +19,9 @@ document.addEventListener('DOMContentLoaded', function () {
 
   let likeCount = 1, commentCount = 4;
   let likeInterval, commentInterval, commentLoop;
+
+  overlay.style.display = 'none'; // Hide UI initially
+  playButton.style.display = 'block'; // Ensure play button is visible
 
   function showNextComment() {
     const comment = comments[commentIndex % comments.length];
@@ -47,9 +49,10 @@ document.addEventListener('DOMContentLoaded', function () {
   }
 
   function startVideo() {
-    overlay.style.display = 'block';
     thumbnailContainer.style.display = 'none';
     video.style.display = 'block';
+    overlay.style.display = 'block';
+    playButton.style.display = 'none';
     video.play();
     startCounters();
   }
