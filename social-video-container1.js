@@ -1,6 +1,7 @@
   document.addEventListener('DOMContentLoaded', function () {
     const videoWrapper = document.getElementById('video-wrapper');
     const video = document.getElementById('video-element');
+    const thumbnail = document.getElementById('video-thumbnail');
     const thumbnailContainer = document.getElementById('video-thumbnail-container');
     const overlay = document.getElementById('overlay-ui');
     const moreActionsToggle = document.getElementById('more-actions-toggle');
@@ -17,17 +18,17 @@
       { user: 'txsummers', text: 'We shared this at our corps!' },
     ];
 
-    let likeCount = 1, commentCount = 4;
-    let likeInterval, commentInterval, commentLoop;
-    let hasStarted = false;
-
     function showNextComment() {
       const comment = comments[commentIndex % comments.length];
       commentFeed.innerHTML = `<strong>@${comment.user}</strong>: ${comment.text}`;
       commentIndex++;
     }
 
-    function startCountersAndComments() {
+    // Counters
+    let likeCount = 1, commentCount = 4;
+    let likeInterval, commentInterval, commentLoop;
+
+    function startCounters() {
       likeInterval = setInterval(() => {
         if (likeCount < 2000) {
           likeCount += Math.floor(Math.random() * 5);
@@ -46,15 +47,12 @@
       commentLoop = setInterval(showNextComment, 3000);
     }
 
+    // Start video
     function startVideo() {
-      if (hasStarted) return;
-      hasStarted = true;
-
       thumbnailContainer.style.display = 'none';
       video.style.display = 'block';
-      overlay.style.display = 'block';
       video.play();
-      startCountersAndComments();
+      startCounters();
     }
 
     thumbnailContainer.addEventListener('click', startVideo);
@@ -65,16 +63,16 @@
       }
     });
 
-    // Hover UI shift
+    // Hover effect for shifting up
     videoWrapper.addEventListener('mouseenter', () => {
-      if (hasStarted) overlay.style.transform = 'translateY(-50px)';
+      overlay.style.transform = 'translateY(-50px)';
     });
     videoWrapper.addEventListener('mouseleave', () => {
-      if (hasStarted) overlay.style.transform = 'translateY(0)';
+      overlay.style.transform = 'translateY(0)';
       moreActionsMenu.style.display = 'none';
     });
 
-    // More actions toggle
+    // More actions menu toggle
     moreActionsToggle.addEventListener('click', e => {
       e.stopPropagation();
       moreActionsMenu.style.display =
@@ -84,7 +82,7 @@
       moreActionsMenu.style.display = 'none';
     });
 
-    // Public method to inject real comments dynamically
+    // Allow dynamic comment injection
     window.addRealComment = function (user, text) {
       comments.unshift({ user, text });
     };
