@@ -2,6 +2,7 @@ document.addEventListener('DOMContentLoaded', function () {
   const videoWrapper = document.getElementById('video-wrapper');
   const video = document.getElementById('video-element');
   const thumbnailContainer = document.getElementById('video-thumbnail-container');
+  const playButton = document.getElementById('play-button');
   const overlay = document.getElementById('overlay-ui');
   const moreActionsToggle = document.getElementById('more-actions-toggle');
   const moreActionsMenu = document.getElementById('more-actions-menu');
@@ -72,6 +73,7 @@ document.addEventListener('DOMContentLoaded', function () {
     moreActionsMenu.style.display =
       moreActionsMenu.style.display === 'none' ? 'block' : 'none';
   });
+
   document.addEventListener('click', () => {
     moreActionsMenu.style.display = 'none';
   });
