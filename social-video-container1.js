@@ -4,6 +4,7 @@ document.addEventListener('DOMContentLoaded', function () {
   const thumbnailContainer = document.getElementById('video-thumbnail-container');
   const playButton = document.getElementById('play-button');
   const overlay = document.getElementById('overlay-ui');
+  overlay.style.display = 'none'; // Hide social UI initially
   const moreActionsToggle = document.getElementById('more-actions-toggle');
   const moreActionsMenu = document.getElementById('more-actions-menu');
   const likeEl = document.getElementById('like-count');
@@ -46,6 +47,7 @@ document.addEventListener('DOMContentLoaded', function () {
   }
 
   function startVideo() {
+    overlay.style.display = 'block';
     thumbnailContainer.style.display = 'none';
     video.style.display = 'block';
     video.play();
