@@ -183,7 +183,7 @@
       border-radius: 15px;
       box-shadow: 2px 2px 10px rgba(0, 0, 0, 0.1);
   }
-    .container-young-adults {
+    .container-young-adult {
       display: grid;
       grid-template-columns: 1fr;
       justify-content: center;
@@ -191,7 +191,7 @@
       padding: 10px;
   }
 
-  .middle-column-young-adults {
+  .middle-column-young-adult {
       background: #8338ec;
         color: #FFFFFF;
       padding: 20px;
