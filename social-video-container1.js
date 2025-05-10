@@ -1,4 +1,3 @@
-
   document.addEventListener('DOMContentLoaded', function () {
     const videoWrapper = document.getElementById('video-wrapper');
     const video = document.getElementById('video-element');
