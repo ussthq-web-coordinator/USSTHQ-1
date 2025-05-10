@@ -48,21 +48,15 @@
     }
 
     function startVideo() {
-  if (hasStarted) return;
-  hasStarted = true;
+      if (hasStarted) return;
+      hasStarted = true;
 
-  thumbnailContainer.style.display = 'none';
-  video.style.display = 'block';
-  overlay.style.pointerEvents = 'auto';
-
-  // Show overlays
-  document.getElementById('icon-stack').style.display = 'flex';
-  document.getElementById('profile-comment').style.display = 'block';
-
-  video.play();
-  startCountersAndComments();
-}
-
+      thumbnailContainer.style.display = 'none';
+      video.style.display = 'block';
+      overlay.style.display = 'block';
+      video.play();
+      startCountersAndComments();
+    }
 
     thumbnailContainer.addEventListener('click', startVideo);
     thumbnailContainer.addEventListener('keypress', e => {
