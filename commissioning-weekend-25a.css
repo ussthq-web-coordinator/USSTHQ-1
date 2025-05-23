@@ -464,7 +464,10 @@
 
 .comm25-card img {
   width: 100%;
-  display: block;
+  height: auto;
+  border-radius: 8px;
+  cursor: pointer;
+  object-fit: cover;
 }
 
 .comm25-card .comm25-title {
