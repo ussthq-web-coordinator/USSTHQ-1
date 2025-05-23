@@ -16,6 +16,105 @@ const graduates = [
     scripture: "Micah 6:8",
     cadetImage: "https://8hxvw8tw.media.zestyio.com/Chelsea-Carter.jpg",
     lieutenantImage: "https://8hxvw8tw.media.zestyio.com/Chelsea-Carter.jpg"
+  },
+    {
+    firstName: "Jane",
+    lastName: "Doe",
+    homeCorps: "Los Angeles Corps",
+    appointment: "Assistant Corps Officer",
+    scripture: "Jeremiah 29:11",
+    cadetImage: "https://8hxvw8tw.media.zestyio.com/Kathleen-Farmer.jpg",
+    lieutenantImage: "https://8hxvw8tw.media.zestyio.com/Kathleen-Farmer.jpg"
+  },
+  {
+    firstName: "John",
+    lastName: "Smith",
+    homeCorps: "Chicago Temple",
+    appointment: "Social Services Director",
+    scripture: "Micah 6:8",
+    cadetImage: "https://8hxvw8tw.media.zestyio.com/Chelsea-Carter.jpg",
+    lieutenantImage: "https://8hxvw8tw.media.zestyio.com/Chelsea-Carter.jpg"
+  },
+  {
+    firstName: "Jane",
+    lastName: "Doe",
+    homeCorps: "Los Angeles Corps",
+    appointment: "Assistant Corps Officer",
+    scripture: "Jeremiah 29:11",
+    cadetImage: "https://8hxvw8tw.media.zestyio.com/Kathleen-Farmer.jpg",
+    lieutenantImage: "https://8hxvw8tw.media.zestyio.com/Kathleen-Farmer.jpg"
+  },
+  {
+    firstName: "John",
+    lastName: "Smith",
+    homeCorps: "Chicago Temple",
+    appointment: "Social Services Director",
+    scripture: "Micah 6:8",
+    cadetImage: "https://8hxvw8tw.media.zestyio.com/Chelsea-Carter.jpg",
+    lieutenantImage: "https://8hxvw8tw.media.zestyio.com/Chelsea-Carter.jpg"
+  },
+  {
+    firstName: "Jane",
+    lastName: "Doe",
+    homeCorps: "Los Angeles Corps",
+    appointment: "Assistant Corps Officer",
+    scripture: "Jeremiah 29:11",
+    cadetImage: "https://8hxvw8tw.media.zestyio.com/Kathleen-Farmer.jpg",
+    lieutenantImage: "https://8hxvw8tw.media.zestyio.com/Kathleen-Farmer.jpg"
+  },
+  {
+    firstName: "John",
+    lastName: "Smith",
+    homeCorps: "Chicago Temple",
+    appointment: "Social Services Director",
+    scripture: "Micah 6:8",
+    cadetImage: "https://8hxvw8tw.media.zestyio.com/Chelsea-Carter.jpg",
+    lieutenantImage: "https://8hxvw8tw.media.zestyio.com/Chelsea-Carter.jpg"
+  },
+  {
+    firstName: "Jane",
+    lastName: "Doe",
+    homeCorps: "Los Angeles Corps",
+    appointment: "Assistant Corps Officer",
+    scripture: "Jeremiah 29:11",
+    cadetImage: "https://8hxvw8tw.media.zestyio.com/Kathleen-Farmer.jpg",
+    lieutenantImage: "https://8hxvw8tw.media.zestyio.com/Kathleen-Farmer.jpg"
+  },
+  {
+    firstName: "John",
+    lastName: "Smith",
+    homeCorps: "Chicago Temple",
+    appointment: "Social Services Director",
+    scripture: "Micah 6:8",
+    cadetImage: "https://8hxvw8tw.media.zestyio.com/Chelsea-Carter.jpg",
+    lieutenantImage: "https://8hxvw8tw.media.zestyio.com/Chelsea-Carter.jpg"
+  },
+  {
+    firstName: "Jane",
+    lastName: "Doe",
+    homeCorps: "Los Angeles Corps",
+    appointment: "Assistant Corps Officer",
+    scripture: "Jeremiah 29:11",
+    cadetImage: "https://8hxvw8tw.media.zestyio.com/Kathleen-Farmer.jpg",
+    lieutenantImage: "https://8hxvw8tw.media.zestyio.com/Kathleen-Farmer.jpg"
+  },
+    {
+    firstName: "Jane",
+    lastName: "Doe",
+    homeCorps: "Los Angeles Corps",
+    appointment: "Assistant Corps Officer",
+    scripture: "Jeremiah 29:11",
+    cadetImage: "https://8hxvw8tw.media.zestyio.com/Kathleen-Farmer.jpg",
+    lieutenantImage: "https://8hxvw8tw.media.zestyio.com/Kathleen-Farmer.jpg"
+  },
+  {
+    firstName: "John",
+    lastName: "Smith",
+    homeCorps: "Chicago Temple",
+    appointment: "Social Services Director",
+    scripture: "Micah 6:8",
+    cadetImage: "https://8hxvw8tw.media.zestyio.com/Chelsea-Carter.jpg",
+    lieutenantImage: "https://8hxvw8tw.media.zestyio.com/Chelsea-Carter.jpg"
   }
   // ...more grads...
 ];
