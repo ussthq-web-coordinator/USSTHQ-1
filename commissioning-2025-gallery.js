@@ -21,6 +21,7 @@
       ];
 
       const galleryGrid = document.getElementById("galleryGrid");
+      console.log(galleryGrid); // Should NOT be null
       const modal = document.getElementById("modal");
       const modalImage = document.getElementById("modalImage");
       const modalDetails = document.getElementById("modalDetails");
