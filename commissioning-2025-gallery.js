@@ -6,7 +6,7 @@ const graduates = [
     appointment: "Assistant Corps Officer",
     scripture: "Jeremiah 29:11",
     cadetImage: "https://8hxvw8tw.media.zestyio.com/Kathleen-Farmer.jpg",
-    lieutenantImage: "images/lieutenant/jane-doe.jpg"
+    lieutenantImage: "https://8hxvw8tw.media.zestyio.com/Kathleen-Farmer.jpg"
   },
   {
     firstName: "John",
@@ -15,7 +15,7 @@ const graduates = [
     appointment: "Social Services Director",
     scripture: "Micah 6:8",
     cadetImage: "https://8hxvw8tw.media.zestyio.com/Chelsea-Carter.jpg",
-    lieutenantImage: "images/lieutenant/john-smith.jpg"
+    lieutenantImage: "https://8hxvw8tw.media.zestyio.com/Chelsea-Carter.jpg"
   },
   // ...remaining cadets...
 ];
