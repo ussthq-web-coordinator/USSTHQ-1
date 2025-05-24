@@ -436,10 +436,10 @@
 /* Container grid */
 .comm25-gallery-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   flex-wrap: wrap;
   justify-content: center;
-  gap: 20px;
+  gap: 1rem;
   padding: 20px;
 }
 
@@ -450,13 +450,13 @@
 }
 /* Each card */
 .comm25-card {
-  width: 280px;
+  display: flex;
+  flex-direction: column;
   background-color: #567395; /* medium navy */
   box-shadow: 5px 5px 15px rgba(0, 0, 0, 0.2);
   border-radius: 4px;
   overflow: hidden;
   text-align: center;
-  font-family: Arial, sans-serif;
 }
 
 /* Hide the checkbox */
@@ -473,13 +473,15 @@
 
 /* Image styling */
 .comm25-image-wrapper img {
-  width: 260px;
+  width: 100%;
+  height: auto;
   background: white;
   padding: 10px;
   box-shadow: 5px 5px 15px rgba(0, 0, 0, 0.2);
   display: block;
   margin: 0 auto;
   border-radius: 0;
+  border-bottom: 2px solid #ddd;
 }
 
 /* Title below image, always visible */
@@ -493,6 +495,7 @@
 
 /* Details panel hidden by default */
 .comm25-details {
+  display: none;
   max-height: 0px;
   opacity: 0;
   overflow: hidden;
@@ -508,6 +511,8 @@
   max-height: 500px; /* enough for content */
   opacity: 1;
   padding: 15px 20px 20px 20px;
+  display: block;
+
 }
 
 .comm25-toggle:checked + .comm25-image-wrapper + .comm25-title {
@@ -552,4 +557,16 @@
   margin-bottom: 1rem;
   font-style: italic;
   color: #555;
+}
+/* Ensure toggle covers the entire card */
+.comm25-image-wrapper {
+  display: block;
+  cursor: pointer;
+  width: 100%;
+}
+
+/* Optional accessibility hover/focus states */
+.comm25-image-wrapper:hover,
+.comm25-image-wrapper:focus {
+  outline: 2px solid #c00;
 }
