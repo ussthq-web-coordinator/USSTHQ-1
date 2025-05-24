@@ -442,15 +442,6 @@
   width: 100%;
 }
 
-/* Force 5 columns on large screens */
-@media (min-width: 1200px) {
-  .comm25-gallery-section {
-    display: grid;
-    grid-template-columns: repeat(5, 1fr);
-    gap: 1.5rem;
-  }
-}
-
 /* Horizontal scroll on mobile */
 @media (max-width: 767px) {
   .comm25-gallery-wrapper {
