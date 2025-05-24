@@ -540,38 +540,45 @@
    .container-champions {
      overflow-x: hidden;
   }
-  .scrollable-container {
-  overflow-x: auto;
-  white-space: nowrap;
-  padding: 0 12.5%; /* Leaves space on both ends to simulate 75% length */
-  box-sizing: content-box;
-    user-select: none;
+  .scroll-hint {
+  text-align: center;
+  font-size: 0.9rem;
+  color: #999;
+  padding-top: 0.5rem;
+  animation: fadeOut 3s ease-in-out forwards;
 }
-    .scrollable-container {
-    scrollbar-color: gold white; /* For Firefox */
-    scrollbar-width: thin;       /* For Firefox */
-  }
 
-  .scrollable-container::-webkit-scrollbar {
-    height: 8px;
-    background-color: white; /* Track background */
-  }
+@keyframes fadeOut {
+  0% { opacity: 1; }
+  80% { opacity: 1; }
+  100% { opacity: 0; display: none; }
+}
+.scrollable-container {
+  overflow-x: auto;
+  overflow-y: hidden;
+  white-space: nowrap;
+  padding: 0 12.5%; /* Shrinks width to simulate 75% */
+  box-sizing: content-box;
+  user-select: none;
+  -ms-overflow-style: auto;         /* IE/Edge */
+  scrollbar-color: gold white;      /* Firefox */
+  scrollbar-width: thin;            /* Firefox */
+}
 
-  .scrollable-container::-webkit-scrollbar-thumb {
-    background-color: gold; /* Thumb color */
-    border-radius: 4px;
-  }
+/* Chrome, Edge, Safari (WebKit) */
+.scrollable-container::-webkit-scrollbar {
+  height: 8px;
+  background-color: white;
+}
 
-  .scrollable-container::-webkit-scrollbar-track {
-    background-color: white;
-  }
+.scrollable-container::-webkit-scrollbar-thumb {
+  background-color: gold;
+  border-radius: 4px;
+}
 
-  /* Force scrollbar to always be visible in WebKit browsers */
-  .scrollable-container {
-    -ms-overflow-style: auto; /* IE 10+ */
-    overflow-y: hidden;
-    overflow-x: scroll;
-  }
+.scrollable-container::-webkit-scrollbar-track {
+  background-color: white;
+}
   }
 
 .comm25-gallery-section::before,
