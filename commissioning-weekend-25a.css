@@ -435,14 +435,19 @@
   /* Gallery */
 /* Container grid */
 .comm25-gallery-grid {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   flex-wrap: wrap;
   justify-content: center;
   gap: 20px;
-  background-color: rgba(86, 115, 149, 0.35); /* subtle background */
   padding: 20px;
 }
 
+@media (min-width: 1200px) {
+  .comm25-gallery-grid {
+    grid-template-columns: repeat(5, 1fr);
+  }
+}
 /* Each card */
 .comm25-card {
   width: 280px;
@@ -505,6 +510,10 @@
   padding: 15px 20px 20px 20px;
 }
 
+.comm25-toggle:checked + .comm25-image-wrapper + .comm25-title {
+  display: none;
+}
+
 /* Paragraph styling inside details */
 .comm25-details p {
   margin: 8px 0;
@@ -538,4 +547,9 @@
                           transform 0.7s cubic-bezier(0.22, 1, 0.36, 1);
           }
   
-  
+  .comm25-instructions {
+  font-size: 1rem;
+  margin-bottom: 1rem;
+  font-style: italic;
+  color: #555;
+}
