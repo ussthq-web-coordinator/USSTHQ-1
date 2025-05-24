@@ -433,13 +433,38 @@
   }
 
   /* Gallery */
- .comm25-gallery {
+.comm25-gallery {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  grid-template-columns: repeat(5, 1fr); /* exactly 5 columns */
   gap: 1.5rem;
   max-width: 1300px;
   margin: auto;
 }
+
+@media (max-width: 1200px) {
+  .comm25-gallery {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+@media (max-width: 900px) {
+  .comm25-gallery {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (max-width: 600px) {
+  .comm25-gallery {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 400px) {
+  .comm25-gallery {
+    grid-template-columns: 1fr;
+  }
+}
+
 
 .comm25-card {
   background-color: #ffffff;
