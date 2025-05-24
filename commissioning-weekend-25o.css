@@ -494,19 +494,23 @@
     scroll-snap-type: x mandatory;
     -webkit-overflow-scrolling: touch;
     box-sizing: border-box;
+    margin: 0;
   }
 
   .comm25-gallery-section {
+    width: max-content;
+    max-width: none !important;
     display: flex;
     flex-direction: row;
     gap: 1rem;
     padding: 0 1rem;
     box-sizing: border-box;
-    width: max-content;
+    margin: 0;
   }
 
   .comm25-card {
-    flex: 0 0 min(75vw, 280px);
+    flex: 0 0 70vw;
+    max-width: 320px;
     scroll-snap-align: start;
     flex-shrink: 0;
     margin: 0;
