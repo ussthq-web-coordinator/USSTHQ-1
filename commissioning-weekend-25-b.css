@@ -542,10 +542,10 @@
   }
   .scroll-hint {
   text-align: center;
-  font-size: 0.9rem;
-  color: #999;
+  font-size: 0.6rem;
+  color: #fff;
   padding-top: 0.5rem;
-  animation: fadeOut 3s ease-in-out forwards;
+  animation: fadeOut 60s ease-in-out forwards;
 }
 
 @keyframes fadeOut {
