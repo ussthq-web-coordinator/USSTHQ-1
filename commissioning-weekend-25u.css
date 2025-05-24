@@ -487,7 +487,7 @@
 
 @media (max-width: 800px) {
   .comm25-gallery-wrapper {
-    width: 90vw !important;
+    width: 85vw !important;
     max-width: 90vw !important;
     padding: 1rem 0;
     overflow-x: auto;
@@ -495,7 +495,7 @@
     scroll-snap-type: x mandatory;
     -webkit-overflow-scrolling: touch;
     box-sizing: border-box;
-    margin: 0;
+    margin: auto;
     padding-left: 0;
     padding-right: 50px;
   }
@@ -536,15 +536,14 @@
     padding-right: 0 !important;
   }
    .container-champions {
-    cursor: grab; /* Shows grab hand */
      overflow-x: hidden;
   }
   .scrollable-container {
   overflow-x: auto;
-  cursor: grab;
-}
-.scrollable-container:active {
-  cursor: grabbing;
+  white-space: nowrap;
+  padding: 0 12.5%; /* Leaves space on both ends to simulate 75% length */
+  box-sizing: content-box;
+    user-select: none;
 }
   }
 
