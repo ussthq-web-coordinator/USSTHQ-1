@@ -444,7 +444,7 @@
 /* Section container */
 .comm25-gallery-section {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   gap: 1rem;
   max-width: 1200px;
   margin: 0 auto;
@@ -454,11 +454,24 @@
 }
 
 
-@media (min-width: 1200px) {
+@media (min-width: 1001px) {
   .comm25-gallery-section {
     grid-template-columns: repeat(5, 1fr);
   }
 }
+
+@media (max-width: 1000px) {
+  .comm25-gallery-section {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (max-width: 800px) {
+  .comm25-gallery-section {
+    grid-template-columns: 1fr;
+  }
+}
+
 
 
 /* Horizontal scroll wrapper for mobile */
