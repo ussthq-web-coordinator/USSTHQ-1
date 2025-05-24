@@ -448,6 +448,24 @@
     grid-template-columns: repeat(5, 1fr);
   }
 }
+
+@media (max-width: 767px) {
+  .comm25-gallery-grid {
+    display: flex;
+    flex-direction: row;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    gap: 1rem;
+    padding: 20px;
+  }
+
+  .comm25-card {
+    min-width: 240px;
+    flex: 0 0 auto;
+    scroll-snap-align: start;
+  }
+}
+
 /* Each card */
 .comm25-card {
   display: flex;
@@ -513,10 +531,6 @@
   padding: 15px 20px 20px 20px;
   display: block;
 
-}
-
-.comm25-toggle:checked + .comm25-image-wrapper + .comm25-title {
-  display: none;
 }
 
 /* Paragraph styling inside details */
