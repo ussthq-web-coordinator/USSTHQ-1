@@ -1,3 +1,10 @@
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+
 .eventDetails {
     display:none !important;
     }
@@ -434,47 +441,49 @@
 
 /* ===== Commencement 2025 Gallery Styles ===== */
 
-/* Grid container layout */
+/* Section container */
 .comm25-gallery-section {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
-  gap: 1.5rem;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 1rem;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+
+@media (min-width: 1200px) {
+  .comm25-gallery-section {
+    grid-template-columns: repeat(5, 1fr);
+  }
+}
+
+
+/* Horizontal scroll wrapper for mobile */
+.comm25-gallery-wrapper {
   width: 100%;
 }
-
-/* Horizontal scroll on mobile */
-@media (max-width: 767px) {
-  .comm25-gallery-wrapper {
-    overflow-x: auto;
-    scroll-snap-type: x mandatory;
-    -webkit-overflow-scrolling: touch;
-    padding: 20px;
-  }
-
+/*@media (min-width: 1200px) {
   .comm25-gallery-section {
-    display: flex;
-    flex-direction: row;
-    gap: 1rem;
-    min-width: max-content;
-  }
+    grid-template-columns: repeat(5, 1fr); /* Max 5 columns */
+/*  }
+}*/
 
-  .comm25-card {
-    flex: 0 0 auto;
-    min-width: 240px;
-    scroll-snap-align: start;
-  }
-}
-
-/* Card base styles */
+/* Card styles */
 .comm25-card {
   display: flex;
   flex-direction: column;
   background-color: #567395; /* medium navy */
   box-shadow: 5px 5px 15px rgba(0, 0, 0, 0.2);
-  border-radius: 4px;
+  border-radius: 30px;
   overflow: hidden;
   text-align: center;
   padding: 10px;
+  margin: 0px;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 /* Title below image */
@@ -482,37 +491,37 @@
   color: white;
   font-weight: 700;
   font-size: 1.1rem;
-  margin: 10px 0 15px 0;
+  margin: 10px 0 15px;
   line-height: 1.3;
 }
 
-/* Toggle checkbox hidden */
+/* Hide native checkbox toggle */
 .comm25-toggle {
   display: none;
 }
 
-/* Label as image wrapper (toggle trigger) */
+/* Label that triggers toggle */
 .comm25-image-wrapper {
   display: block;
   cursor: pointer;
   width: 100%;
-  padding: 10px 0 0 0;
+  padding-top: 10px;
 }
 
-/* Image styling */
+/* Image styles */
 .comm25-image-wrapper img {
-  width: 100%;
+  width: 90%;
   height: auto;
   background: white;
   padding: 10px;
+  border-radius: 30px;
+  border-bottom: 2px solid #ddd;
   box-shadow: 5px 5px 15px rgba(0, 0, 0, 0.2);
   display: block;
   margin: 0 auto;
-  border-radius: 0;
-  border-bottom: 2px solid #ddd;
 }
 
-/* Bio/details panel hidden by default */
+/* Bio/details panel (initially hidden) */
 .comm25-details {
   display: none;
   max-height: 0;
@@ -521,22 +530,25 @@
   padding: 0 20px;
   color: white;
   background-color: #001F3F; /* navy blue */
-  transition: max-height 0.5s ease, opacity 0.4s ease, padding 0.3s ease;
   border-top: 1px solid #124273;
+  border-radius: 30px;
+  transition:
+    max-height 0.5s ease,
+    opacity 0.4s ease,
+    padding 0.3s ease;
 }
 
-/* Show details when toggle is checked */
+/* Reveal panel when checkbox is checked */
 .comm25-toggle:checked ~ .comm25-card-body .comm25-details {
   display: block;
   max-height: 500px;
   opacity: 1;
-  padding: 15px 20px 20px 20px;
+  padding: 15px 20px 20px;
 }
 
-/* Paragraphs inside details */
+/* Detail text formatting */
 .comm25-details p {
   margin: 8px 0;
-  font-size: 0.95rem;
   line-height: 1.4;
 }
 
@@ -544,14 +556,14 @@
   font-weight: 600;
 }
 
-/* Keyboard focus styles */
-.comm25-image-wrapper:hover,
-.comm25-image-wrapper:focus {
+/* Accessibility focus/hover effect */
+.comm25-image-wrapper img:hover,
+.comm25-image-wrapper img:focus {
   outline: 2px solid #c00;
   outline-offset: 3px;
 }
 
-/* Instructions block */
+/* Instructions above the gallery */
 .comm25-instructions {
   font-size: 1rem;
   margin-bottom: 1rem;
