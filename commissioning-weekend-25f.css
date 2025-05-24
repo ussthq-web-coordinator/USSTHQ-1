@@ -443,7 +443,7 @@
 
 /* Force 5 columns on large screens */
 @media (min-width: 1200px) {
-  .comm25-gallery-grid {
+  .comm25-gallery-section {
     display: grid;
     grid-template-columns: repeat(5, 1fr);
     gap: 1.5rem;
@@ -459,7 +459,7 @@
     padding: 20px;
   }
 
-  .comm25-gallery-grid {
+  .comm25-gallery-section {
     display: flex;
     flex-direction: row;
     gap: 1rem;
