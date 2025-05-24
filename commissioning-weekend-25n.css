@@ -176,16 +176,14 @@
       box-shadow: 2px 2px 10px rgba(0, 0, 0, 0.1);
   }
       .container-champions {
-      display: grid;
-      grid-template-columns: 1fr;
       justify-content: center;
       align-items: center;
-      padding: 10px;
+      padding: 30px;
   }
   
   .middle-column-champions {
       background: #759dca;
-        color: #FFFFFF;
+      color: #FFFFFF;
       padding: 20px;
       border-radius: 15px;
       box-shadow: 2px 2px 10px rgba(0, 0, 0, 0.1);
@@ -540,6 +538,12 @@
     padding-right: 0;
     margin: 0;
   }
+}
+
+.comm25-gallery-section::before,
+.comm25-gallery-section::after {
+  content: "";
+  flex: 0 0 1rem;
 }
 
 
