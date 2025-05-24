@@ -544,14 +544,7 @@
   text-align: center;
   font-size: 0.6rem;
   color: #fff;
-  padding-top: 0.5rem;
-  animation: fadeOut 60s ease-in-out forwards;
-}
-
-@keyframes fadeOut {
-  0% { opacity: 1; }
-  80% { opacity: 1; }
-  100% { opacity: 0; display: none; }
+  padding-top: 0.2rem;
 }
 .scrollable-container {
   overflow-x: auto;
