@@ -519,6 +519,30 @@
   }
 }
 
+@media (max-width: 800px) {
+  .container-champions {
+    width: 100vw !important;
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+    max-width: none !important;
+  }
+
+  .middle-column-champions {
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+  }
+
+  .comm25-gallery-wrapper {
+    width: 100vw;
+    padding-left: 0;
+    padding-right: 0;
+    margin: 0;
+  }
+}
+
+
 /* Horizontal scroll wrapper for mobile */
 .comm25-gallery-wrapper {
   width: 100%;
