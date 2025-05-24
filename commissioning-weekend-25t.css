@@ -535,6 +535,17 @@
     padding-left: 0 !important;
     padding-right: 0 !important;
   }
+   .container-champions {
+    cursor: grab; /* Shows grab hand */
+     overflow-x: hidden;
+  }
+  .scrollable-container {
+  overflow-x: auto;
+  cursor: grab;
+}
+.scrollable-container:active {
+  cursor: grabbing;
+}
   }
 
 .comm25-gallery-section::before,
