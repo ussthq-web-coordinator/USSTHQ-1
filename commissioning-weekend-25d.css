@@ -591,3 +591,14 @@
 .comm25-image-wrapper:focus {
   outline: 2px solid #c00;
 }
+.comm25-toggle:not(:checked) ~ .comm25-card-body .comm25-details {
+  max-height: 0;
+  overflow: hidden;
+  opacity: 0;
+  transition: max-height 0.3s ease, opacity 0.3s ease;
+}
+
+.comm25-toggle:checked ~ .comm25-card-body .comm25-details {
+  max-height: 500px; /* or auto with animation fallback */
+  opacity: 1;
+}
