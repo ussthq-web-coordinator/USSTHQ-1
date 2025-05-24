@@ -434,34 +434,40 @@
 
   /* Gallery */
 /* Container grid */
+/* Base grid layout */
 .comm25-gallery-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  flex-wrap: wrap;
-  justify-content: center;
   gap: 1rem;
   padding: 20px;
 }
 
+/* Force 5 columns on large screens */
 @media (min-width: 1200px) {
   .comm25-gallery-grid {
     grid-template-columns: repeat(5, 1fr);
   }
 }
 
+/* Horizontal scroll on mobile */
 @media (max-width: 767px) {
-  .comm25-gallery-grid {
-    display: flex;
-    flex-direction: row;
+  .comm25-gallery-wrapper {
     overflow-x: auto;
     scroll-snap-type: x mandatory;
-    gap: 1rem;
+    -webkit-overflow-scrolling: touch;
     padding: 20px;
   }
 
+  .comm25-gallery-grid {
+    display: flex;
+    flex-direction: row;
+    gap: 1rem;
+    min-width: max-content;
+  }
+
   .comm25-card {
-    min-width: 240px;
     flex: 0 0 auto;
+    min-width: 240px;
     scroll-snap-align: start;
   }
 }
