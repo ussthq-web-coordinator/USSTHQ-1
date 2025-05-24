@@ -497,7 +497,7 @@
     box-sizing: border-box;
     margin: 0;
     padding-left: 0;
-    padding-right: 0;
+    padding-right: 50px;
   }
 
   .comm25-gallery-section {
