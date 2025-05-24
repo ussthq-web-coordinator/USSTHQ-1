@@ -435,12 +435,12 @@
   /* Gallery */
 /* Container grid */
 /* Base grid layout */
-.comm25-gallery-grid {
+.comm25-gallery-section {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 1rem;
-  padding: 20px;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 1.5rem;
 }
+
 
 /* Force 5 columns on large screens */
 @media (min-width: 1200px) {
@@ -481,6 +481,7 @@
   border-radius: 4px;
   overflow: hidden;
   text-align: center;
+  padding: 10px;
 }
 
 /* Hide the checkbox */
