@@ -513,7 +513,7 @@
 
   .comm25-card {
     flex: 0 0 70vw;
-    max-width: 320px;
+    max-width: 260px;
     scroll-snap-align: center;
     flex-shrink: 0;
     margin: 0;
@@ -522,9 +522,6 @@
   body {
     overflow-x: hidden;
   }
-}
-
-@media (max-width: 800px) {
   .container-champions {
     width: 100vw !important;
     padding-left: 0 !important;
@@ -538,14 +535,7 @@
     padding-left: 0 !important;
     padding-right: 0 !important;
   }
-
-  .comm25-gallery-wrapper {
-    width: 80vw;
-    padding-left: 0;
-    padding-right: 0;
-    margin: 0;
   }
-}
 
 .comm25-gallery-section::before,
 .comm25-gallery-section::after {
@@ -555,10 +545,10 @@
 
 
 /* Horizontal scroll wrapper for mobile */
-.comm25-gallery-wrapper {
+/*.comm25-gallery-wrapper {
   width: 100%;
 }
-/*@media (min-width: 1200px) {
+@media (min-width: 1200px) {
   .comm25-gallery-section {
     grid-template-columns: repeat(5, 1fr); /* Max 5 columns */
 /*  }
