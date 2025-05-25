@@ -478,18 +478,12 @@
   }
 }
 
-@media (max-width: 1000px) {
+@media (min-width: 801px) {
   .comm25-gallery-section {
     grid-template-columns: repeat(3, 1fr);
   }
   .scroll-hint {
     display: none;
-  }
-}
-
-@media (max-width: 800px) {
-  .comm25-gallery-section {
-    grid-template-columns: 1fr;
   }
 }
 
@@ -517,6 +511,7 @@
     padding: 0 1rem;
     box-sizing: border-box;
     margin: 0;
+    grid-template-columns: 1fr;
   }
 
   .comm25-card {
