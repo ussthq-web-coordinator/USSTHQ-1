@@ -555,7 +555,7 @@
   font-size: 0.6rem;
   color: #fff;
   padding-top: 0.2rem;
-  display: inline;
+  display: flex;
 }
 .scrollable-container {
   overflow-x: auto;
