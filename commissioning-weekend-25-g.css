@@ -478,6 +478,15 @@
   }
 }
 
+@media (max-width: 1000px) {
+  .comm25-gallery-section {
+    grid-template-columns: repeat(3, 1fr);
+  }
+  .scroll-hint {
+    display: none;
+  }
+}
+
 @media (min-width: 801px) {
   .comm25-gallery-section {
     grid-template-columns: repeat(3, 1fr);
