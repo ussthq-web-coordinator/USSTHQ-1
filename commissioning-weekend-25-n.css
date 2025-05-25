@@ -487,14 +487,11 @@
   }
 }
 
-/*@media (min-width: 801px) {
-  .comm25-gallery-section {
-    grid-template-columns: repeat(3, 1fr);
-  }
+@media (max-width: 800px) {
   .scroll-hint {
-    display: none;
+    display: block;
   }
-}*/
+}
 
 @media (max-width: 800px) {
   .comm25-gallery-wrapper {
