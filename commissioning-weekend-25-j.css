@@ -673,6 +673,7 @@
   display: none;
   max-height: 0;
   min-height: 217px;
+  margin-top: auto;
   opacity: 0;
   overflow: hidden;
   padding: 0 20px;
