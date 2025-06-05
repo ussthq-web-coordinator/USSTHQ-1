@@ -153,8 +153,23 @@
       padding: 10px;
   }
   
-  .middle-column-live-streams {
+  .middle-column-event-guides {
       background: #000000;
+        color: #FFFFFF;
+      padding: 20px;
+      border-radius: 15px;
+      box-shadow: 2px 2px 10px rgba(0, 0, 0, 0.1);
+  }
+    .container-event-guides {
+      display: grid;
+      grid-template-columns: 1fr;
+      justify-content: center;
+      align-items: center;
+      padding: 10px;
+  }
+  
+  .middle-column-live-streams {
+      background: #84745C;
         color: #FFFFFF;
       padding: 20px;
       border-radius: 15px;
@@ -789,5 +804,37 @@
 
 .comm25-thumbnail.comm25-active {
   border-color: #c8102e; /* Salvation Army red */
-  box-shadow: 0 0 0 2px white, 0 0 8px #c8102e;
+  box-shadow: 0 0 0 2px #c8102e, 0 0 8px #c8102e;
+}
+
+/* Event Program Guides */
+.comm25-toggle-buttons .comm25-toggle-btn {
+  padding: 0.5rem 1.25rem;
+  background-color: #f2f2f2;
+  border: 2px solid transparent;
+  border-radius: 999px;
+  font-weight: bold;
+  color: #333;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.comm25-toggle-buttons .comm25-toggle-btn:hover {
+  background-color: #e6e6e6;
+}
+
+.comm25-toggle-buttons .comm25-active {
+  background-color: #c8102e;
+  color: #fff;
+  border-color: #c8102e;
+  box-shadow: 0 0 0 2px white;
+}
+
+.comm25-program-embed {
+  display: none;
+  transition: opacity 0.4s ease;
+}
+
+.comm25-program-embed.comm25-visible {
+  display: block;
 }
