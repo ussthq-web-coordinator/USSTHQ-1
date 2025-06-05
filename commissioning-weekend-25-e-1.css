@@ -762,11 +762,14 @@
 }
 
 /* Live Stream Gallery */
+/* Outer section max-width */
 .comm25-video-gallery {
   max-width: 1200px;
   margin: 0 auto;
+  padding: 2rem 1rem;
 }
 
+/* Featured video */
 .comm25-featured-video iframe {
   width: 100%;
   aspect-ratio: 16 / 9;
@@ -775,74 +778,51 @@
   transition: all 0.3s ease;
 }
 
-.comm25-thumbnail-gallery {
+/* Scroll hint for mobile only */
+.scroll-hint {
+  text-align: center;
+  font-size: 0.75rem;
+  color: #fff;
+  margin-bottom: 0.5rem;
+}
+@media (min-width: 481px) {
+  .scroll-hint {
+    display: none;
+  }
+}
+
+/* Scrollable thumbnail container */
+.comm25-thumbnail-wrapper {
   overflow-x: auto;
-  padding-bottom: 10px;
-}
-
-.comm25-thumbnail {
-  flex: 0 0 auto;
-  width: 160px;
-  cursor: pointer;
-  border-radius: 8px;
-  overflow: hidden;
-  position: relative;
-  transition: transform 0.2s;
-  border: 3px solid transparent;
-}
-
-.comm25-thumbnail img {
-  width: 100%;
-  display: block;
-  transition: transform 0.3s ease;
-}
-
-.comm25-thumbnail:hover img {
-  transform: scale(1.05);
-}
-
-.comm25-thumbnail.comm25-active {
-  border-color: #c8102e; /* Salvation Army red */
-  box-shadow: 0 0 0 2px #c8102e, 0 0 8px #c8102e;
-}
-
-/* Container that limits width and scrolls on small screens */
-.comm25-thumbnail-scroll-container {
-  max-width: 1200px;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  scrollbar-color: gold white;
   margin: 0 auto;
   padding: 0 1rem;
-  overflow-x: auto;
-  overflow-y: hidden;
-  white-space: nowrap;
-  box-sizing: border-box;
-  -webkit-overflow-scrolling: touch;
-  scrollbar-color: gold white;
-  scrollbar-width: thin;
 }
 
-/* WebKit scrollbar */
-.comm25-thumbnail-scroll-container::-webkit-scrollbar {
+/* WebKit scrollbars */
+.comm25-thumbnail-wrapper::-webkit-scrollbar {
   height: 8px;
-  background-color: white;
+}
+.comm25-thumbnail-wrapper::-webkit-scrollbar-thumb {
+  background: gold;
+  border-radius: 10px;
+}
+.comm25-thumbnail-wrapper::-webkit-scrollbar-track {
+  background: white;
 }
 
-.comm25-thumbnail-scroll-container::-webkit-scrollbar-thumb {
-  background-color: gold;
-  border-radius: 4px;
-}
-
-.comm25-thumbnail-scroll-container::-webkit-scrollbar-track {
-  background-color: white;
-}
-
-/* Row of thumbnails */
+/* Flex row of thumbnails */
 .comm25-thumbnail-gallery {
-  display: inline-flex;
+  display: flex;
   gap: 1rem;
-  padding: 1rem 0;
+  padding: 0.5rem 0 1rem;
+  flex-wrap: nowrap;
+  width: max-content; /* This keeps it from stretching weirdly on mobile */
 }
 
-/* Each thumbnail */
+/* Thumbnail card */
 .comm25-thumbnail {
   flex: 0 0 auto;
   width: 160px;
@@ -866,13 +846,6 @@
 .comm25-thumbnail.comm25-active {
   border-color: #c8102e;
   box-shadow: 0 0 0 2px #c8102e, 0 0 8px #c8102e;
-}
-
-/* Scroll hint for phones only */
-@media (min-width: 481px) {
-  .scroll-hint {
-    display: none;
-  }
 }
 
 
