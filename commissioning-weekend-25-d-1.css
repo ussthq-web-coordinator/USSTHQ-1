@@ -805,45 +805,75 @@
   border-color: #c8102e; /* Salvation Army red */
   box-shadow: 0 0 0 2px #c8102e, 0 0 8px #c8102e;
 }
-/* Horizontal scroll container */
-.comm25-thumbnail-scroll-wrapper {
-  width: 100%;
+
+/* Container that limits width and scrolls on small screens */
+.comm25-thumbnail-scroll-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 1rem;
   overflow-x: auto;
+  overflow-y: hidden;
+  white-space: nowrap;
+  box-sizing: border-box;
   -webkit-overflow-scrolling: touch;
-  padding-bottom: 0.5rem;
+  scrollbar-color: gold white;
+  scrollbar-width: thin;
 }
 
-@media (max-width: 480px) {
-  .comm25-thumbnail-gallery {
-    flex-wrap: nowrap !important;
-    width: max-content;
-    padding-left: 1rem;
-    padding-right: 1rem;
-  }
-
-  .comm25-thumbnail {
-    flex: 0 0 auto;
-    width: 150px;
-  }
-
-  .comm25-thumbnail img {
-    width: 100%;
-    height: auto;
-    border-radius: 4px;
-    margin: 0 auto;
-  }
-
-  /* Optional: hide scrollbar for a cleaner look */
-  .comm25-thumbnail-scroll-wrapper::-webkit-scrollbar {
-    height: 6px;
-  }
-
-  .comm25-thumbnail-scroll-wrapper::-webkit-scrollbar-thumb {
-    background-color: rgba(0, 0, 0, 0.15);
-    border-radius: 6px;
-  }
+/* WebKit scrollbar */
+.comm25-thumbnail-scroll-container::-webkit-scrollbar {
+  height: 8px;
+  background-color: white;
 }
 
+.comm25-thumbnail-scroll-container::-webkit-scrollbar-thumb {
+  background-color: gold;
+  border-radius: 4px;
+}
+
+.comm25-thumbnail-scroll-container::-webkit-scrollbar-track {
+  background-color: white;
+}
+
+/* Row of thumbnails */
+.comm25-thumbnail-gallery {
+  display: inline-flex;
+  gap: 1rem;
+  padding: 1rem 0;
+}
+
+/* Each thumbnail */
+.comm25-thumbnail {
+  flex: 0 0 auto;
+  width: 160px;
+  cursor: pointer;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 3px solid transparent;
+  transition: transform 0.2s;
+}
+
+.comm25-thumbnail img {
+  width: 100%;
+  display: block;
+  transition: transform 0.3s ease;
+}
+
+.comm25-thumbnail:hover img {
+  transform: scale(1.05);
+}
+
+.comm25-thumbnail.comm25-active {
+  border-color: #c8102e;
+  box-shadow: 0 0 0 2px #c8102e, 0 0 8px #c8102e;
+}
+
+/* Scroll hint for phones only */
+@media (min-width: 481px) {
+  .scroll-hint {
+    display: none;
+  }
+}
 
 
 /* Event Program Guides */
