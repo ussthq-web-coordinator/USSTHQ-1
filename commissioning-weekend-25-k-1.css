@@ -773,6 +773,15 @@
   box-sizing: border-box;
 }
 
+/* Featured video */
+.comm25-featured-video iframe {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  transition: all 0.3s ease;
+}
+
 @media (max-width: 800px) {
   .scroll-hint {
     display: block;
