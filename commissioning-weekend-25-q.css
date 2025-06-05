@@ -731,3 +731,48 @@
   font-style: italic;
   color: #555;
 }
+
+/* Live Stream Gallery */
+.comm25-video-gallery {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.comm25-featured-video iframe {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  transition: all 0.3s ease;
+}
+
+.comm25-thumbnail-gallery {
+  overflow-x: auto;
+  padding-bottom: 10px;
+}
+
+.comm25-thumbnail {
+  flex: 0 0 auto;
+  width: 160px;
+  cursor: pointer;
+  border-radius: 8px;
+  overflow: hidden;
+  position: relative;
+  transition: transform 0.2s;
+  border: 3px solid transparent;
+}
+
+.comm25-thumbnail img {
+  width: 100%;
+  display: block;
+  transition: transform 0.3s ease;
+}
+
+.comm25-thumbnail:hover img {
+  transform: scale(1.05);
+}
+
+.comm25-thumbnail.comm25-active {
+  border-color: #c8102e; /* Salvation Army red */
+  box-shadow: 0 0 0 2px white, 0 0 8px #c8102e;
+}
