@@ -789,6 +789,22 @@
   background: white;
 }
 
+.comm25-thumbnail {
+  flex: 0 0 auto;
+  width: 160px;
+  border-radius: 8px;
+  overflow: hidden;
+  cursor: pointer;
+  border: 3px solid transparent;
+  transition: transform 0.2s ease;
+}
+
+.comm25-thumbnail img {
+  width: 100%;
+  display: block;
+  transition: transform 0.3s ease;
+}
+
 
 /* Featured video */
 .comm25-featured-video iframe {
