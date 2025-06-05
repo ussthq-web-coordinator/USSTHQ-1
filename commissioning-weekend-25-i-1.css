@@ -763,7 +763,7 @@
 
 /* ========== Live Stream Video Gallery ========== */
 
-/* Outer Section Container */
+/* Section container */
 .comm25-video-gallery {
   max-width: 1200px;
   margin: 0 auto;
@@ -777,62 +777,53 @@
   aspect-ratio: 16 / 9;
   border-radius: 12px;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
-  transition: all 0.3s ease;
 }
 
-/* Scroll hint — show only on small screens */
+/* Scroll hint */
 .scroll-hint {
   text-align: center;
-  font-size: 0.75rem;
+  font-size: 0.6rem;
   color: #fff;
-  margin-bottom: 0.5rem;
-  display: none;
-}
-@media (max-width: 800px) {
-  .scroll-hint {
-    display: block;
-  }
+  padding-top: 0.2rem;
+  display: block;
 }
 
-/* Thumbnail Scroll Wrapper */
-.comm25-thumbnail-wrapper {
+/* Thumbnails scroll wrapper (only this scrolls) */
+.scrollable-container {
   overflow-x: auto;
   overflow-y: hidden;
-  -webkit-overflow-scrolling: touch;
-  margin: 0 auto;
+  white-space: nowrap;
   padding: 0 1rem;
+  margin: 0 auto;
   box-sizing: border-box;
-  max-width: 100%;
-}
-
-/* Optional custom scrollbars */
-.comm25-thumbnail-wrapper::-webkit-scrollbar {
-  height: 8px;
-}
-.comm25-thumbnail-wrapper::-webkit-scrollbar-thumb {
-  background: gold;
-  border-radius: 10px;
-}
-.comm25-thumbnail-wrapper::-webkit-scrollbar-track {
-  background: white;
-}
-.comm25-thumbnail-wrapper {
-  scrollbar-width: thin;
+  -webkit-overflow-scrolling: touch;
   scrollbar-color: gold white;
+  scrollbar-width: thin;
 }
 
-/* Inner thumbnail gallery (horizontal row) */
+/* Chrome, Edge, Safari (WebKit) */
+.scrollable-container::-webkit-scrollbar {
+  height: 8px;
+  background-color: white;
+}
+.scrollable-container::-webkit-scrollbar-thumb {
+  background-color: gold;
+  border-radius: 4px;
+}
+.scrollable-container::-webkit-scrollbar-track {
+  background-color: white;
+}
+
+/* Inner flex row of thumbnails */
 .comm25-thumbnail-gallery {
   display: flex;
-  flex-wrap: nowrap;
   gap: 1rem;
-  width: max-content;
   padding: 0.5rem 0 1rem;
-  margin: 0;
+  width: max-content;
   box-sizing: border-box;
 }
 
-/* Individual thumbnail card */
+/* Individual thumbnail */
 .comm25-thumbnail {
   flex: 0 0 auto;
   width: 160px;
@@ -840,29 +831,19 @@
   border-radius: 8px;
   overflow: hidden;
   border: 3px solid transparent;
-  transition: transform 0.2s ease, border-color 0.2s ease;
+  transition: transform 0.2s ease;
 }
-
 .comm25-thumbnail img {
   width: 100%;
   display: block;
   transition: transform 0.3s ease;
 }
-
 .comm25-thumbnail:hover img {
   transform: scale(1.05);
 }
-
 .comm25-thumbnail.comm25-active {
   border-color: #c8102e;
   box-shadow: 0 0 0 2px #c8102e, 0 0 8px #c8102e;
-}
-
-/* Responsive sizing — consistent mobile spacing */
-@media (max-width: 800px) {
-  .comm25-video-gallery {
-    padding: 1rem;
-  }
 }
 
 
