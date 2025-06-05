@@ -761,16 +761,13 @@
   color: #555;
 }
 
-/* Live Stream Gallery */
+/* ========== Live Stream Video Gallery ========== */
 
-/* Section container */
+/* Outer Section Container */
 .comm25-video-gallery {
-  display: grid;
-  gap: 1rem;
   max-width: 1200px;
   margin: 0 auto;
   padding: 2rem 1rem;
-  width: 100%;
   box-sizing: border-box;
 }
 
@@ -783,17 +780,13 @@
   transition: all 0.3s ease;
 }
 
-/* Scroll hint for mobile only */
+/* Scroll hint — show only on small screens */
 .scroll-hint {
   text-align: center;
   font-size: 0.75rem;
   color: #fff;
   margin-bottom: 0.5rem;
-}
-@media (min-width: 801px) {
-  .scroll-hint {
-    display: none;
-  }
+  display: none;
 }
 @media (max-width: 800px) {
   .scroll-hint {
@@ -801,17 +794,18 @@
   }
 }
 
-/* Scrollable thumbnail container */
+/* Thumbnail Scroll Wrapper */
 .comm25-thumbnail-wrapper {
   overflow-x: auto;
+  overflow-y: hidden;
   -webkit-overflow-scrolling: touch;
-  scrollbar-width: thin;
-  scrollbar-color: gold white;
   margin: 0 auto;
   padding: 0 1rem;
+  box-sizing: border-box;
+  max-width: 100%;
 }
 
-/* WebKit scrollbars */
+/* Optional custom scrollbars */
 .comm25-thumbnail-wrapper::-webkit-scrollbar {
   height: 8px;
 }
@@ -822,17 +816,23 @@
 .comm25-thumbnail-wrapper::-webkit-scrollbar-track {
   background: white;
 }
-
-/* Flex row of thumbnails */
-.comm25-thumbnail-gallery {
-  display: flex;
-  gap: 1rem;
-  padding: 0.5rem 0 1rem;
-  flex-wrap: nowrap;
-  width: max-content; /* Prevents odd stretching */
+.comm25-thumbnail-wrapper {
+  scrollbar-width: thin;
+  scrollbar-color: gold white;
 }
 
-/* Thumbnail card */
+/* Inner thumbnail gallery (horizontal row) */
+.comm25-thumbnail-gallery {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 1rem;
+  width: max-content;
+  padding: 0.5rem 0 1rem;
+  margin: 0;
+  box-sizing: border-box;
+}
+
+/* Individual thumbnail card */
 .comm25-thumbnail {
   flex: 0 0 auto;
   width: 160px;
@@ -840,7 +840,7 @@
   border-radius: 8px;
   overflow: hidden;
   border: 3px solid transparent;
-  transition: transform 0.2s;
+  transition: transform 0.2s ease, border-color 0.2s ease;
 }
 
 .comm25-thumbnail img {
@@ -858,11 +858,10 @@
   box-shadow: 0 0 0 2px #c8102e, 0 0 8px #c8102e;
 }
 
-/* Mobile tweaks */
+/* Responsive sizing — consistent mobile spacing */
 @media (max-width: 800px) {
   .comm25-video-gallery {
-    width: 100%;
-    padding: 1rem 0;
+    padding: 1rem;
   }
 }
 
