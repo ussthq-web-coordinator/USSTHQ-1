@@ -764,14 +764,31 @@
 /* ========== Live Stream Video Gallery ========== */
 /* Section container */
 .comm25-thumbnails-section {
-  display: grid;
+  display: flex;
+  flex-wrap: nowrap;
+  overflow-x: auto;
   gap: 1rem;
   max-width: 1200px;
   margin: 0 auto;
   padding: 1rem;
-  width: 100%;
   box-sizing: border-box;
+  scrollbar-width: thin;
+  scrollbar-color: gold white;
+  -webkit-overflow-scrolling: touch;
 }
+
+/* Optional: WebKit scrollbar styling */
+.comm25-thumbnails-section::-webkit-scrollbar {
+  height: 8px;
+}
+.comm25-thumbnails-section::-webkit-scrollbar-thumb {
+  background: gold;
+  border-radius: 10px;
+}
+.comm25-thumbnails-section::-webkit-scrollbar-track {
+  background: white;
+}
+
 
 /* Featured video */
 .comm25-featured-video iframe {
