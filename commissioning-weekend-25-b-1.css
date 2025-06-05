@@ -834,17 +834,9 @@
     width: 100%;
     height: auto;
     border-radius: 4px;
-  }
-}
-@media (min-width: 481px) {
-  .comm25-thumbnail {
-    width: 150px;
+    margin: auto;
   }
 
-  .comm25-thumbnail img {
-    width: 100%;
-    height: auto;
-  }
 }
 
 
