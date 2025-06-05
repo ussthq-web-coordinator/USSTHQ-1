@@ -839,24 +839,25 @@
 }
 
 /* Modal Styling (mobile/tablet only) */
+/* Modal Styling */
 .comm25-modal {
   display: none;
   position: fixed;
   z-index: 9999;
   inset: 0;
-  background-color: rgba(0, 0, 0, 0.85);
+  background-color: rgba(0, 0, 0, 0.9);
   justify-content: center;
   align-items: center;
-  padding: 1rem;
+  padding: 0;
 }
 
+/* Make modal content truly full screen */
 .comm25-modal-content {
   position: relative;
-  width: 100%;
-  max-width: 960px;
-  aspect-ratio: 4 / 3;
+  width: 100vw;
+  height: 100vh;
   background: #000;
-  border-radius: 8px;
+  border-radius: 0;
   overflow: hidden;
 }
 
@@ -866,18 +867,22 @@
   border: none;
 }
 
+/* Close button */
 .comm25-close-btn {
   position: absolute;
   top: 12px;
-  right: 12px;
-  font-size: 2rem;
+  right: 16px;
+  font-size: 2.5rem;
   background: transparent;
   border: none;
   color: #fff;
+  z-index: 10000;
   cursor: pointer;
+  padding: 0;
+  line-height: 1;
 }
 
-/* Show modal behavior only under 992px */
+/* Only use modals on mobile/tablet */
 @media (max-width: 991px) {
   .comm25-program-embed-wrapper {
     display: none !important;
@@ -887,4 +892,3 @@
     display: flex;
   }
 }
-
