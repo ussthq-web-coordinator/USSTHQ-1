@@ -832,9 +832,59 @@
 
 .comm25-program-embed {
   display: none;
-  transition: opacity 0.4s ease;
 }
 
 .comm25-program-embed.comm25-visible {
   display: block;
 }
+
+/* Modal Styling (mobile/tablet only) */
+.comm25-modal {
+  display: none;
+  position: fixed;
+  z-index: 9999;
+  inset: 0;
+  background-color: rgba(0, 0, 0, 0.85);
+  justify-content: center;
+  align-items: center;
+  padding: 1rem;
+}
+
+.comm25-modal-content {
+  position: relative;
+  width: 100%;
+  max-width: 960px;
+  aspect-ratio: 4 / 3;
+  background: #000;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.comm25-modal-content iframe {
+  width: 100%;
+  height: 100%;
+  border: none;
+}
+
+.comm25-close-btn {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  font-size: 2rem;
+  background: transparent;
+  border: none;
+  color: #fff;
+  cursor: pointer;
+}
+
+/* Show modal behavior only under 992px */
+@media (max-width: 991px) {
+  .comm25-program-embed-wrapper {
+    display: none !important;
+  }
+
+  .comm25-modal.open {
+    display: flex;
+  }
+}
+
