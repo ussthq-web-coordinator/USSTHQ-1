@@ -931,3 +931,12 @@
   height: 100%;
   border: none;
 }
+
+/* Carousel */
+#carouselExampleCaptions .carousel-inner {
+  border-radius: 1rem;
+  overflow: hidden;
+}
+#carouselExampleCaptions .carousel-item img {
+  border-radius: 0;
+}
