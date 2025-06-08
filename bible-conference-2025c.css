@@ -362,4 +362,26 @@
       font-size: 24px; /* Further shrink the font on very small screens */
     }
   }
-  
+  /* Carousel */
+#carouselExampleCaptions .carousel-inner {
+  overflow: hidden;
+}
+#carouselExampleCaptions .carousel-item img {
+  border-radius: 0;
+}
+
+
+#carouselExampleCaptions .carousel-control-prev,
+#carouselExampleCaptions .carousel-control-next,
+#carouselExampleCaptions .carousel-indicators {
+  opacity: 0;
+  transition: opacity 0.4s ease-in-out;
+  pointer-events: none;
+}
+
+#carouselExampleCaptions:hover .carousel-control-prev,
+#carouselExampleCaptions:hover .carousel-control-next,
+#carouselExampleCaptions:hover .carousel-indicators {
+  opacity: 1;
+  pointer-events: auto;
+}
