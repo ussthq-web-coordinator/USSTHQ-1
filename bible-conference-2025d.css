@@ -365,6 +365,7 @@
   /* Carousel */
 #carouselExampleCaptions .carousel-inner {
   overflow: hidden;
+  margin-bottom: 30px;
 }
 #carouselExampleCaptions .carousel-item img {
   border-radius: 0;
