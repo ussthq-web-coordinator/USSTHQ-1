@@ -1,5 +1,5 @@
 /* Solid Red Buttons */
-span .btn btn-solid btn-red {
+span.btn.btn-solid.btn-red {
 	/* Font & Text */
 	font-family: proxima-nova, sans-serif;
 	font-size: 18px;
@@ -85,7 +85,7 @@ span .btn btn-solid btn-red {
 }
 
 /* Grey Button */
-span .btn btn-solid btn-grey {
+span.btn.btn-solid.btn-grey {
 	/* Font & Text */
 	font-family: proxima-nova, sans-serif;
 	font-size: 18px;
