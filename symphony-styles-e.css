@@ -45,48 +45,6 @@ span.btn.btn-solid.btn-grey {
 	background-repeat: repeat;
 	color: rgb(153, 153, 153);
 
-	/* Box */
-	height: 62.7969px;
-	width: 161.078px;
-	border: 2px solid rgb(153, 153, 153);
-	border-top: 2px solid rgb(153, 153, 153);
-	border-right: 2px solid rgb(153, 153, 153);
-	border-bottom: 2px solid rgb(153, 153, 153);
-	border-left: 2px solid rgb(153, 153, 153);
-	margin: 4.5px 0px;
-	padding: 15px 35px;
-	max-height: none;
-	min-height: 0px;
-	max-width: none;
-	min-width: 0px;
-
-	/* Positioning */
-	position: static;
-	top: auto;
-	bottom: auto;
-	right: auto;
-	left: auto;
-	float: none;
-	display: inline-block;
-	clear: none;
-	z-index: auto;
-
-	/* List */
-	list-style-image: none;
-	list-style-type: disc;
-	list-style-position: outside;
-
-	/* Table */
-	border-collapse: separate;
-	border-spacing: 0px 0px;
-	caption-side: top;
-	empty-cells: show;
-	table-layout: auto;
-
-	/* Miscellaneous */
-	overflow: visible;
-	cursor: pointer;
-	visibility: visible;
 
 	/* Effects */
 	transform: none;
