@@ -23,6 +23,40 @@
   pointer-events: auto;
 }
 
+/* Cards */
+/* Container layout for cards */
+.cards-module {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 1.5rem;
+  margin-top: 2rem;
+}
+
+/* Individual card styles */
+.u-card {
+  flex: 1 1 calc(33.333% - 1rem); /* 3 cards per row with spacing */
+  background: white;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+/* Responsive: stack on tablets */
+@media (max-width: 992px) {
+  .u-card {
+    flex: 1 1 calc(50% - 1rem); /* 2 cards per row */
+  }
+}
+
+/* Responsive: stack on mobile */
+@media (max-width: 600px) {
+  .u-card {
+    flex: 1 1 100%;
+  }
+}
+
+
 /* Solid Backgrounds */
 .u-sa-redBg {
 	background-color: rgb(237, 28, 43);
