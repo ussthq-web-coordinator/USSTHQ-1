@@ -57,6 +57,40 @@
   }
 }
 
+/* Accordion */
+/* Red background for active (open) accordion headers */
+.accordion-button:not(.collapsed) {
+  background-color: #ed1c2b; /* your red */
+  color: #fff;
+  font-weight: bold;
+}
+
+/* Red border on active panels */
+.accordion-button:not(.collapsed)::after {
+  filter: brightness(0) invert(1); /* makes arrow icon white */
+}
+
+/* Keep closed items with red text headers */
+.accordion-button.collapsed {
+  color: #ed1c2b;
+  font-weight: bold;
+}
+
+/* Optional: white background for content */
+.accordion-body {
+  background-color: #fff;
+  color: #333;
+}
+
+/* Optional: add subtle box shadow to each panel */
+.accordion-item {
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+  border-radius: 0.5rem;
+  overflow: hidden;
+  margin-bottom: 1rem;
+  border: none;
+}
+
 
 /* Solid Backgrounds */
 .u-sa-redBg {
