@@ -29,13 +29,6 @@ span.btn.btn-solid.btn-red {
 /* Grey Button */
 span.btn.btn-solid.btn-grey {
 	/* Font & Text */
-	font-family: proxima-nova, sans-serif;
-	font-size: 18px;
-	font-style: normal;
-	font-variant: normal;
-	font-weight: 300;
-	letter-spacing: normal;
-	line-height: 28.8px;
 	text-decoration: none solid rgb(153, 153, 153);
 	text-align: center;
 	text-indent: 0px;
@@ -46,7 +39,7 @@ span.btn.btn-solid.btn-grey {
 
 	/* Color & Background */
 	background-attachment: scroll;
-	background-color: rgb(255, 255, 255);
+	background-color: rgb(153, 153, 153);
 	background-image: none;
 	background-position: 0% 0%;
 	background-repeat: repeat;
