@@ -6,7 +6,7 @@ span.btn.btn-solid.btn-red {
 	background-image: none;
 	background-position: 0% 0%;
 	background-repeat: repeat;
-	color: rgb(237, 28, 43);
+	color: rgb(255, 255, 255);
 
 	/* Effects */
 	transform: none;
@@ -17,6 +17,7 @@ span.btn.btn-solid.btn-red {
 	resize: none;
 	text-shadow: none;
 	text-overflow: clip;
+	text-decoration: none;
 	word-wrap: normal;
 	box-shadow: none;
 	border-top-left-radius: 5px;
