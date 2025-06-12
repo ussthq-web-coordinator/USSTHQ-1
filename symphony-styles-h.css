@@ -29,6 +29,11 @@
 	color: white;
 }
 
+.u-sa-navyBg {
+	background-color: rgb(42, 49, 63);
+	color: white;
+}
+
 /* Solid Red Buttons */
 span.btn.btn-solid.btn-red {
 /* Color & Background */
