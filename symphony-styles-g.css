@@ -23,6 +23,11 @@
   pointer-events: auto;
 }
 
+/* Solid Backgrounds */
+.u-sa-redBg {
+	background-color: rgb(237, 28, 43);
+	color: white;
+}
 
 /* Solid Red Buttons */
 span.btn.btn-solid.btn-red {
