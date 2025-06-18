@@ -1,0 +1,143 @@
+/* Carousel */
+#carouselExampleCaptions .carousel-inner {
+  border-radius: 1rem;
+  overflow: hidden;
+}
+#carouselExampleCaptions .carousel-item img {
+  border-radius: 0;
+}
+
+
+#carouselExampleCaptions .carousel-control-prev,
+#carouselExampleCaptions .carousel-control-next,
+#carouselExampleCaptions .carousel-indicators {
+  opacity: 0;
+  transition: opacity 0.4s ease-in-out;
+  pointer-events: none;
+}
+
+#carouselExampleCaptions:hover .carousel-control-prev,
+#carouselExampleCaptions:hover .carousel-control-next,
+#carouselExampleCaptions:hover .carousel-indicators {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* Cards */
+/* Container layout for cards */
+.cards-module {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 1.5rem;
+  margin-top: 2rem;
+}
+
+/* Individual card styles */
+.u-card {
+  flex: 1 1 calc(33.333% - 1rem); /* 3 cards per row with spacing */
+  background: white;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  padding: 1rem;
+}
+
+/* Responsive: stack on tablets */
+@media (max-width: 992px) {
+  .u-card {
+    flex: 1 1 calc(50% - 1rem); /* 2 cards per row */
+  }
+}
+
+/* Responsive: stack on mobile */
+@media (max-width: 600px) {
+  .u-card {
+    flex: 1 1 100%;
+  }
+}
+
+/* Accordion */
+/* Red background for active (open) accordion headers */
+.accordion-button:not(.collapsed) {
+  background-color: #ed1c2b; /* your red */
+  color: #fff;
+  font-weight: bold;
+}
+
+/* Red border on active panels */
+.accordion-button:not(.collapsed)::after {
+  filter: brightness(0) invert(1); /* makes arrow icon white */
+}
+
+/* Keep closed items with red text headers */
+.accordion-button.collapsed {
+  color: #ed1c2b;
+  font-weight: bold;
+}
+
+/* Optional: white background for content */
+.accordion-body {
+  background-color: #fff;
+  color: #333;
+}
+
+/* Optional: add subtle box shadow to each panel */
+.accordion-item {
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+  border-radius: 0.5rem;
+  overflow: hidden;
+  margin-bottom: 1rem;
+  border: none;
+}
+
+
+/* Solid Backgrounds */
+.u-sa-redBg {
+	background-color: rgb(237, 28, 43);
+	color: white;
+}
+
+.u-sa-navyBg {
+	background-color: rgb(42, 49, 63);
+	color: white;
+}
+
+
+span.btn.btn-solid {
+  display: inline-block;
+  font-family: "Creato Display", sans-serif;
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 21px;
+  text-align: center;
+  text-decoration: none;
+  vertical-align: middle;
+  cursor: pointer;
+  user-select: none;
+  border: 1px solid transparent;
+  padding: 12px 20px;
+  border-radius: 8px;
+  transition: color 0.15s ease-in-out, background-color 0.15s ease-in-out, border-color 0.15s ease-in-out;
+  color: #fff;
+  background-color: #ef3e42;
+  border-color: #ef3e42;
+}
+
+span.btn.btn-solid:hover {
+  background-color: #c93034; /* darker red */
+  border-color: #c93034;
+  text-decoration: none;
+}
+
+span.btn.btn-solid:focus {
+  outline: none;
+  box-shadow: none;
+  text-decoration: none;
+}
+
+/* Prevent underline in case span is inside <a> */
+span.btn.btn-solid a {
+  text-decoration: none;
+  color: inherit;
+}
