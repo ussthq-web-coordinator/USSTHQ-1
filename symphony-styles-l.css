@@ -104,7 +104,8 @@
 }
 
 /* Solid Red Buttons */
-span.btn.btn-solid.btn-red {
+span.btn.btn-solid.btn-red,
+span.btn.btn-solid.btn-red a {
 /* Color & Background */
 	background-attachment: scroll;
 	background-color: rgb(237, 28, 43);
@@ -122,13 +123,21 @@ span.btn.btn-solid.btn-red {
 	resize: none;
 	text-shadow: none;
 	text-overflow: clip;
-	text-decoration: none;
+	text-decoration: none !important;
 	word-wrap: normal;
 	box-shadow: none;
 	border-top-left-radius: 5px;
 	border-top-right-radius: 5px;
 	border-bottom-left-radius: 5px;
 	border-bottom-right-radius: 5px;
+}
+
+span.btn.btn-solid.btn-red:hover,
+span.btn.btn-solid.btn-red a:hover {
+  text-decoration: none !important; 
+  color: rgb(255, 255, 255); 
+  transition: color 0.15s ease-in-out, background-color 0.15s ease-in-out, border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+
 }
 
 /* Grey Button */
