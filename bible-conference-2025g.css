@@ -366,10 +366,10 @@
 #carouselExampleCaptions .carousel-inner {
   overflow: hidden;
   margin-bottom: 38px;
-  border-radius: 0;
+  border-radius: 0px;
 }
 #carouselExampleCaptions .carousel-item img {
-  border-radius: 0;
+  border-radius: 0px;
 }
 
 
