@@ -393,3 +393,23 @@
   opacity: 1;
   pointer-events: auto;
 }
+
+/* Schedule Accordion Styles */
+  .accordion-button {
+    color: #3d0072; /* dark purple */
+    font-weight: bold;
+  }
+
+  .accordion-body p {
+    color: #008080; /* teal */
+    margin-bottom: 0.5rem;
+  }
+
+  .accordion-body p:has(strong:contains("Main Session")) {
+    color: #3d0072; /* purple override for main sessions */
+  }
+
+  /* Fallback for browsers not supporting :has */
+  .accordion-body p.main-session {
+    color: #3d0072 !important;
+  }
