@@ -98,14 +98,24 @@
       color: #1e293b;
     }
   
+    .container,
+    .row-flex-nsaw {
+      max-width: 100%;
+      overflow-x: hidden;
+    }
+    
     .row-flex-nsaw {
       display: flex;
-      flex-wrap: nowrap;
+      flex-wrap: wrap;
       justify-content: center;
       align-items: center;
       margin-bottom: 6rem;
       gap: 0;
       position: relative;
+      box-sizing: border-box;
+      overflow-x: hidden;
+      max-width: 100%;
+      width: 100%;
     }
   
     .image-col-nsaw {
