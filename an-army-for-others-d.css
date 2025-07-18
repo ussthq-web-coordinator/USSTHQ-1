@@ -223,7 +223,7 @@ html, body {
 }
 
 /* === Extra Small Devices === */
-@media (max-width: 575.98px) {
+@media (max-width: 1000px) {
   .image-section-nsaw {
     width: 100%;
     height: auto;
