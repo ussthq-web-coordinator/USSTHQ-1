@@ -21,8 +21,22 @@ html, body {
 }
 
 /* Override for reversed rows (on md+ and fixed for smaller screens) */
+/* === Force Stack for Bootstrap .flex-md-row-reverse === */
 .flex-md-row-reverse {
-  flex-direction: row-reverse;
+  flex-direction: column !important;
+}
+
+/* Match image width to card width */
+.flex-md-row-reverse .image-col-nsaw {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+}
+
+.flex-md-row-reverse .image-section-nsaw {
+  width: 90%; /* same as .overlay-card-nsaw */
+  max-width: 500px;
+  height: auto;
 }
 
 @media (max-width: 991.98px) {
