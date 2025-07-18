@@ -157,7 +157,7 @@ html, body {
 }
 
 /* === Responsive Fixes === */
-@media (max-width: 991.98px) {
+@media (max-width: 791.98px) {
   .row-flex-nsaw {
     flex-direction: column;
     align-items: center;
