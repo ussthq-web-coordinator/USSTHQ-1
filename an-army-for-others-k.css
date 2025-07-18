@@ -302,10 +302,8 @@ input[type="checkbox"]:checked + .panel-content {
   display: none;
 }
 
-/* Button tweaks for mobile */
-@media (max-width: 992px) {
   .btn.btn-outline-dark {
     border: 1px solid #132230;
     color: #132230;
   }
-}
+
