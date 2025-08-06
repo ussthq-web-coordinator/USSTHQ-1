@@ -418,3 +418,119 @@
   .accordion-body p.main-session {
     color: #3d0072 !important;
   }
+  /* ========== Live Stream Video Gallery ========== */
+/* Section container */
+.comm25-thumbnails-section {
+  display: flex;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  gap: 1rem;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 1rem;
+  box-sizing: border-box;
+  scrollbar-width: thin;
+  scrollbar-color: gold white;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Optional: WebKit scrollbar styling */
+.comm25-thumbnails-section::-webkit-scrollbar {
+  height: 8px;
+}
+.comm25-thumbnails-section::-webkit-scrollbar-thumb {
+  background: gold;
+  border-radius: 10px;
+}
+.comm25-thumbnails-section::-webkit-scrollbar-track {
+  background: white;
+}
+
+.comm25-thumbnail {
+  flex: 0 0 auto;
+  width: 160px;
+  border-radius: 8px;
+  overflow: hidden;
+  cursor: pointer;
+  border: 3px solid transparent;
+  transition: transform 0.2s ease;
+}
+
+.comm25-thumbnail img {
+  width: 100%;
+  display: block;
+  transition: transform 0.3s ease;
+}
+
+
+/* Featured video */
+.comm25-featured-video iframe {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  transition: all 0.3s ease;
+}
+
+@media (max-width: 800px) {
+  .scroll-hint {
+    display: block;
+  }
+}
+
+@media (max-width: 800px) {
+  .comm25-thumbnails-wrapper {
+    width: 70vw !important;
+    max-width: 80vw !important;
+    padding: 1rem 0;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
+    box-sizing: border-box;
+    margin: auto;
+    padding-left: 0;
+    padding-right: 50px;
+  }
+
+  .comm25-thumbnails-section {
+    width: max-content;
+    max-width: none !important;
+    display: flex;
+    flex-direction: row;
+    gap: 1rem;
+    padding: 0 1rem;
+    box-sizing: border-box;
+    margin: 0;
+    grid-template-columns: 1fr;
+  }
+
+  body {
+    overflow-x: hidden;
+  }
+  .container-thumbnails {
+    width: 100vw !important;
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+    max-width: none !important;
+  }
+
+  .middle-column-thumbnails {
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+  }
+   .container-thumbnails {
+     overflow-x: hidden;
+  }
+
+  }
+/* End of media query */
+
+
+.comm25-thumbnails-section::before,
+.comm25-thumbnails-section::after {
+  content: "";
+  flex: 0 0 1rem;
+}
