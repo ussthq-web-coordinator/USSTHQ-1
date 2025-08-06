@@ -170,7 +170,13 @@
     100% { background-position: 0% 50%; }
   }
   
-    
+  
+      .livestream-section {
+    width: 100%;
+    background: #EFEFEF;
+    color: darkblue;
+    padding: 20px 20px 20px 20px;
+    }  
     .singing-section {
     width: 100%;
     background: #F5DE6D;
