@@ -105,6 +105,8 @@ html, body {
 .card-dark-nsaw {
   background-color: #132230;
   color: #f1f5f9;
+  border-radius: 1rem;
+  box-shadow: 0 1rem 2rem rgba(239, 62, 66, 0.2);
 }
 
 .card-dark-nsaw .btn {
