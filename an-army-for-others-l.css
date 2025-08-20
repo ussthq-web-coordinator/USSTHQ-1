@@ -74,8 +74,8 @@ html, body {
 
 /* Image styling with 95% width */
 .image-section-nsaw {
-  width: 100%;
-  max-width: 100%;
+  width: 50%;
+  max-width: 70%;
   height: auto;
   aspect-ratio: 1 / 1;
   background-size: cover;
