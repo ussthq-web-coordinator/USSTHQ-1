@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Website Migration Dashboard</title>
+
+<!-- Prefetch JSON -->
+<link rel="preload" href="https://cdn.jsdelivr.net/gh/ussthq-web-coordinator/USSTHQ-1@latest/DashboardData.json" as="fetch" crossorigin="anonymous">
+
+<!-- Bootstrap CSS -->
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+
+<!-- React + ReactDOM -->
+<script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+<!-- Babel for JSX transpile -->
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+<!-- Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<style>
+body { padding: 20px; font-family: Arial, sans-serif; }
+.card { margin-bottom: 15px; }
+.filter-label { font-weight: bold; margin-right: 5px; }
+.chart-container { position: relative; height: 300px; width: 100%; margin-bottom: 30px; }
+</style>
+</head>
+<body>
+
+<div id="root"></div>
+
+<script type="text/babel">
+
+const { useState, useEffect, useRef } = React;
+
+// Fetch JSON data
+async function fetchData() {
+  const res = await fetch('https://cdn.jsdelivr.net/gh/ussthq-web-coordinator/USSTHQ-1@latest/DashboardData.json');
+  return await res.json();
+}
+
+// Utility: Count occurrences
+const countBy = (data, key) => {
+  return data.reduce((acc, item) => {
+    const val = item[key] || "Not Set";
+    acc[val] = (acc[val] || 0) + 1;
+    return acc;
+  }, {});
+};
+
+// Metric card component
+function MetricCard({ title, value, color }) {
+  return (
+    <div className="col-md-2 col-6">
+      <div className={`card text-white bg-${color}`}>
+        <div className="card-body">
+          <h5 className="card-title">{title}</h5>
+          <p className="card-text">{value}</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Pie chart component
+function PieChart({ dataObj, title }) {
+  const canvasRef = useRef(null);
+
+  useEffect(() => {
+    const ctx = canvasRef.current.getContext('2d');
+    const chart = new Chart(ctx, {
+      type: 'pie',
+      data: {
+        labels: Object.keys(dataObj),
+        datasets: [{
+          data: Object.values(dataObj),
+          backgroundColor: Object.keys(dataObj).map((_, i) => `hsl(${i*60%360},70%,50%)`)
+        }]
+      },
+      options: {
+        plugins: { legend: { display: true, position: 'bottom' } }
+      }
+    });
+    return () => chart.destroy();
+  }, [dataObj]);
+
+  return (
+    <div className="chart-container">
+      <h6>{title}</h6>
+      <canvas ref={canvasRef}></canvas>
+    </div>
+  );
+}
+
+// Main Dashboard
+function Dashboard() {
+  const [data, setData] = useState([]);
+  const [filters, setFilters] = useState({
+    Division: '', AreaCommand: '', Status: '', PageType: '', PublishedSymphony: '', SymphonySiteType: ''
+  });
+
+  useEffect(() => {
+    fetchData().then(setData);
+  }, []);
+
+  const filteredData = data.filter(d =>
+    (!filters.Division || d.Division === filters.Division) &&
+    (!filters.AreaCommand || d['Area Command Admin Group.title'] === filters.AreaCommand) &&
+    (!filters.Status || d.Status === filters.Status) &&
+    (!filters.PageType || d['Page Type'] === filters.PageType) &&
+    (!filters.PublishedSymphony || d['Published Symphony'] === filters.PublishedSymphony) &&
+    (!filters.SymphonySiteType || d['Symphony Site Type'] === filters.SymphonySiteType)
+  );
+
+  // Metrics
+  const completed = filteredData.filter(d => d.Status.startsWith("4") || d.Status.startsWith("5") || d.Status==="Do Not Migrate").length;
+  const doNotMigrate = filteredData.filter(d => d.Status==="Do Not Migrate").length;
+
+  const now = new Date();
+  const modLastMonth = filteredData.filter(d => {
+    const m = new Date(d.Modified);
+    return m >= new Date(now.getFullYear(), now.getMonth()-1,1) && m < new Date(now.getFullYear(), now.getMonth(),1);
+  }).length;
+  const modThisMonth = filteredData.filter(d => {
+    const m = new Date(d.Modified);
+    return m >= new Date(now.getFullYear(), now.getMonth(),1);
+  }).length;
+
+  // Pie chart data
+  const statusCounts = countBy(filteredData, 'Status');
+  const priorityCounts = countBy(filteredData, 'Priority');
+  const pageTypeCounts = countBy(filteredData, 'Page Type');
+  const pubCounts = countBy(filteredData, 'Published Symphony');
+
+  // Unique filter options
+  const getUnique = key => [...new Set(data.map(d => d[key] || "Not Set"))].sort();
+
+  return (
+    <div>
+      <h1 className="mb-4">Website Migration Dashboard</h1>
+
+      {/* Filters */}
+      <div className="row mb-3">
+        {['Division','AreaCommand','Status','PageType','PublishedSymphony','SymphonySiteType'].map(f => (
+          <div key={f} className="col-md-2 col-6 mb-2">
+            <label className="filter-label">{f}</label>
+            <select className="form-select"
+              value={filters[f]}
+              onChange={e => setFilters({...filters,[f]: e.target.value})}
+            >
+              <option value="">All</option>
+              {getUnique(f==='AreaCommand' ? 'Area Command Admin Group.title' :
+                         f==='PageType' ? 'Page Type' :
+                         f==='PublishedSymphony' ? 'Published Symphony' :
+                         f==='SymphonySiteType' ? 'Symphony Site Type' : f).map(v => (
+                <option key={v} value={v}>{v}</option>
+              ))}
+            </select>
+          </div>
+        ))}
+      </div>
+
+      {/* Metric cards */}
+      <div className="row mb-4">
+        <MetricCard title="Completed" value={completed} color="primary"/>
+        <MetricCard title="Do Not Migrate" value={doNotMigrate} color="danger"/>
+        <MetricCard title="Modified Last Month" value={modLastMonth} color="success"/>
+        <MetricCard title="Modified This Month" value={modThisMonth} color="warning"/>
+      </div>
+
+      {/* Charts */}
+      <div className="row">
+        <div className="col-md-6 col-12"><PieChart dataObj={statusCounts} title="Status Distribution"/></div>
+        <div className="col-md-6 col-12"><PieChart dataObj={priorityCounts} title="Priority Distribution"/></div>
+        <div className="col-md-6 col-12"><PieChart dataObj={pageTypeCounts} title="Page Type Distribution"/></div>
+        <div className="col-md-6 col-12"><PieChart dataObj={pubCounts} title="Published Symphony Distribution"/></div>
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<Dashboard />);
+
+</script>
+</body>
+</html>
