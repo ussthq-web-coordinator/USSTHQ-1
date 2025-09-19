@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Site Migration Dashboard</title>
+
+<!-- Tabulator CSS -->
+<link href="https://unpkg.com/tabulator-tables@5.6.4/dist/css/tabulator.min.css" rel="stylesheet">
+
+<!-- Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<!-- Optional: FontAwesome for icons -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+
+<style>
+body { font-family: Arial, sans-serif; margin: 20px; }
+.card-container { display:flex; flex-wrap:wrap; gap:15px; margin-bottom:20px; }
+.card { flex:1 1 200px; background:#f4f4f4; padding:15px; border-radius:6px; text-align:center; }
+.chart-container { display:flex; flex-wrap:wrap; gap:20px; margin-bottom:20px; }
+.chart-box { flex:1 1 300px; padding:10px; border:1px solid #ddd; border-radius:6px; background:#fff; }
+.filter-container { display:flex; flex-wrap:wrap; gap:10px; margin-bottom:20px; }
+.filter-container select { padding:5px; min-width:150px; }
+#dashboard-table { margin-top:20px; }
+</style>
+</head>
+<body>
+
+<h1>Site Migration Dashboard</h1>
+
+<div class="filter-container">
+  <select id="divisionFilter"><option value="">All Divisions</option></select>
+  <select id="areaFilter"><option value="">All Area Commands</option></select>
+  <select id="statusFilter"><option value="">All Status</option></select>
+  <select id="pageTypeFilter"><option value="">All Page Types</option></select>
+  <select id="symphonyFilter"><option value="">All Published Symphony</option></select>
+  <select id="symphonyTypeFilter"><option value="">All Symphony Site Type</option></select>
+</div>
+
+<div class="card-container" id="cards"></div>
+
+<div class="chart-container">
+  <div class="chart-box">
+    <canvas id="statusChart"></canvas>
+  </div>
+  <div class="chart-box">
+    <canvas id="priorityChart"></canvas>
+  </div>
+  <div class="chart-box">
+    <canvas id="pageTypeChart"></canvas>
+  </div>
+  <div class="chart-box">
+    <canvas id="publishedChart"></canvas>
+  </div>
+</div>
+
+<div id="dashboard-table"></div>
+
+<!-- Tabulator JS -->
+<script src="https://unpkg.com/tabulator-tables@5.6.4/dist/js/tabulator.min.js"></script>
+
+<script>
+const jsonUrl = "https://cdn.jsdelivr.net/gh/ussthq-web-coordinator/USSTHQ-1@latest/DashboardData.json";
+let rawData = [];
+
+// Chart.js chart instances
+let statusChart, priorityChart, pageTypeChart, publishedChart;
+
+// Fetch JSON and initialize dashboard
+async function initDashboard() {
+    try {
+        const response = await fetch(jsonUrl);
+        rawData = await response.json();
+
+        populateFilters();
+        updateDashboard();
+    } catch(e) {
+        console.error("Failed to load JSON:", e);
+        document.body.innerHTML = "<p style='color:red;'>Failed to load dashboard data.</p>";
+    }
+}
+
+// Populate filter dropdowns
+function populateFilters() {
+    const divs = new Set(), areas = new Set(), statuses = new Set(), pageTypes = new Set(), symphonyPub = new Set(), symphonyType = new Set();
+
+    rawData.forEach(r => {
+        if(r.Division) divs.add(r.Division);
+        if(r["Area Command Admin Group.title"]) areas.add(r["Area Command Admin Group.title"]);
+        if(r.Status) statuses.add(r.Status);
+        if(r["Page Type"]) pageTypes.add(r["Page Type"]);
+        if(r["Published Symphony"]) symphonyPub.add(r["Published Symphony"]);
+        if(r["Symphony Site Type"]) symphonyType.add(r["Symphony Site Type"]);
+    });
+
+    fillSelect("divisionFilter", divs);
+    fillSelect("areaFilter", areas);
+    fillSelect("statusFilter", statuses);
+    fillSelect("pageTypeFilter", pageTypes);
+    fillSelect("symphonyFilter", symphonyPub);
+    fillSelect("symphonyTypeFilter", symphonyType);
+}
+
+function fillSelect(id, setValues){
+    const sel = document.getElementById(id);
+    Array.from(setValues).sort().forEach(v=>{
+        const opt = document.createElement("option");
+        opt.value = v; opt.textContent = v;
+        sel.appendChild(opt);
+    });
+}
+
+// Aggregate and render cards & charts
+function updateDashboard(){
+    const filters = {
+        Division: document.getElementById("divisionFilter").value,
+        Area: document.getElementById("areaFilter").value,
+        Status: document.getElementById("statusFilter").value,
+        PageType: document.getElementById("pageTypeFilter").value,
+        Published: document.getElementById("symphonyFilter").value,
+        SymphonyType: document.getElementById("symphonyTypeFilter").value
+    };
+
+    const filtered = rawData.filter(r=>{
+        return (!filters.Division || r.Division===filters.Division) &&
+               (!filters.Area || r["Area Command Admin Group.title"]===filters.Area) &&
+               (!filters.Status || r.Status===filters.Status) &&
+               (!filters.PageType || r["Page Type"]===filters.PageType) &&
+               (!filters.Published || r["Published Symphony"]===filters.Published) &&
+               (!filters.SymphonyType || r["Symphony Site Type"]===filters.SymphonyType);
+    });
+
+    renderCards(filtered);
+    renderCharts(filtered);
+    renderTable(filtered);
+}
+
+// Cards
+function renderCards(data){
+    const cardsDiv = document.getElementById("cards");
+    cardsDiv.innerHTML = "";
+
+    const completedCount = data.filter(r=>["4","5","Do Not Migrate"].some(s=>r.Status.startsWith(s) || r.Status===s)).length;
+    const doNotMigrateCount = data.filter(r=>r.Status==="Do Not Migrate").length;
+    const modifiedLastMonth = data.filter(r=>{
+        if(!r.Modified) return false;
+        const mDate = new Date(r.Modified);
+        const today = new Date();
+        const lastMonth = new Date(today.getFullYear(), today.getMonth()-1, 1);
+        return mDate >= lastMonth;
+    }).length;
+    const modifiedThisMonth = data.filter(r=>{
+        if(!r.Modified) return false;
+        const mDate = new Date(r.Modified);
+        const today = new Date();
+        return mDate.getMonth()===today.getMonth() && mDate.getFullYear()===today.getFullYear();
+    }).length;
+
+    const metrics = [
+        {label:"Completed", value:completedCount},
+        {label:"Do Not Migrate", value:doNotMigrateCount},
+        {label:"Modified Last Month", value:modifiedLastMonth},
+        {label:"Modified This Month", value:modifiedThisMonth},
+        {label:"Total Pages", value:data.length}
+    ];
+
+    metrics.forEach(m=>{
+        const c = document.createElement("div");
+        c.className="card";
+        c.innerHTML=`<strong>${m.value}</strong><br>${m.label}`;
+        cardsDiv.appendChild(c);
+    });
+}
+
+// Charts
+function renderCharts(data){
+    const statusCounts = {}, priorityCounts = {}, pageTypeCounts = {}, pubCounts = {};
+    data.forEach(r=>{
+        statusCounts[r.Status||"Not Set"] = (statusCounts[r.Status||"Not Set"]||0)+1;
+        priorityCounts[r.Priority||"Not Set"] = (priorityCounts[r.Priority||"Not Set"]||0)+1;
+        pageTypeCounts[r["Page Type"]||"Not Set"] = (pageTypeCounts[r["Page Type"]||"Not Set"]||0)+1;
+        pubCounts[r["Published Symphony"]||"Not Set"] = (pubCounts[r["Published Symphony"]||"Not Set"]||0)+1;
+    });
+
+    const colors = i=>`hsl(${i*70 % 360},70%,50%)`;
+
+    const ctxS = document.getElementById("statusChart").getContext("2d");
+    if(statusChart) statusChart.destroy();
+    statusChart = new Chart(ctxS,{type:"pie",data:{labels:Object.keys(statusCounts),datasets:[{data:Object.values(statusCounts),backgroundColor:Object.keys(statusCounts).map((_,i)=>colors(i))}]},options:{plugins:{legend:{display:true,position:'bottom'}}}});
+
+    const ctxP = document.getElementById("priorityChart").getContext("2d");
+    if(priorityChart) priorityChart.destroy();
+    priorityChart = new Chart(ctxP,{type:"pie",data:{labels:Object.keys(priorityCounts),datasets:[{data:Object.values(priorityCounts),backgroundColor:Object.keys(priorityCounts).map((_,i)=>colors(i))}]},options:{plugins:{legend:{display:true,position:'bottom'}}}});
+
+    const ctxPT = document.getElementById("pageTypeChart").getContext("2d");
+    if(pageTypeChart) pageTypeChart.destroy();
+    pageTypeChart = new Chart(ctxPT,{type:"pie",data:{labels:Object.keys(pageTypeCounts),datasets:[{data:Object.values(pageTypeCounts),backgroundColor:Object.keys(pageTypeCounts).map((_,i)=>colors(i))}]},options:{plugins:{legend:{display:true,position:'bottom'}}}});
+
+    const ctxPub = document.getElementById("publishedChart").getContext("2d");
+    if(publishedChart) publishedChart.destroy();
+    publishedChart = new Chart(ctxPub,{type:"pie",data:{labels:Object.keys(pubCounts),datasets:[{data:Object.values(pubCounts),backgroundColor:Object.keys(pubCounts).map((_,i)=>colors(i))}]},options:{plugins:{legend:{display:true,position:'bottom'}}}});
+}
+
+// Table with Tabulator
+let table;
+function renderTable(data){
+    if(table) table.replaceData(data);
+    else{
+        table = new Tabulator("#dashboard-table", {
+            data:data,
+            layout:"fitColumns",
+            responsiveLayout:"collapse",
+            pagination:"local",
+            paginationSize:50,
+            columns:[
+                {title:"Title", field:"Title", formatter:"link", formatterParams:{urlField:"Page URL", target:"_blank"}},
+                {title:"Division", field:"Division"},
+                {title:"Area Command", field:"Area Command Admin Group.title"},
+                {title:"Status", field:"Status"},
+                {title:"Priority", field:"Priority"},
+                {title:"Page Type", field:"Page Type"},
+                {title:"Published Symphony", field:"Published Symphony"},
+                {title:"Symphony Site Type", field:"Symphony Site Type"},
+                {title:"Modified", field:"Modified"},
+            ],
+        });
+    }
+}
+
+// Connect filters
+document.querySelectorAll(".filter-container select").forEach(sel=>{
+    sel.addEventListener("change", updateDashboard);
+});
+
+initDashboard();
+</script>
+</body>
+</html>
