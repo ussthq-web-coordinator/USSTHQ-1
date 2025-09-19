@@ -116,24 +116,20 @@
     </div>
 </div>
 
-<!-- Optional: Table -->
-<div class="row mt-4">
-    <div class="col-12" id="tableContainer"></div>
-</div>
-
 <script>
 // Global variables
 let fullData = [];
 let charts = {};
 
-// Load JSON and initialize
-fetch('DashboardData.json')
+// Load JSON from CDN
+fetch('https://cdn.jsdelivr.net/gh/ussthq-web-coordinator/USSTHQ-1@latest/DashboardData.json')
   .then(res => res.json())
   .then(data => {
     fullData = data;
     initFilters();
     updateDashboard();
-  });
+  })
+  .catch(err => console.error("Failed to load JSON:", err));
 
 // Initialize filters
 function initFilters() {
