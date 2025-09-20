@@ -1,0 +1,667 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Site Migration Dashboard</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+<link href="https://unpkg.com/tabulator-tables@5.5.0/dist/css/tabulator.min.css" rel="stylesheet">
+<script src="https://unpkg.com/tabulator-tables@5.5.0/dist/js/tabulator.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+body { font-family: 'Arial', sans-serif; background:#f9f9f9; }
+.card { margin-bottom: 1rem; }
+.card-body { text-align:center; }
+.card-title { font-size:1rem; font-weight:bold; }
+.progress { height: 1.5rem; margin-bottom: 1rem; }
+.card-text { font-size:0.9rem; }
+.chart-container { margin-bottom:1rem; }
+.tabulator { font-size:0.85rem; }
+.tabulator .tabulator-header { background-color: #2c3e50; color: #fff; font-weight:bold; }
+.modal-body table { width:100%; border-collapse:collapse; }
+.modal-body td, .modal-body th { padding:0.25rem; vertical-align:top; border:1px solid #ddd; font-size:0.85rem; }
+.table-header-links { font-size:1rem; margin-left:1rem; }
+.hidden-group { display:none; }
+.tabulator-cell[data-field="Effort Needed"], 
+.tabulator-cell[data-field="Published Symphony"], 
+.tabulator-cell[data-field="Site Title"] {
+  max-width:80px; /* thinner columns */
+  overflow:hidden; 
+  white-space:nowrap; 
+  text-overflow:ellipsis;
+}
+.tabulator-cell.text-wrap {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* inner wrapper used by the formatter — this will show the ellipsis and provide full text on hover */
+.tabulator-cell .col-ellipsis {
+  display: block;           /* must be block/inline-block */
+  width: 100%;              /* fill the cell width */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+</style>
+</head>
+<body>
+<div class="container-fluid my-3">
+
+ <!-- Navbar / Menu -->
+  <nav class="navbar navbar-expand-lg navbar-light bg-light shadow-sm">
+    <div class="container-fluid">
+      <a class="navbar-brand fw-bold" href="#">Site Migration Dashboard</a>
+      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNavDropdown" 
+        aria-controls="navbarNavDropdown" aria-expanded="false" aria-label="Toggle navigation">
+        <span class="navbar-toggler-icon"></span>
+      </button>
+
+      <div class="collapse navbar-collapse" id="navbarNavDropdown">
+        <ul class="navbar-nav ms-auto">
+          <!-- Direct links -->
+          <li class="nav-item">
+            <a href="https://metrositesreport.usscommunications.org/" target="_blank" class="nav-link">📄DHQ/AC Report</a>
+          </li>
+          <li class="nav-item">
+            <a href="http://corpssitesreport.usscommunications.org/" target="_blank" class="nav-link">📄Corps Report</a>
+          </li>
+
+          <!-- Tools Dropdown -->
+          <li class="nav-item dropdown">
+            <a class="nav-link dropdown-toggle" href="#" id="toolsDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+              🛠️Tools
+            </a>
+            <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="toolsDropdown">
+              <li><a class="dropdown-item" href="https://salvationarmy.mobile.zesty.io/" target="_blank">🔗 Zesty Editor</a></li>
+              <li><a class="dropdown-item" href="https://sauss.sharepoint.com/:w:/r/sites/USSWEBADM/_layouts/15/Doc.aspx?sourcedoc=%7B3995E1E4-5730-42E1-BACA-BFEA67B90F92%7D&file=QA%20Checklist%20.docx&action=default&mobileredirect=true" target="_blank">🔗 Quality Assurance Checklist</a></li>
+              <li><a class="dropdown-item" href="https://snippets.usnsandbox.net/" target="_blank">🔗 Snippets for Components</a></li>
+            </ul>
+          </li>
+        </ul>
+      </div>
+    </div>
+  </nav>
+
+<!-- Filters -->
+<div class="row mt-3 mb-3">
+  <div class="col-lg-2 col-md-4 col-sm-6 mb-2">
+    <label>Division</label>
+    <select id="filterDivision" class="form-select"></select>
+  </div>
+  <div class="col-lg-2 col-md-4 col-sm-6 mb-2">
+    <label>Area Command</label>
+    <select id="filterAC" class="form-select"></select>
+  </div>
+  <div class="col-lg-2 col-md-4 col-sm-6 mb-2">
+    <label>Status</label>
+    <select id="filterStatus" class="form-select"></select>
+  </div>
+  <div class="col-lg-2 col-md-4 col-sm-6 mb-2">
+    <label>Page Type</label>
+    <select id="filterPageType" class="form-select"></select>
+  </div>
+  <div class="col-lg-2 col-md-4 col-sm-6 mb-2">
+    <label>Published Symphony</label>
+    <select id="filterPubSym" class="form-select"></select>
+  </div>
+  <div class="col-lg-2 col-md-4 col-sm-6 mb-2">
+    <label>Symphony Site Type</label>
+    <select id="filterSymType" class="form-select"></select>
+  </div>
+</div>
+
+<!-- Metric Cards -->
+<div class="row" id="metricCards"></div>
+
+<!-- Overall Progress -->
+<div class="row mb-3">
+  <div class="col-12">
+    <p>Overall Progress</p>
+    <div class="progress mb-2">
+      <div id="progressBar" class="progress-bar" role="progressbar" style="width:0%">0%</div>
+    </div>
+    <!-- Accordion for breakdown -->
+    <div class="accordion" id="progressAccordion">
+      <div class="accordion-item">
+        <h2 class="accordion-header" id="headingBreakdown">
+          <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseBreakdown" aria-expanded="false" aria-controls="collapseBreakdown">
+            Show Detailed Progress by Group
+          </button>
+        </h2>
+        <div id="collapseBreakdown" class="accordion-collapse collapse" aria-labelledby="headingBreakdown" data-bs-parent="#progressAccordion">
+          <div class="accordion-body" id="progressBreakdownBody">
+            <button id="toggleHiddenGroups" class="btn btn-sm btn-secondary mb-2">Show 0% Groups</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Accordion for QA Issues -->
+<div class="accordion" id="qaAccordion">
+  <div class="accordion-item">
+    <h2 class="accordion-header" id="headingQA">
+      <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseQA" aria-expanded="false" aria-controls="collapseQA">
+        QA Groups
+      </button>
+    </h2>
+    <div id="collapseQA" class="accordion-collapse collapse" aria-labelledby="headingQA" data-bs-parent="#qaAccordion">
+      <div class="accordion-body" id="qaGroupsBody">
+        <!-- QA cards will be injected here -->
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- Charts -->
+<div class="row">
+  <div class="col-lg-3 col-md-6 col-sm-12 chart-container">
+    <canvas id="statusChart"></canvas>
+  </div>
+  <div class="col-lg-3 col-md-6 col-sm-12 chart-container">
+    <canvas id="priorityChart"></canvas>
+  </div>
+  <div class="col-lg-3 col-md-6 col-sm-12 chart-container">
+    <canvas id="pageTypeChart"></canvas>
+  </div>
+  <div class="col-lg-3 col-md-6 col-sm-12 chart-container">
+    <canvas id="pubSymChart"></canvas>
+  </div>
+</div>
+
+<!-- QA Issues Modal -->
+<div class="modal fade" id="qaIssuesModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Pages with QA Issues</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body" id="qaIssuesModalBody"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Table -->
+<div id="tableContainer"></div>
+
+<!-- Table Modal -->
+<div class="modal fade" id="tableDetailModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-xl modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="tableModalTitle"></h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body" id="tableModalBody"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const jsonURL = "https://cdn.jsdelivr.net/gh/ussthq-web-coordinator/USSTHQ-1@latest/DashboardData-b.json";
+let table, tableData=[], charts={}, pageCache={}, qaGroupedCache={};
+
+async function fetchData(){
+  try{
+    const res = await fetch(jsonURL);
+    if(!res.ok) throw new Error('Unable to load JSON data');
+    tableData = await res.json();
+
+    pageCache = {};
+    tableData.forEach((d,i)=>{ d._id=i; pageCache[i]=d; });
+
+    initFilters();
+    updateDashboard();
+  }catch(err){
+    document.body.innerHTML = `<div class="alert alert-danger m-3">Error loading dashboard: ${err.message}</div>`;
+    console.error(err);
+  }
+}
+
+function initFilters(){
+  const filters = {
+    filterDivision: [...new Set(tableData.map(d=>d.Division||"Not Set"))].sort(),
+    filterAC: [...new Set(tableData.map(d=>d["Area Command Admin Group.title"]||"Not Set"))].sort(),
+    filterStatus: [...new Set(tableData.map(d=>d.Status||"Not Set"))].sort(),
+    filterPageType: [...new Set(tableData.map(d=>d["Page Type"]||"Not Set"))].sort(),
+    filterPubSym: [...new Set(tableData.map(d=>d["Published Symphony"]||"Not Set"))].sort(),
+    filterSymType: [...new Set(tableData.map(d=>d["Symphony Site Type"]||"Not Set"))].sort()
+  };
+  for(const id in filters){
+    const sel = document.getElementById(id);
+    sel.innerHTML = "<option value=''>All</option>"+filters[id].map(f=>`<option value="${f}">${f}</option>`).join("");
+    sel.addEventListener("change", updateDashboard);
+  }
+}
+
+function getFilteredData(){
+  const div = document.getElementById("filterDivision").value;
+  const ac = document.getElementById("filterAC").value;
+  const status = document.getElementById("filterStatus").value;
+  const pageType = document.getElementById("filterPageType").value;
+  const pubSym = document.getElementById("filterPubSym").value;
+  const symType = document.getElementById("filterSymType").value;
+
+  return tableData.filter(d => 
+    (!div || d.Division===div) &&
+    (!ac || d["Area Command Admin Group.title"]===ac) &&
+    (!status || d.Status===status) &&
+    (!pageType || d["Page Type"]===pageType) &&
+    (!pubSym || d["Published Symphony"]===pubSym) &&
+    (!symType || d["Symphony Site Type"]===symType)
+  );
+}
+
+function renderQaAccordion(data){
+  const container = document.getElementById("qaGroupsBody");
+  container.innerHTML = "";
+  const qaRows = data.filter(d=>d["QA Issues.lookupValue"]);
+  if(!qaRows.length){
+    container.innerHTML = "<p>No QA Issues found.</p>";
+    return;
+  }
+
+  qaGroupedCache={};
+  qaRows.forEach(d=>{
+    const key=d["QA Issues.lookupValue"];
+    qaGroupedCache[key]=qaGroupedCache[key]||[];
+    qaGroupedCache[key].push(d._id);
+  });
+
+  Object.keys(qaGroupedCache).sort().forEach(k=>{
+    container.innerHTML += `
+      <div class="mb-2">
+        <strong>${k} (${qaGroupedCache[k].length})</strong>
+        <button class="btn btn-sm btn-primary ms-2" onclick="showQaIssuesModal('${k}')">View Pages</button>
+      </div>`;
+  });
+}
+
+function renderCards(){
+  const filtered = getFilteredData();
+  const today = new Date();
+  const lastMonth = new Date(today.getFullYear(), today.getMonth()-1, today.getDate());
+
+  const metrics = {
+    "Total Pages": filtered.length,
+    "Completed": filtered.filter(d=>["4","5"].some(s=>d.Status?.trim().startsWith(s))).length,
+    "Do Not Migrate": filtered.filter(d=>d.Status?.trim()==="Do Not Migrate").length,
+    "Modified Last Month": filtered.filter(d=>d.Modified && new Date(d.Modified)>=lastMonth).length,
+    "Modified This Month": filtered.filter(d=>d.Modified && new Date(d.Modified).getMonth()===today.getMonth() && new Date(d.Modified).getFullYear()===today.getFullYear()).length,
+    "QA Issues": filtered.filter(d=>d["QA Issues.lookupValue"]).length,
+    "High Priority QA": filtered.filter(d=>d["QA Issues.lookupValue"] && d.Priority==="High").length,
+    "Low Priority QA": filtered.filter(d=>d["QA Issues.lookupValue"] && d.Priority!=="High").length
+  };
+
+  const colors = ['#e74c3c','#f39c12','#f1c40f','#2ecc71','#3498db','#9b59b6','#16a085','#d35400'];
+  const container = document.getElementById("metricCards");
+  container.innerHTML = "";
+  let i=0;
+  for(const key in metrics){
+    container.innerHTML += `
+      <div class="col-lg-3 col-md-6 col-sm-12">
+        <div class="card text-white" style="background-color:${colors[i++ % colors.length]}">
+          <div class="card-body">
+            <h5 class="card-title">${key}</h5>
+            <p class="card-text">${metrics[key]}</p>
+          </div>
+        </div>
+      </div>`;
+  }
+
+  const progress = metrics["Total Pages"] ? Math.round((metrics.Completed + metrics["Do Not Migrate"])/metrics["Total Pages"]*100):0;
+  const bar = document.getElementById("progressBar");
+  bar.style.width = progress+"%";
+  bar.innerText = progress+"%";
+  bar.className="progress-bar";
+  if(progress<40) bar.classList.add("bg-danger");
+  else if(progress<70) bar.classList.add("bg-warning");
+  else bar.classList.add("bg-success");
+
+  renderBreakdown(filtered);
+  renderQaAccordion(filtered);
+}
+
+function renderBreakdown(data){
+  const container = document.getElementById("progressBreakdownBody");
+  container.innerHTML="<button id='toggleHiddenGroups' class='btn btn-sm btn-secondary mb-2'>Show 0% Groups</button>";
+
+  const groups = [
+    {name:"Division", field:"Division"},
+    {name:"Page Type", field:"Page Type"},
+    {name:"Site Type", field:"Symphony Site Type"},
+    {name:"Area Command", field:"Area Command Admin Group.title"}
+  ];
+
+  groups.forEach(g=>{
+    const grouped={};
+    data.forEach(d=>{
+      let val = d[g.field] || "Not Set";
+      grouped[val] = grouped[val] || {total:0, done:0, donot:0};
+      grouped[val].total++;
+      if(["4","5"].some(s=>d.Status?.startsWith(s))) grouped[val].done++;
+      if(d.Status==="Do Not Migrate") grouped[val].donot++;
+    });
+
+    container.innerHTML += `<h3 class="mt-3">${g.name}</h3>`;
+    Object.keys(grouped).sort().forEach(k=>{
+      const total = grouped[k].total;
+      const prog = total ? Math.round((grouped[k].done + grouped[k].donot)/total*100) : 0;
+      const hiddenClass = prog===0?"hidden-group":""; 
+      const colorClass = prog<40?"bg-danger":prog<70?"bg-warning":"bg-success";
+      container.innerHTML += `<div class="mb-1 ${hiddenClass}" style="display:${hiddenClass?'none':'block'}">
+        <strong>${k}</strong>
+        <div class="progress">
+          <div class="progress-bar ${colorClass}" style="width:${prog}%">${prog}%</div>
+        </div>
+      </div>`;
+    });
+  });
+
+  document.getElementById("toggleHiddenGroups").onclick=()=> {
+    const hiddenElems = container.querySelectorAll(".hidden-group");
+    hiddenElems.forEach(e=>e.style.display=e.style.display==="none"?"block":"none");
+    document.getElementById("toggleHiddenGroups").innerText = hiddenElems[0].style.display==="block"?"Hide 0% Groups":"Show 0% Groups";
+  };
+}
+
+// Table rendering
+function renderTable(){
+  if(table) table.destroy();
+  const filtered = getFilteredData();
+  table = new Tabulator("#tableContainer",{
+    data: filtered,
+    layout:"fitDataStretch",
+    responsiveLayout:"collapse",
+    placeholder:"No matching pages found",
+    columns:[
+      {title:"Title", field:"Title", formatter:"plaintext", cellClick:(e,cell)=>showTableModalById(cell.getRow().getData()._id)},
+      {title:"SD", field:"Page URL", formatter:cell=>cell.getValue()?`<a href="${cell.getValue()}" target="_blank">&#128279;</a>`:""},
+      {title:"ZD", field:"Zesty URL Path Part", formatter:cell=>cell.getValue()?`<a href="https://8hxvw8tw-dev.webengine.zesty.io${cell.getValue()}?zpw=tsasecret123&redirect=false&_bypassError=true" target="_blank">&#128279;</a>`:""},
+      {title:"Status", field:"Status",
+          width: 110,        // fixed column width in px (adjust to taste)
+          minWidth: 80,
+          headerSort: false, // optional: keep width stable on header sort
+          formatter: function(cell){
+    const v = cell.getValue() ?? "";
+    // escape html so long content can't break markup
+    const esc = String(v).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+    return `<div class="col-ellipsis" title="${esc}">${esc}</div>`;
+  }
+      },
+      {title:"Priority", field:"Priority"},
+      {
+  title: "Effort Needed",
+  field: "Effort Needed",
+  width: 110,        // fixed column width in px (adjust to taste)
+  minWidth: 80,
+  headerSort: false, // optional: keep width stable on header sort
+  formatter: function(cell){
+    const v = cell.getValue() ?? "";
+    // escape html so long content can't break markup
+    const esc = String(v).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+    return `<div class="col-ellipsis" title="${esc}">${esc}</div>`;
+  }
+},
+
+      {title:"Published Symphony", field:"Published Symphony", formatter:cell=>cell.getValue()?"True":"False"},
+      {title:"Page Type", field:"Page Type"},
+      {title:"Modified", field:"Modified"},
+      {title:"Site Title", field:"Site Title"}
+    ],
+    pagination:"local",
+    paginationSize:20,
+    movableColumns:true
+  });
+}
+
+function showTableModalById(id){
+  const page = pageCache[id];
+  if(page) showTableModal(page);
+}
+
+function showTableModal(page){
+  document.getElementById("tableModalTitle").innerText = page.Title;
+  let html = '<table class="table table-bordered">';
+  for(const k in page){
+    let val = page[k];
+    if(k==="Page URL" && val) val=`<a href="${val}" target="_blank">${val}</a>`;
+    if(k==="Zesty URL Path Part" && val) val=`<a href="https://8hxvw8tw-dev.webengine.zesty.io${val}?zpw=tsasecret123&redirect=false&_bypassError=true" target="_blank">${val}</a>`;
+    if(k==="Zesty Content Mobile Editor Path" && val) val=`<a href="${val}" target="_blank">${val}</a>`;
+    if(k==="Migration URL" && val) val=`<a href="${val}" target="_blank">${val}</a>`;
+    html+=`<tr><th>${k}</th><td>${val}</td></tr>`;
+  }
+  html+="</table>";
+  document.getElementById("tableModalBody").innerHTML=html;
+  new bootstrap.Modal(document.getElementById('tableDetailModal')).show();
+}
+
+// --- QA Modal: now a responsive table with SD/ZD icons and clickable title ---
+function showQaIssuesModal(groupKey){
+  const ids = qaGroupedCache[groupKey] || [];
+  const modalBody = document.getElementById("qaIssuesModalBody");
+
+  if (ids.length === 0) {
+    modalBody.innerHTML = "<p>No pages in this group.</p>";
+    return;
+  }
+
+  let html = `
+    <div class="table-responsive">
+      <table class="table table-sm table-bordered align-middle">
+        <thead class="table-light">
+          <tr>
+            <th class="text-center">SD</th>
+            <th class="text-center">ZD</th>
+            <th>Title</th>
+            <th>Status</th>
+            <th>Priority</th>
+          </tr>
+        </thead>
+        <tbody>
+  `;
+
+  ids.forEach(id => {
+    const p = pageCache[id];
+    const sdLink = p["Page URL"]
+      ? `<a href="${p["Page URL"]}" target="_blank" title="Site Link">🔗</a>` : "";
+    const zdLink = p["Zesty URL Path Part"]
+      ? `<a href="https://8hxvw8tw-dev.webengine.zesty.io${p["Zesty URL Path Part"]}?zpw=tsasecret123&redirect=false&_bypassError=true"
+           target="_blank" title="Zesty Preview">🟢</a>` : "";
+
+    html += `
+      <tr>
+        <td class="text-center">${sdLink}</td>
+        <td class="text-center">${zdLink}</td>
+        <td><a href="#" onclick="showTableModalById(${id})">${p.Title}</a></td>
+        <td>${p.Status || "N/A"}</td>
+        <td>${p.Priority || "N/A"}</td>
+      </tr>
+    `;
+  });
+
+  html += "</tbody></table></div>";
+  modalBody.innerHTML = html;
+
+  new bootstrap.Modal(document.getElementById("qaIssuesModal")).show();
+}
+
+// --- Charts: fixed Published Symphony chart to show Yes/No correctly ---
+function renderCharts(data){
+  Object.values(charts).forEach(c => c.destroy && c.destroy());
+  charts = {};
+
+  // Status
+  const statusGroups = { "Completed":0, "Do Not Migrate":0, "In Progress":0 };
+  data.forEach(d => {
+    const s = d.Status?.trim() || "";
+    if (/^(4|5)/.test(s)) statusGroups["Completed"]++;
+    else if (s === "Do Not Migrate") statusGroups["Do Not Migrate"]++;
+    else if (/^(1|2|3)/.test(s)) statusGroups["In Progress"]++;
+  });
+  charts.statusChart = new Chart(document.getElementById("statusChart"), {
+    type:"doughnut",
+    data:{ labels:Object.keys(statusGroups),
+           datasets:[{ data:Object.values(statusGroups),
+                       backgroundColor:["#2ecc71","#e74c3c","#f39c12"] }] },
+    options:{ plugins:{ title:{display:true,text:"Status"} } }
+  });
+
+  // Priority
+  const priorityCounts = countBy(data,"Priority");
+  charts.priorityChart = new Chart(document.getElementById("priorityChart"), {
+    type:"doughnut",
+    data:{ labels:Object.keys(priorityCounts),
+           datasets:[{ data:Object.values(priorityCounts),
+                       backgroundColor:palette(Object.keys(priorityCounts).length) }] },
+    options:{ plugins:{ title:{display:true,text:"Priority"} } }
+  });
+
+  // Page Type
+  const typeCounts = countBy(data,"Page Type");
+  charts.pageTypeChart = new Chart(document.getElementById("pageTypeChart"), {
+    type:"doughnut",
+    data:{ labels:Object.keys(typeCounts),
+           datasets:[{ data:Object.values(typeCounts),
+                       backgroundColor:palette(Object.keys(typeCounts).length) }] },
+    options:{ plugins:{ title:{display:true,text:"Page Type"} } }
+  });
+
+  // ✅ Published Symphony fix
+  const pubCounts = { Yes:0, No:0 };
+  data.forEach(d => {
+    if (String(d["Published Symphony"]).toLowerCase() === "true") pubCounts.Yes++;
+    else pubCounts.No++;
+  });
+  charts.pubSymChart = new Chart(document.getElementById("pubSymChart"), {
+    type:"doughnut",
+    data:{ labels:["Yes","No"],
+           datasets:[{ data:[pubCounts.Yes, pubCounts.No],
+                       backgroundColor:["#3498db","#95a5a6"] }] },
+    options:{ plugins:{ title:{display:true,text:"Published Symphony"} } }
+  });
+}
+
+
+
+
+function countBy(arr, field, mapFn) {
+  const counts={};
+  arr.forEach(d=>{
+    let key = mapFn ? mapFn(d[field]):d[field]||"Not Set";
+    counts[key] = (counts[key]||0)+1;
+  });
+  return counts;
+}
+
+function palette(n){
+  const colors = ["#e74c3c","#f39c12","#f1c40f","#2ecc71","#3498db","#9b59b6","#16a085","#d35400"];
+  return Array.from({length:n},(_,i)=>colors[i % colors.length]);
+}
+
+function applyChartFilter(field,value){
+  const selMap={
+    "Status":"filterStatus",
+    "Priority":"filterPriority",
+    "Page Type":"filterPageType",
+    "Published Symphony":"filterPubSym"
+  };
+  if(selMap[field]){
+    document.getElementById(selMap[field]).value=value;
+    updateDashboard();
+  }
+}
+
+function renderCharts(data){
+  Object.values(charts).forEach(c=>c.destroy && c.destroy());
+  charts={};
+
+// --- Status chart (stub with corrected ordering and no "Other") ---
+const statusGroups = {
+  "Completed": 0,
+  "Do Not Migrate": 0,
+  "In QA": 0,
+  "In Progress": 0
+};
+
+data.forEach(d => {
+  const s = (d.Status || "").trim();
+  if (/^(4|5)/.test(s)) {
+    statusGroups["Completed"]++;
+  } else if (s === "Do Not Migrate") {
+    statusGroups["Do Not Migrate"]++;
+  } else if (/^3/.test(s)) {
+    statusGroups["In QA"]++;
+  } else if (/^(1|2)/.test(s)) {
+    statusGroups["In Progress"]++;
+  }
+});
+
+charts.statusChart = new Chart(document.getElementById("statusChart"), {
+  type: "doughnut",
+  data: {
+    labels: Object.keys(statusGroups),
+    datasets: [{
+      data: Object.values(statusGroups),
+      backgroundColor: [
+        "#2ecc71", // Completed
+        "#e74c3c", // Do Not Migrate
+        "#95a5a6", // In QA
+        "#f39c12"  // In Progress
+      ]
+    }]
+  },
+  options: {
+    plugins: { title: { display: true, text: "Status" } },
+    onClick: (e, els) => {
+      if (els.length > 0) {
+        applyChartFilter("Status",
+          charts.statusChart.data.labels[els[0].index]);
+      }
+    }
+  }
+});
+
+
+  const priorityCounts = countBy(data,"Priority");
+  charts.priorityChart = new Chart(document.getElementById("priorityChart"), {
+    type:"doughnut", data:{labels:Object.keys(priorityCounts),datasets:[{data:Object.values(priorityCounts),backgroundColor:palette(Object.keys(priorityCounts).length)}]},
+    options:{plugins:{title:{display:true,text:"Priority"}},onClick:(e,els)=>{if(els.length>0){applyChartFilter("Priority",charts.priorityChart.data.labels[els[0].index]);}}}
+  });
+
+  const typeCounts = countBy(data,"Page Type");
+  charts.pageTypeChart = new Chart(document.getElementById("pageTypeChart"), {
+    type:"doughnut", data:{labels:Object.keys(typeCounts),datasets:[{data:Object.values(typeCounts),backgroundColor:palette(Object.keys(typeCounts).length)}]},
+    options:{plugins:{title:{display:true,text:"Page Type"}},onClick:(e,els)=>{if(els.length>0){applyChartFilter("Page Type",charts.pageTypeChart.data.labels[els[0].index]);}}}
+  });
+
+  // Published Symphony: show Yes/No
+  const pubSymCounts = countBy(data,"Published Symphony",v=>v?"Yes":"No");
+  charts.pubSymChart = new Chart(document.getElementById("pubSymChart"), {
+    type:"doughnut", 
+    data:{
+      labels:Object.keys(pubSymCounts), 
+      datasets:[{data:Object.values(pubSymCounts),backgroundColor:["#3498db","#95a5a6"]}]
+    },
+    options:{plugins:{title:{display:true,text:"Published Symphony"}},onClick:(e,els)=>{
+      if(els.length>0){applyChartFilter("Published Symphony",charts.pubSymChart.data.labels[els[0].index]==="Yes"?"true":"");}
+    }}
+  });
+}
+
+function updateDashboard(){
+  renderCards();
+  renderTable();
+  renderCharts(getFilteredData());
+}
+
+fetchData();
+</script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
