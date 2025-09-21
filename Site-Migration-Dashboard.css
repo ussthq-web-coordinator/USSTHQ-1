@@ -1,0 +1,244 @@
+  /**
+ * Site-Migration-Dashboard.css
+ * 
+ * (c) 2024 Orientrius Cook. All rights reserved.
+ */
+
+.montserrat-dash {
+  font-family: "Montserrat", sans-serif;
+  font-optical-sizing: auto;
+  font-weight: 400;
+  font-style: normal;
+}
+
+body { font-family: 'Montserrat', sans-serif; background:#f9f9f9; }
+.card { margin-bottom: 1rem; }
+.card-body { text-align:center; }
+.card-title { font-size:1rem; font-weight:bold; }
+.progress { height: 1.5rem; margin-bottom: 1rem; }
+.card-text { font-size:0.9rem; }
+.chart-container { margin-bottom:1rem; }
+.tabulator { font-size:0.85rem; }
+.tabulator .tabulator-header { background-color: #2c3e50; color: #fff; font-weight:bold; }
+.modal-body table { width:100%; border-collapse:collapse; }
+.modal-body td, .modal-body th { padding:0.25rem; vertical-align:top; border:1px solid #ddd; font-size:0.85rem; }
+.table-header-links { font-size:1rem; margin-left:1rem; }
+.hidden-group { display:none; }
+.tabulator-cell[data-field="Effort Needed"], 
+.tabulator-cell[data-field="Published Symphony"], 
+.tabulator-cell[data-field="Site Title"] {
+  max-width:80px; /* thinner columns */
+  overflow:hidden; 
+  white-space:nowrap; 
+  text-overflow:ellipsis;
+}
+.tabulator-cell.text-wrap {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* inner wrapper used by the formatter — this will show the ellipsis and provide full text on hover */
+.tabulator-cell .col-ellipsis {
+  display: block;           /* must be block/inline-block */
+  width: 100%;              /* fill the cell width */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.list-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0.5rem 0;
+}
+
+.list-icon-button {
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: default;
+}
+
+/* Geometric background for rocket */
+.icon-container {
+  background-color: #CA5010;
+  padding: 0.5rem; /* space around the rocket */
+  border-radius: 12px; /* rounded rectangle */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;  /* fixed size */
+  height: 40px; /* fixed size */
+}
+
+.icon-container img {
+  width: 20px;
+  height: 20px;
+}
+
+.icon-shape img {
+  display: block;
+}
+
+.info {
+  display: flex;
+  flex-direction: column;
+}
+
+.team-name {
+  color: gray;
+  font-size: 0.70rem;
+}
+
+.site-title {
+  color: black;
+  font-weight: bold;
+  font-size: 1.03rem;
+}
+.table-link {
+  color: #0a66c2;   /* typical link blue */
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.table-link:hover {
+  color: #004080;
+}
+
+/* Desktop charts smaller */
+.chart-container canvas {
+  width: 100% !important;
+  max-width: 250px; /* smaller than default */
+  height: 250px !important;
+  margin: 0 auto;
+}
+
+@media(min-width: 1200px){
+  .chart-container canvas {
+    max-width: 250px;
+    height: 250px !important;
+  }
+}
+
+/* --- UPDATED STYLE ONLY --- */
+
+/* Thinner Tabulator columns for Effort Needed, Published Symphony, Site Title */
+.tabulator-cell[data-field="Effort Needed"],
+.tabulator-cell[data-field="Published Symphony"],
+.tabulator-cell[data-field="Site Title"] {
+  max-width: 60px; /* reduced from 80px */
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* Desktop charts smaller */
+.chart-container canvas {
+  width: 100% !important;
+  max-width: 250px; /* reduced from 250px */
+  height: 250px !important; /* reduced from 250px */
+  margin: 0 auto;
+}
+
+@media(min-width: 1200px){
+  .chart-container canvas {
+    max-width: 250px;
+    height: 250px !important;
+  }
+}
+
+/* Horizontal scroll for mobile: maintain existing widths but adjust metric card width */
+@media (max-width: 991px) {
+  #metricCards .col-lg-3,
+  #metricCards .col-md-6,
+  #metricCards .col-sm-12 {
+    width: 80%; /* slightly narrower for easier scroll */
+  }
+
+  .charts-row .chart-container {
+    width: 100%; /* match smaller chart */
+  }
+}
+  /* Horizontal scroll for medium and small screens */
+@media (max-width: 991px) {
+  #metricCards {
+    display: flex;
+    flex-wrap: nowrap;      /* prevent wrapping */
+    overflow-x: auto;       /* allow horizontal scroll */
+    gap: 0.5rem;            /* spacing between cards */
+  }
+
+  #metricCards .col-lg-3,
+  #metricCards .col-md-6,
+  #metricCards .col-sm-12 {
+    flex: 0 0 auto;         /* prevent columns from shrinking */
+    width: auto;            /* allow cards to keep their natural width */
+  }
+}
+
+/* Horizontal scroll for filter dropdowns on md/sm screens */
+@media (max-width: 991px) {
+  .filters-row {
+    display: flex;
+    flex-wrap: nowrap;      /* keep all filters in a single row */
+    overflow-x: auto;       /* allow horizontal scroll */
+    -webkit-overflow-scrolling: touch; /* smooth scrolling on iOS */
+    gap: 0.5rem;            /* optional spacing between filters */
+    padding-bottom: 0.5rem; /* optional padding for scroll area */
+  }
+
+  .filters-row .col-lg-2,
+  .filters-row .col-md-4,
+  .filters-row .col-sm-6 {
+    flex: 0 0 auto;         /* prevent flex items from shrinking */
+    width: auto;            /* let each filter keep its natural width */
+  }
+}
+
+/* Horizontal scroll for charts on md/sm screens */
+@media (max-width: 991px) {
+  .charts-row {
+    display: flex;
+    flex-wrap: nowrap;      /* keep charts in a single row */
+    overflow-x: auto;       /* allow horizontal scroll */
+    -webkit-overflow-scrolling: touch; /* smooth scrolling on iOS */
+    gap: 1rem;              /* spacing between charts */
+    padding-bottom: 0.5rem; /* padding for scroll area */
+  }
+
+  .charts-row .col-lg-3,
+  .charts-row .col-md-6,
+  .charts-row .col-sm-12 {
+    flex: 0 0 auto;         /* prevent flex items from shrinking */
+    width: 400px;           /* optional: fixed width per chart */
+  }
+}
+
+/* Chart top margin */
+.charts-row .chart-container p {
+  margin-top: 1rem;
+  font-size: 0.95rem;
+}
+
+/* Mobile swipe hint only on small screens */
+@media (min-width: 992px) {
+  .charts-row .chart-container small {
+    display: none;
+  }
+}
+
+/* Horizontal scroll for progress legend on mobile */
+@media (max-width: 767px) {
+  #progressLegend {
+    display: flex;
+    flex-wrap: nowrap;          /* prevent wrapping */
+    overflow-x: auto;           /* enable horizontal scroll */
+    -webkit-overflow-scrolling: touch; /* smooth on iOS */
+    gap: 0.75rem;               /* space between items */
+    padding-bottom: 0.5rem;     /* optional for scroll area */
+  }
+
+  #progressLegend .legend-item {
+    flex: 0 0 auto;             /* keep each item from shrinking */
+  }
+}
