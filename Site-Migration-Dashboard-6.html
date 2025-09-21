@@ -239,6 +239,22 @@ body { font-family: 'Montserrat', sans-serif; background:#f9f9f9; }
   }
 }
 
+/* Horizontal scroll for progress legend on mobile */
+@media (max-width: 767px) {
+  #progressLegend {
+    display: flex;
+    flex-wrap: nowrap;          /* prevent wrapping */
+    overflow-x: auto;           /* enable horizontal scroll */
+    -webkit-overflow-scrolling: touch; /* smooth on iOS */
+    gap: 0.75rem;               /* space between items */
+    padding-bottom: 0.5rem;     /* optional for scroll area */
+  }
+
+  #progressLegend .legend-item {
+    flex: 0 0 auto;             /* keep each item from shrinking */
+  }
+}
+
 
 </style>
 </head>
@@ -289,6 +305,7 @@ body { font-family: 'Montserrat', sans-serif; background:#f9f9f9; }
       </div>
     </div>
   </nav>
+
 
 <!-- Filters -->
 <div class="row mt-3 mb-3 filters-row">
@@ -440,7 +457,7 @@ body { font-family: 'Montserrat', sans-serif; background:#f9f9f9; }
 
 
 <script>
-const jsonURL = "https://cdn.jsdelivr.net/gh/ussthq-web-coordinator/USSTHQ-1@latest/DashboardData-f.json";
+const jsonURL = "https://cdn.jsdelivr.net/gh/ussthq-web-coordinator/USSTHQ-1@latest/DashboardData-g.json";
 let table, tableData=[], pageCache={}, qaGroupedCache={};
 let priorityChart, pageTypeChart, pubSymChart;
 let statusChart = null;
@@ -472,15 +489,15 @@ function normalizeStatus(status){
 
 // canonical mapping
 function getCanonicalStatus(status) {
-  if (!status) return "Unknown";
-  status = status.toString().trim();
-  if (/^4|^5/.test(status)) return "Completed";
+  status = (status||"").trim();
+  if (/^(4|5)/.test(status)) return "Completed";
   if (status === "Do Not Migrate") return "Do Not Migrate";
-  if (/^2/.test(status)) return "In Progress";
+  if (/^2/.test(status)) return "In Progress";       // 2a/2b/2c
+  if (/^3[a-c]/.test(status)) return "In QA";       // 3a/3b/3c
   if (/^1/.test(status)) return "Needs Info";
-  if (/^3[a-c]/.test(status)) return "In QA";
   return "Unknown";
 }
+
 
 // status colors
 const statusColors = {
@@ -505,6 +522,8 @@ const chartOptions = {
     }
   }
 };
+
+
 
 function addChartLegendModal(chart, chartTitle) {
   const container = chart.canvas.parentNode;
@@ -602,9 +621,10 @@ function getFilteredData(){
   );
 }
 
+    // Change order of overall progress legend
 function renderOverallProgress(filtered){
   const total = filtered.length;
-  const counts = { Completed:0, "Do Not Migrate":0, "In Progress":0, "Needs Info":0, "In QA":0, Unknown:0 };
+  const counts = { "Do Not Migrate":0, "Needs Info":0, "In Progress":0, "In QA":0, Unknown:0, Completed:0,};
   
   filtered.forEach(d=>{
     const s = getCanonicalStatus(d.Status);
@@ -618,9 +638,8 @@ function renderOverallProgress(filtered){
   legendContainer.innerHTML = "";
 
   Object.keys(counts).forEach(key=>{
-    const pct = total ? Math.round((counts[key]/total)*100) : 0;
-    if(pct > 0){
-      // Add progress segment
+    const pct = total ? (counts[key]/total*100) : 0; // use float, not rounded
+    if(counts[key] > 0){  // render all non-zero counts
       const div = document.createElement("div");
       div.className = "progress-bar";
       div.style.width = pct + "%";
@@ -628,17 +647,18 @@ function renderOverallProgress(filtered){
       div.style.display="flex";
       div.style.alignItems="center";
       div.style.justifyContent="center";
-      div.innerText=`${pct}% (${counts[key]})`;
+      div.innerText = `${Math.round(pct)}% (${counts[key]})`;
       container.appendChild(div);
 
-      // Add legend item
+      // Add legend
       const legendItem = document.createElement("div");
-      legendItem.className = "d-flex align-items-center gap-1";
+      legendItem.className = "d-flex align-items-center gap-1 legend-item";
       legendItem.innerHTML = `<span style="display:inline-block;width:14px;height:14px;background-color:${statusColors[key]};"></span> ${key}`;
       legendContainer.appendChild(legendItem);
     }
   });
 }
+
 
 
 
@@ -774,9 +794,9 @@ statusChart = new Chart(ctxStatus, {
       backgroundColor: [
         "#dc3545", // Do Not Migrate – red
         "#28a745", // Completed – green
-        "#ffc107", // In Progress – yellow
-        "#6f42c1", // In QA – purple
-        "#fd7e14", // Needs Info – orange
+        "#3B50B2", // In QA –Blue - orange #fd7e14
+        "#ffc107", // Needs Info – yellow
+        "#6f42c1", // In Progress – purple
         "#6c757d"  // Unknown – gray
       ]
     }]
@@ -806,7 +826,7 @@ statusChart = new Chart(ctxStatus, {
       labels: Object.keys(priorityCounts),
       datasets: [{
         data: Object.values(priorityCounts),
-        backgroundColor: ["#f1c40f","#2ecc71","#e74c3c","#f39c12","#3498db","#9b59b6","#16a085","#d35400","#ff6b6b"]
+        backgroundColor: ["#3B50B2","#f1c40f","#f39c12","#e74c3c","#3498db","#9b59b6","#16a085","#d35400","#ff6b6b"]
       }]
     },
     options: {
@@ -1054,6 +1074,46 @@ function renderTable(){
     movableColumns:true
   });
 }
+
+// Make sure masterData references tableData
+const masterData = tableData;
+
+document.addEventListener("DOMContentLoaded", () => {
+  const searchInput = document.getElementById("searchInput");
+  const searchBtn = document.getElementById("searchBtn");
+  const clearBtn = document.getElementById("clearBtn");
+
+  // Search function for Tabulator
+  function filterTable() {
+    const query = searchInput.value.toLowerCase().trim();
+    if (!table) return;
+    if (!query) {
+      table.clearFilter();
+      return;
+    }
+    table.setFilter(row => {
+      return Object.values(row).some(val => String(val).toLowerCase().includes(query));
+    });
+  }
+
+  function clearFilter() {
+    searchInput.value = "";
+    if (table) table.clearFilter();
+  }
+
+  searchBtn.addEventListener("click", filterTable);
+  clearBtn.addEventListener("click", clearFilter);
+
+  // Optional: filter on Enter key press
+  searchInput.addEventListener("keypress", function(e) {
+    if (e.key === "Enter") filterTable();
+  });
+});
+
+
+
+
+
 
   // --- Table Modal ---
 function showTableModalById(id){
