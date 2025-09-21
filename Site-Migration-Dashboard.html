@@ -457,7 +457,7 @@ body { font-family: 'Montserrat', sans-serif; background:#f9f9f9; }
 
 
 <script>
-const jsonURL = "https://cdn.jsdelivr.net/gh/ussthq-web-coordinator/USSTHQ-1@latest/DashboardData-h.json";
+const jsonURL = "https://cdn.jsdelivr.net/gh/ussthq-web-coordinator/USSTHQ-1@latest/DashboardData-i.json";
 let table, tableData=[], pageCache={}, qaGroupedCache={};
 let priorityChart, pageTypeChart, pubSymChart;
 let statusChart = null;
@@ -786,7 +786,7 @@ filtered.forEach(d => {
 
 if(statusChart) statusChart.destroy();
 statusChart = new Chart(ctxStatus, {
-  type: "doughnut",
+  type: "pie",
   data: {
     labels: Object.keys(statusCounts),
     datasets: [{
@@ -847,7 +847,7 @@ statusChart = new Chart(ctxStatus, {
 
   if(pageTypeChart) pageTypeChart.destroy();
   pageTypeChart = new Chart(ctxPageType, {
-    type: "doughnut",
+    type: "pie",
     data: {
       labels: Object.keys(pageTypeCounts),
       datasets: [{
@@ -1248,7 +1248,7 @@ function renderCharts(data){
   // Priority
   const priorityCounts = countBy(data,"Priority");
   charts.priorityChart = new Chart(document.getElementById("priorityChart"), {
-    type:"doughnut",
+    type:"pie",
     data:{ labels:Object.keys(priorityCounts),
            datasets:[{ data:Object.values(priorityCounts),
                        backgroundColor:palette(Object.keys(priorityCounts).length) }] },
@@ -1258,7 +1258,7 @@ function renderCharts(data){
   // Page Type
   const typeCounts = countBy(data,"Page Type");
   charts.pageTypeChart = new Chart(document.getElementById("pageTypeChart"), {
-    type:"doughnut",
+    type:"pie",
     data:{ labels:Object.keys(typeCounts),
            datasets:[{ data:Object.values(typeCounts),
                        backgroundColor:palette(Object.keys(typeCounts).length) }] },
@@ -1272,7 +1272,7 @@ function renderCharts(data){
     else pubCounts.No++;
   });
   charts.pubSymChart = new Chart(document.getElementById("pubSymChart"), {
-    type:"doughnut",
+    type:"pie",
     data:{ labels:["Yes","No"],
            datasets:[{ data:[pubCounts.Yes, pubCounts.No],
                        backgroundColor:["#3498db","#95a5a6"] }] },
@@ -1305,7 +1305,7 @@ function renderCharts(data){
 
 const statusChart = new Chart(document.getElementById('statusChart'), {
 
-  type: 'doughnut',
+  type: 'pie',
   data: statusData,
   options: {
     plugins: {
@@ -1351,7 +1351,7 @@ addChartLegendModal(statusChart, "Status Overview");
   const statusLabelsWithPct = statusLabels.map((l,i)=>`${l} (${statusTotal?Math.round(statusData[i]/statusTotal*100):0}%)`);
 
   charts.statusChart = new Chart(document.getElementById("statusChart"), {
-    type:"doughnut",
+    type:"pie",
     data:{ labels:statusLabelsWithPct, datasets:[{ data:statusData, backgroundColor:["#2ecc71","#e74c3c","#f39c12","#3B50B2","#CA5010"] }] },
     options:{ plugins:{ title:{display:true,text:"Status"} } }
   });
@@ -1364,7 +1364,7 @@ addChartLegendModal(statusChart, "Status Overview");
   const priorityLabelsWithPct = priorityLabels.map((l,i)=>`${l} (${priorityTotal?Math.round(priorityData[i]/priorityTotal*100):0}%)`);
 
   charts.priorityChart = new Chart(document.getElementById("priorityChart"),{
-    type:"doughnut",
+    type:"pie",
     data:{ labels:priorityLabelsWithPct, datasets:[{ data:priorityData, backgroundColor:palette(priorityLabels.length) }] },
     options:{ plugins:{ title:{display:true,text:"Priority"} } }
   });
@@ -1377,7 +1377,7 @@ addChartLegendModal(statusChart, "Status Overview");
   const typeLabelsWithPct = typeLabels.map((l,i)=>`${l} (${typeTotal?Math.round(typeData[i]/typeTotal*100):0}%)`);
 
   charts.pageTypeChart = new Chart(document.getElementById("pageTypeChart"),{
-    type:"doughnut",
+    type:"pie",
     data:{ labels:typeLabelsWithPct, datasets:[{ data:typeData, backgroundColor:palette(typeLabels.length) }] },
     options:{ plugins:{ title:{display:true,text:"Page Type"} } }
   });
@@ -1395,7 +1395,7 @@ addChartLegendModal(statusChart, "Status Overview");
   const pubLabelsWithPct = pubLabels.map((l,i)=>`${l} (${pubTotal?Math.round(pubData[i]/pubTotal*100):0}%)`);
 
   charts.pubSymChart = new Chart(document.getElementById("pubSymChart"),{
-    type:"doughnut",
+    type:"pie",
     data:{ labels:pubLabelsWithPct, datasets:[{ data:pubData, backgroundColor:["#2ecc71","#e74c3c"] }] },
     options:{ plugins:{ title:{display:true,text:"Published Symphony"} } }
   });
