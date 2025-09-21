@@ -1,7 +1,6 @@
 /**
  * Site-Migration-Dashboard.js
  * 
- * (c) 2024 Orientrius Cook. All rights reserved.
  */
 
 // Strict mode for better error checking
