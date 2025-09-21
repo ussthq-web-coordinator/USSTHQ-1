@@ -440,7 +440,7 @@ body { font-family: 'Montserrat', sans-serif; background:#f9f9f9; }
 
 
 <script>
-const jsonURL = "https://cdn.jsdelivr.net/gh/ussthq-web-coordinator/USSTHQ-1@latest/DashboardData-c.json";
+const jsonURL = "https://cdn.jsdelivr.net/gh/ussthq-web-coordinator/USSTHQ-1@latest/DashboardData-d.json";
 let table, tableData=[], pageCache={}, qaGroupedCache={};
 let priorityChart, pageTypeChart, pubSymChart;
 let statusChart = null;
@@ -470,100 +470,19 @@ function normalizeStatus(status){
   return (status || "").toString().trim();
 }
 
-// Map any raw JSON Status to canonical group for overall progress chart
-function getCanonicalStatus(status){
-    status = (status || "").toString().trim();
-    if (/^(4|5)/.test(status)) return "Completed";
-    if (status === "Do Not Migrate") return "Do Not Migrate";
-    if (/^(1|2)/.test(status)) return "In Progress";
-    if (/^3[a-c]/.test(status)) return "In QA";
-    if (status === "Needs Info") return "Needs Info";
-    return "Unknown"; // fallback
-}
-
-function renderCharts(filteredData) {
-    const ctxStatus = document.getElementById("statusChart").getContext("2d");
-    if (statusChart) statusChart.destroy();
-
-    const counts = { "Completed":0,"Do Not Migrate":0,"In Progress":0,"In QA":0,"Needs Info":0 };
-    filteredData.forEach(d=>{
-        const s = getCanonicalStatus(d.Status);
-        if(counts.hasOwnProperty(s)) counts[s]++;
-    });
-
-    statusChart = new Chart(ctxStatus, {
-        type:"pie",
-        data:{
-            labels:Object.keys(counts),
-            datasets:[{
-                data:Object.values(counts),
-                backgroundColor:[
-                    "#2ecc71","#e74c3c","#f39c12","#CA5010","#3B50B2"
-                ]
-            }]
-        },
-        options:{ plugins:{ legend:{ display:true, position:'right' }, tooltip:{ enabled:true } } }
-    });
-
-    const total = filteredData.length;
-    const progressContainer = document.getElementById("overallProgress");
-    progressContainer.innerHTML = `
-        <div class="progress" style="height:25px;">
-            <div class="progress-bar bg-success" role="progressbar" style="width:${(counts["Completed"]/total)*100}%">
-                Completed (${counts["Completed"]})
-            </div>
-            <div class="progress-bar bg-danger" role="progressbar" style="width:${(counts["Do Not Migrate"]/total)*100}%">
-                Do Not Migrate (${counts["Do Not Migrate"]})
-            </div>
-            <div class="progress-bar bg-warning text-dark" role="progressbar" style="width:${(counts["In Progress"]/total)*100}%">
-                In Progress (${counts["In Progress"]})
-            </div>
-            <div class="progress-bar" style="background-color:#CA5010" role="progressbar" style="width:${(counts["In QA"]/total)*100}%">
-                In QA (${counts["In QA"]})
-            </div>
-            <div class="progress-bar" style="background-color:#3B50B2" role="progressbar" style="width:${(counts["Needs Info"]/total)*100}%">
-                Needs Info (${counts["Needs Info"]})
-            </div>
-        </div>
-    `;
-}
-
+// canonical mapping
 function getCanonicalStatus(status) {
-  switch (status) {
-    case "Do Not Migrate":
-      return "Do Not Migrate";
-
-    // 1-series → Needs Info
-    case "1a. Need Migration Fields set":
-    case "1b. Pending Migration":
-      return "Needs Info";
-
-    // 2-series → In Progress
-    case "2a. Started Content Migration":
-    case "2b. Finished Content Migration; Zesty Columns Set in this list":
-    case "2c. Updates Needed, See QA Notes/Comments":
-      return "In Progress";
-
-    // 3-series → In QA
-    case "3a. Ready for Area Command QA":
-    case "3b. Ready for DHQ QA":
-    case "3c. Ready for THQ QA":
-      return "In QA";
-
-    // 4–5 → Completed
-    case "4. THQ QA Complete, THQ will publish on migration date":
-    case "5. THQ Published and URL Redirected":
-      return "Completed";
-
-    default:
-      return "Unknown";
-  }
+  if (!status) return "Unknown";
+  status = status.toString().trim();
+  if (/^4|^5/.test(status)) return "Completed";
+  if (status === "Do Not Migrate") return "Do Not Migrate";
+  if (/^2/.test(status)) return "In Progress";
+  if (/^1/.test(status)) return "Needs Info";
+  if (/^3[a-c]/.test(status)) return "In QA";
+  return "Unknown";
 }
 
-
-
-
-// Define the colors for each canonical status
+// status colors
 const statusColors = {
     "Completed": "#2ecc71",
     "Do Not Migrate": "#e74c3c",
@@ -573,43 +492,6 @@ const statusColors = {
     "Unknown": "#7f8c8d"
 };
 
-function renderCharts(filtered){
-    const ctxStatus = document.getElementById("statusChart").getContext("2d");
-
-    // Count statuses
-    const statusCounts = { "Completed":0, "Do Not Migrate":0, "In Progress":0, "In QA":0, "Needs Info":0 };
-    filtered.forEach(d => {
-        const key = getCanonicalStatus(d.Status);
-        if(statusCounts[key] !== undefined){
-            statusCounts[key]++;
-        } else {
-            statusCounts["Unknown"] = (statusCounts["Unknown"] || 0) + 1;
-        }
-    });
-
-    // Destroy old chart if exists
-    if(statusChart) statusChart.destroy();
-
-    // Create overall progress pie chart
-    statusChart = new Chart(ctxStatus, {
-        type: "pie",
-        data: {
-            labels: Object.keys(statusCounts).filter(k => statusCounts[k] > 0),
-            datasets: [{
-                data: Object.values(statusCounts).filter(v => v > 0),
-                backgroundColor: Object.keys(statusCounts)
-                    .filter(k => statusCounts[k] > 0)
-                    .map(k => statusColors[k])
-            }]
-        },
-        options: {
-            plugins: {
-                legend: { display: true, position: "bottom" },
-                tooltip: { enabled: true }
-            }
-        }
-    });
-}
 
 
 
@@ -819,52 +701,6 @@ const metrics = {
   })()
 };
 
-function renderStatusChart(filtered) {
-    const ctxStatus = document.getElementById("statusChart").getContext("2d");
-
-    // Reset previous chart
-    if (statusChart) statusChart.destroy();
-
-    // Count statuses
-    const counts = {
-        "Completed": 0,
-        "Do Not Migrate": 0,
-        "In Progress": 0,
-        "In QA": 0,
-        "Needs Info": 0
-    };
-
-    filtered.forEach(d => {
-        const s = getCanonicalStatus(d.Status); // returns one of the keys above
-        if (counts.hasOwnProperty(s)) counts[s]++;
-    });
-
-    const data = {
-        labels: Object.keys(counts),
-        datasets: [{
-            data: Object.values(counts),
-            backgroundColor: [
-                "#2ecc71", // Completed
-                "#e74c3c", // Do Not Migrate
-                "#f39c12", // In Progress
-                "#CA5010", // In QA
-                "#3B50B2"  // Needs Info
-            ]
-        }]
-    };
-
-    statusChart = new Chart(ctxStatus, {
-        type: "pie",
-        data: data,
-        options: {
-            plugins: {
-                legend: { display: true, position: 'right' },
-                tooltip: { enabled: true }
-            }
-        }
-    });
-}
-
 
 function renderCharts(filtered) {
   const ctxStatus = document.getElementById("statusChart").getContext("2d");
@@ -875,8 +711,8 @@ function renderCharts(filtered) {
   // Status chart colors match overall progress
 const colorsStatus = {
   "do not migrate": "#dc3545",       // red shades
-  "1a": "#e74c3c",                   // darker red
-  "1b": "#f1948a",                   // lighter red
+  "1a. Need Migration Fields set": "#e74c3c",                   // darker red
+  "1b. Pending Migration": "#f1948a",                   // lighter red
   "2a": "#f1c40f",                   // yellow shades
   "2b": "#f7dc6f",
   "2c": "#f9e79f",
@@ -910,8 +746,10 @@ filtered.forEach(d => {
   s = "Completed";
 } else if (s === "Do Not Migrate") {
   s = "Do Not Migrate";
-} else if (/^(1|2)/.test(s)) {
+} else if (/^2/.test(s)) {
   s = "In Progress";
+} else if (/^1/.test(s)) {
+  s = "Needs Info";
 } else if (/^3[a-c]/.test(s)) {
   s = "In QA";
 } else if (s === "Needs Info") {
@@ -924,17 +762,23 @@ filtered.forEach(d => {
   statusCounts[s] = (statusCounts[s] || 0) + 1;
 });
 
+  // Status chart
 
-  if(statusChart) statusChart.destroy();
+if(statusChart) statusChart.destroy();
 statusChart = new Chart(ctxStatus, {
-  type: "pie",
+  type: "doughnut",
   data: {
     labels: Object.keys(statusCounts),
     datasets: [{
       data: Object.values(statusCounts),
-      backgroundColor: Object.keys(statusCounts).map(
-        k => colorsStatus[k.toLowerCase()] || "#9b59b6"  // fallback only if missing
-      )
+      backgroundColor: [
+        "#dc3545", // Do Not Migrate – red
+        "#28a745", // Completed – green
+        "#ffc107", // In Progress – yellow
+        "#6f42c1", // In QA – purple
+        "#fd7e14", // Needs Info – orange
+        "#6c757d"  // Unknown – gray
+      ]
     }]
   },
   options: {
@@ -945,6 +789,7 @@ statusChart = new Chart(ctxStatus, {
     }
   },
 });
+
 
 
   // Priority chart (now pie)
