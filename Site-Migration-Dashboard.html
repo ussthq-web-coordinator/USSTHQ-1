@@ -1011,7 +1011,7 @@ function renderTable(){
 title: "Title",
       field: "Title",
       sorter: "string",
-      width: 300,       // a little wider than Effort Needed (110)
+      width: 300,       
       minWidth: 120,
       headerSort: true,
       formatter: function(cell){
@@ -1031,7 +1031,7 @@ title: "Title",
   field: "Form", 
   formatter: cell => {
     const row = cell.getRow().getData();
-    const id = row.ID; // use the actual JSON ID property
+    const id = row.ID; 
     const type = (row["Symphony Site Type"] || "").trim();
     let url = "#";
     if(type === "Metro Area") {
@@ -1061,9 +1061,9 @@ title: "Title",
       {
   title: "Effort Needed",
   field: "Effort Needed",
-  width: 110,        // fixed column width in px (adjust to taste)
+  width: 110,        
   minWidth: 80,
-  headerSort: true, // optional: keep width stable on header sort
+  headerSort: true, 
   formatter: function(cell){
     const v = cell.getValue() ?? "";
     // escape html so long content can't break markup
@@ -1075,7 +1075,19 @@ title: "Title",
       {title:"Published", field:"Published Symphony"},
       {title:"Page Type", field:"Page Type"},
       {title:"Modified", field:"Modified"},
-      {title:"Site Title", field:"Site Title"}
+      {
+  title:"Site Title", 
+  field:"Site Title",
+  width: 110,        
+  minWidth: 80,
+  headerSort: true, 
+  formatter: function(cell){
+    const v = cell.getValue() ?? "";
+    // escape html so long content can't break markup
+    const esc = String(v).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+    return `<div class="col-ellipsis" title="${esc}">${esc}</div>`;  
+  }
+}
     ],
     pagination:"local",
     paginationSize:20,
