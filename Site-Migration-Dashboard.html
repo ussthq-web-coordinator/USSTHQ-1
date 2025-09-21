@@ -1404,7 +1404,7 @@ addChartLegendModal(statusChart, "Status Overview");
 const refreshEl = document.getElementById("refreshDate");
 if(refreshEl){
   refreshEl.textContent = refreshUTC 
-    ? "Last refreshed (Eastern): " + refreshUTC.toLocaleString("en-US",{timeZone:"America/New_York", dateStyle:"medium", timeStyle:"short"}) + "Version 1.921414"
+    ? "Version 1.921414 - Last refreshed (Eastern): " + refreshUTC.toLocaleString("en-US",{timeZone:"America/New_York", dateStyle:"medium", timeStyle:"short"})
     : "Last refreshed: Unknown";
 }
 
