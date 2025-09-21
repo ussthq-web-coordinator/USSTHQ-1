@@ -1008,14 +1008,22 @@ function renderTable(){
     placeholder:"No matching pages found",
     columns:[
       { 
-  title: "Title", 
-  field: "Title", 
-  sorter: "string",
-  formatter: function(cell, formatterParams, onRendered){
-    const value = cell.getValue() || "";
-    return `<span class="table-link">${value}</span>`;
-  },
-  cellClick: (e, cell) => showTableModalById(cell.getRow().getData()._id)
+title: "Title",
+      field: "Title",
+      sorter: "string",
+      width: 250,       // a little wider than Effort Needed (110)
+      minWidth: 120,
+      headerSort: true,
+      formatter: function(cell){
+        const v = cell.getValue() ?? "";
+        const esc = String(v)
+          .replace(/&/g,"&amp;")
+          .replace(/</g,"&lt;")
+          .replace(/>/g,"&gt;")
+          .replace(/"/g,"&quot;");
+        return `<div class="col-ellipsis table-link" title="${esc}">${esc}</div>`;
+      },
+      cellClick: (e, cell) => showTableModalById(cell.getRow().getData()._id)
 }
 ,
 {
