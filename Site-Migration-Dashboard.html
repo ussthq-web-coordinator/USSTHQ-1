@@ -457,7 +457,7 @@ body { font-family: 'Montserrat', sans-serif; background:#f9f9f9; }
 
 
 <script>
-const jsonURL = "https://cdn.jsdelivr.net/gh/ussthq-web-coordinator/USSTHQ-1@latest/DashboardData-g.json";
+const jsonURL = "https://cdn.jsdelivr.net/gh/ussthq-web-coordinator/USSTHQ-1@latest/DashboardData-h.json";
 let table, tableData=[], pageCache={}, qaGroupedCache={};
 let priorityChart, pageTypeChart, pubSymChart;
 let statusChart = null;
@@ -1404,7 +1404,7 @@ addChartLegendModal(statusChart, "Status Overview");
 const refreshEl = document.getElementById("refreshDate");
 if(refreshEl){
   refreshEl.textContent = refreshUTC 
-    ? "Last refreshed (Eastern): " + refreshUTC.toLocaleString("en-US",{timeZone:"America/New_York", dateStyle:"medium", timeStyle:"short"})
+    ? "Last refreshed (Eastern): " + refreshUTC.toLocaleString("en-US",{timeZone:"America/New_York", dateStyle:"medium", timeStyle:"short"}) + "Version 1.921414"
     : "Last refreshed: Unknown";
 }
 
