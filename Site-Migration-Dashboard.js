@@ -279,7 +279,7 @@ const metrics = {
   "Completed": filtered.filter(d=>["4","5"].some(s=>d.Status?.trim().startsWith(s))).length,
   "Do Not Migrate": filtered.filter(d=>d.Status?.trim()==="Do Not Migrate").length,
   // ✅ combine Modified counts
-  "Monthly Modified": (() => {
+/*  "Monthly Modified": (() => {
       const today = new Date();
       const lastMonth = new Date(today.getFullYear(), today.getMonth()-1, today.getDate());
       const last = filtered.filter(d=>d.Modified && new Date(d.Modified)>=lastMonth &&
@@ -288,7 +288,27 @@ const metrics = {
                                          new Date(d.Modified).getMonth()===today.getMonth() &&
                                          new Date(d.Modified).getFullYear()===today.getFullYear()).length;
       return `Last: ${last} | This: ${current}`;
-  })(),
+  })(),*/
+  "Weekly Modified": (() => {
+    const today = new Date();
+
+    // This week window (last 7 days)
+    const thisWeekStart = new Date(today);
+    thisWeekStart.setDate(today.getDate() - 7);
+
+    const thisWeekCount = filtered.filter(d => d.Modified && new Date(d.Modified) >= thisWeekStart).length;
+
+    // Previous week window (8–14 days ago)
+    const prevWeekStart = new Date(today);
+    prevWeekStart.setDate(today.getDate() - 14);
+    const prevWeekEnd = new Date(today);
+    prevWeekEnd.setDate(today.getDate() - 7);
+
+    const prevWeekCount = filtered.filter(d => d.Modified && new Date(d.Modified) >= prevWeekStart && new Date(d.Modified) < prevWeekEnd).length;
+
+    return `This Week: ${thisWeekCount} | Last Week: ${prevWeekCount}`;
+})(),
+
   // ✅ single QA Issues card with High/Low/Total
   "QA Issues": (() => {
       const total = filtered.filter(d=>d["QA Issues.lookupValue"]).length;
