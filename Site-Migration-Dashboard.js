@@ -275,49 +275,44 @@ function renderCards(){
 
     // --- replace the metrics object ---
 const metrics = {
-  "Total Pages": filtered.length,
-  "Completed": filtered.filter(d=>["4","5"].some(s=>d.Status?.trim().startsWith(s))).length,
-  "Do Not Migrate": filtered.filter(d=>d.Status?.trim()==="Do Not Migrate").length,
-  // ✅ combine Modified counts
-/*  "Monthly Modified": (() => {
-      const today = new Date();
-      const lastMonth = new Date(today.getFullYear(), today.getMonth()-1, today.getDate());
-      const last = filtered.filter(d=>d.Modified && new Date(d.Modified)>=lastMonth &&
-                                      new Date(d.Modified).getMonth()!==today.getMonth()).length;
-      const current = filtered.filter(d=>d.Modified &&
-                                         new Date(d.Modified).getMonth()===today.getMonth() &&
-                                         new Date(d.Modified).getFullYear()===today.getFullYear()).length;
-      return `Last: ${last} | This: ${current}`;
-  })(),*/
+  "Migration Progress": (() => {
+      const total = filtered.length;
+      const completed = filtered.filter(d => ["4","5"].some(s => d.Status?.trim().startsWith(s))).length;
+      const doNotMigrate = filtered.filter(d => d.Status?.trim() === "Do Not Migrate").length;
+      const progressCount = completed + doNotMigrate;
+      const progressPct = total > 0 ? Math.round((progressCount / total) * 100) : 0;
+      return `${progressPct}% (${progressCount} of ${total} Total Pages)`;
+  })(),
+
+  "Completed": filtered.filter(d => ["4","5"].some(s => d.Status?.trim().startsWith(s))).length,
+  "Do Not Migrate": filtered.filter(d => d.Status?.trim() === "Do Not Migrate").length,
+
   "Weekly Modified": (() => {
-    const today = new Date();
+      const today = new Date();
+      const thisWeekStart = new Date(today);
+      thisWeekStart.setDate(today.getDate() - 7);
 
-    // This week window (last 7 days)
-    const thisWeekStart = new Date(today);
-    thisWeekStart.setDate(today.getDate() - 7);
+      const thisWeekCount = filtered.filter(d => d.Modified && new Date(d.Modified) >= thisWeekStart).length;
 
-    const thisWeekCount = filtered.filter(d => d.Modified && new Date(d.Modified) >= thisWeekStart).length;
+      const prevWeekStart = new Date(today);
+      prevWeekStart.setDate(today.getDate() - 14);
+      const prevWeekEnd = new Date(today);
+      prevWeekEnd.setDate(today.getDate() - 7);
 
-    // Previous week window (8–14 days ago)
-    const prevWeekStart = new Date(today);
-    prevWeekStart.setDate(today.getDate() - 14);
-    const prevWeekEnd = new Date(today);
-    prevWeekEnd.setDate(today.getDate() - 7);
+      const prevWeekCount = filtered.filter(d => d.Modified && new Date(d.Modified) >= prevWeekStart && new Date(d.Modified) < prevWeekEnd).length;
 
-    const prevWeekCount = filtered.filter(d => d.Modified && new Date(d.Modified) >= prevWeekStart && new Date(d.Modified) < prevWeekEnd).length;
+      return `This Week: ${thisWeekCount} | Last Week: ${prevWeekCount}`;
+  })(),
 
-    return `This Week: ${thisWeekCount} | Last Week: ${prevWeekCount}`;
-})(),
-
-  // ✅ single QA Issues card with High/Low/Total
   "QA Issues": (() => {
-      const total = filtered.filter(d=>d["QA Issues.lookupValue"]).length;
-      const high  = filtered.filter(d=>d["QA Issues.lookupValue"] && d.Priority==="High").length;
-      const low   = total - high;
+      const total = filtered.filter(d => d["QA Issues.lookupValue"]).length;
+      const high = filtered.filter(d => d["QA Issues.lookupValue"] && d.Priority === "High").length;
+      const low = total - high;
       renderCharts(filtered);
       return `High: ${high} | Low: ${low} | Total: ${total}`;
   })()
 };
+
 
 
 function renderCharts(filtered) {
