@@ -31,7 +31,7 @@
 })();
 
 
-const jsonURL = "https://cdn.jsdelivr.net/gh/ussthq-web-coordinator/USSTHQ-1@latest/DashboardData-l.json";
+const jsonURL = "https://cdn.jsdelivr.net/gh/ussthq-web-coordinator/USSTHQ-1@latest/DashboardData-m.json";
 let table, tableData=[], pageCache={}, qaGroupedCache={};
 let priorityChart, pageTypeChart, pubSymChart;
 let statusChart = null;
