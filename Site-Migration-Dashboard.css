@@ -14,7 +14,7 @@ body { font-family: 'Montserrat', sans-serif; background:#f9f9f9; }
 .card { margin-bottom: 1rem; }
 .card-body { text-align:center; }
 .card-title { font-size:1rem; font-weight:bold; }
-.progress { height: 1.5rem; margin-bottom: 1rem; }
+.progress { height: 1.75rem; margin-bottom: 1rem; }
 .card-text { font-size:0.9rem; }
 .chart-container { margin-bottom:1rem; }
 .tabulator { font-size:0.85rem; }
@@ -240,4 +240,59 @@ body { font-family: 'Montserrat', sans-serif; background:#f9f9f9; }
   #progressLegend .legend-item {
     flex: 0 0 auto;             /* keep each item from shrinking */
   }
+}
+
+/* === Unified legend styling === */
+.legend-row {
+  display: flex;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  gap: 0.75rem;
+  padding: 0.25rem 0;
+  font-size: 0.75rem;        /* smaller text for all legends */
+  line-height: 1.2;
+}
+
+.legend-row .legend-item {
+  flex: 0 0 auto;            /* prevent shrink */
+  white-space: nowrap;       /* keep each item on one line */
+}
+
+/* Horizontal scroll for the breakdown legend row */
+#progressBreakdownBody .legend-row {
+  display: flex;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  gap: 0.75rem;
+  padding: 0.25rem 0;
+  font-size: 0.75rem;
+  line-height: 1.2;
+}
+
+#progressBreakdownBody .legend-row .legend-item {
+  flex: 0 0 auto;
+  white-space: nowrap;
+  position: relative;
+}
+
+/* Tooltip for overall % hover at the end of legends */
+.legend-overall-tip {
+  margin-left: 0.5rem;
+  cursor: help;
+  font-weight: 600;
+  color: #555;
+}
+.legend-overall-tip:hover::after {
+  content: attr(data-overall);
+  position: absolute;
+  background: rgba(0,0,0,0.8);
+  color: #fff;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  white-space: nowrap;
+  transform: translateY(-120%);
+  font-size: 0.75rem;
+  z-index: 999;
 }

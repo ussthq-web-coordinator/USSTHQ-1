@@ -225,10 +225,14 @@ function renderOverallProgress(filtered){
       container.appendChild(div);
 
       // Add legend
-      const legendItem = document.createElement("div");
-      legendItem.className = "d-flex align-items-center gap-1 legend-item";
-      legendItem.innerHTML = `<span style="display:inline-block;width:14px;height:14px;background-color:${statusColors[key]};"></span> ${key}`;
-      legendContainer.appendChild(legendItem);
+      // Add legend
+    const legendItem = document.createElement("div");
+    legendItem.className = "d-flex align-items-center gap-1 legend-item";
+    legendItem.innerHTML =
+    `<span style="display:inline-block;width:14px;height:14px;background-color:${statusColors[key]};"></span>
+    ${key} – ${Math.round(pct)}% (${counts[key]})`;
+    legendContainer.appendChild(legendItem);
+
     }
   });
 }
