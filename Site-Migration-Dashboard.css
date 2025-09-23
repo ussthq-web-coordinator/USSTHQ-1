@@ -86,13 +86,13 @@ body { font-family: 'Montserrat', sans-serif; background:#f9f9f9; }
 
 .team-name {
   color: gray;
-  font-size: 0.70rem;
+  font-size: clamp(0.60rem, 1.70vw, 0.63rem);
 }
 
 .site-title {
   color: black;
   font-weight: bold;
-  font-size: 1.03rem;
+  font-size: clamp(0.85rem, 2.5vw, 1.03rem);
 }
 .table-link {
   color: #0a66c2;   /* typical link blue */
