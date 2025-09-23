@@ -46,7 +46,7 @@ async function fetchData() {
     const json = await res.json();
     tableData = Array.isArray(json) ? json : (json.data || []);
     const refreshUTC = json.refreshDate ? new Date(json.refreshDate) : null;
-    document.getElementById("refreshDate").textContent = refreshUTC ? "Version 1.9231720 - Last refreshed (Eastern): " + refreshUTC.toLocaleString("en-US",{ timeZone:"America/New_York", dateStyle:"medium", timeStyle:"short"}) : "Last refreshed: Unknown";
+    document.getElementById("refreshDate").textContent = refreshUTC ? "Version 1.9231901 - Last refreshed (Eastern): " + refreshUTC.toLocaleString("en-US",{ timeZone:"America/New_York", dateStyle:"medium", timeStyle:"short"}) : "Last refreshed: Unknown";
     pageCache = {}; tableData.forEach((d,i)=>{d._id=i; pageCache[i]=d;});
     initFilters(); renderCards(); renderTable();
   } catch(err) {
@@ -476,7 +476,9 @@ statusChart = new Chart(ctxStatus, {
 
 // Cards rendering
 // Old Colors '#f1c40f','#2ecc71','#e74c3c','#f39c12','#3498db','#9b59b6','#16a085','#d35400','#ff6b6b', '#f7b32b', '#4ecdc4'
-  const colors = ['#132230', '#1a3245', '#22445a', '#2b5770', '#33688a', '#3c7aa0', '#448cba', '#4d9ecf', '#55b0e5', '#5dc3f5', '#66d6ff'];
+  // ['#132230', '#1a3245', '#22445a', '#2b5770', '#33688a', '#3c7aa0', '#448cba', '#4d9ecf', '#55b0e5', '#5dc3f5', '#66d6ff'];
+const colors = ['#0b1622', '#0f1b2d', '#132230', '#18293a', '#1d3145', '#223950', '#27415b', '#2c4966', '#315171', '#365a7c', '#3b637f'];
+
 
 
   const container = document.getElementById("metricCards");
