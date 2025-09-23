@@ -46,7 +46,7 @@ async function fetchData() {
     const json = await res.json();
     tableData = Array.isArray(json) ? json : (json.data || []);
     const refreshUTC = json.refreshDate ? new Date(json.refreshDate) : null;
-    document.getElementById("refreshDate").textContent = refreshUTC ? "Version 1.9231901 - Last refreshed (Eastern): " + refreshUTC.toLocaleString("en-US",{ timeZone:"America/New_York", dateStyle:"medium", timeStyle:"short"}) : "Last refreshed: Unknown";
+    document.getElementById("refreshDate").textContent = refreshUTC ? "Version 1.9231934 - Last refreshed (Eastern): " + refreshUTC.toLocaleString("en-US",{ timeZone:"America/New_York", dateStyle:"medium", timeStyle:"short"}) : "Last refreshed: Unknown";
     pageCache = {}; tableData.forEach((d,i)=>{d._id=i; pageCache[i]=d;});
     initFilters(); renderCards(); renderTable();
   } catch(err) {
@@ -245,6 +245,11 @@ function renderQaAccordion(data){
   const container = document.getElementById("qaGroupsBody");
   container.innerHTML = "";
   const qaRows = data.filter(d=>d["QA Issues.lookupValue"]);
+  
+  // Update badge with total count
+  const badge = document.getElementById("qaBadge");
+  badge.textContent = qaRows.length;
+
   if(!qaRows.length){
     container.innerHTML = "<p>No QA Issues found.</p>";
     return;
@@ -260,11 +265,12 @@ function renderQaAccordion(data){
   Object.keys(qaGroupedCache).sort().forEach(k=>{
     container.innerHTML += `
       <div class="mb-2">
-      <button class="btn btn-sm btn-secondary ms-2" onclick="showQaIssuesModal('${k}')">View Pages</button>&nbsp&nbsp;
+        <button class="btn btn-sm btn-secondary ms-2" onclick="showQaIssuesModal('${k}')">View Pages</button>&nbsp;&nbsp;
         ${k} <strong>(${qaGroupedCache[k].length})</strong>
       </div>`;
   });
 }
+
 
 
 function renderCards(){
