@@ -30,8 +30,9 @@
     }
 })();
 
+// Backup Data URL https://cdn.jsdelivr.net/gh/ussthq-web-coordinator/USSTHQ-1@latest/DashboardData.json
 
-const jsonURL = "https://cdn.jsdelivr.net/gh/ussthq-web-coordinator/USSTHQ-1@latest/DashboardData.json";
+const jsonURL = "https://hopewell.pages.dev/DashboardData.json";
 let table, tableData=[], pageCache={}, qaGroupedCache={};
 let priorityChart, pageTypeChart, pubSymChart;
 let statusChart = null;
