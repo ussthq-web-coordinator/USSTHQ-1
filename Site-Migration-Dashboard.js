@@ -74,13 +74,13 @@ function getCanonicalStatus(status) {
 }
 
 
-// status colors
+// status colors Old Blue 3B50B2
 const statusColors = {
     "Completed": "#2ecc71",
     "Do Not Migrate": "#e74c3c",
     "In Progress": "#f39c12",
     "In QA": "#CA5010",
-    "Needs Info": "#3B50B2",
+    "Needs Info": "#002056",
     "Unknown": "#7f8c8d"
 };
 
@@ -388,7 +388,7 @@ statusChart = new Chart(ctxStatus, {
       backgroundColor: [
         "#dc3545", // Do Not Migrate – red
         "#28a745", // Completed – green
-        "#3B50B2", // In QA –Blue - orange #fd7e14
+        "#002056", // In QA –Blue - orange #fd7e14
         "#ffc107", // Needs Info – yellow
         "#6f42c1", // In Progress – purple
         "#6c757d"  // Unknown – gray
@@ -420,7 +420,7 @@ statusChart = new Chart(ctxStatus, {
       labels: Object.keys(priorityCounts),
       datasets: [{
         data: Object.values(priorityCounts),
-        backgroundColor: ["#3B50B2","#f1c40f","#f39c12","#e74c3c","#3498db","#9b59b6","#16a085","#d35400","#ff6b6b"]
+        backgroundColor: ["#002056","#f1c40f","#f39c12","#e74c3c","#3498db","#9b59b6","#16a085","#d35400","#ff6b6b"]
       }]
     },
     options: {
@@ -446,7 +446,7 @@ statusChart = new Chart(ctxStatus, {
       labels: Object.keys(pageTypeCounts),
       datasets: [{
         data: Object.values(pageTypeCounts),
-        backgroundColor: ["#3B50B2","#2ecc71","#e74c3c","#f39c12","#3498db"]
+        backgroundColor: ["#002056","#2ecc71","#e74c3c","#f39c12","#3498db"]
       }]
     },
     options: {
@@ -471,7 +471,7 @@ statusChart = new Chart(ctxStatus, {
       labels:Object.keys(pubSymCounts),
       datasets:[{
         data:Object.values(pubSymCounts),
-        backgroundColor:["#3B50B2","#e74c3c","#f39c12","#3498db","#9b59b6"]
+        backgroundColor:["#002056","#e74c3c","#f39c12","#3498db","#9b59b6"]
       }]
     },
     options: {
@@ -483,9 +483,10 @@ statusChart = new Chart(ctxStatus, {
   });
 }
 
+// Cards rendering
+// Old Colors '#f1c40f','#2ecc71','#e74c3c','#f39c12','#3498db','#9b59b6','#16a085','#d35400','#ff6b6b', '#f7b32b', '#4ecdc4'
+  const colors = ['#0d1a2b', '#112136', '#132230', '#1b2b3c', '#223344', '#2a3d4c', '#314556', '#395060', '#41586a', '#4a6174', '#536b7e'];
 
-
-  const colors = ['#f1c40f','#2ecc71','#e74c3c','#f39c12','#3498db','#9b59b6','#16a085','#d35400','#ff6b6b', '#f7b32b', '#4ecdc4'];
   const container = document.getElementById("metricCards");
   container.innerHTML = "";
   let i=0;
@@ -969,7 +970,7 @@ charts.statusChart = new Chart(document.getElementById("statusChart"), {
     labels: statusLabels,           // keep plain names here
     datasets:[{ 
       data: statusData,
-      backgroundColor:["#2ecc71","#e74c3c","#f39c12","#3B50B2","#CA5010"]
+      backgroundColor:["#2ecc71","#e74c3c","#f39c12","#002056","#CA5010"]
     }]
   },
   options:{

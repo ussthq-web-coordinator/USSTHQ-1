@@ -58,9 +58,9 @@ body { font-family: 'Montserrat', sans-serif; background:#f9f9f9; }
   cursor: default;
 }
 
-/* Geometric background for rocket */
+/* Geometric background for rocket Old Orange #CA5010*/
 .icon-container {
-  background-color: #CA5010;
+  background-color: #AF8C46;
   padding: 0.5rem; /* space around the rocket */
   border-radius: 12px; /* rounded rectangle */
   display: flex;
