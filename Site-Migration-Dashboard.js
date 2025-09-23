@@ -38,7 +38,7 @@ let priorityChart, pageTypeChart, pubSymChart;
 let statusChart = null;
 
 
-
+//version number change here
 async function fetchData() {
   try {
     const res = await fetch(jsonURL);
@@ -46,7 +46,7 @@ async function fetchData() {
     const json = await res.json();
     tableData = Array.isArray(json) ? json : (json.data || []);
     const refreshUTC = json.refreshDate ? new Date(json.refreshDate) : null;
-    document.getElementById("refreshDate").textContent = refreshUTC ? "Version 1.9221150 - Last refreshed (Eastern): " + refreshUTC.toLocaleString("en-US",{ timeZone:"America/New_York", dateStyle:"medium", timeStyle:"short"}) : "Last refreshed: Unknown";
+    document.getElementById("refreshDate").textContent = refreshUTC ? "Version 1.9231720 - Last refreshed (Eastern): " + refreshUTC.toLocaleString("en-US",{ timeZone:"America/New_York", dateStyle:"medium", timeStyle:"short"}) : "Last refreshed: Unknown";
     pageCache = {}; tableData.forEach((d,i)=>{d._id=i; pageCache[i]=d;});
     initFilters(); renderCards(); renderTable();
   } catch(err) {
@@ -948,71 +948,114 @@ const statusChart = new Chart(document.getElementById('statusChart'), {
 addChartLegendModal(statusChart, "Status Overview");
 
 
-  // --- Status chart ---
-  const statusGroups = { "Completed":0, "Do Not Migrate":0, "Needs Info":0,  "In Progress":0, "In QA":0 };
-  data.forEach(d=>{
-    const s = (d.Status||"").trim();
-    if (/^(4|5)/.test(s)) statusGroups["Completed"]++;
-    else if (/^3/.test(s)) statusGroups["In QA"]++;
-    else if (/^2/.test(s)) statusGroups["In Progress"]++;
-    else if (/^1/.test(s)) statusGroups["Needs Info"]++;
-    else if (s === "Do Not Migrate") statusGroups["Do Not Migrate"]++;
-  });
+// --- Status chart ---
+const statusGroups = { "Completed":0, "Do Not Migrate":0, "Needs Info":0, "In Progress":0, "In QA":0 };
+data.forEach(d=>{
+  const s = (d.Status||"").trim();
+  if (/^(4|5)/.test(s)) statusGroups["Completed"]++;
+  else if (/^3/.test(s)) statusGroups["In QA"]++;
+  else if (/^2/.test(s)) statusGroups["In Progress"]++;
+  else if (/^1/.test(s)) statusGroups["Needs Info"]++;
+  else if (s === "Do Not Migrate") statusGroups["Do Not Migrate"]++;
+});
 
-  const statusLabels = Object.keys(statusGroups);
-  const statusData = Object.values(statusGroups);
-  const statusTotal = statusData.reduce((a,b)=>a+b,0);
-  const statusLabelsWithPct = statusLabels.map((l,i)=>`${l} (${statusTotal?Math.round(statusData[i]/statusTotal*100):0}%)`);
+const statusLabels = Object.keys(statusGroups);
+const statusData   = Object.values(statusGroups);
+const statusTotal  = statusData.reduce((a,b)=>a+b,0);
 
-  charts.statusChart = new Chart(document.getElementById("statusChart"), {
-    type:"pie",
-    data:{ labels:statusLabelsWithPct, datasets:[{ data:statusData, backgroundColor:["#2ecc71","#e74c3c","#f39c12","#3B50B2","#CA5010"] }] },
-    options:{ plugins:{ title:{display:true,text:"Status"} } }
-  });
+charts.statusChart = new Chart(document.getElementById("statusChart"), {
+  type:"pie",
+  data:{
+    labels: statusLabels,           // keep plain names here
+    datasets:[{ 
+      data: statusData,
+      backgroundColor:["#2ecc71","#e74c3c","#f39c12","#3B50B2","#CA5010"]
+    }]
+  },
+  options:{
+    plugins:{
+      title:{ display:true, text:"Status" },
+      legend:{
+        labels:{
+          generateLabels(chart){
+            const {data} = chart;
+            const total = data.datasets[0].data.reduce((a,b)=>a+b,0);
+            return data.labels.map((label, i)=>{
+              const count = data.datasets[0].data[i];
+              const pct   = total ? Math.round(count/total*100) : 0;
+              const bg    = data.datasets[0].backgroundColor[i];
+              return {
+                text: `${label} - ${pct}% (${count})`,
+                fillStyle: bg,
+                hidden: isNaN(count) || chart.getDatasetMeta(0).data[i].hidden
+              };
+            });
+          }
+        }
+      }
+    }
+  }
+});
 
-  // --- Priority chart ---
-  const priorityCounts = countBy(data,"Priority");
-  const priorityLabels = Object.keys(priorityCounts);
-  const priorityData = Object.values(priorityCounts);
-  const priorityTotal = priorityData.reduce((a,b)=>a+b,0);
-  const priorityLabelsWithPct = priorityLabels.map((l,i)=>`${l} (${priorityTotal?Math.round(priorityData[i]/priorityTotal*100):0}%)`);
 
-  charts.priorityChart = new Chart(document.getElementById("priorityChart"),{
-    type:"pie",
-    data:{ labels:priorityLabelsWithPct, datasets:[{ data:priorityData, backgroundColor:palette(priorityLabels.length) }] },
-    options:{ plugins:{ title:{display:true,text:"Priority"} } }
-  });
+// --- Priority chart ---
+const priorityCounts = countBy(data,"Priority");
+const priorityLabels = Object.keys(priorityCounts);
+const priorityData   = Object.values(priorityCounts);
+const priorityTotal  = priorityData.reduce((a,b)=>a+b,0);
+const priorityLabelsWithPct = priorityLabels.map(
+  (l,i)=>`${l} - ${priorityTotal ? Math.round(priorityData[i]/priorityTotal*100) : 0}% (${priorityData[i]})`
+);
 
-  // --- Page Type chart ---
-  const typeCounts = countBy(data,"Page Type");
-  const typeLabels = Object.keys(typeCounts);
-  const typeData = Object.values(typeCounts);
-  const typeTotal = typeData.reduce((a,b)=>a+b,0);
-  const typeLabelsWithPct = typeLabels.map((l,i)=>`${l} (${typeTotal?Math.round(typeData[i]/typeTotal*100):0}%)`);
+charts.priorityChart = new Chart(document.getElementById("priorityChart"), {
+  type:"pie",
+  data:{
+    labels: priorityLabelsWithPct,
+    datasets:[{ data: priorityData, backgroundColor: palette(priorityLabels.length) }]
+  },
+  options:{ plugins:{ title:{display:true,text:"Priority"} } }
+});
 
-  charts.pageTypeChart = new Chart(document.getElementById("pageTypeChart"),{
-    type:"pie",
-    data:{ labels:typeLabelsWithPct, datasets:[{ data:typeData, backgroundColor:palette(typeLabels.length) }] },
-    options:{ plugins:{ title:{display:true,text:"Page Type"} } }
-  });
+// --- Page Type chart ---
+const typeCounts = countBy(data,"Page Type");
+const typeLabels = Object.keys(typeCounts);
+const typeData   = Object.values(typeCounts);
+const typeTotal  = typeData.reduce((a,b)=>a+b,0);
+const typeLabelsWithPct = typeLabels.map(
+  (l,i)=>`${l} - ${typeTotal ? Math.round(typeData[i]/typeTotal*100) : 0}% (${typeData[i]})`
+);
 
-  // --- Published Symphony chart (Yes/No) ---
-  const pubCounts = { "Yes":0, "No":0 };
-  data.forEach(d=>{
-    const val = (d["Published Symphony"]||"").trim().toLowerCase();
-    if(val==="yes") pubCounts["Yes"]++;
-    else pubCounts["No"]++;
-  });
-  const pubLabels = Object.keys(pubCounts);
-  const pubData = Object.values(pubCounts);
-  const pubTotal = pubData.reduce((a,b)=>a+b,0);
-  const pubLabelsWithPct = pubLabels.map((l,i)=>`${l} (${pubTotal?Math.round(pubData[i]/pubTotal*100):0}%)`);
+charts.pageTypeChart = new Chart(document.getElementById("pageTypeChart"), {
+  type:"pie",
+  data:{
+    labels: typeLabelsWithPct,
+    datasets:[{ data: typeData, backgroundColor: palette(typeLabels.length) }]
+  },
+  options:{ plugins:{ title:{display:true,text:"Page Type"} } }
+});
 
-  charts.pubSymChart = new Chart(document.getElementById("pubSymChart"),{
-    type:"pie",
-    data:{ labels:pubLabelsWithPct, datasets:[{ data:pubData, backgroundColor:["#2ecc71","#e74c3c"] }] },
-    options:{ plugins:{ title:{display:true,text:"Published Symphony"} } }
-  });
+// --- Published Symphony chart (Yes/No) ---
+const pubCounts = { "Yes":0, "No":0 };
+data.forEach(d=>{
+  const val = (d["Published Symphony"]||"").trim().toLowerCase();
+  if(val==="yes") pubCounts["Yes"]++;
+  else pubCounts["No"]++;
+});
+const pubLabels = Object.keys(pubCounts);
+const pubData   = Object.values(pubCounts);
+const pubTotal  = pubData.reduce((a,b)=>a+b,0);
+const pubLabelsWithPct = pubLabels.map(
+  (l,i)=>`${l} - ${pubTotal ? Math.round(pubData[i]/pubTotal*100) : 0}% (${pubData[i]})`
+);
+
+charts.pubSymChart = new Chart(document.getElementById("pubSymChart"), {
+  type:"pie",
+  data:{
+    labels: pubLabelsWithPct,
+    datasets:[{ data: pubData, backgroundColor:["#2ecc71","#e74c3c"] }]
+  },
+  options:{ plugins:{ title:{display:true,text:"Published Symphony"} } }
+});
 }
 
 const refreshEl = document.getElementById("refreshDate");
