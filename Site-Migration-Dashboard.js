@@ -322,24 +322,6 @@ function renderCharts(filtered) {
   const ctxPageType = document.getElementById("pageTypeChart").getContext("2d");
   const ctxPubSym = document.getElementById("pubSymChart").getContext("2d");
 
-  // Status chart colors match overall progress
-const colorsStatus = {
-  "do not migrate": "#dc3545",       // red shades
-  "1a. Need Migration Fields set": "#e74c3c",                   // darker red
-  "1b. Pending Migration": "#f1948a",                   // lighter red
-  "2a": "#f1c40f",                   // yellow shades
-  "2b": "#f7dc6f",
-  "2c": "#f9e79f",
-  "3a": "#8e44ad",                   // purple shades
-  "3b": "#9b59b6",
-  "3c": "#bb8fce",
-  "4": "#196f3d",                     // dark green
-  "5": "#27ae60",                     // light green
-  "ready": "#27ae60",                 // example mapping
-  "in progress": "#f1c40f",
-  "pending migration": "#f39c12",
-  "finished": "#16a085"
-};
 
   const canonicalStatus = {
     completed: ["4. THQ QA Complete, THQ will publish on migration date","5. THQ Published and URL Redirected"],
@@ -377,22 +359,30 @@ filtered.forEach(d => {
 });
 
   // Status chart
+// Map of status to color
+const statusColors = {
+  "Do Not Migrate": "#dc3545", // red
+  "Completed": "#28a745",      // green
+  "In QA": "#fd7e14",          // orange 
+  "Needs Info": "#002056",     // navy/
+  "In Progress": "#6f42c1",    // purple
+  "Unknown": "#6c757d"         // gray
+};
 
+// Prepare data for chart
+const labels = Object.keys(statusCounts);
+const data = Object.values(statusCounts);
+const backgroundColor = labels.map(label => statusColors[label] || "#6c757d"); // fallback gray
+
+// Status chart
 if(statusChart) statusChart.destroy();
 statusChart = new Chart(ctxStatus, {
   type: "pie",
   data: {
-    labels: Object.keys(statusCounts),
+    labels: labels,
     datasets: [{
-      data: Object.values(statusCounts),
-      backgroundColor: [
-        "#dc3545", // Do Not Migrate – red
-        "#28a745", // Completed – green
-        "#002056", // In QA –Blue - orange #fd7e14
-        "#ffc107", // Needs Info – yellow
-        "#6f42c1", // In Progress – purple
-        "#6c757d"  // Unknown – gray
-      ]
+      data: data,
+      backgroundColor: backgroundColor
     }]
   },
   options: {
@@ -403,6 +393,7 @@ statusChart = new Chart(ctxStatus, {
     }
   },
 });
+
 
 
 
