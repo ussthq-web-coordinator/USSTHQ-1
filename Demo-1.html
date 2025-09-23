@@ -3,337 +3,336 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Site Migration — Mini Insights Dashboard</title>
+<title>Site Migration — Insights Dashboard</title>
 <style>
-  :root{--bg:#0f1724;--card:#0b1220;--muted:#9aa4b2;--accent:#e03b2e;--glass: rgba(255,255,255,0.03)}
-  body{font-family:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial; background:linear-gradient(180deg,#071028 0%, #081426 100%); color:#dbe7f2; margin:0; padding:20px;}
-  header{display:flex;gap:12px;align-items:center; margin-bottom:18px;}
-  h1{margin:0;font-size:18px}
-  .controls{margin-left:auto; display:flex; gap:8px;}
-  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px;}
-  .card{background:var(--card); padding:14px; border-radius:10px; box-shadow:0 6px 18px rgba(3,8,20,.6); min-height:120px;}
-  .card h3{margin:0 0 8px 0; font-size:14px}
-  .stat{font-weight:700;font-size:20px}
-  .muted{color:var(--muted); font-size:12px}
-  .small-list{list-style:none;padding:0;margin:8px 0 0 0; max-height:160px; overflow:auto}
-  .small-list li{padding:6px 0;border-bottom:1px dashed rgba(255,255,255,0.03); font-size:13px}
-  .bar{height:10px;background:var(--glass);border-radius:6px;overflow:hidden;margin-top:8px}
-  .bar > i{display:block;height:10px;background:linear-gradient(90deg,var(--accent),#ff7a66); width:0%}
-  pre{background:#09131b;border-radius:8px;padding:10px;color:#cfe9ff;overflow:auto}
-  button{background:#0b2230;border:1px solid rgba(255,255,255,0.03); color:#dbe7f2;padding:6px 10px;border-radius:8px;cursor:pointer}
-  .pill{background:rgba(255,255,255,0.03);padding:4px 8px;border-radius:999px;font-size:12px}
-  .meta{font-size:12px;color:var(--muted)}
-  .top-row{display:flex;gap:12px;align-items:center}
-  /* small responsive tweak */
-  @media (max-width:640px){ header{flex-direction:column;align-items:flex-start} .controls{margin-left:0} }
+  :root{
+    --bg:#0f1724; --card:#101b2a; --muted:#8b99ae;
+    --accent:#e03b2e; --accent-light:#ff7a66; --glass: rgba(255,255,255,0.03);
+    --completed:#3cb371; --inprogress:#ffa500; --donot:#ff4500;
+  }
+  body{
+    font-family: system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial;
+    background: linear-gradient(180deg,#071028 0%, #081426 100%);
+    color: #dbe7f2; margin:0; padding:20px;
+  }
+  header{
+    display:flex; flex-wrap:wrap; gap:12px; align-items:center; margin-bottom:20px;
+  }
+  h1{margin:0;font-size:22px;font-weight:700;}
+  .controls{margin-left:auto; display:flex; gap:8px; flex-wrap:wrap;}
+  #dataUrl{font-weight:600; color:#ffa;}
+  .grid{
+    display:grid;
+    grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+    gap:16px;
+  }
+  .card{
+    background: var(--card);
+    padding:22px;
+    border-radius:18px;
+    box-shadow:0 10px 30px rgba(3,8,20,.6);
+    min-height:200px;
+    display:flex;
+    flex-direction:column;
+    justify-content:flex-start;
+    transition: transform 0.2s, box-shadow 0.2s;
+  }
+  .card:hover{
+    transform: translateY(-4px);
+    box-shadow:0 16px 36px rgba(3,8,20,.8);
+  }
+  .card h3{margin:0 0 14px 0; font-size:18px;}
+  .stat{font-weight:700; font-size:28px;}
+  .muted{color:var(--muted); font-size:13px;}
+  .small-list{
+    list-style:none; padding:0; margin:10px 0 0 0; max-height:240px; overflow-y:auto;
+  }
+  .small-list li{
+    padding:8px 0; border-bottom:1px dashed rgba(255,255,255,0.05);
+    font-size:14px; transition: background 0.2s;
+  }
+  .small-list li:hover{ background: rgba(255,255,255,0.03); }
+  .bar{
+    height:16px; background:var(--glass); border-radius:10px;
+    overflow:hidden; margin-top:14px;
+  }
+  .bar > i{
+    display:block; height:16px; background: linear-gradient(90deg,var(--accent),var(--accent-light));
+    width:0%;
+    border-radius:10px;
+    transition: width 0.6s ease;
+  }
+  .pill{
+    display:inline-block; font-weight:600;
+    padding:6px 14px; border-radius:999px; font-size:14px;
+    margin-right:8px; margin-top:4px;
+  }
+  .completed{background:var(--completed); color:#fff;}
+  .inprogress{background:var(--inprogress); color:#fff;}
+  .donot{background:var(--donot); color:#fff;}
+  table{
+    border-collapse: separate;
+    border-spacing:4px;
+    width:100%;
+    font-size:13px;
+  }
+  table th, table td{ padding:4px 8px; text-align:left; }
+  table th{ color:var(--accent); font-weight:600; }
+  button{
+    background:#0b2230; border:1px solid rgba(255,255,255,0.05);
+    color:#dbe7f2; padding:8px 14px; border-radius:10px; cursor:pointer;
+    transition: background 0.2s, transform 0.1s;
+  }
+  button:hover{ background:#132f45; transform: translateY(-1px);}
+  #refreshTime{margin-top:6px;font-size:13px;color:var(--muted);}
+  @media (max-width:640px){
+    header{flex-direction:column;align-items:flex-start;}
+    .controls{margin-left:0;}
+  }
 </style>
 </head>
 <body>
 <header>
   <div>
-    <h1>Site Migration Mini Insights</h1>
+    <h1>Site Migration Insights Dashboard</h1>
     <div class="muted">Connected to: <span id="dataUrl">loading...</span></div>
   </div>
-
   <div class="controls">
     <select id="divisionFilter"><option value="">All Divisions</option></select>
     <button id="refreshBtn">Refresh</button>
-    <!-- required toggle button (always present) -->
     <button id="toggleCodeBtn">Show code</button>
     <button data-copy-target="cardsCodeContainer" onclick="copyCodeById(event)">Copy code</button>
   </div>
 </header>
 
-<!-- Grid of 6 required cards -->
 <div class="grid" id="cardsGrid">
-  <!-- Card 1: Migration progress -->
-  <div class="card" id="card-migration">
-    <!-- Comment: To add/remove a card, duplicate or delete a .card div and update the initialization mapping in JS (see comments in the script). -->
-    <h3>Migration progress — overall</h3>
-    <div><span class="stat" id="totalPages">0</span> pages</div>
-    <div class="muted">Completed / In progress / Do Not Migrate</div>
-    <div style="display:flex;gap:10px;margin-top:8px">
-      <div><div class="pill" id="pctCompleted">0%</div><div class="meta">Completed</div></div>
-      <div><div class="pill" id="pctInProgress">0%</div><div class="meta">In progress</div></div>
-      <div><div class="pill" id="pctDoNot">0%</div><div class="meta">Do Not Migrate</div></div>
-    </div>
-    <div class="bar"><i id="migrationBar"></i></div>
-    <div class="muted" style="margin-top:8px" id="migrationByDivisionSummary"></div>
+  <!-- Card 1: Longest editor idle -->
+  <div class="card" id="card-idle">
+    <h3>Longest Editor Idle Time</h3>
+    <div class="muted">Editors who haven’t updated pages recently</div>
+    <ul class="small-list" id="idleList"><li class="muted">loading...</li></ul>
   </div>
 
-  <!-- Card 2: QA issues -->
-  <div class="card" id="card-qa">
-    <h3>QA issues — action queue</h3>
-    <div class="muted">Rows with QA flags or notes</div>
-    <ul class="small-list" id="qaList"><li class="muted">loading...</li></ul>
+  <!-- Card 2: Pages without priority -->
+  <div class="card" id="card-no-priority">
+    <h3>Pages Missing Priority</h3>
+    <div class="muted">Pages without a set priority value</div>
+    <ul class="small-list" id="noPriorityList"><li class="muted">loading...</li></ul>
   </div>
 
-  <!-- Card 3: Editor workload -->
-  <div class="card" id="card-editors">
-    <h3>Editor workload</h3>
-    <div class="muted">Top editors by assigned pages</div>
-    <ul class="small-list" id="editorList"><li class="muted">loading...</li></ul>
+  <!-- Card 3: Divisions with highest QA flags -->
+  <div class="card" id="card-qa-hotspots">
+    <h3>QA Hotspots by Division</h3>
+    <div class="muted">Divisions with highest QA flags per page</div>
+    <ul class="small-list" id="qaHotspotList"><li class="muted">loading...</li></ul>
   </div>
 
-  <!-- Card 4: Priority × Effort triage -->
-  <div class="card" id="card-triage">
-    <h3>Priority × Effort triage</h3>
-    <div class="muted">Quick wins: High priority, Low effort</div>
-    <div style="margin-top:8px" id="triageMatrix"></div>
+  <!-- Card 4: Stale & Do Not Migrate pages -->
+  <div class="card" id="card-stale-dnm">
+    <h3>Stale & Do Not Migrate Pages</h3>
+    <div class="muted">Old pages that are also marked "Do Not Migrate"</div>
+    <ul class="small-list" id="staleDnmList"><li class="muted">loading...</li></ul>
   </div>
 
-  <!-- Card 5: Stale content -->
-  <div class="card" id="card-stale">
-    <h3>Stale content</h3>
-    <div class="muted">Oldest published / modified pages</div>
-    <ul class="small-list" id="staleList"><li class="muted">loading...</li></ul>
+  <!-- Card 5: Redirect conflicts -->
+  <div class="card" id="card-redirect-conflicts">
+    <h3>Redirect Conflicts</h3>
+    <div class="muted">Pages with conflicting internal/external redirects</div>
+    <ul class="small-list" id="redirectConflictList"><li class="muted">loading...</li></ul>
   </div>
 
-  <!-- Card 6: Redirects & Zesty path checks -->
-  <div class="card" id="card-redirects">
-    <h3>Redirects & Zesty mapping</h3>
-    <div class="muted">Pages with external redirects or missing Zesty path</div>
-    <ul class="small-list" id="redirectList"><li class="muted">loading...</li></ul>
+  <!-- Card 6: Quick win potential by division -->
+  <div class="card" id="card-quick-wins">
+    <h3>Quick Win Potential</h3>
+    <div class="muted">High priority + low effort pages by division</div>
+    <ul class="small-list" id="quickWinsList"><li class="muted">loading...</li></ul>
   </div>
 </div>
 
-<hr style="margin:18px 0;border:none;border-top:1px solid rgba(255,255,255,0.03)">
 
-<!-- Code container (hidden toggled) required by the spec -->
+<hr style="margin:20px 0;border:none;border-top:1px solid rgba(255,255,255,0.05)">
 <div id="cardsCodeContainer" style="display:none;">
-/* This snippet shows how the cards are generated. To copy the cards' markup/logic, use the "Copy code" button. */
-const DATA_URL = 'https://cdn.jsdelivr.net/gh/ussthq-web-coordinator/USSTHQ-1@latest/DashboardData-n.json';
-// The main logic groups pages by Status, Division, Page Editor, and computes stale items, QA items, and redirect checks.
-// To add a card: duplicate the .card div in the HTML and implement a small render function that updates an element by id.
-// To remove a card: delete the .card div and the corresponding rendering code below.
+  /* Copy code container */
 </div>
+<div class="muted" id="refreshTime">Last refreshed: loading...</div>
+
 
 <script>
+/* ========= configuration ========= */
 /* ========= configuration ========= */
 const DATA_URL = 'https://hopewell.pages.dev/DashboardData-n.json';
 document.getElementById('dataUrl').textContent = DATA_URL;
 
-fetch('https://hopewell.pages.dev/DashboardData-n.json', {
-  mode: 'cors'      // default is 'cors', but explicit is fine
-})
-  .then(r => r.json())
-  .then(data => console.log(data))
-  .catch(err => console.error(err));
-
+/* ========= global storage ========= */
+let allRows = [];      // full dataset
+let refreshDate = '';  // last refresh time
 
 /* ========= utility helpers ========= */
 function parseDate(s){
   if(!s) return null;
   const d = new Date(s);
-  if(isNaN(d)) return null;
-  return d;
+  return isNaN(d) ? null : d;
 }
-function daysSince(d){ if(!d) return null; return Math.floor((Date.now() - d.getTime())/(1000*60*60*24)); }
+function daysSince(d){ return d ? Math.floor((Date.now() - d.getTime()) / (1000*60*60*24)) : null; }
 function safeGet(row, key){ return row && (key in row) ? row[key] : ""; }
 
 /* ========= fetch + render pipeline ========= */
 async function fetchAndRender(){
   try {
     const res = await fetch(DATA_URL);
-    const rows = await res.json(); // assume array of objects using your exact column keys
-    renderAll(rows);
-    populateDivisionFilter(rows);
+    const jsonData = await res.json();
+    allRows = jsonData.data || [];
+    refreshDate = jsonData.refreshDate || '';
+    
+    // update refresh time display
+    const refreshEl = document.getElementById('refreshTime');
+    if(refreshEl) refreshEl.textContent = 'Last refreshed: ' + refreshDate;
+
+    renderObscureInsights(allRows);
+    populateDivisionFilter(allRows);
   } catch(err){
     console.error('Failed to fetch data', err);
     alert('Could not fetch the dataset. Check URL / CORS in your environment.');
   }
 }
 
-function renderAll(rows){
-  // normalize keys: we assume each row is an object with keys that exactly match your column headings
-  // CARD 1: migration progress
-  const total = rows.length;
-  const statusCounts = rows.reduce((acc, r) => {
-    const s = (safeGet(r,'Status') || 'Unknown').toString();
-    acc[s] = (acc[s]||0) + 1;
-    return acc;
-  }, {});
-  const completedCount = statusCounts['Completed'] || 0;
-  const doNot = statusCounts['Do Not Migrate'] || 0;
-  const inProgress = total - completedCount - doNot;
-  const pctCompleted = total ? Math.round((completedCount/total)*100) : 0;
-  const pctInProgress = total ? Math.round((inProgress/total)*100) : 0;
-  const pctDoNot = total ? Math.round((doNot/total)*100) : 0;
-
-  document.getElementById('totalPages').textContent = total.toLocaleString();
-  document.getElementById('pctCompleted').textContent = pctCompleted + '%';
-  document.getElementById('pctInProgress').textContent = pctInProgress + '%';
-  document.getElementById('pctDoNot').textContent = pctDoNot + '%';
-  document.getElementById('migrationBar').style.width = pctCompleted + '%';
-
-  // short division summary
-  const byDiv = rows.reduce((acc,r)=>{
-    const d = safeGet(r,'Division')||'(none)';
-    acc[d] = (acc[d]||0)+1;
-    return acc;
-  },{});
-  const topDiv = Object.entries(byDiv).sort((a,b)=>b[1]-a[1]).slice(0,3).map(x=>x[0]+' ('+x[1]+')').join(', ');
-  document.getElementById('migrationByDivisionSummary').textContent = 'Top divisions: ' + topDiv;
-
-  // CARD 2: QA issues
-  const qaItems = rows.filter(r => {
-    return (safeGet(r,'QA Issues.lookupValue') && safeGet(r,'QA Issues.lookupValue').toString().trim() !== "") ||
-           (safeGet(r,'QA Notes') && safeGet(r,'QA Notes').toString().trim() !== "") ||
-           (safeGet(r,'QA Issues.isSecretFieldValue') === true);
-  }).slice(0,30); // limit to 30 for display
-  const qaList = document.getElementById('qaList');
-  qaList.innerHTML = '';
-  if(qaItems.length === 0){ qaList.innerHTML = '<li class="muted">No QA issues found</li>'; }
-  qaItems.forEach(r=>{
-    const li = document.createElement('li');
-    li.innerHTML = '<strong>' + (safeGet(r,'Title')||safeGet(r,'Page Title')||'Untitled') + '</strong>'
-      + '<div class="muted">' + (safeGet(r,'Page Editor')||'—') + ' · ' + (safeGet(r,'Division')||'—') + '</div>'
-      + '<div class="muted">QA: ' + (safeGet(r,'QA Issues.lookupValue')||safeGet(r,'QA Notes')||'—') + '</div>';
-    qaList.appendChild(li);
-  });
-
-  // CARD 3: Editor workload (top editors)
-  const editors = rows.reduce((acc,r)=>{
-    const e = safeGet(r,'Page Editor')||'(unassigned)';
-    acc[e] = acc[e]||{count:0, statuses:{}};
-    acc[e].count++;
-    const s = safeGet(r,'Status')||'Unknown';
-    acc[e].statuses[s] = (acc[e].statuses[s]||0)+1;
-    return acc;
-  },{});
-  const editorList = document.getElementById('editorList');
-  editorList.innerHTML = '';
-  Object.entries(editors).sort((a,b)=>b[1].count-a[1].count).slice(0,8).forEach(([editor,meta])=>{
-    const li = document.createElement('li');
-    li.innerHTML = `<strong>${editor}</strong> <span class="muted">(${meta.count})</span><div class="muted">Top status: ${Object.entries(meta.statuses).sort((a,b)=>b[1]-a[1])[0][0]}</div>`;
-    editorList.appendChild(li);
-  });
-
-  // CARD 4: Priority x Effort matrix summary
-  const matrix = {}; // matrix[priority][effort] = count
-  const priorities = new Set();
-  const efforts = new Set();
+/* ========= render and helper functions ========= */
+function renderObscureInsights(rows){
+  // 1: Longest editor idle
+  const editorsLastUpdate = {};
   rows.forEach(r=>{
-    const p = (safeGet(r,'Priority')||'None').toString();
-    const e = (safeGet(r,'Effort Needed')||'Unknown').toString();
-    priorities.add(p); efforts.add(e);
-    matrix[p] = matrix[p] || {};
-    matrix[p][e] = (matrix[p][e]||0) + 1;
+    const e = safeGet(r,'Page Editor')||'(unassigned)';
+    const d = parseDate(safeGet(r,'Date Modified')||safeGet(r,'Date Publish'));
+    if(!editorsLastUpdate[e] || d > editorsLastUpdate[e]) editorsLastUpdate[e] = d;
   });
-  const triageDiv = document.getElementById('triageMatrix');
-  triageDiv.innerHTML = '';
-  const pList = Array.from(priorities);
-  const eList = Array.from(efforts);
-  const tbl = document.createElement('table');
-  tbl.style.width='100%'; tbl.style.borderSpacing='6px';
-  // header
-  const thead = document.createElement('thead');
-  const hrow = document.createElement('tr');
-  hrow.innerHTML = '<th style="text-align:left">Priority \\ Effort</th>' + eList.map(e=>`<th style="text-align:right">${e}</th>`).join('');
-  thead.appendChild(hrow); tbl.appendChild(thead);
-  const tbody = document.createElement('tbody');
-  pList.forEach(p=>{
-    const tr = document.createElement('tr');
-    tr.innerHTML = `<td style="font-weight:600">${p}</td>` + eList.map(e=>`<td style="text-align:right">${(matrix[p] && matrix[p][e])?matrix[p][e]:0}</td>`).join('');
-    tbody.appendChild(tr);
-  });
-  tbl.appendChild(tbody);
-  triageDiv.appendChild(tbl);
-  // quick wins (High + Low)
-  const quickWins = (matrix['High'] && matrix['High']['Low']) ? matrix['High']['Low'] : 0;
-  const quickWinsP = document.createElement('div');
-  quickWinsP.className = 'muted';
-  quickWinsP.style.marginTop='8px';
-  quickWinsP.textContent = 'Quick wins (High priority, Low effort): ' + quickWins;
-  triageDiv.appendChild(quickWinsP);
+  const idleList = document.getElementById('idleList');
+  idleList.innerHTML = '';
+  Object.entries(editorsLastUpdate)
+    .sort((a,b)=> (a[1]?a[1].getTime():0) - (b[1]?b[1].getTime():0))
+    .slice(0,10)
+    .forEach(([editor,date])=>{
+      const days = daysSince(date);
+      const li = document.createElement('li');
+      li.innerHTML = `<strong>${editor}</strong> · ${days} days since last update`;
+      idleList.appendChild(li);
+    });
 
-  // CARD 5: Stale content (sorted by Date Modified or Date Publish)
-  const staleCandidates = rows.map(r=>{
-    const mod = parseDate(safeGet(r,'Date Modified') || safeGet(r,'Date Publish') || safeGet(r,'Date Publish'));
-    return {row:r, modDate:mod, days: daysSince(mod)};
-  }).filter(x=>x.modDate).sort((a,b)=> (b.days - a.days)).slice(0,12);
-  const staleList = document.getElementById('staleList');
-  staleList.innerHTML = '';
-  if(staleCandidates.length===0) staleList.innerHTML = '<li class="muted">No dated pages found</li>';
-  staleCandidates.forEach(x=>{
-    const r = x.row;
+  // 2: Pages missing priority
+  const noPriorityPages = rows.filter(r=>!(safeGet(r,'Priority')||'').trim()).slice(0,12);
+  const noPriorityList = document.getElementById('noPriorityList');
+  noPriorityList.innerHTML = '';
+  noPriorityPages.forEach(r=>{
     const li = document.createElement('li');
-    li.innerHTML = `<strong>${safeGet(r,'Title')||safeGet(r,'Page Title')||'Untitled'}</strong><div class="muted">${x.days} days since last publish/modify · ${safeGet(r,'Division')||'–'}</div>`;
-    staleList.appendChild(li);
+    li.innerHTML = `<strong>${safeGet(r,'Title')||safeGet(r,'Page Title')||'Untitled'}</strong> · ${safeGet(r,'Division')||'–'}`;
+    noPriorityList.appendChild(li);
   });
 
-  // CARD 6: Redirects and Zesty mapping issues
-  const redirectRows = rows.filter(r=>{
-    const redirect = (safeGet(r,'Redirect External URL')||'').toString().trim();
-    const zestyFull = (safeGet(r,'Zesty Full Page Path')||'').toString().trim();
-    const zestyPart = (safeGet(r,'Zesty URL Path Part')||'').toString().trim();
-    // report if redirect present OR missing zesty path (but published)
-    return (redirect !== '') || ( (safeGet(r,'Published') || '').toString().toLowerCase() === 'true' && (!zestyFull && !zestyPart) );
-  }).slice(0,20);
-  const redirectList = document.getElementById('redirectList');
-  redirectList.innerHTML = '';
-  if(redirectRows.length===0) redirectList.innerHTML = '<li class="muted">None found</li>';
-  redirectRows.forEach(r=>{
+  // 3: QA hotspots
+  const qaByDivision = {};
+  rows.forEach(r=>{
+    const d = safeGet(r,'Division')||'(none)';
+    const qaCount = (safeGet(r,'QA Issues.lookupValue')||'').trim() ? 1 : 0;
+    if(!qaByDivision[d]) qaByDivision[d]=0;
+    qaByDivision[d]+=qaCount;
+  });
+  const qaHotspotList = document.getElementById('qaHotspotList');
+  qaHotspotList.innerHTML = '';
+  Object.entries(qaByDivision)
+    .sort((a,b)=>b[1]-a[1])
+    .slice(0,10)
+    .forEach(([div,count])=>{
+      const li = document.createElement('li');
+      li.innerHTML = `<strong>${div}</strong> · ${count} QA flags`;
+      qaHotspotList.appendChild(li);
+    });
+
+  // 4: Stale & Do Not Migrate
+  const staleDnm = rows.filter(r=>{
+    return (safeGet(r,'Status')==='Do Not Migrate') && parseDate(safeGet(r,'Date Modified')||safeGet(r,'Date Publish'));
+  }).sort((a,b)=>daysSince(parseDate(safeGet(b,'Date Modified')||safeGet(b,'Date Publish')))-daysSince(parseDate(safeGet(a,'Date Modified')||safeGet(a,'Date Publish'))))
+    .slice(0,12);
+  const staleDnmList = document.getElementById('staleDnmList');
+  staleDnmList.innerHTML = '';
+  staleDnm.forEach(r=>{
     const li = document.createElement('li');
-    li.innerHTML = `<strong>${safeGet(r,'Title')||safeGet(r,'Page Title')||'Untitled'}</strong><div class="muted">${safeGet(r,'Redirect External URL')?'Redirect → ' + safeGet(r,'Redirect External URL'): 'Missing Zesty path'}</div>`;
-    redirectList.appendChild(li);
+    const days = daysSince(parseDate(safeGet(r,'Date Modified')||safeGet(r,'Date Publish')));
+    li.innerHTML = `<strong>${safeGet(r,'Title')||safeGet(r,'Page Title')||'Untitled'}</strong> · ${days} days old`;
+    staleDnmList.appendChild(li);
   });
 
-  // small data for division filter counts
-  const divCounts = {};
-  rows.forEach(r=>{ const d = safeGet(r,'Division')||'(none)'; divCounts[d] = (divCounts[d]||0) + 1; });
-  (window.__divCounts = divCounts);
+  // 5: Redirect conflicts
+  const redirectConflicts = rows.filter(r=>{
+    const redirect = (safeGet(r,'Redirect External URL')||'').trim();
+    const zestyFull = (safeGet(r,'Zesty Full Page Path')||'').trim();
+    return redirect && zestyFull;
+  }).slice(0,12);
+  const redirectConflictList = document.getElementById('redirectConflictList');
+  redirectConflictList.innerHTML = '';
+  redirectConflicts.forEach(r=>{
+    const li = document.createElement('li');
+    li.innerHTML = `<strong>${safeGet(r,'Title')||'Untitled'}</strong> · Redirect + Zesty path conflict`;
+    redirectConflictList.appendChild(li);
+  });
+
+  // 6: Quick win potential
+  const quickWins = rows.filter(r=>(safeGet(r,'Priority')==='High' && safeGet(r,'Effort Needed')==='Low'));
+  const winsByDiv = {};
+  quickWins.forEach(r=>{
+    const d = safeGet(r,'Division')||'(none)';
+    winsByDiv[d] = (winsByDiv[d]||0)+1;
+  });
+  const quickWinsList = document.getElementById('quickWinsList');
+  quickWinsList.innerHTML = '';
+  Object.entries(winsByDiv).sort((a,b)=>b[1]-a[1]).forEach(([div,count])=>{
+    const li = document.createElement('li');
+    li.innerHTML = `<strong>${div}</strong> · ${count} potential quick wins`;
+    quickWinsList.appendChild(li);
+  });
 }
 
-/* populate division dropdown */
+
+/* ========= populate division filter ========= */
 function populateDivisionFilter(rows){
   const sel = document.getElementById('divisionFilter');
-  const divs = Object.keys(window.__divCounts || {});
-  // clear except first option
   sel.innerHTML = '<option value="">All Divisions</option>';
-  divs.sort().forEach(d=>{
+  Object.keys(window.__divCounts || {}).sort().forEach(d=>{
     const opt = document.createElement('option');
     opt.value = d;
     opt.textContent = `${d} (${window.__divCounts[d]})`;
     sel.appendChild(opt);
   });
-  sel.addEventListener('change', async (e)=>{
-    const val = e.target.value;
-    if(!val) { fetchAndRender(); return; }
-    try {
-      const res = await fetch(DATA_URL);
-      const rows = await res.json();
-      const filtered = rows.filter(r => (safeGet(r,'Division')||'') === val);
-      renderAll(filtered);
-    } catch(err){ console.error(err); alert('Failed to re-filter'); }
-  });
+
+  sel.onchange = () => {
+    const val = sel.value;
+    if(!val) return renderAll(allRows);
+    const filtered = allRows.filter(r => (safeGet(r,'Division')||'')===val);
+    renderAll(filtered);
+  };
 }
 
-/* ========= UI helpers (toggle code + copy) ========= */
+/* ========= UI helpers ========= */
 document.getElementById('refreshBtn').addEventListener('click', ()=>fetchAndRender());
 document.getElementById('toggleCodeBtn').addEventListener('click', ()=>{
   const el = document.getElementById('cardsCodeContainer');
-  el.style.display = el.style.display === 'none' ? 'block' : 'none';
-  document.getElementById('toggleCodeBtn').textContent = el.style.display === 'none' ? 'Show code' : 'Hide code';
+  el.style.display = el.style.display==='none'?'block':'none';
+  document.getElementById('toggleCodeBtn').textContent = el.style.display==='none'?'Show code':'Hide code';
 });
 function copyCodeById(evt){
-  // accepts event; uses data-copy-target attribute
-  const targetId = evt && evt.target && evt.target.dataset && evt.target.dataset.copyTarget;
-  if(!targetId){ alert('No data-copy-target found'); return; }
+  const targetId = evt?.target?.dataset?.copyTarget;
+  if(!targetId){ alert('No data-copy-target'); return; }
   const el = document.getElementById(targetId);
-  if(!el){ alert('Target element not found: ' + targetId); return; }
+  if(!el){ alert('Target element not found'); return; }
   const text = el.textContent || el.innerText || el.innerHTML;
-  navigator.clipboard.writeText(text).then(()=> {
+  navigator.clipboard.writeText(text).then(()=>{
     const original = evt.target.textContent;
     evt.target.textContent = 'Copied!';
-    setTimeout(()=> evt.target.textContent = original, 1200);
-  }).catch(err=>{
-    alert('Copy failed: ' + err);
-  });
+    setTimeout(()=> evt.target.textContent = original,1200);
+  }).catch(err=>alert('Copy failed: '+err));
 }
 
 /* ========= boot ========= */
 fetchAndRender();
+
 /* ========= end ========= */
 </script>
 </body>
