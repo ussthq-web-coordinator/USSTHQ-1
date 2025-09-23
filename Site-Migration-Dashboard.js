@@ -485,7 +485,8 @@ statusChart = new Chart(ctxStatus, {
 
 // Cards rendering
 // Old Colors '#f1c40f','#2ecc71','#e74c3c','#f39c12','#3498db','#9b59b6','#16a085','#d35400','#ff6b6b', '#f7b32b', '#4ecdc4'
-  const colors = ['#0d1a2b', '#112136', '#132230', '#1b2b3c', '#223344', '#2a3d4c', '#314556', '#395060', '#41586a', '#4a6174', '#536b7e'];
+  const colors = ['#132230', '#1a3245', '#22445a', '#2b5770', '#33688a', '#3c7aa0', '#448cba', '#4d9ecf', '#55b0e5', '#5dc3f5', '#66d6ff'];
+
 
   const container = document.getElementById("metricCards");
   container.innerHTML = "";
