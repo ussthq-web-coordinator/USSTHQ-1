@@ -655,9 +655,9 @@ title: "Title",
       {title:"SD", field:"Page URL", formatter:cell=>cell.getValue()?`<a href="${cell.getValue()}" target="_blank">&#128279;</a>`:""},
       {title:"ZD", field:"Zesty URL Path Part", formatter:cell=>cell.getValue()?`<a href="https://8hxvw8tw-dev.webengine.zesty.io${cell.getValue()}?zpw=tsasecret123&redirect=false&_bypassError=true" target="_blank">&#128279;</a>`:""},
       {title:"Status", field:"Status",
-          width: 110,        // fixed column width in px (adjust to taste)
+          width: 110,        
           minWidth: 80,
-          headerSort: true, // optional: keep width stable on header sort
+          headerSort: true, 
           formatter: function(cell){
     const v = cell.getValue() ?? "";
     // escape html so long content can't break markup
@@ -895,7 +895,6 @@ document.querySelectorAll(".qaTitleLink").forEach(link => {
 });
 
 
-// Function to show all QA issues in a modal
 // Function to show all QA issues in the modal
 function showAllQaIssues() {
     const tbody = document.querySelector("#allQaTable tbody");

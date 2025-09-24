@@ -1,0 +1,4 @@
+User-agent: *
+Disallow: /Site-Migration-Dashboard.html
+Disallow: /DashboardData.json
+Disallow: /Site-Migration-Dashboard.js
