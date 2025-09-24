@@ -924,6 +924,8 @@ function showAllQaIssues() {
             <td>${p.Priority || ""}</td>
             <td>${p["QA Notes"] || ""}</td>
             <td>${p["QA Issues.lookupValue"]}</td>
+            <td>${p["QA Issues:Why This Is Important"]}</td>
+            <td>${p["QA Issues:How to Fix"]}</td>
         `;
         tbody.appendChild(tr);
     });
