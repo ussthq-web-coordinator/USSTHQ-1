@@ -46,7 +46,7 @@ async function fetchData() {
     const json = await res.json();
     tableData = Array.isArray(json) ? json : (json.data || []);
     const refreshUTC = json.refreshDate ? new Date(json.refreshDate) : null;
-    document.getElementById("refreshDate").textContent = refreshUTC ? "Version 1.9232028 - Last refreshed (Eastern): " + refreshUTC.toLocaleString("en-US",{ timeZone:"America/New_York", dateStyle:"medium", timeStyle:"short"}) : "Last refreshed: Unknown";
+    document.getElementById("refreshDate").textContent = refreshUTC ? "Version 1.9232040 - Last refreshed (Eastern): " + refreshUTC.toLocaleString("en-US",{ timeZone:"America/New_York", dateStyle:"medium", timeStyle:"short"}) : "Last refreshed: Unknown";
     pageCache = {}; tableData.forEach((d,i)=>{d._id=i; pageCache[i]=d;});
     initFilters(); renderCards(); renderTable();
   } catch(err) {
@@ -797,7 +797,7 @@ function showQaIssuesModal(groupKey){
   }
 
   let html = `
-  <div class="mb-2"><strong>${groupKey}</strong></div>
+  <div class="mb-2"><strong>Issue: </strong><p style="font-size: 1rem;">${groupKey}</p></div>
     <div class="table-responsive">
       <table class="table table-sm table-bordered align-middle">
         <thead class="table-light">
