@@ -46,7 +46,7 @@ async function fetchData() {
     const json = await res.json();
     tableData = Array.isArray(json) ? json : (json.data || []);
     const refreshUTC = json.refreshDate ? new Date(json.refreshDate) : null;
-    document.getElementById("refreshDate").textContent = refreshUTC ? "Version 1.9232009 - Last refreshed (Eastern): " + refreshUTC.toLocaleString("en-US",{ timeZone:"America/New_York", dateStyle:"medium", timeStyle:"short"}) : "Last refreshed: Unknown";
+    document.getElementById("refreshDate").textContent = refreshUTC ? "Version 1.9232028 - Last refreshed (Eastern): " + refreshUTC.toLocaleString("en-US",{ timeZone:"America/New_York", dateStyle:"medium", timeStyle:"short"}) : "Last refreshed: Unknown";
     pageCache = {}; tableData.forEach((d,i)=>{d._id=i; pageCache[i]=d;});
     initFilters(); renderCards(); renderTable();
   } catch(err) {
@@ -814,6 +814,9 @@ function showQaIssuesModal(groupKey){
         <tbody>
   `;
 
+  let whyImportant = "";
+  let howToFix = "";
+
   ids.forEach(id => {
     const p = pageCache[id];
     const sdLink = p["Page URL"]
@@ -839,11 +842,26 @@ function showQaIssuesModal(groupKey){
       </tr>
     `;
 
+  // capture first non-empty value only
+    if (!whyImportant && p["QA Issues:Why This Is Important"]) {
+      whyImportant = p["QA Issues:Why This Is Important"];
+    }
+    if (!howToFix && p["QA Issues:How to Fix"]) {
+      howToFix = p["QA Issues:How to Fix"];
+    }
   });
 
   html += "</tbody></table></div>";
-  modalBody.innerHTML = html;
 
+  // add headings/values under the table
+  if (whyImportant) {
+    html += `<div class="mt-3"><h5>Why Fixing This Is Important</h5><p>${whyImportant}</p></div>`;
+  }
+  if (howToFix) {
+    html += `<div class="mt-3"><h5>How to Fix This Issue</h5><p>${howToFix}</p></div>`;
+  }
+
+  modalBody.innerHTML = html;
   new bootstrap.Modal(document.getElementById("qaIssuesModal")).show();
 }
 
