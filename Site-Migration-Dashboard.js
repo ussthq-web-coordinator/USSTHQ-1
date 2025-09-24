@@ -46,7 +46,7 @@ async function fetchData() {
     const json = await res.json();
     tableData = Array.isArray(json) ? json : (json.data || []);
     const refreshUTC = json.refreshDate ? new Date(json.refreshDate) : null;
-    document.getElementById("refreshDate").textContent = refreshUTC ? "Version 1.9240038 - Last refreshed (Eastern): " + refreshUTC.toLocaleString("en-US",{ timeZone:"America/New_York", dateStyle:"medium", timeStyle:"short"}) : "Last refreshed: Unknown";
+    document.getElementById("refreshDate").textContent = refreshUTC ? "Version 1.9240149 - Last refreshed (Eastern): " + refreshUTC.toLocaleString("en-US",{ timeZone:"America/New_York", dateStyle:"medium", timeStyle:"short"}) : "Last refreshed: Unknown";
     pageCache = {}; tableData.forEach((d,i)=>{d._id=i; pageCache[i]=d;});
     initFilters(); renderCards(); renderTable();
   } catch(err) {
@@ -865,7 +865,7 @@ function showQaIssuesModal(groupKey){
     html += `<div class="mt-3"><h5>How to Fix This Issue</h5><p>${howToFix}</p></div>`;
   }
   if (howToFixDetails) {
-    html += `<div class="mt-3"><h5>How to Fix Details</h5><p>${howToFixDetails}</p></div>`;
+    html += `<div class="mt-3"><h6>How to Fix Details</h6><p>${howToFixDetails}</p></div>`;
   }
 
   modalBody.innerHTML = html;
@@ -933,6 +933,7 @@ function showAllQaIssues() {
             <td>${p["QA Issues.lookupValue"]}</td>
             <td>${p["QA Issues:Why This Is Important"]}</td>
             <td>${p["QA Issues:How to Fix"]}</td>
+            <td>${p["QA Issues:How to Fix Details"]}</td>
         `;
         tbody.appendChild(tr);
     });
