@@ -1,4 +1,5 @@
 User-agent: *
+Disallow: *
 Disallow: /
 Disallow: /index.html
 Disallow: /Site-Migration-Dashboard.html
