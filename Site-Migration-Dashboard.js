@@ -894,64 +894,45 @@ function showAllQaIssues() {
     const tbody = document.querySelector("#allQaTable tbody");
     tbody.innerHTML = "";
 
-    // Loop through all QA issues in tableData
-    const allQaIssuesReal = [];
+    // ✅ Get currently filtered data first
+    const filteredData = getFilteredData();
 
-    tableData.forEach(p => {
-        if (p["QA Issues.lookupValue"]) {
-            allQaIssuesReal.push({
-                issue: p["QA Issues.lookupValue"],
-                title: p.Title,
-                status: p.Status,
-                priority: p.Priority,
-                id: p.ID, // store the row ID for modal
-                qaNotes: p["QA Notes"] || "",
-                formLink: (() => {
-                    const type = (p["Symphony Site Type"] || "").trim();
-                    if (type === "Metro Area") return `https://sauss.sharepoint.com/sites/USSWEBADM/Lists/MetroAreaSitesInfoPagesSymphony/DispForm.aspx?ID=${p.ID}&e=mY8mhG`;
-                    if (type === "Corps") return `https://sauss.sharepoint.com/sites/USSWEBADM/Lists/CorpsSitesPageMigrationReport/DispForm.aspx?ID=${p.ID}&e=dF11LG`;
-                    return "#";
-                })(),
-                sdLink: p["Page URL"] || "#",
-                zdLink: p["Zesty URL Path Part"]
-                    ? `https://8hxvw8tw-dev.webengine.zesty.io${p["Zesty URL Path Part"]}?zpw=tsasecret123&redirect=false&_bypassError=true`
-                    : "#"
-            });
-        }
-    });
+    // Filter QA issues within the filtered dataset
+    const allQaIssuesFiltered = filteredData.filter(p => p["QA Issues.lookupValue"]);
 
     // Build table rows
-    allQaIssuesReal.forEach(p => {
+    allQaIssuesFiltered.forEach(p => {
         const tr = document.createElement("tr");
+        const type = (p["Symphony Site Type"] || "").trim();
+        const formLink = type === "Metro Area"
+            ? `https://sauss.sharepoint.com/sites/USSWEBADM/Lists/MetroAreaSitesInfoPagesSymphony/DispForm.aspx?ID=${p.ID}&e=mY8mhG`
+            : type === "Corps"
+                ? `https://sauss.sharepoint.com/sites/USSWEBADM/Lists/CorpsSitesPageMigrationReport/DispForm.aspx?ID=${p.ID}&e=dF11LG`
+                : "#";
+
+        const sdLink = p["Page URL"] || "#";
+        const zdLink = p["Zesty URL Path Part"]
+            ? `https://8hxvw8tw-dev.webengine.zesty.io${p["Zesty URL Path Part"]}?zpw=tsasecret123&redirect=false&_bypassError=true`
+            : "#";
+
         tr.innerHTML = `
-            <td>${p.title}</td>
-            <td><a href="${p.formLink}" target="_blank">Form</a></td>
-            <td class="text-center"><a href="${p.sdLink}" target="_blank">Live</a></td>
-            <td class="text-center"><a href="${p.zdLink}" target="_blank">Zesty</a></td>
-            <td>${p.status || ""}</td>
-            <td>${p.priority || ""}</td>
-            <td>${p.qaNotes || ""}</td>
-            <td>${p.issue}</td>
+            <td>${p.Title}</td>
+            <td><a href="${formLink}" target="_blank">Form</a></td>
+            <td class="text-center"><a href="${sdLink}" target="_blank">Live</a></td>
+            <td class="text-center"><a href="${zdLink}" target="_blank">Zesty</a></td>
+            <td>${p.Status || ""}</td>
+            <td>${p.Priority || ""}</td>
+            <td>${p["QA Notes"] || ""}</td>
+            <td>${p["QA Issues.lookupValue"]}</td>
         `;
         tbody.appendChild(tr);
     });
-
-    // Attach click handlers for title links
-    tbody.querySelectorAll(".qaTitleLink").forEach(link => {
-    link.addEventListener("click", e => {
-        e.preventDefault();
-        const rowId = link.dataset.id;
-        const record = allRows.find(r => r.rowId == rowId);
-        showTableModalById(rowId);
-    });
-});
-
-
 
     // Show modal
     const modalEl = document.getElementById('allQaModal');
     new bootstrap.Modal(modalEl).show();
 }
+
 
 // Attach handler
 const viewAllQaBtn = document.getElementById("viewAllQaBtn");
