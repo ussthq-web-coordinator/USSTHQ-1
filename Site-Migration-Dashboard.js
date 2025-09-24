@@ -704,7 +704,7 @@ title: "Title",
 }
 
 // Make sure masterData references tableData
-const masterData = tableData;
+const masterData = [...tableData];
 
 document.addEventListener("DOMContentLoaded", () => {
   const searchInput = document.getElementById("searchInput");
@@ -802,10 +802,10 @@ function showQaIssuesModal(groupKey){
       <table class="table table-sm table-bordered align-middle">
         <thead class="table-light">
           <tr>
+            <th>Title</th>
             <th class="text-center">Edit</th>
             <th class="text-center">SD</th>
             <th class="text-center">ZD</th>
-            <th>Title</th>
             <th>Status</th>
             <th>Priority</th>
             <th>QA Notes</th>
@@ -832,7 +832,7 @@ function showQaIssuesModal(groupKey){
 
     html += `
       <tr>
-      <td><a href="#" onclick="showTableModalById(${id})">${p.Title}</a></td>  
+      <td>${p.Title}</a></td>  
       <td class="text-center">${formLink}</td>
         <td class="text-center">${sdLink}</td>
         <td class="text-center">${zdLink}</td>
@@ -865,69 +865,102 @@ function showQaIssuesModal(groupKey){
   new bootstrap.Modal(document.getElementById("qaIssuesModal")).show();
 }
 
-// --- Charts: fixed Published Symphony chart to show Yes/No correctly ---
-function renderCharts(data){
-  Object.values(charts).forEach(c => c.destroy && c.destroy());
-  charts = {};
+// 1️⃣ Attach event listeners to all QA title links
+document.querySelectorAll(".qaTitleLink").forEach(link => {
+    link.addEventListener("click", e => {
+        e.preventDefault();
 
-  // Status
-// --- Compute progress ---
-  const statusGroups = { "Completed":0, "Do Not Migrate":0, "Needs Info":0, "In Progress":0, "In QA":0 };
+        // 2️⃣ Get the dataset ID from the clicked link
+        const rowId = link.dataset.id;
+        console.log("Clicked link dataset.id:", rowId);
 
-  data.forEach(d => {
-    const s = (d.Status || "").trim();
-    if (/^(4|5)/.test(s)) statusGroups["Completed"]++;
-    else if (/^3/.test(s)) statusGroups["In QA"]++;
-    else if (/^2/.test(s)) statusGroups["In Progress"]++;
-    else if (/^1/.test(s)) statusGroups["Needs Info"]++;
-    else if (s === "Do Not Migrate") statusGroups["Do Not Migrate"]++;
-  
-    
-  });
+        // 3️⃣ Find the correct record in allRows
+        const record = allRows.find(r => r.rowId == rowId); // use the correct property from your data
+        console.log("Record found:", record);
 
-  const total = Object.values(statusGroups).reduce((a,b)=>a+b,0);
+        if (record) {
+            // 4️⃣ Launch modal with that record
+            showTableModalById(record.rowId);
+        } else {
+            console.warn("No record found for rowId:", rowId);
+        }
+    });
+});
 
-  // --- Set progress bar widths ---
-  document.getElementById("progressCompleted").style.width = (statusGroups["Completed"]/total*100) + "%";
-  document.getElementById("progressDoNotMigrate").style.width = (statusGroups["Do Not Migrate"]/total*100) + "%";
-  document.getElementById("progressNeedsInfo").style.width = (statusGroups["Needs Info"]/total*100) + "%";
-  document.getElementById("progressInProgress").style.width = (statusGroups["In Progress"]/total*100) + "%";
-  document.getElementById("progressInQA").style.width = (statusGroups["In QA"]/total*100) + "%";
 
-  // Priority
-  const priorityCounts = countBy(data,"Priority");
-  charts.priorityChart = new Chart(document.getElementById("priorityChart"), {
-    type:"pie",
-    data:{ labels:Object.keys(priorityCounts),
-           datasets:[{ data:Object.values(priorityCounts),
-                       backgroundColor:palette(Object.keys(priorityCounts).length) }] },
-    options:{ plugins:{ title:{display:true,text:"Priority"} } }
-  });
+// Function to show all QA issues in a modal
+// Function to show all QA issues in the modal
+function showAllQaIssues() {
+    const tbody = document.querySelector("#allQaTable tbody");
+    tbody.innerHTML = "";
 
-  // Page Type
-  const typeCounts = countBy(data,"Page Type");
-  charts.pageTypeChart = new Chart(document.getElementById("pageTypeChart"), {
-    type:"pie",
-    data:{ labels:Object.keys(typeCounts),
-           datasets:[{ data:Object.values(typeCounts),
-                       backgroundColor:palette(Object.keys(typeCounts).length) }] },
-    options:{ plugins:{ title:{display:true,text:"Page Type"} } }
-  });
+    // Loop through all QA issues in tableData
+    const allQaIssuesReal = [];
 
-  // ✅ Published Symphony fix
-  const pubCounts = { Yes:0, No:0 };
-  data.forEach(d => {
-    if (String(d["Published Symphony"]).toLowerCase() === "true") pubCounts.Yes++;
-    else pubCounts.No++;
-  });
-  charts.pubSymChart = new Chart(document.getElementById("pubSymChart"), {
-    type:"pie",
-    data:{ labels:["Yes","No"],
-           datasets:[{ data:[pubCounts.Yes, pubCounts.No],
-                       backgroundColor:["#3498db","#95a5a6"] }] },
-    options:{ plugins:{ title:{display:true,text:"Published Symphony"} } }
-  });
+    tableData.forEach(p => {
+        if (p["QA Issues.lookupValue"]) {
+            allQaIssuesReal.push({
+                issue: p["QA Issues.lookupValue"],
+                title: p.Title,
+                status: p.Status,
+                priority: p.Priority,
+                id: p.ID, // store the row ID for modal
+                qaNotes: p["QA Notes"] || "",
+                formLink: (() => {
+                    const type = (p["Symphony Site Type"] || "").trim();
+                    if (type === "Metro Area") return `https://sauss.sharepoint.com/sites/USSWEBADM/Lists/MetroAreaSitesInfoPagesSymphony/DispForm.aspx?ID=${p.ID}&e=mY8mhG`;
+                    if (type === "Corps") return `https://sauss.sharepoint.com/sites/USSWEBADM/Lists/CorpsSitesPageMigrationReport/DispForm.aspx?ID=${p.ID}&e=dF11LG`;
+                    return "#";
+                })(),
+                sdLink: p["Page URL"] || "#",
+                zdLink: p["Zesty URL Path Part"]
+                    ? `https://8hxvw8tw-dev.webengine.zesty.io${p["Zesty URL Path Part"]}?zpw=tsasecret123&redirect=false&_bypassError=true`
+                    : "#"
+            });
+        }
+    });
+
+    // Build table rows
+    allQaIssuesReal.forEach(p => {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+            <td>${p.title}</td>
+            <td><a href="${p.formLink}" target="_blank">Form</a></td>
+            <td class="text-center"><a href="${p.sdLink}" target="_blank">Live</a></td>
+            <td class="text-center"><a href="${p.zdLink}" target="_blank">Zesty</a></td>
+            <td>${p.status || ""}</td>
+            <td>${p.priority || ""}</td>
+            <td>${p.qaNotes || ""}</td>
+            <td>${p.issue}</td>
+        `;
+        tbody.appendChild(tr);
+    });
+
+    // Attach click handlers for title links
+    tbody.querySelectorAll(".qaTitleLink").forEach(link => {
+    link.addEventListener("click", e => {
+        e.preventDefault();
+        const rowId = link.dataset.id;
+        const record = allRows.find(r => r.rowId == rowId);
+        showTableModalById(rowId);
+    });
+});
+
+
+
+    // Show modal
+    const modalEl = document.getElementById('allQaModal');
+    new bootstrap.Modal(modalEl).show();
 }
+
+// Attach handler
+const viewAllQaBtn = document.getElementById("viewAllQaBtn");
+if (viewAllQaBtn) viewAllQaBtn.addEventListener("click", showAllQaIssues);
+
+
+
+
+
 
 
 
@@ -947,37 +980,7 @@ function palette(n){
   return Array.from({length:n},(_,i)=>colors[i%colors.length]);
 }
 
-function renderCharts(data){
-  // destroy old charts
-  Object.values(charts).forEach(c=>c.destroy && c.destroy());
-  charts={};
 
-const statusChart = new Chart(document.getElementById('statusChart'), {
-
-  type: 'pie',
-  data: statusData,
-  options: {
-    plugins: {
-      legend: { display: false } // hide in chart
-    }
-  },
-  plugins: [{
-    id: 'legendPlugin',
-    afterUpdate: chart => {
-      chart.generateLegend = function() {
-        const items = chart.data.labels.map((label, i) => {
-          const color = chart.data.datasets[0].backgroundColor[i];
-          const value = chart.data.datasets[0].data[i];
-          return `<div style="display:flex;align-items:center;gap:0.5rem;margin:0.2rem 0;">
-                    <span style="width:12px;height:12px;background-color:${color};display:inline-block;"></span>
-                    ${label}: ${value}
-                  </div>`;
-        }).join('');
-        return items;
-      }
-    }
-  }]
-});
 
 // Attach modal trigger
 addChartLegendModal(statusChart, "Status Overview");
@@ -1091,7 +1094,7 @@ charts.pubSymChart = new Chart(document.getElementById("pubSymChart"), {
   },
   options:{ plugins:{ title:{display:true,text:"Published Symphony"} } }
 });
-}
+
 
 const refreshEl = document.getElementById("refreshDate");
 if(refreshEl){
