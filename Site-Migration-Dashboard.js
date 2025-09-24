@@ -46,7 +46,7 @@ async function fetchData() {
     const json = await res.json();
     tableData = Array.isArray(json) ? json : (json.data || []);
     const refreshUTC = json.refreshDate ? new Date(json.refreshDate) : null;
-    document.getElementById("refreshDate").textContent = refreshUTC ? "Version 1.9232228 - Last refreshed (Eastern): " + refreshUTC.toLocaleString("en-US",{ timeZone:"America/New_York", dateStyle:"medium", timeStyle:"short"}) : "Last refreshed: Unknown";
+    document.getElementById("refreshDate").textContent = refreshUTC ? "Version 1.9240038 - Last refreshed (Eastern): " + refreshUTC.toLocaleString("en-US",{ timeZone:"America/New_York", dateStyle:"medium", timeStyle:"short"}) : "Last refreshed: Unknown";
     pageCache = {}; tableData.forEach((d,i)=>{d._id=i; pageCache[i]=d;});
     initFilters(); renderCards(); renderTable();
   } catch(err) {
@@ -816,6 +816,7 @@ function showQaIssuesModal(groupKey){
 
   let whyImportant = "";
   let howToFix = "";
+  let howToFixDetails = "";
 
   ids.forEach(id => {
     const p = pageCache[id];
@@ -849,6 +850,9 @@ function showQaIssuesModal(groupKey){
     if (!howToFix && p["QA Issues:How to Fix"]) {
       howToFix = p["QA Issues:How to Fix"];
     }
+    if (!howToFixDetails && p["QA Issues:How to Fix Details"]) {
+      howToFixDetails = p["QA Issues:How to Fix Details"];
+    }
   });
 
   html += "</tbody></table></div>";
@@ -859,6 +863,9 @@ function showQaIssuesModal(groupKey){
   }
   if (howToFix) {
     html += `<div class="mt-3"><h5>How to Fix This Issue</h5><p>${howToFix}</p></div>`;
+  }
+  if (howToFixDetails) {
+    html += `<div class="mt-3"><h5>How to Fix Details</h5><p>${howToFixDetails}</p></div>`;
   }
 
   modalBody.innerHTML = html;
