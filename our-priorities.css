@@ -1,4 +1,4 @@
-.scroll-row {
+  .scroll-row {
     display: flex;
     overflow-x: auto;
     scroll-behavior: smooth;
@@ -14,7 +14,7 @@
   }
 
   .scroll-row .content img {
-    height: 350px; /* larger images */
+    height: 350px;
     border-radius: 8px;
     display: block;
   }
@@ -25,7 +25,7 @@
 
   /* Lightbox overlay */
   #lightboxPriorities {
-    display: none;
+    display: none; /* hidden by default */
     position: fixed;
     z-index: 9999;
     top:0; left:0;
@@ -52,20 +52,6 @@
     background: rgba(255,255,255,0.8);
   }
 
-  #closeBtnPriorities {
-    top: 20px;
-    right: 20px;
-    background: #fff;
-  }
-
-  #prevBtnPriorities {
-    top: 50%;
-    left: 20px;
-    transform: translateY(-50%);
-  }
-
-  #nextBtnPriorities {
-    top: 50%;
-    right: 20px;
-    transform: translateY(-50%);
-  }
+  #closeBtnPriorities { top: 20px; right: 20px; background: #fff; }
+  #prevBtnPriorities { top: 50%; left: 20px; transform: translateY(-50%); }
+  #nextBtnPriorities { top: 50%; right: 20px; transform: translateY(-50%); }
