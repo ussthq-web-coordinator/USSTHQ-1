@@ -4,7 +4,6 @@
     scroll-behavior: smooth;
     gap: 15px;
     padding: 10px 0;
-    white-space: nowrap;
   }
 
   .scroll-row .content {
