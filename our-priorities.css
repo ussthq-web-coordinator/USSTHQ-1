@@ -72,3 +72,19 @@
   font-weight: bold;
   font-size: 18px;
 }
+
+/* Horizontal scroll container */
+.scroll-row-priorities {
+  display: flex;
+  overflow-x: auto;
+  scroll-behavior: smooth;
+  gap: 20px;
+  padding: 20px 0;
+  white-space: nowrap;
+}
+
+/* Each card in the scroll */
+.priority-card {
+  flex: 0 0 auto;
+  min-width: 300px; /* adjust as needed */
+}
