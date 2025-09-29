@@ -1,0 +1,71 @@
+.scroll-row {
+    display: flex;
+    overflow-x: auto;
+    scroll-behavior: smooth;
+    gap: 15px;
+    padding: 10px 0;
+    white-space: nowrap;
+  }
+
+  .scroll-row .content {
+    flex: 0 0 auto;
+    cursor: pointer;
+    transition: transform 0.3s;
+  }
+
+  .scroll-row .content img {
+    height: 350px; /* larger images */
+    border-radius: 8px;
+    display: block;
+  }
+
+  .scroll-row .content:hover {
+    transform: scale(1.05);
+  }
+
+  /* Lightbox overlay */
+  #lightboxPriorities {
+    display: none;
+    position: fixed;
+    z-index: 9999;
+    top:0; left:0;
+    width:100%; height:100%;
+    background-color: rgba(0,0,0,0.85);
+    justify-content: center;
+    align-items: center;
+  }
+
+  #lightboxPriorities img {
+    max-width: 90%;
+    max-height: 80%;
+    border-radius: 10px;
+    transition: transform 1s ease;
+  }
+
+  #lightboxPriorities button {
+    position: absolute;
+    border: none;
+    padding: 10px 15px;
+    font-size: 18px;
+    cursor: pointer;
+    border-radius: 5px;
+    background: rgba(255,255,255,0.8);
+  }
+
+  #closeBtnPriorities {
+    top: 20px;
+    right: 20px;
+    background: #fff;
+  }
+
+  #prevBtnPriorities {
+    top: 50%;
+    left: 20px;
+    transform: translateY(-50%);
+  }
+
+  #nextBtnPriorities {
+    top: 50%;
+    right: 20px;
+    transform: translateY(-50%);
+  }
