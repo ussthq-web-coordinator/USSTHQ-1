@@ -56,8 +56,19 @@
   #prevBtnPriorities { top: 50%; left: 20px; transform: translateY(-50%); }
   #nextBtnPriorities { top: 50%; right: 20px; transform: translateY(-50%); }
 
-  @keyframes iridescent {
+ @keyframes iridescent {
   0% { background-position: 0% 50%; }
   50% { background-position: 100% 50%; }
   100% { background-position: 0% 50%; }
+}
+.iridescent-box {
+  text-align: center;
+  background: linear-gradient(135deg, #EC3B43, #F0625F, #F5A3A0, #D96E7D, #EC3B43);
+  background-size: 400% 400%;
+  animation: iridescent 12s ease infinite;
+  padding: 20px;
+  border-radius: 10px;
+  color: #fff;
+  font-weight: bold;
+  font-size: 18px;
 }
