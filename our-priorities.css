@@ -55,3 +55,9 @@
   #closeBtnPriorities { top: 20px; right: 20px; background: #fff; }
   #prevBtnPriorities { top: 50%; left: 20px; transform: translateY(-50%); }
   #nextBtnPriorities { top: 50%; right: 20px; transform: translateY(-50%); }
+
+  @keyframes iridescent {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
