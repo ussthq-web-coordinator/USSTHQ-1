@@ -1,6 +1,6 @@
   .scroll-row {
     display: flex;
-    overflow-x: auto;
+    overflow-x: scroll;
     scroll-behavior: smooth;
     gap: 15px;
     padding: 10px 0;
