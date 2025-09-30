@@ -87,7 +87,7 @@ async function fetchData() {
     const refreshUTC = json.refreshDate ? new Date(json.refreshDate) : null;
     const refreshEl = document.getElementById("refreshDate");
     if (refreshEl) {
-      refreshEl.textContent = refreshUTC ? "Version 1.9300620 - Last refreshed (Eastern): " + refreshUTC.toLocaleString("en-US",{ timeZone:"America/New_York", dateStyle:"medium", timeStyle:"short"}) : "Last refreshed: Unknown";
+      refreshEl.textContent = refreshUTC ? "Version 1.9301920 - Last refreshed (Eastern): " + refreshUTC.toLocaleString("en-US",{ timeZone:"America/New_York", dateStyle:"medium", timeStyle:"short"}) : "Last refreshed: Unknown";
     }
     pageCache = {}; tableData.forEach((d,i)=>{d._id=i; pageCache[i]=d;});
     initFilters(); renderCards(); renderTable();
@@ -223,10 +223,11 @@ function adjustLabel(rawValue) {
   return rawValue;
 }
 
-// 2. Your filter mappings (unchanged: these are real values for filtering)
+// 2. Your filter mappings (derive Area Command from Local when AC is missing)
 const filterMapping = {
   filterDivision: d => d.Division || "Not Set",
-  filterAC: d => d["Area Command Admin Group.title"] || "Not Set",
+  // Prefer Area Command title, but fallback to Local Web Admin Group.title when AC is empty
+  filterAC: d => (d["Area Command Admin Group.title"] || d["Local Web Admin Group.title"] || "Not Set"),
   filterStatus: d => d.Status || "Not Set",
   filterPageType: d => d["Page Type"] || "Not Set",
   filterPubSym: d => d["Published Symphony"] || "Not Set",
@@ -315,7 +316,8 @@ function getFilteredData(){
 
   return tableData.filter(d => 
     (!div || d.Division===div) &&
-    (!ac || d["Area Command Admin Group.title"]===ac) &&
+    // Match AC filter if it equals the row's AC OR the row's Local (derived AC)
+    (!ac || d["Area Command Admin Group.title"]===ac || d["Local Web Admin Group.title"]===ac) &&
     (!status || d.Status===status) &&
     (!pageType || d["Page Type"]===pageType) &&
     (!pubSym || d["Published Symphony"]===pubSym) &&
@@ -390,7 +392,8 @@ function updateACDropdown(filteredData) {
   const sel = document.getElementById("filterAC");
   if (!sel) return;
 
-  const options = [...new Set(filteredData.map(d => d["Area Command Admin Group.title"]))].sort();
+  // Build AC option list: prefer AC, fallback to Local when AC is empty
+  const options = [...new Set(filteredData.map(d => (d["Area Command Admin Group.title"] || d["Local Web Admin Group.title"] || 'Not Set')))].sort();
 
   sel.innerHTML = "<option value=''>All</option>" + options.map(o => {
     const displayText = formatAcDisplay(o); // formatted for dropdown
@@ -730,39 +733,101 @@ function renderBreakdown(data){
     {name:"Division", field:"Division"},
     {name:"Page Type", field:"Page Type"},
     {name:"Site Type", field:"Symphony Site Type"},
-    {name:"Area Command", field:"Area Command Admin Group.title"}
+    {name:"Area Command", field:"Area Command Admin Group.title"},
+    {name:"Location", field:"Local Web Admin Group.title"}
   ];
 
   groups.forEach(g=>{
-    const grouped={};
+    const grouped = {};
+
     data.forEach(d=>{
-      let val = d[g.field] || "Not Set";
-      grouped[val] = grouped[val] || {total:0, done:0, donot:0};
-      grouped[val].total++;
-      if(["4","5"].some(s=>d.Status?.startsWith(s))) grouped[val].done++;
-      if(d.Status==="Do Not Migrate") grouped[val].donot++;
+      // Read raw values and normalize (trim) to avoid false mismatches due to whitespace
+      const rawLocal = (d['Local Web Admin Group.title'] || '').toString().trim();
+      const rawAC = (d['Area Command Admin Group.title'] || '').toString().trim();
+      const rawVal = (d[g.field] || '').toString().trim();
+
+      // For Area Command grouping: if AC is missing, try to derive from Local (some rows only populate Local)
+      let key;
+      if (g.field === 'Area Command Admin Group.title') {
+        key = rawAC || rawLocal || 'Not Set';
+      } else if (g.field === 'Local Web Admin Group.title') {
+        // For Location grouping:
+        // - Use Local when present.
+        // - If Local is empty but Area Command exists, treat the AC as the location (AC's own site).
+        // - Fallback to 'Not Set' when neither is present.
+        key = rawLocal || rawAC || 'Not Set';
+      } else {
+        key = rawVal || 'Not Set';
+      }
+
+      // Use a normalized key for grouping
+      const k = key || 'Not Set';
+      grouped[k] = grouped[k] || { total: 0, done: 0, donot: 0, siteTitles: new Set() };
+      grouped[k].total++;
+      if (/[45]/.test(String(d.Status || '').charAt(0))) grouped[k].done++;
+      if ((d.Status || '') === 'Do Not Migrate') grouped[k].donot++;
+      const siteTitle = (d['Site Title'] || d['SiteTitle'] || '').toString().trim();
+      if (siteTitle) grouped[k].siteTitles.add(siteTitle);
     });
 
+    // Prepare display list: show human-friendly labels for AC and Location
+    let entries = Object.keys(grouped).map(rawKey => {
+      let display = rawKey;
+      if (g.field === 'Area Command Admin Group.title') display = formatAcDisplay(rawKey);
+      else if (g.field === 'Local Web Admin Group.title') display = adjustLabel(rawKey);
+      else display = rawKey || 'Not Set';
+      return { rawKey, display };
+    }).sort((a,b)=> a.display.localeCompare(b.display, undefined, { sensitivity: 'base' }));
+
+    // For Area Command group, only keep entries that appear to be Area Commands
+    if (g.field === 'Area Command Admin Group.title'){
+      entries = entries.filter(e => {
+        const rk = (e.rawKey || '').toString().toLowerCase();
+        const d = (e.display || '').toString().toLowerCase();
+        return rk.includes('area command') || d.includes('area command');
+      });
+    }
+
     container.innerHTML += `<h3 class="mt-3">${g.name}</h3>`;
-    Object.keys(grouped).sort().forEach(k=>{
-      const total = grouped[k].total;
-      const prog = total ? Math.round((grouped[k].done + grouped[k].donot)/total*100) : 0;
-      const hiddenClass = prog===0?"hidden-group":""; 
-      const colorClass = prog<40?"bg-danger":prog<70?"bg-warning":"bg-success";
-      container.innerHTML += `<div class="mb-1 ${hiddenClass}" style="display:${hiddenClass?'none':'block'}">
-        <strong>${k}</strong>
-        <div class="progress">
-          <div class="progress-bar ${colorClass}" style="width:${prog}%">${prog}%</div>
-        </div>
-      </div>`;
+    if (g.field === 'Local Web Admin Group.title'){
+      const childKeys = Object.keys(grouped).filter(k=>k && k !== 'Not Set');
+      try { console.debug('renderBreakdown: child locations for current filters', childKeys.slice(0,50)); } catch(e){}
+      if (!childKeys.length) {
+        container.innerHTML += `<div class="mb-2 text-muted"><em>No child locations found for the current filters. (Either Local is empty or there are no distinct Local values for the current filters.)</em></div>`;
+      }
+    }
+    entries.forEach(({ rawKey, display }) => {
+      const grp = grouped[rawKey];
+      const total = grp.total;
+      const prog = total ? Math.round((grp.done + grp.donot) / total * 100) : 0;
+      const siteCount = grp.siteTitles ? grp.siteTitles.size : 0;
+  // (previously omitted single-site AC rows; now we keep them so AC entries that
+  // contain 'Area Command' are shown regardless of siteCount)
+      // Hide zero-percent groups by default for all group types; toggle will reveal them.
+  let hiddenClass = (prog === 0) ? 'hidden-group' : '';
+  // Only hide Area Command rows that are across exactly one site AND have 0% progress
+  if (g.field === 'Area Command Admin Group.title' && siteCount === 1 && prog === 0) hiddenClass = 'hidden-group';
+      const colorClass = prog < 40 ? 'bg-danger' : prog < 70 ? 'bg-warning' : 'bg-success';
+  // Always show the progress bar for all groups (including Area Command)
+  const progressHtml = `\n          <div class="progress mt-1">\n            <div class="progress-bar ${colorClass}" style="width:${prog}%">${prog}%</div>\n          </div>`;
+      container.innerHTML += `
+        <div class="mb-1 ${hiddenClass}" data-key="${encodeURIComponent(rawKey)}" style="display:${hiddenClass ? 'none' : 'block'}">
+          <strong>${display}</strong> <small class="text-muted">(${total} pages${siteCount? ' across '+siteCount+' sites':''})</small>${progressHtml}
+        </div>`;
     });
   });
 
-  document.getElementById("toggleHiddenGroups").onclick=()=> {
-    const hiddenElems = container.querySelectorAll(".hidden-group");
-    hiddenElems.forEach(e=>e.style.display=e.style.display==="none"?"block":"none");
-    document.getElementById("toggleHiddenGroups").innerText = hiddenElems[0].style.display==="block"?"Hide 0% Groups":"Show 0% Groups";
-  };
+  // Make toggle robust even when there are no hidden items
+  const toggleBtn = document.getElementById('toggleHiddenGroups');
+  let showHidden = false;
+  if (toggleBtn) {
+    toggleBtn.onclick = () => {
+      showHidden = !showHidden;
+      const hiddenElems = container.querySelectorAll('.hidden-group');
+      hiddenElems.forEach(e => e.style.display = showHidden ? 'block' : 'none');
+      toggleBtn.innerText = showHidden ? 'Hide 0% Groups' : 'Show 0% Groups';
+    };
+  }
 }
 
 // Table rendering
