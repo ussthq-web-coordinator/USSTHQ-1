@@ -56,7 +56,7 @@ async function fetchData() {
     const refreshUTC = json.refreshDate ? new Date(json.refreshDate) : null;
     const refreshEl = document.getElementById("refreshDate");
     if (refreshEl) {
-      refreshEl.textContent = refreshUTC ? "Version 1.9300348 - Last refreshed (Eastern): " + refreshUTC.toLocaleString("en-US",{ timeZone:"America/New_York", dateStyle:"medium", timeStyle:"short"}) : "Last refreshed: Unknown";
+      refreshEl.textContent = refreshUTC ? "Version 1.9300400 - Last refreshed (Eastern): " + refreshUTC.toLocaleString("en-US",{ timeZone:"America/New_York", dateStyle:"medium", timeStyle:"short"}) : "Last refreshed: Unknown";
     }
     pageCache = {}; tableData.forEach((d,i)=>{d._id=i; pageCache[i]=d;});
     initFilters(); renderCards(); renderTable();
@@ -176,22 +176,57 @@ function updateFiltersOptions() {
     filterSymType: document.getElementById("filterSymType").value
   };
 
+  // For each filter, compute available values based on OTHER selected filters
   Object.keys(filterMapping).forEach(filterId => {
     const dropdown = document.getElementById(filterId);
     if (!dropdown) return;
-    let values = [...new Set(tableData.map(filterMapping[filterId]))];
 
-    // Sort the Area Command (filterAC) by the adjusted/display label ascending
+    // Build otherFilters (exclude current filter)
+    const otherSelected = { ...selected };
+    delete otherSelected[filterId];
+
+    // Filter tableData by otherSelected values
+    const filteredData = tableData.filter(d => {
+      return Object.keys(otherSelected).every(fId => {
+        const val = otherSelected[fId];
+        if (!val) return true; // no constraint
+        const fieldFn = filterMapping[fId];
+        return fieldFn(d) === val;
+      });
+    });
+
+    // Extract unique values for this filter
+    let values = [...new Set(filteredData.map(filterMapping[filterId]))];
+
+    // Sort by adjusted label for filterAC, otherwise by raw string
     if (filterId === 'filterAC') {
-      values = values.sort((a,b) => adjustLabel(String(a)).localeCompare(adjustLabel(String(b)), undefined, {sensitivity:'base'}));
+      values = values.sort((a, b) => adjustLabel(String(a)).localeCompare(adjustLabel(String(b)), undefined, { sensitivity: 'base' }));
     } else {
-      values = values.sort((a,b) => String(a).localeCompare(String(b), undefined, {sensitivity:'base'}));
+      values = values.sort((a, b) => String(a).localeCompare(String(b), undefined, { sensitivity: 'base' }));
     }
 
-    dropdown.innerHTML = `<option value="">All</option>` + values.map(v => {
-      const label = adjustLabel(v); // <-- adjusted for dropdown
-      return `<option value="${v}" ${selected[filterId] === v ? "selected" : ""}>${label}</option>`;
+    // Preserve current selection if still available; if not, keep it as an unavailable option
+    const currentValue = selected[filterId];
+
+    let optionsHtml = "<option value=''>All</option>" + values.map(v => {
+      const label = adjustLabel(v);
+      return `<option value="${v}" ${currentValue === v ? 'selected' : ''}>${label}</option>`;
     }).join("");
+
+    if (currentValue && !values.includes(currentValue)) {
+      // Add the unavailable current value (marked) so user's selection doesn't vanish
+      const label = adjustLabel(currentValue);
+      optionsHtml += `<option value="${currentValue}" selected>${label} (Unavailable)</option>`;
+    }
+
+    dropdown.innerHTML = optionsHtml;
+    try {
+      // Try to preserve selection explicitly (some browsers reset value when innerHTML changes)
+      if (currentValue) dropdown.value = currentValue;
+      else dropdown.value = "";
+    } catch(e) {
+      // ignore if setting value fails for any reason
+    }
   });
 }
 
