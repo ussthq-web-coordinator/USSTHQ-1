@@ -4,8 +4,9 @@ const _migrationSampleData = [
   { "Site Title": "USA Southern Territory", "Migration Date": "2025-05-08", "View Website URL": "https://www.salvationarmyusa.org/usa-southern-territory/", "Division": "USA Southern Territory" },
   { "Site Title": "North and South Carolina", "Migration Date": "2025-08-21", "View Website URL": "https://www.salvationarmyusa.org/usa-southern-territory/north-and-south-carolina/", "Division": "North and South Carolina" },
   { "Site Title": "Potomac", "Migration Date": "2025-09-05", "View Website URL": "https://www.salvationarmyusa.org/usa-southern-territory/potomac/", "Division": "Potomac" },
-  { "Site Title": "Kentucky and Tennessee", "Migration Date": "2025-10-01", "View Website URL": "", "Division": "Kentucky and Tennessee" },
-  { "Site Title": "Alabama, Louisiana, and Mississippi", "Migration Date": "2025-10-02", "View Website URL": "", "Division": "Alabama, Louisiana, and Mississippi" },
+  { "Site Title": "Kentucky and Tennessee", "Migration Date": "2025-10-01", "View Website URL": "https://www.salvationarmyusa.org/usa-southern-territory/kentucky-and-tennessee/", "Division": "Kentucky and Tennessee" },
+  { "Site Title": "Arkansas and Oklahoma", "Migration Date": "2025-10-02", "View Website URL": "https://www.salvationarmyusa.org/usa-southern-territory/arkansas-and-oklahoma/", "Division": "Alabama, Louisiana, and Mississippi" },
+  { "Site Title": "Alabama, Louisiana, and Mississippi", "Migration Date": "", "View Website URL": "", "Division": "Alabama, Louisiana, and Mississippi" },
   { "Site Title": "Texas", "Migration Date": "", "View Website URL": "", "Division": "Texas" },
   { "Site Title": "Arkansas and Oklahoma", "Migration Date": "", "View Website URL": "", "Division": "Arkansas and Oklahoma" },
   { "Site Title": "Florida", "Migration Date": "", "View Website URL": "", "Division": "Florida" },
@@ -1166,26 +1167,52 @@ function updateDashboard(){
 (function(){
   let migrationData = [];
   let fullCalendar = null;
+  const E_TZ = 'America/New_York';
+
+  // Parse a date value for display in the configured timezone.
+  // If the value is a date-only string (YYYY-MM-DD) treat it as that calendar day
+  // by creating a UTC-noon instant so timezone conversions won't push it to the previous day.
+  function parseDateForDisplay(v){
+    if (!v) return null;
+    if (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v)){
+      // Use UTC noon to avoid timezone day shifting when formatting
+      return new Date(v + 'T12:00:00Z');
+    }
+    const d = new Date(v);
+    if (isNaN(d)) return null;
+    return d;
+  }
 
   function formatDateISO(d){
     if (!d) return '';
-    const dt = new Date(d);
-    if (isNaN(dt)) return '';
-    return dt.toLocaleDateString();
+    const dt = parseDateForDisplay(d);
+    if (!dt) return '';
+    try {
+      return dt.toLocaleDateString('en-US', { timeZone: E_TZ, year:'numeric', month:'short', day:'numeric' });
+    } catch (e) {
+      return dt.toLocaleDateString();
+    }
   }
 
   function toEvent(r){
-    return {
+    const raw = r['Migration Date'] || r.migrationDate || r.MigrationDate || null;
+    const isDateOnly = typeof raw === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(raw);
+    const parsed = parseDateForDisplay(raw);
+    const ev = {
       title: r['Site Title'] || r.siteTitle || '(No Title)',
-      start: r['Migration Date'] || r.migrationDate || r.MigrationDate || null,
+      start: parsed || null,
       url: r['View Website URL'] || r.viewUrl || r.viewWebsiteUrl || null,
       extendedProps: { division: r['Division'] || r.division || '' }
     };
+    if (isDateOnly) ev.allDay = true;
+    return ev;
   }
 
   function buildAgendaHTML(data){
     const groups = data.reduce((acc,row)=>{
-      const key = row['Migration Date'] ? new Date(row['Migration Date']).toLocaleString(undefined,{year:'numeric',month:'long'}) : 'Unscheduled';
+      const raw = row['Migration Date'];
+      const pd = parseDateForDisplay(raw);
+      const key = pd ? pd.toLocaleString('en-US',{year:'numeric',month:'long', timeZone: E_TZ}) : 'Unscheduled';
       (acc[key]=acc[key]||[]).push(row);
       return acc;
     },{});
@@ -1207,7 +1234,7 @@ function updateDashboard(){
       const h = document.createElement('h6'); h.textContent = k; section.appendChild(h);
       const list = document.createElement('div'); list.className = 'list-group';
 
-      groups[k].sort((a,b)=> new Date(a['Migration Date']||8640000000000000) - new Date(b['Migration Date']||8640000000000000)).forEach(r=>{
+  groups[k].sort((a,b)=> new Date(a['Migration Date']||8640000000000000) - new Date(b['Migration Date']||8640000000000000)).forEach(r=>{
         const item = document.createElement('a');
         item.className = 'list-group-item list-group-item-action d-flex justify-content-between align-items-start';
         item.href = r['View Website URL'] || '#'; item.target = '_blank';
@@ -1235,6 +1262,7 @@ function updateDashboard(){
       fullCalendar = new FullCalendar.Calendar(el,{
         initialView: 'dayGridMonth',
         headerToolbar: { left: 'prev,next today', center: 'title', right: 'dayGridMonth,timeGridWeek,timeGridDay,listWeek' },
+        timeZone: E_TZ,
         navLinks: true,
         events: events,
         eventClick: function(info){ if(info.event.url){ info.jsEvent.preventDefault(); window.open(info.event.url,'_blank'); } },
