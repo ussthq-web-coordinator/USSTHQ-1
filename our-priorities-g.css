@@ -134,7 +134,7 @@
 /* Make each column stay its natural width and not shrink */
 .row-horizontal-scroll > div {
   flex: 0 0 auto;
-  min-width: 300px; /* adjust so text fits */
+  min-width: 350px; /* adjust so text fits */
 }
 
 /* Optional: hide scrollbar on Webkit browsers for a cleaner look */
