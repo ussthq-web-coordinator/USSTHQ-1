@@ -119,3 +119,32 @@
   transform: scale(1.02);
   transition: transform 0.3s ease;
 }
+
+/* Grey cards adjustments */
+/* Make the row scrollable horizontally */
+.row-horizontal-scroll {
+  display: flex;
+  flex-wrap: nowrap; /* keep everything in one row */
+  overflow-x: auto;
+  gap: 15px; /* space between cards */
+  padding: 20px 0;
+  scroll-behavior: smooth;
+}
+
+/* Make each column stay its natural width and not shrink */
+.row-horizontal-scroll > div {
+  flex: 0 0 auto;
+  min-width: 300px; /* adjust so text fits */
+}
+
+/* Optional: hide scrollbar on Webkit browsers for a cleaner look */
+.row-horizontal-scroll::-webkit-scrollbar {
+  height: 8px;
+}
+.row-horizontal-scroll::-webkit-scrollbar-thumb {
+  background: rgba(0,0,0,0.2);
+  border-radius: 4px;
+}
+.row-horizontal-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
