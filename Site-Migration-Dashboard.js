@@ -1,3 +1,18 @@
+/* Migration Dates module: FullCalendar (grid) + Agenda (list) + Table (Tabulator) */
+const _migrationSampleData = [
+  { "Site Title": "USA National Homepage", "Migration Date": "2025-04-03", "View Website URL": "https://www.salvationarmyusa.org/", "Division": "USA National" },
+  { "Site Title": "USA Southern Territory", "Migration Date": "2025-05-08", "View Website URL": "https://www.salvationarmyusa.org/usa-southern-territory/", "Division": "USA Southern Territory" },
+  { "Site Title": "North and South Carolina", "Migration Date": "2025-08-21", "View Website URL": "https://www.salvationarmyusa.org/usa-southern-territory/north-and-south-carolina/", "Division": "North and South Carolina" },
+  { "Site Title": "Potomac", "Migration Date": "2025-09-05", "View Website URL": "https://www.salvationarmyusa.org/usa-southern-territory/potomac/", "Division": "Potomac" },
+  { "Site Title": "Kentucky and Tennessee", "Migration Date": "", "View Website URL": "", "Division": "Kentucky and Tennessee" },
+  { "Site Title": "Alabama, Louisiana, and Mississippi", "Migration Date": "", "View Website URL": "", "Division": "Alabama, Louisiana, and Mississippi" },
+  { "Site Title": "Texas", "Migration Date": "", "View Website URL": "", "Division": "Texas" },
+  { "Site Title": "Arkansas and Oklahoma", "Migration Date": "", "View Website URL": "", "Division": "Arkansas and Oklahoma" },
+  { "Site Title": "Florida", "Migration Date": "", "View Website URL": "", "Division": "Florida" },
+  { "Site Title": "Georgia", "Migration Date": "", "View Website URL": "", "Division": "Georgia" }
+];
+
+
 /**
  * Site-Migration-Dashboard.js
  * 
@@ -35,11 +50,26 @@
   }
 })();
 
+// If sample migration data is defined, try to populate the views via the public API
+if (typeof _migrationSampleData !== 'undefined' && Array.isArray(_migrationSampleData)){
+  const applySample = () => {
+    if (typeof window.setMigrationData === 'function'){
+      try { window.setMigrationData(_migrationSampleData); return true; } catch(e){ console.warn('setMigrationData threw', e); }
+    }
+    return false;
+  };
+
+  if (!applySample()){
+    // Retry a couple times in case module registers after this script runs
+    setTimeout(()=>{ if (!applySample()) setTimeout(applySample, 500); }, 200);
+  }
+}
+
 // Backup Data URL https://cdn.jsdelivr.net/gh/ussthq-web-coordinator/USSTHQ-1@latest/DashboardData.json
 
 const jsonURL = "https://hopewell.pages.dev/DashboardData.json";
 
-// Globals used across the dashboard
+// Globals used across the dashboard version number
 let table;
 let tableData = [];
 let pageCache = {};
@@ -56,7 +86,7 @@ async function fetchData() {
     const refreshUTC = json.refreshDate ? new Date(json.refreshDate) : null;
     const refreshEl = document.getElementById("refreshDate");
     if (refreshEl) {
-      refreshEl.textContent = refreshUTC ? "Version 1.9300400 - Last refreshed (Eastern): " + refreshUTC.toLocaleString("en-US",{ timeZone:"America/New_York", dateStyle:"medium", timeStyle:"short"}) : "Last refreshed: Unknown";
+      refreshEl.textContent = refreshUTC ? "Version 1.9300620 - Last refreshed (Eastern): " + refreshUTC.toLocaleString("en-US",{ timeZone:"America/New_York", dateStyle:"medium", timeStyle:"short"}) : "Last refreshed: Unknown";
     }
     pageCache = {}; tableData.forEach((d,i)=>{d._id=i; pageCache[i]=d;});
     initFilters(); renderCards(); renderTable();
@@ -112,17 +142,38 @@ const chartOptions = {
 
 
 function addChartLegendModal(chart, chartTitle) {
+  if (!chart || !chart.canvas) return;
   const container = chart.canvas.parentNode;
-  
-  container.addEventListener("mouseenter", () => showLegendModal(chart, chartTitle));
-  container.addEventListener("touchstart", () => showLegendModal(chart, chartTitle));
+  if (!container) return;
+
+  // Only show legend on explicit user click/tap (not on hover or scroll)
+  container.addEventListener('click', (e) => {
+    try {
+      if (!chart || typeof chart.generateLegend !== 'function') return;
+      const legendHtml = chart.generateLegend();
+      if (!legendHtml || String(legendHtml).trim() === '') return;
+      showLegendModal(chart, chartTitle);
+    } catch (err) {
+      console.warn('Failed to check/generate chart legend', err);
+    }
+  }, { passive: true });
 }
 
 function showLegendModal(chart, title) {
-  const legendHtml = chart.generateLegend ? chart.generateLegend() : "Legend unavailable";
-  document.getElementById("chartLegendTitle").innerText = title;
-  document.getElementById("chartLegendBody").innerHTML = legendHtml;
-  new bootstrap.Modal(document.getElementById("chartLegendModal")).show();
+  if (!chart || typeof chart.generateLegend !== 'function') return;
+  const legendHtml = chart.generateLegend();
+  if (!legendHtml || String(legendHtml).trim() === '') return; // nothing to show
+
+  const titleEl = document.getElementById("chartLegendTitle");
+  const bodyEl = document.getElementById("chartLegendBody");
+  const modalEl = document.getElementById("chartLegendModal");
+  if (!titleEl || !bodyEl || !modalEl) {
+    console.warn('Chart legend modal elements missing');
+    return;
+  }
+  titleEl.innerText = title;
+  bodyEl.innerHTML = legendHtml;
+  try { new bootstrap.Modal(modalEl).show(); } catch(e) { console.warn('bootstrap.Modal not available or failed to show legend modal', e); }
 }
 
 
@@ -131,10 +182,26 @@ function initFilters(){
 
   filterIds.forEach(id=>{
     const sel = document.getElementById(id);
-    sel.addEventListener("change", updateFiltersAndDashboard);
+    if (sel) sel.addEventListener("change", debounce(updateFiltersAndDashboard, 150));
   });
 
   updateFiltersOptions();
+}
+
+// Safe helper to read select values when an element may be missing
+function getSelectValue(id){
+  const el = document.getElementById(id);
+  return el ? el.value : "";
+}
+
+// debounce helper to avoid excessive re-renders on rapid input changes
+function debounce(fn, wait){
+  let timer = null;
+  return function(...args){
+    const ctx = this;
+    clearTimeout(timer);
+    timer = setTimeout(()=> fn.apply(ctx, args), wait);
+  };
 }
 
 // 1. Adjust label for display only
@@ -168,12 +235,12 @@ const filterMapping = {
 // 3. When building dropdown options, apply `adjustLabel`
 function updateFiltersOptions() {
   const selected = {
-    filterDivision: document.getElementById("filterDivision").value,
-    filterAC: document.getElementById("filterAC").value,
-    filterStatus: document.getElementById("filterStatus").value,
-    filterPageType: document.getElementById("filterPageType").value,
-    filterPubSym: document.getElementById("filterPubSym").value,
-    filterSymType: document.getElementById("filterSymType").value
+    filterDivision: getSelectValue("filterDivision"),
+    filterAC: getSelectValue("filterAC"),
+    filterStatus: getSelectValue("filterStatus"),
+    filterPageType: getSelectValue("filterPageType"),
+    filterPubSym: getSelectValue("filterPubSym"),
+    filterSymType: getSelectValue("filterSymType")
   };
 
   // For each filter, compute available values based on OTHER selected filters
@@ -238,12 +305,12 @@ function updateFiltersAndDashboard(){
 
 
 function getFilteredData(){
-  const div = document.getElementById("filterDivision").value;
-  const ac = document.getElementById("filterAC").value;
-  const status = document.getElementById("filterStatus").value;
-  const pageType = document.getElementById("filterPageType").value;
-  const pubSym = document.getElementById("filterPubSym").value;
-  const symType = document.getElementById("filterSymType").value;
+  const div = getSelectValue("filterDivision");
+  const ac = getSelectValue("filterAC");
+  const status = getSelectValue("filterStatus");
+  const pageType = getSelectValue("filterPageType");
+  const pubSym = getSelectValue("filterPubSym");
+  const symType = getSelectValue("filterSymType");
 
   return tableData.filter(d => 
     (!div || d.Division===div) &&
@@ -257,6 +324,7 @@ function getFilteredData(){
 
     // Change order of overall progress legend
 function renderOverallProgress(filtered){
+  if (!Array.isArray(filtered)) return;
   const total = filtered.length;
   const counts = { "Do Not Migrate":0, "Needs Info":0, "In Progress":0, "In QA":0, Unknown:0, Completed:0,};
   
@@ -266,9 +334,11 @@ function renderOverallProgress(filtered){
   });
 
   const container = document.getElementById("progressBarContainer");
+  if (!container) return;
   container.innerHTML = "";
 
   const legendContainer = document.getElementById("progressLegend");
+  if (!legendContainer) return;
   legendContainer.innerHTML = "";
 
   Object.keys(counts).forEach(key=>{
@@ -317,6 +387,7 @@ function formatAcDisplay(title) {
 
 function updateACDropdown(filteredData) {
   const sel = document.getElementById("filterAC");
+  if (!sel) return;
 
   const options = [...new Set(filteredData.map(d => d["Area Command Admin Group.title"]))].sort();
 
@@ -329,12 +400,13 @@ function updateACDropdown(filteredData) {
 
 function renderQaAccordion(data){
   const container = document.getElementById("qaGroupsBody");
+  if (!container) return;
   container.innerHTML = "";
-  const qaRows = data.filter(d=>d["QA Issues.lookupValue"]);
-  
+  const qaRows = Array.isArray(data) ? data.filter(d=>d["QA Issues.lookupValue"]) : [];
+
   // Update badge with total count
   const badge = document.getElementById("qaBadge");
-  badge.textContent = qaRows.length;
+  if (badge) badge.textContent = qaRows.length;
 
   if(!qaRows.length){
     container.innerHTML = "<p>No QA Issues found.</p>";
@@ -485,6 +557,7 @@ statusChart = new Chart(ctxStatus, {
     }
   },
 });
+try{ addChartLegendModal(statusChart, 'Status'); }catch(e){}
 
 
 
@@ -514,6 +587,7 @@ statusChart = new Chart(ctxStatus, {
       }
     },
   });
+  try{ addChartLegendModal(priorityChart, 'Priority'); }catch(e){}
 
   // Page Type chart
   const pageTypeCounts = {};
@@ -539,6 +613,7 @@ statusChart = new Chart(ctxStatus, {
       }
     }
   });
+    try{ addChartLegendModal(pageTypeChart, 'Page Type'); }catch(e){}
 
   // Published Symphony chart
   const pubSymCounts = {};
@@ -564,6 +639,7 @@ statusChart = new Chart(ctxStatus, {
       }
     }
   });
+      try{ addChartLegendModal(pubSymChart, 'Published Symphony'); }catch(e){}
 }
 
 // Cards rendering
@@ -797,9 +873,10 @@ document.addEventListener("DOMContentLoaded", () => {
   const searchBtn = document.getElementById("searchBtn");
   const clearBtn = document.getElementById("clearBtn");
 
-  // Search function for Tabulator
+  // Search function for Tabulator (safe guards if elements are missing)
   function filterTable() {
-    const query = searchInput.value.toLowerCase().trim();
+    if (!searchInput) return;
+    const query = (searchInput.value || "").toLowerCase().trim();
     if (!table) return;
     if (!query) {
       table.clearFilter();
@@ -811,17 +888,19 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function clearFilter() {
-    searchInput.value = "";
+    if (searchInput) searchInput.value = "";
     if (table) table.clearFilter();
   }
 
-  searchBtn.addEventListener("click", filterTable);
-  clearBtn.addEventListener("click", clearFilter);
+  if (searchBtn) searchBtn.addEventListener("click", filterTable);
+  if (clearBtn) clearBtn.addEventListener("click", clearFilter);
 
   // Optional: filter on Enter key press
-  searchInput.addEventListener("keypress", function(e) {
-    if (e.key === "Enter") filterTable();
-  });
+  if (searchInput) {
+    searchInput.addEventListener("keypress", function(e) {
+      if (e.key === "Enter") filterTable();
+    });
+  }
 });
 
 
@@ -836,7 +915,15 @@ function showTableModalById(id){
 }
 
 function showTableModal(page){
-  document.getElementById("tableModalTitle").innerText = page.Title;
+  const titleEl = document.getElementById("tableModalTitle");
+  const bodyEl = document.getElementById("tableModalBody");
+  const modalEl = document.getElementById('tableDetailModal');
+  if (!titleEl || !bodyEl) {
+    console.warn('Table modal elements missing');
+    return;
+  }
+
+  titleEl.innerText = page.Title;
 
   let html = '<table class="table table-bordered">';
 
@@ -866,9 +953,10 @@ function showTableModal(page){
   }
 
   html += "</table>";
-  document.getElementById("tableModalBody").innerHTML = html;
-
-  new bootstrap.Modal(document.getElementById('tableDetailModal')).show();
+  bodyEl.innerHTML = html;
+  if (modalEl) {
+    try { new bootstrap.Modal(modalEl).show(); } catch(e) { console.warn('bootstrap.Modal not available or failed to show table detail modal', e); }
+  }
 }
 
 
@@ -876,6 +964,11 @@ function showTableModal(page){
 function showQaIssuesModal(groupKey){
   const ids = qaGroupedCache[groupKey] || [];
   const modalBody = document.getElementById("qaIssuesModalBody");
+  const modalEl = document.getElementById("qaIssuesModal");
+  if (!modalBody) {
+    console.warn('qaIssuesModalBody missing');
+    return;
+  }
 
   if (ids.length === 0) {
     modalBody.innerHTML = "<p>No pages in this group.</p>";
@@ -955,7 +1048,11 @@ function showQaIssuesModal(groupKey){
   }
 
   modalBody.innerHTML = html;
-  new bootstrap.Modal(document.getElementById("qaIssuesModal")).show();
+  if (modalEl) {
+    try { new bootstrap.Modal(modalEl).show(); } catch(e) { console.warn('bootstrap.Modal not available or failed', e); }
+  } else {
+    console.warn('qaIssuesModal element missing');
+  }
 }
 
 // Delegated handler for QA title links (works when rows are added dynamically)
@@ -1064,3 +1161,134 @@ function updateDashboard(){
   renderCharts(getFilteredData());
   renderOverallProgress(getFilteredData());
 }
+
+/* Migration Dates module: FullCalendar (grid) + Agenda (list) + Table (Tabulator) */
+(function(){
+  let migrationData = [];
+  let fullCalendar = null;
+
+  function formatDateISO(d){
+    if (!d) return '';
+    const dt = new Date(d);
+    if (isNaN(dt)) return '';
+    return dt.toLocaleDateString();
+  }
+
+  function toEvent(r){
+    return {
+      title: r['Site Title'] || r.siteTitle || '(No Title)',
+      start: r['Migration Date'] || r.migrationDate || r.MigrationDate || null,
+      url: r['View Website URL'] || r.viewUrl || r.viewWebsiteUrl || null,
+      extendedProps: { division: r['Division'] || r.division || '' }
+    };
+  }
+
+  function buildAgendaHTML(data){
+    const groups = data.reduce((acc,row)=>{
+      const key = row['Migration Date'] ? new Date(row['Migration Date']).toLocaleString(undefined,{year:'numeric',month:'long'}) : 'Unscheduled';
+      (acc[key]=acc[key]||[]).push(row);
+      return acc;
+    },{});
+
+    const keys = Object.keys(groups).sort((a,b)=>{
+      if (a==='Unscheduled') return 1;
+      if (b==='Unscheduled') return -1;
+      const da = new Date(groups[a][0]['Migration Date']);
+      const db = new Date(groups[b][0]['Migration Date']);
+      return da - db;
+    });
+
+    const container = document.createElement('div');
+    container.className = 'migration-agenda';
+
+    keys.forEach(k=>{
+      const section = document.createElement('div');
+      section.className = 'mb-3';
+      const h = document.createElement('h6'); h.textContent = k; section.appendChild(h);
+      const list = document.createElement('div'); list.className = 'list-group';
+
+      groups[k].sort((a,b)=> new Date(a['Migration Date']||8640000000000000) - new Date(b['Migration Date']||8640000000000000)).forEach(r=>{
+        const item = document.createElement('a');
+        item.className = 'list-group-item list-group-item-action d-flex justify-content-between align-items-start';
+        item.href = r['View Website URL'] || '#'; item.target = '_blank';
+        const left = document.createElement('div'); left.innerHTML = '<div class="fw-bold">'+(r['Site Title']||'(No Title)')+'</div>'+(r['Division']?'<small class="text-muted">'+r['Division']+'</small>':'');
+        const right = document.createElement('div'); right.className='text-end'; right.innerHTML = '<div>'+formatDateISO(r['Migration Date'])+'</div>'+(r['View Website URL']?'<div><small class="text-primary">Visit</small></div>':'');
+        item.appendChild(left); item.appendChild(right); list.appendChild(item);
+      });
+
+      section.appendChild(list); container.appendChild(section);
+    });
+
+    return container;
+  }
+
+  function renderAgenda(filtered){
+    const el = document.getElementById('migrationAgenda'); if(!el) return; el.innerHTML=''; el.appendChild(buildAgendaHTML(filtered));
+  }
+
+  // Table view removed — migration modal shows Calendar and Agenda only
+
+  function refreshFullCalendar(){
+    const el = document.getElementById('migrationFullCalendar'); if(!el || typeof FullCalendar==='undefined') return;
+    const events = migrationData.filter(r=>r['Migration Date']).map(toEvent);
+    if (!fullCalendar){
+      fullCalendar = new FullCalendar.Calendar(el,{
+        initialView: 'dayGridMonth',
+        headerToolbar: { left: 'prev,next today', center: 'title', right: 'dayGridMonth,timeGridWeek,timeGridDay,listWeek' },
+        navLinks: true,
+        events: events,
+        eventClick: function(info){ if(info.event.url){ info.jsEvent.preventDefault(); window.open(info.event.url,'_blank'); } },
+        height: 'auto',
+        themeSystem: 'bootstrap'
+      });
+      fullCalendar.render();
+    } else {
+      fullCalendar.removeAllEvents();
+      events.forEach(e=>fullCalendar.addEvent(e));
+    }
+  }
+
+  function filterMigrationData(q){ if(!q) return migrationData.slice(); const s=q.toLowerCase(); return migrationData.filter(r=> (r['Site Title']||'').toLowerCase().includes(s) || (r['Division']||'').toLowerCase().includes(s)); }
+
+  document.addEventListener('DOMContentLoaded', ()=>{
+  const btnCal = document.getElementById('viewCalendarBtn');
+  const btnAgenda = document.getElementById('viewAgendaBtn');
+    const search = document.getElementById('migrationSearch');
+    const modal = document.getElementById('migrationDatesModal');
+    const exportBtn = document.getElementById('exportMigrationJson');
+
+  function showCalendar(){ document.getElementById('migrationFullCalendar').style.display=''; document.getElementById('migrationAgenda').style.display='none'; if(btnCal) btnCal.classList.add('btn-primary'); if(btnCal) btnCal.classList.remove('btn-outline-primary'); if(btnAgenda) btnAgenda.classList.remove('btn-primary'); if(btnAgenda) btnAgenda.classList.add('btn-outline-primary'); }
+  function showAgenda(){ document.getElementById('migrationFullCalendar').style.display='none'; document.getElementById('migrationAgenda').style.display=''; if(btnAgenda) btnAgenda.classList.add('btn-primary'); if(btnAgenda) btnAgenda.classList.remove('btn-outline-primary'); if(btnCal) btnCal.classList.remove('btn-primary'); if(btnCal) btnCal.classList.add('btn-outline-primary'); }
+
+    if (btnCal) btnCal.addEventListener('click', ()=>{ showCalendar(); if(!fullCalendar) refreshFullCalendar(); else fullCalendar.changeView('dayGridMonth'); });
+    if (btnAgenda) btnAgenda.addEventListener('click', ()=>{ showAgenda(); });
+
+    if (search) search.addEventListener('input', ()=>{
+      const q = search.value.trim(); const filtered = filterMigrationData(q);
+      renderAgenda(filtered); if (fullCalendar) refreshFullCalendar();
+    });
+
+  if (modal) modal.addEventListener('shown.bs.modal', ()=>{ renderAgenda(migrationData && migrationData.length ? migrationData : (typeof _migrationSampleData !== 'undefined' ? _migrationSampleData.slice() : [])); if (!fullCalendar) refreshFullCalendar(); else fullCalendar.render(); });
+
+    if (exportBtn) exportBtn.addEventListener('click', function(e){ e.preventDefault(); const blob=new Blob([JSON.stringify(migrationData,null,2)],{type:'application/json'}); const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download='migration-dates.json'; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url); });
+
+    // default to Agenda view on open
+    if (btnAgenda) btnAgenda.click();
+  });
+
+  window.setMigrationData = function(dataArray){
+    if (!Array.isArray(dataArray)) return;
+    migrationData = dataArray.map(r=>({
+      'Site Title': r['Site Title'] || r.siteTitle || '',
+      'Migration Date': r['Migration Date'] || r.migrationDate || r.MigrationDate || '',
+      'View Website URL': r['View Website URL'] || r.viewUrl || r.viewWebsiteUrl || '',
+      'Division': r['Division'] || r.division || ''
+    }));
+
+    const modalEl = document.getElementById('migrationDatesModal');
+    if (modalEl && modalEl.classList.contains('show')){
+      renderAgenda(migrationData); initTable(migrationData); refreshFullCalendar();
+    }
+  };
+
+})();

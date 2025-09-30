@@ -22,6 +22,9 @@
 
 <script src="https://unpkg.com/tabulator-tables@5.5.0/dist/js/tabulator.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<!-- FullCalendar (grid + list views) -->
+<link href="https://cdn.jsdelivr.net/npm/fullcalendar@5.11.3/main.min.css" rel="stylesheet" />
+<script src="https://cdn.jsdelivr.net/npm/fullcalendar@5.11.3/main.min.js"></script>
 </head>
 <body>
 <div class="container-fluid my-3">
@@ -106,7 +109,10 @@
 <!-- Above Overall Progress -->
 <div class="row d-flex justify-content-between align-items-center mb-2 mt-3">
   <div class="col-12">
-    <p>Overall Progress</p>
+    <div class="d-flex justify-content-between align-items-start mb-2">
+      <p class="mb-0">Overall Progress</p>
+      <a href="#" id="migrationDatesLink" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#migrationDatesModal">Migration Dates</a>
+    </div>
 
     <!-- Legend -->
     <div id="progressLegend" class="d-flex gap-3 mb-1">
@@ -132,6 +138,46 @@
         </div>
       </div>
     </div>
+
+
+          <!-- Migration Dates Modal -->
+          <div class="modal fade" id="migrationDatesModal" tabindex="-1" aria-labelledby="migrationDatesModalLabel" aria-hidden="true">
+            <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+              <div class="modal-content">
+                <div class="modal-header">
+                  <h5 class="modal-title" id="migrationDatesModalLabel">Migration Dates</h5>
+                  <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                  <div class="d-flex justify-content-between align-items-center mb-3">
+                    <div class="btn-group" role="group" aria-label="View Toggle">
+                      <button type="button" id="viewCalendarBtn" class="btn btn-outline-primary btn-sm">Calendar</button>
+                      <button type="button" id="viewAgendaBtn" class="btn btn-primary btn-sm">Agenda</button>
+                    </div>
+                    <div>
+                      <input id="migrationSearch" class="form-control form-control-sm" placeholder="Search site title or division" style="min-width:220px;" />
+                    </div>
+                  </div>
+
+                  <!-- Full calendar grid -->
+                  <div id="migrationFullCalendar" class="mb-3" style="display:none;">
+                    <!-- FullCalendar will render here -->
+                  </div>
+
+                  <!-- Agenda (grouped list) container -->
+                  <div id="migrationAgenda" class="mb-3">
+                    <!-- agenda will be rendered here as a responsive grouped-by-month list -->
+                  </div>
+
+                  <!-- Table view removed per request -->
+                </div>
+                <div class="modal-footer">
+                  <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                  <a id="exportMigrationJson" class="btn btn-outline-primary" href="#">Export JSON</a>
+                </div>
+              </div>
+            </div>
+          </div>
   </div>
 </div>
 
