@@ -4,41 +4,49 @@
  */
 
 // Strict mode for better error checking
+/**
+ * Site-Migration-Dashboard.js
+ */
+
+// Strict mode for better error checking
 'use strict';
 
 // Prevent global namespace pollution
 (function() {
-    // Example: App namespace
-    window.SiteMigrationDashboard = window.SiteMigrationDashboard || {};
+  // Example: App namespace
+  window.SiteMigrationDashboard = window.SiteMigrationDashboard || {};
 
-    // Basic protection: Prevent script execution if not in browser
-    if (typeof window === 'undefined' || typeof document === 'undefined') {
-        throw new Error('This script must be run in a browser environment.');
-    }
+  // Basic protection: Prevent script execution if not in browser
+  if (typeof window === 'undefined' || typeof document === 'undefined') {
+    throw new Error('This script must be run in a browser environment.');
+  }
 
-    // Example: Initialization function
-    SiteMigrationDashboard.init = function() {
-        // Initialization code here
-        console.log('Site Migration Dashboard initialized.');
-    };
+  // Example: Initialization function
+  SiteMigrationDashboard.init = function() {
+    // Initialization code here
+    console.log('Site Migration Dashboard initialized.');
+  };
 
-    // Auto-initialize when DOM is ready
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', SiteMigrationDashboard.init);
-    } else {
-        SiteMigrationDashboard.init();
-    }
+  // Auto-initialize when DOM is ready
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', SiteMigrationDashboard.init);
+  } else {
+    SiteMigrationDashboard.init();
+  }
 })();
 
 // Backup Data URL https://cdn.jsdelivr.net/gh/ussthq-web-coordinator/USSTHQ-1@latest/DashboardData.json
 
 const jsonURL = "https://hopewell.pages.dev/DashboardData.json";
-let table, tableData=[], pageCache={}, qaGroupedCache={};
+
+// Globals used across the dashboard
+let table;
+let tableData = [];
+let pageCache = {};
+let qaGroupedCache = {};
 let priorityChart, pageTypeChart, pubSymChart;
 let statusChart = null;
 
-
-//version number change here
 async function fetchData() {
   try {
     const res = await fetch(jsonURL);
@@ -46,7 +54,10 @@ async function fetchData() {
     const json = await res.json();
     tableData = Array.isArray(json) ? json : (json.data || []);
     const refreshUTC = json.refreshDate ? new Date(json.refreshDate) : null;
-    document.getElementById("refreshDate").textContent = refreshUTC ? "Version 1.9240149 - Last refreshed (Eastern): " + refreshUTC.toLocaleString("en-US",{ timeZone:"America/New_York", dateStyle:"medium", timeStyle:"short"}) : "Last refreshed: Unknown";
+    const refreshEl = document.getElementById("refreshDate");
+    if (refreshEl) {
+      refreshEl.textContent = refreshUTC ? "Version 1.9300348 - Last refreshed (Eastern): " + refreshUTC.toLocaleString("en-US",{ timeZone:"America/New_York", dateStyle:"medium", timeStyle:"short"}) : "Last refreshed: Unknown";
+    }
     pageCache = {}; tableData.forEach((d,i)=>{d._id=i; pageCache[i]=d;});
     initFilters(); renderCards(); renderTable();
   } catch(err) {
@@ -126,7 +137,36 @@ function initFilters(){
   updateFiltersOptions();
 }
 
-function updateFiltersOptions(){
+// 1. Adjust label for display only
+function adjustLabel(rawValue) {
+  if (!rawValue) return "Not Set";
+
+  // LOC titles: remove "INTLAPP_WM_LOC_USS_" but leave rest intact
+  if (rawValue.startsWith("INTLAPP_WM_LOC_USS_")) {
+    return rawValue.replace("INTLAPP_WM_LOC_USS_", "");
+  }
+
+  // DIV titles: reduce "INTLAPP_WM_DIV_USS_XXX" -> "XXX"
+  if (rawValue.startsWith("INTLAPP_WM_DIV_USS_")) {
+    return rawValue.replace("INTLAPP_WM_DIV_USS_", "");
+  }
+
+  // fallback
+  return rawValue;
+}
+
+// 2. Your filter mappings (unchanged: these are real values for filtering)
+const filterMapping = {
+  filterDivision: d => d.Division || "Not Set",
+  filterAC: d => d["Area Command Admin Group.title"] || "Not Set",
+  filterStatus: d => d.Status || "Not Set",
+  filterPageType: d => d["Page Type"] || "Not Set",
+  filterPubSym: d => d["Published Symphony"] || "Not Set",
+  filterSymType: d => d["Symphony Site Type"] || "Not Set"
+};
+
+// 3. When building dropdown options, apply `adjustLabel`
+function updateFiltersOptions() {
   const selected = {
     filterDivision: document.getElementById("filterDivision").value,
     filterAC: document.getElementById("filterAC").value,
@@ -136,41 +176,25 @@ function updateFiltersOptions(){
     filterSymType: document.getElementById("filterSymType").value
   };
 
-  const filterMapping = {
-    filterDivision: d => d.Division || "Not Set",
-    filterAC: d => d["Area Command Admin Group.title"] || "Not Set",
-    filterStatus: d => d.Status || "Not Set",
-    filterPageType: d => d["Page Type"] || "Not Set",
-    filterPubSym: d => d["Published Symphony"] || "Not Set",
-    filterSymType: d => d["Symphony Site Type"] || "Not Set"
-  };
+  Object.keys(filterMapping).forEach(filterId => {
+    const dropdown = document.getElementById(filterId);
+    if (!dropdown) return;
+    let values = [...new Set(tableData.map(filterMapping[filterId]))];
 
-  const filterIds = Object.keys(selected);
+    // Sort the Area Command (filterAC) by the adjusted/display label ascending
+    if (filterId === 'filterAC') {
+      values = values.sort((a,b) => adjustLabel(String(a)).localeCompare(adjustLabel(String(b)), undefined, {sensitivity:'base'}));
+    } else {
+      values = values.sort((a,b) => String(a).localeCompare(String(b), undefined, {sensitivity:'base'}));
+    }
 
-  filterIds.forEach(id=>{
-    const sel = document.getElementById(id);
-
-    // Calculate available options based on other selected filters
-    const otherFilters = {...selected};
-    delete otherFilters[id];
-
-    const filteredData = tableData.filter(d=>{
-      return Object.keys(otherFilters).every(fId=>{
-        const val = otherFilters[fId];
-        if(!val) return true;
-        const field = filterMapping[fId];
-        return field(d) === val;
-      });
-    });
-
-    const options = [...new Set(filteredData.map(d=>filterMapping[id](d)))].sort();
-
-    // Preserve current selection if still available
-    const currentValue = sel.value;
-    sel.innerHTML = "<option value=''>All</option>" + options.map(o=>`<option value="${o}">${o}</option>`).join("");
-    if(options.includes(currentValue)) sel.value = currentValue;
+    dropdown.innerHTML = `<option value="">All</option>` + values.map(v => {
+      const label = adjustLabel(v); // <-- adjusted for dropdown
+      return `<option value="${v}" ${selected[filterId] === v ? "selected" : ""}>${label}</option>`;
+    }).join("");
   });
 }
+
 
 function updateFiltersAndDashboard(){
   updateFiltersOptions();
@@ -238,7 +262,34 @@ function renderOverallProgress(filtered){
   });
 }
 
+function formatAcDisplay(title) {
+  if (!title) return "Not Set";
 
+  // Case 1: Division codes (INTLAPP_WM_DIV_USS_XXX)
+  if (title.startsWith("INTLAPP_WM_DIV_USS_")) {
+    return title.replace("INTLAPP_WM_DIV_USS_", "");
+  }
+
+  // Case 2: Location codes (INTLAPP_WM_LOC_USS_XXX ...)
+  if (title.startsWith("INTLAPP_WM_LOC_USS_")) {
+    // remove INTLAPP_WM_LOC_USS_ and keep the rest
+    return title.replace("INTLAPP_WM_LOC_USS_", "");
+  }
+
+  // Default: return as-is
+  return title;
+}
+
+function updateACDropdown(filteredData) {
+  const sel = document.getElementById("filterAC");
+
+  const options = [...new Set(filteredData.map(d => d["Area Command Admin Group.title"]))].sort();
+
+  sel.innerHTML = "<option value=''>All</option>" + options.map(o => {
+    const displayText = formatAcDisplay(o); // formatted for dropdown
+    return `<option value="${o}">${displayText}</option>`; // keep original value
+  }).join("");
+}
 
 
 function renderQaAccordion(data){
@@ -872,26 +923,25 @@ function showQaIssuesModal(groupKey){
   new bootstrap.Modal(document.getElementById("qaIssuesModal")).show();
 }
 
-// 1️⃣ Attach event listeners to all QA title links
-document.querySelectorAll(".qaTitleLink").forEach(link => {
-    link.addEventListener("click", e => {
-        e.preventDefault();
+// Delegated handler for QA title links (works when rows are added dynamically)
+document.addEventListener('click', function (e) {
+  const link = e.target.closest && e.target.closest('.qaTitleLink');
+  if (!link) return;
+  e.preventDefault();
+  const rowId = link.dataset && (link.dataset.id || link.dataset.rowid);
+  if (!rowId) return console.warn('qaTitleLink clicked but no data-id found');
 
-        // 2️⃣ Get the dataset ID from the clicked link
-        const rowId = link.dataset.id;
-        console.log("Clicked link dataset.id:", rowId);
+  // Prefer pageCache lookup (we populate _id on fetch)
+  const page = pageCache[rowId];
+  if (page) return showTableModal(page);
 
-        // 3️⃣ Find the correct record in allRows
-        const record = allRows.find(r => r.rowId == rowId); // use the correct property from your data
-        console.log("Record found:", record);
+  // fallback: if there is a table and Tabulator row, try to find by ID
+  if (table && typeof table.getData === 'function') {
+    const found = table.getData().find(r => String(r._id) === String(rowId) || String(r.ID) === String(rowId));
+    if (found) return showTableModal(found);
+  }
 
-        if (record) {
-            // 4️⃣ Launch modal with that record
-            showTableModalById(record.rowId);
-        } else {
-            console.warn("No record found for rowId:", rowId);
-        }
-    });
+  console.warn('No page found for qaTitleLink id', rowId);
 });
 
 
@@ -972,128 +1022,7 @@ function palette(n){
 
 
 
-// Attach modal trigger
-addChartLegendModal(statusChart, "Status Overview");
-
-
-// --- Status chart ---
-const statusGroups = { "Completed":0, "Do Not Migrate":0, "Needs Info":0, "In Progress":0, "In QA":0 };
-data.forEach(d=>{
-  const s = (d.Status||"").trim();
-  if (/^(4|5)/.test(s)) statusGroups["Completed"]++;
-  else if (/^3/.test(s)) statusGroups["In QA"]++;
-  else if (/^2/.test(s)) statusGroups["In Progress"]++;
-  else if (/^1/.test(s)) statusGroups["Needs Info"]++;
-  else if (s === "Do Not Migrate") statusGroups["Do Not Migrate"]++;
-});
-
-const statusLabels = Object.keys(statusGroups);
-const statusData   = Object.values(statusGroups);
-const statusTotal  = statusData.reduce((a,b)=>a+b,0);
-
-charts.statusChart = new Chart(document.getElementById("statusChart"), {
-  type:"pie",
-  data:{
-    labels: statusLabels,           // keep plain names here
-    datasets:[{ 
-      data: statusData,
-      backgroundColor:["#2ecc71","#e74c3c","#f39c12","#002056","#CA5010"]
-    }]
-  },
-  options:{
-    plugins:{
-      title:{ display:true, text:"Status" },
-      legend:{
-        labels:{
-          generateLabels(chart){
-            const {data} = chart;
-            const total = data.datasets[0].data.reduce((a,b)=>a+b,0);
-            return data.labels.map((label, i)=>{
-              const count = data.datasets[0].data[i];
-              const pct   = total ? Math.round(count/total*100) : 0;
-              const bg    = data.datasets[0].backgroundColor[i];
-              return {
-                text: `${label} - ${pct}% (${count})`,
-                fillStyle: bg,
-                hidden: isNaN(count) || chart.getDatasetMeta(0).data[i].hidden
-              };
-            });
-          }
-        }
-      }
-    }
-  }
-});
-
-
 // --- Priority chart ---
-const priorityCounts = countBy(data,"Priority");
-const priorityLabels = Object.keys(priorityCounts);
-const priorityData   = Object.values(priorityCounts);
-const priorityTotal  = priorityData.reduce((a,b)=>a+b,0);
-const priorityLabelsWithPct = priorityLabels.map(
-  (l,i)=>`${l} - ${priorityTotal ? Math.round(priorityData[i]/priorityTotal*100) : 0}% (${priorityData[i]})`
-);
-
-charts.priorityChart = new Chart(document.getElementById("priorityChart"), {
-  type:"pie",
-  data:{
-    labels: priorityLabelsWithPct,
-    datasets:[{ data: priorityData, backgroundColor: palette(priorityLabels.length) }]
-  },
-  options:{ plugins:{ title:{display:true,text:"Priority"} } }
-});
-
-// --- Page Type chart ---
-const typeCounts = countBy(data,"Page Type");
-const typeLabels = Object.keys(typeCounts);
-const typeData   = Object.values(typeCounts);
-const typeTotal  = typeData.reduce((a,b)=>a+b,0);
-const typeLabelsWithPct = typeLabels.map(
-  (l,i)=>`${l} - ${typeTotal ? Math.round(typeData[i]/typeTotal*100) : 0}% (${typeData[i]})`
-);
-
-charts.pageTypeChart = new Chart(document.getElementById("pageTypeChart"), {
-  type:"pie",
-  data:{
-    labels: typeLabelsWithPct,
-    datasets:[{ data: typeData, backgroundColor: palette(typeLabels.length) }]
-  },
-  options:{ plugins:{ title:{display:true,text:"Page Type"} } }
-});
-
-// --- Published Symphony chart (Yes/No) ---
-const pubCounts = { "Yes":0, "No":0 };
-data.forEach(d=>{
-  const val = (d["Published Symphony"]||"").trim().toLowerCase();
-  if(val==="yes") pubCounts["Yes"]++;
-  else pubCounts["No"]++;
-});
-const pubLabels = Object.keys(pubCounts);
-const pubData   = Object.values(pubCounts);
-const pubTotal  = pubData.reduce((a,b)=>a+b,0);
-const pubLabelsWithPct = pubLabels.map(
-  (l,i)=>`${l} - ${pubTotal ? Math.round(pubData[i]/pubTotal*100) : 0}% (${pubData[i]})`
-);
-
-charts.pubSymChart = new Chart(document.getElementById("pubSymChart"), {
-  type:"pie",
-  data:{
-    labels: pubLabelsWithPct,
-    datasets:[{ data: pubData, backgroundColor:["#2ecc71","#e74c3c"] }]
-  },
-  options:{ plugins:{ title:{display:true,text:"Published Symphony"} } }
-});
-
-
-const refreshEl = document.getElementById("refreshDate");
-if(refreshEl){
-  refreshEl.textContent = refreshUTC 
-    ? "Last refreshed (Eastern): " + refreshUTC.toLocaleString("en-US",{timeZone:"America/New_York", dateStyle:"medium", timeStyle:"short"})
-    : "Last refreshed: Unknown";
-}
-
-
 function updateDashboard(){
   renderCards();
   renderTable();
