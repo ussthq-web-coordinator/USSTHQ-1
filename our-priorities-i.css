@@ -62,7 +62,14 @@
 }
 .iridescent-box {
   text-align: center;
-  background: linear-gradient(135deg, #EC3B43, #F0625F, #F5A3A0, #D96E7D, #EC3B43);
+  background: linear-gradient(
+  135deg,
+  #B3272C,
+  #C4323B,
+  #EC3B43,
+  #9E1F28,
+  #7F1B24
+);
   background-size: 400% 400%;
   animation: iridescent 12s ease infinite;
   padding: 20px;
@@ -70,54 +77,6 @@
   color: #fff;
   font-weight: bold;
   font-size: 18px;
-}
-
-/* Horizontal scroll container */
-.scroll-row-priorities {
-  display: flex;
-  overflow-x: auto;
-  scroll-behavior: smooth;
-  gap: 20px;
-  padding: 20px 0;
-  white-space: nowrap;
-}
-
-/* Each card in the scroll */
-.priority-card {
-  flex: 0 0 auto;
-  padding: 20px
-}
-
-/* Scroll row container */
-.scroll-row-priorities2 {
-  display: flex;
-  overflow-x: auto;
-  gap: 20px;
-  padding: 20px 0;
-  scroll-behavior: smooth;
-  white-space: nowrap;
-}
-
-/* Each card in scroll */
-.priority-card2 {
-  flex: 0 0 auto;
-  min-width: 380px; /* wide enough for text to wrap */
-  box-sizing: border-box;
-}
-
-/* Grey background and iridescent animation */
-.priority-card2 .bg-area {
-  background-color: #f5f5f5; /* light grey base */
-  color: #000;
-  border-radius: 10px;
-  padding: 2rem;
-  white-space: normal; /* allows text to wrap */
-}
-
-/* Optional: subtle hover effect */
-.priority-card2 .bg-area:hover {
-  transform: scale(1.02);
-  transition: transform 0.3s ease;
 }
 
 /* Grey cards adjustments */
