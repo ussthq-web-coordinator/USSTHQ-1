@@ -126,7 +126,7 @@
   display: flex;
   flex-wrap: nowrap; /* keep everything in one row */
   overflow-x: auto;
-  gap: 15px; /* space between cards */
+  gap: 7px; /* space between cards */
   padding: 20px 0;
   scroll-behavior: smooth;
 }
