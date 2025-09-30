@@ -14,6 +14,11 @@ body { font-family: 'Montserrat', sans-serif; background:#f9f9f9; font-size: 0.8
 .card { margin-bottom: 1rem; }
 .card-body { text-align:center; }
 .card-title { font-size:1rem; font-weight:bold; }
+
+/* Increase font weight for all headings to improve emphasis */
+h1, h2, h3, h4, h5, h6 {
+  font-weight: 700;
+}
 .progress { height: 1.75rem; margin-bottom: 1rem; }
 .card-text { font-size:0.9rem; }
 .chart-container { margin-bottom:1rem; }
@@ -275,6 +280,16 @@ body { font-family: 'Montserrat', sans-serif; background:#f9f9f9; font-size: 0.8
   flex: 0 0 auto;
   white-space: nowrap;
   position: relative;
+}
+
+/* Add extra spacing beneath each section in the progress breakdown accordion,
+   but do not add it after the bottom-most section */
+/* Reduce heading bottom margin and instead add spacing after the last progress bar in a section */
+#progressBreakdownBody > h3 { margin-bottom: 0.4rem; }
+
+/* Add spacing after the last progress bar within each breakdown section */
+.breakdown-section .progress:last-of-type {
+  margin-bottom: 1.25rem;
 }
 
 /* Tooltip for overall % hover at the end of legends */

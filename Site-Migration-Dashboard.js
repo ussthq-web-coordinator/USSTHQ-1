@@ -87,7 +87,7 @@ async function fetchData() {
     const refreshUTC = json.refreshDate ? new Date(json.refreshDate) : null;
     const refreshEl = document.getElementById("refreshDate");
     if (refreshEl) {
-      refreshEl.textContent = refreshUTC ? "Version 1.9301920 - Last refreshed (Eastern): " + refreshUTC.toLocaleString("en-US",{ timeZone:"America/New_York", dateStyle:"medium", timeStyle:"short"}) : "Last refreshed: Unknown";
+      refreshEl.textContent = refreshUTC ? "Version 1.9301929 - Last refreshed (Eastern): " + refreshUTC.toLocaleString("en-US",{ timeZone:"America/New_York", dateStyle:"medium", timeStyle:"short"}) : "Last refreshed: Unknown";
     }
     pageCache = {}; tableData.forEach((d,i)=>{d._id=i; pageCache[i]=d;});
     initFilters(); renderCards(); renderTable();
@@ -788,12 +788,13 @@ function renderBreakdown(data){
       });
     }
 
-    container.innerHTML += `<h3 class="mt-3">${g.name}</h3>`;
+    // Build a section wrapper so we can control spacing after the last progress bar
+    let sectionHtml = `<div class="breakdown-section"><h3 class="mt-3">${g.name}</h3>`;
     if (g.field === 'Local Web Admin Group.title'){
       const childKeys = Object.keys(grouped).filter(k=>k && k !== 'Not Set');
       try { console.debug('renderBreakdown: child locations for current filters', childKeys.slice(0,50)); } catch(e){}
       if (!childKeys.length) {
-        container.innerHTML += `<div class="mb-2 text-muted"><em>No child locations found for the current filters. (Either Local is empty or there are no distinct Local values for the current filters.)</em></div>`;
+        sectionHtml += `<div class="mb-2 text-muted"><em>No child locations found for the current filters. (Either Local is empty or there are no distinct Local values for the current filters.)</em></div>`;
       }
     }
     entries.forEach(({ rawKey, display }) => {
@@ -801,20 +802,19 @@ function renderBreakdown(data){
       const total = grp.total;
       const prog = total ? Math.round((grp.done + grp.donot) / total * 100) : 0;
       const siteCount = grp.siteTitles ? grp.siteTitles.size : 0;
-  // (previously omitted single-site AC rows; now we keep them so AC entries that
-  // contain 'Area Command' are shown regardless of siteCount)
       // Hide zero-percent groups by default for all group types; toggle will reveal them.
-  let hiddenClass = (prog === 0) ? 'hidden-group' : '';
-  // Only hide Area Command rows that are across exactly one site AND have 0% progress
-  if (g.field === 'Area Command Admin Group.title' && siteCount === 1 && prog === 0) hiddenClass = 'hidden-group';
+      let hiddenClass = (prog === 0) ? 'hidden-group' : '';
+      // Only hide Area Command rows that are across exactly one site AND have 0% progress
+      if (g.field === 'Area Command Admin Group.title' && siteCount === 1 && prog === 0) hiddenClass = 'hidden-group';
       const colorClass = prog < 40 ? 'bg-danger' : prog < 70 ? 'bg-warning' : 'bg-success';
-  // Always show the progress bar for all groups (including Area Command)
-  const progressHtml = `\n          <div class="progress mt-1">\n            <div class="progress-bar ${colorClass}" style="width:${prog}%">${prog}%</div>\n          </div>`;
-      container.innerHTML += `
+      const progressHtml = `\n          <div class="progress mt-1">\n            <div class="progress-bar ${colorClass}" style="width:${prog}%">${prog}%</div>\n          </div>`;
+      sectionHtml += `
         <div class="mb-1 ${hiddenClass}" data-key="${encodeURIComponent(rawKey)}" style="display:${hiddenClass ? 'none' : 'block'}">
           <strong>${display}</strong> <small class="text-muted">(${total} pages${siteCount? ' across '+siteCount+' sites':''})</small>${progressHtml}
         </div>`;
     });
+    sectionHtml += `</div>`;
+    container.innerHTML += sectionHtml;
   });
 
   // Make toggle robust even when there are no hidden items
