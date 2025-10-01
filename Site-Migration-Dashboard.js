@@ -13,6 +13,7 @@ const _migrationSampleData = [
 ];
 
 
+
 /**
  * Site-Migration-Dashboard.js
  * 
@@ -65,53 +66,99 @@ if (typeof _migrationSampleData !== 'undefined' && Array.isArray(_migrationSampl
   }
 }
 
-// Backup Data URL https://cdn.jsdelivr.net/gh/ussthq-web-coordinator/USSTHQ-1@latest/DashboardData.json
-
-const jsonURL = "https://hopewell.pages.dev/DashboardData.json";
-
-// Globals used across the dashboard version number
-let table;
-let tableData = [];
-let pageCache = {};
-let qaGroupedCache = {};
-let priorityChart, pageTypeChart, pubSymChart;
+// Top-level data structures used across the dashboard
+let table, tableData = [], charts = {}, pageCache = {}, qaGroupedCache = {}, masterData;
+// Chart instances used by renderCharts
 let statusChart = null;
+let priorityChart = null;
+let pageTypeChart = null;
+let pubSymChart = null;
+// Application version (update as needed)
+const APP_VERSION = '1.0.0';
 
-async function fetchData() {
-  try {
-    const res = await fetch(jsonURL);
-    if(!res.ok) throw new Error('Unable to load JSON data');
-    const json = await res.json();
-    tableData = Array.isArray(json) ? json : (json.data || []);
-    const refreshUTC = json.refreshDate ? new Date(json.refreshDate) : null;
-    const refreshEl = document.getElementById("refreshDate");
-    if (refreshEl) {
-      refreshEl.textContent = refreshUTC ? "Version 1.9301929 - Last refreshed (Eastern): " + refreshUTC.toLocaleString("en-US",{ timeZone:"America/New_York", dateStyle:"medium", timeStyle:"short"}) : "Last refreshed: Unknown";
+// Set the refresh date element text to show version + ET timestamp
+function setRefreshDate(date){
+  try{
+    const el = document.getElementById('refreshDate');
+    if(!el) return;
+    const d = date ? new Date(date) : new Date();
+    const fmt = d.toLocaleString('en-US', { timeZone: 'America/New_York', year:'numeric', month:'short', day:'numeric', hour:'numeric', minute:'2-digit', second:'2-digit' });
+    el.textContent = `v${APP_VERSION} · Data refreshed: ${fmt} ET`;
+  }catch(e){ console.warn('Failed to set refresh date', e); }
+}
+
+// Try to load dashboard data: prefer local `DashboardData.json` when available, otherwise fall back to CDN.
+// Restore original behavior: try local DashboardData.json first, then fall back to CDN.
+(async function loadDashboardData(){
+  const localUrl = 'DashboardData.json';
+  const cdnUrl = 'https://hopewell.pages.dev/DashboardData.json';
+  let json = null;
+  try{
+    // Try local file first (user requested local behavior)
+    try{
+      const r = await fetch(localUrl);
+      if (r && r.ok) json = await r.json();
+    }catch(e){
+      // local fetch failed — we'll attempt CDN below
+      console.warn('Local DashboardData.json fetch failed, trying CDN...', e);
     }
-    pageCache = {}; tableData.forEach((d,i)=>{d._id=i; pageCache[i]=d;});
-    initFilters(); renderCards(); renderTable();
-  } catch(err) {
-    document.body.innerHTML = `<div class="alert alert-danger m-3">Error loading dashboard: ${err.message}</div>`;
-    console.error(err);
+
+    if (!json){
+      const r2 = await fetch(cdnUrl);
+      if (!r2.ok) throw new Error('Failed to load remote dashboard JSON');
+      json = await r2.json();
+    }
+
+    // 🔹 Show refreshDate if present in JSON
+    if (json.refreshDate){
+      const refreshEl = document.getElementById("refreshDate");
+      if (refreshEl){
+        // Try to parse the refreshDate into a Date object
+        let formatted = json.refreshDate;
+        const parsedDate = new Date(json.refreshDate);
+
+        if (!isNaN(parsedDate.getTime())) {
+          // Format to a friendly readable style
+          formatted = parsedDate.toLocaleString("en-US", {
+            year: "numeric",
+            month: "long",
+            day: "numeric",
+            hour: "numeric",
+            minute: "2-digit",
+            hour12: true,
+            timeZoneName: "short" // e.g., "ET"
+          });
+        }
+
+        refreshEl.textContent = `Data last refreshed: ${formatted}`;
+      }
+    }
+
+    // 🔹 Process table data
+    tableData = Array.isArray(json) ? json : (json.data || []);
+    pageCache = {};
+    tableData.forEach((d,i)=>{ d._id = i; pageCache[i] = d; });
+
+    masterData = tableData; // keep a reference (not a shallow copy)
+
+    // Initialize filters and render the dashboard — let errors surface
+    initFilters();
+    updateDashboard();
+  }catch(err){
+    console.error('Dashboard data load failed', err);
+    throw err;
   }
-}
-document.addEventListener("DOMContentLoaded", () => {
-    fetchData();
-});
+})();
 
-function normalizeStatus(status){
-  return (status || "").toString().trim();
-}
-
-// canonical mapping
-function getCanonicalStatus(status) {
-  status = (status||"").trim();
-  if (/^(4|5)/.test(status)) return "Completed";
-  if (status === "Do Not Migrate") return "Do Not Migrate";
-  if (/^2/.test(status)) return "In Progress";       // 2a/2b/2c
-  if (/^3[a-c]/.test(status)) return "In QA";       // 3a/3b/3c
-  if (/^1/.test(status)) return "Needs Info";
-  return "Unknown";
+// Small helper to escape HTML in strings inserted via innerHTML
+function escapeHtml(str){
+  if (str === null || str === undefined) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 }
 
 
@@ -325,6 +372,22 @@ function getFilteredData(){
 }
 
     // Change order of overall progress legend
+// Normalize status string
+function normalizeStatus(status){
+  return (status || "").toString().trim();
+}
+
+// Map raw status values to canonical buckets used throughout the dashboard
+function getCanonicalStatus(status) {
+  if (!status) return "Unknown";
+  status = status.toString().trim();
+  if (/^4|^5/.test(status)) return "Completed";
+  if (status === "Do Not Migrate") return "Do Not Migrate";
+  if (/^2/.test(status)) return "In Progress";
+  if (/^1/.test(status)) return "Needs Info";
+  if (/^3[a-c]/.test(status)) return "In QA";
+  return "Unknown";
+}
 function renderOverallProgress(filtered){
   if (!Array.isArray(filtered)) return;
   const total = filtered.length;
@@ -423,13 +486,53 @@ function renderQaAccordion(data){
     qaGroupedCache[key].push(d._id);
   });
 
-  Object.keys(qaGroupedCache).sort().forEach(k=>{
-    container.innerHTML += `
-      <div class="mb-2">
-        <button class="btn btn-sm btn-secondary ms-2" onclick="showQaIssuesModal('${k}')">View Pages</button>&nbsp;&nbsp;
-        ${k} <strong>(${qaGroupedCache[k].length})</strong>
-      </div>`;
+  // Build responsive card grid: up to 4 cards per row using Bootstrap cols
+  const keys = Object.keys(qaGroupedCache).sort();
+  const rowDiv = document.createElement('div');
+  rowDiv.className = 'row g-3';
+
+  keys.forEach(k=>{
+    const count = qaGroupedCache[k].length;
+    const col = document.createElement('div');
+    // 4 per row on lg, 3 per row on md, 2 per row on sm, 1 per row on xs
+    col.className = 'col-12 col-sm-6 col-md-4 col-lg-3';
+
+    const card = document.createElement('div');
+    card.className = 'card h-100 qa-issue-card';
+    // Collect unique non-empty 'Why This Is Important' values for this QA key
+    const matchingRows = qaRows.filter(r => r["QA Issues.lookupValue"] === k);
+    const reasons = Array.from(new Set(matchingRows.map(r => (r["QA Issues:Why This Is Important"] || '').toString().trim()).filter(Boolean)));
+    let subtitleHtml = '';
+    if (reasons.length === 1) {
+      subtitleHtml = escapeHtml(reasons[0]);
+    } else if (reasons.length > 1) {
+      const first = escapeHtml(reasons[0]);
+      const restCount = reasons.length - 1;
+      const full = escapeHtml(reasons.join('\n\n'));
+      // show first reason and a small hint for more; full list available in title tooltip
+      subtitleHtml = `${first} <small class="text-muted" title="${full}">(+${restCount} more)</small>`;
+    }
+
+    card.innerHTML = `
+      <div class="card-body d-flex flex-column">
+        <div class="d-flex justify-content-between align-items-start mb-2">
+          <div>
+            <h6 class="card-title mb-1">${escapeHtml(k)}</h6>
+            <p class="card-subtitle text-muted small mb-0">${subtitleHtml}</p>
+          </div>
+          <span class="badge bg-warning qa-badge">${count}</span>
+        </div>
+        <div class="mt-auto pt-2">
+          <button class="btn btn-sm btn-outline-primary" onclick="showQaIssuesModal('${k.replace(/'/g,"\\'")}')">View Pages</button>
+        </div>
+      </div>
+    `;
+
+    col.appendChild(card);
+    rowDiv.appendChild(col);
   });
+
+  container.appendChild(rowDiv);
 }
 
 
@@ -930,8 +1033,8 @@ title: "Title",
   });
 }
 
-// Make sure masterData references tableData
-const masterData = [...tableData];
+// Make sure masterData references tableData (assign to previously declared variable)
+masterData = tableData;
 
 document.addEventListener("DOMContentLoaded", () => {
   const searchInput = document.getElementById("searchInput");
@@ -1179,7 +1282,7 @@ function showAllQaIssues() {
             <td>${p["QA Issues.lookupValue"]}</td>
             <td>${p["QA Issues:Why This Is Important"]}</td>
             <td>${p["QA Issues:How to Fix"]}</td>
-            <td>${p["QA Issues:How to Fix Details"]}</td>
+            <td class="qa-fix-details">${p["QA Issues:How to Fix Details"]}</td>
         `;
         tbody.appendChild(tr);
     });
@@ -1359,7 +1462,7 @@ function updateDashboard(){
     const exportBtn = document.getElementById('exportMigrationJson');
 
   function showCalendar(){ document.getElementById('migrationFullCalendar').style.display=''; document.getElementById('migrationAgenda').style.display='none'; if(btnCal) btnCal.classList.add('btn-primary'); if(btnCal) btnCal.classList.remove('btn-outline-primary'); if(btnAgenda) btnAgenda.classList.remove('btn-primary'); if(btnAgenda) btnAgenda.classList.add('btn-outline-primary'); }
-  function showAgenda(){ document.getElementById('migrationFullCalendar').style.display='none'; document.getElementById('migrationAgenda').style.display=''; if(btnAgenda) btnAgenda.classList.add('btn-primary'); if(btnAgenda) btnAgenda.classList.remove('btn-outline-primary'); if(btnCal) btnCal.classList.remove('btn-primary'); if(btnCal) btnCal.classList.add('btn-outline-primary'); }
+  function showAgenda(){ document.getElementById('migrationFullCalendar').style.display='none'; document.getElementById('migrationAgenda').style.display=''; if(btnAgenda) btnAgenda.classList.add('btn-secondary'); if(btnAgenda) btnAgenda.classList.remove('btn-outline-primary'); if(btnCal) btnCal.classList.remove('btn-primary'); if(btnCal) btnCal.classList.add('btn-outline-primary'); }
 
     if (btnCal) btnCal.addEventListener('click', ()=>{ showCalendar(); if(!fullCalendar) refreshFullCalendar(); else fullCalendar.changeView('dayGridMonth'); });
     if (btnAgenda) btnAgenda.addEventListener('click', ()=>{ showAgenda(); });

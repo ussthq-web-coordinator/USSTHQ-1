@@ -10,7 +10,14 @@
   font-style: normal;
 }
 
-body { font-family: 'Montserrat', sans-serif; background:#f9f9f9; font-size: 0.84rem; }
+.inter-dash {
+  font-family: "Inter", sans-serif;
+  font-optical-sizing: auto;
+  font-weight: 400;
+  font-style: normal;
+}
+
+body { font-family: 'Inter', sans-serif; background:#f9f9f9; font-size: 0.84rem; }
 .card { margin-bottom: 1rem; }
 .card-body { text-align:center; }
 .card-title { font-size:1rem; font-weight:bold; }
@@ -318,4 +325,70 @@ h1, h2, h3, h4, h5, h6 {
   padding: 0.25rem 0.5rem;
   margin-left: 15px;
   color: darkslategray;
+}
+
+/* Wider QA 'How to Fix Details' column in modals */
+.modal-body td.qa-fix-details {
+  min-width: 320px;    /* make the column noticeably wider */
+  max-width: 640px;    /* prevent it from growing too large */
+  white-space: normal; /* allow wrapping */
+  word-break: break-word;
+}
+
+/* For small screens, let it occupy full width and stack */
+@media (max-width: 575px) {
+  .modal-body td.qa-fix-details {
+    min-width: auto;
+    max-width: none;
+    display: block;
+    width: 100%;
+  }
+}
+
+/* QA issue card styling */
+.qa-issue-card {
+  border: 1px solid rgba(0,0,0,0.08);
+  box-shadow: none;
+}
+.qa-issue-card .qa-badge {
+  font-size: 0.85rem;
+  padding: 0.35rem 0.5rem;
+  color: #333;
+}
+
+/* Make card title wrap safely */
+.qa-issue-card .card-title {
+  white-space: normal;
+  word-break: break-word;
+}
+
+/* QA card layout tweaks: modest height, tighter padding and a two-line clamp for the "Why This Is Important" subtitle only */
+.qa-issue-card {
+  margin-bottom: 0.75rem; /* small gap between cards */
+}
+.qa-issue-card .card-body {
+  padding: 0.75rem; /* slightly tighter than default */
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.qa-issue-card .card-subtitle {
+  /* clamp to three lines with ellipsis — only applies inside QA cards; provide small top margin (mt-2)
+     to separate it from the title and give a little breathing room */
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.1rem;
+  max-height: 3.4rem; /* 3 lines x line-height (approx) */
+  margin-top: 0.5rem; /* mt-2 */
+  margin-bottom: 0.25rem;
+}
+.qa-issue-card .card-title {
+  margin-bottom: 0.25rem; /* tighter spacing above subtitle */
+}
+.qa-issue-card .card-body .mt-auto {
+  margin-top: 0.5rem; /* ensure button sits slightly separated from subtitle */
 }
