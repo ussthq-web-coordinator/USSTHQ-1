@@ -508,7 +508,7 @@ function renderQaAccordion(data){
     } else if (reasons.length > 1) {
       const first = escapeHtml(reasons[0]);
       const restCount = reasons.length - 1;
-      const full = escapeHtml(reasons.join('\n\n'));
+      const full = escapeHtml(reasons.join(' | ')); // safer for title attribute
       // show first reason and a small hint for more; full list available in title tooltip
       subtitleHtml = `${first} <small class="text-muted" title="${full}">(+${restCount} more)</small>`;
     }
@@ -1161,9 +1161,10 @@ function showQaIssuesModal(groupKey){
         <tbody>
   `;
 
-  let whyImportant = "";
-  let howToFix = "";
-  let howToFixDetails = "";
+  // ✅ collect ALL unique values across this group
+  const whyImportantList = new Set();
+  const howToFixList = new Set();
+  const howToFixDetailsList = new Set();
 
   ids.forEach(id => {
     const p = pageCache[id];
@@ -1180,8 +1181,8 @@ function showQaIssuesModal(groupKey){
 
     html += `
       <tr>
-      <td>${p.Title}</a></td>  
-      <td class="text-center">${formLink}</td>
+        <td>${p.Title}</td>  
+        <td class="text-center">${formLink}</td>
         <td class="text-center">${sdLink}</td>
         <td class="text-center">${zdLink}</td>
         <td>${p.Status || "N/A"}</td>
@@ -1190,29 +1191,32 @@ function showQaIssuesModal(groupKey){
       </tr>
     `;
 
-  // capture first non-empty value only
-    if (!whyImportant && p["QA Issues:Why This Is Important"]) {
-      whyImportant = p["QA Issues:Why This Is Important"];
+    // ✅ add to sets
+    if (p["QA Issues:Why This Is Important"]) {
+      whyImportantList.add(p["QA Issues:Why This Is Important"].trim());
     }
-    if (!howToFix && p["QA Issues:How to Fix"]) {
-      howToFix = p["QA Issues:How to Fix"];
+    if (p["QA Issues:How to Fix"]) {
+      howToFixList.add(p["QA Issues:How to Fix"].trim());
     }
-    if (!howToFixDetails && p["QA Issues:How to Fix Details"]) {
-      howToFixDetails = p["QA Issues:How to Fix Details"];
+    if (p["QA Issues:How to Fix Details"]) {
+      howToFixDetailsList.add(p["QA Issues:How to Fix Details"].trim());
     }
   });
 
   html += "</tbody></table></div>";
 
-  // add headings/values under the table
-  if (whyImportant) {
-    html += `<div class="mt-3"><h5>Why Fixing This Is Important</h5><p>${whyImportant}</p></div>`;
+  // ✅ render distinct values
+  if (whyImportantList.size) {
+    html += `<div class="mt-3"><h5>Why Fixing This Is Important</h5>
+               <ul>${[...whyImportantList].map(v=>`<li>${v}</li>`).join('')}</ul></div>`;
   }
-  if (howToFix) {
-    html += `<div class="mt-3"><h5>How to Fix This Issue</h5><p>${howToFix}</p></div>`;
+  if (howToFixList.size) {
+    html += `<div class="mt-3"><h5>How to Fix This Issue</h5>
+               <ul>${[...howToFixList].map(v=>`<li>${v}</li>`).join('')}</ul></div>`;
   }
-  if (howToFixDetails) {
-    html += `<div class="mt-3"><h6>How to Fix Details</h6><p>${howToFixDetails}</p></div>`;
+  if (howToFixDetailsList.size) {
+    html += `<div class="mt-3"><h6>How to Fix Details</h6>
+               <ul>${[...howToFixDetailsList].map(v=>`<li>${v}</li>`).join('')}</ul></div>`;
   }
 
   modalBody.innerHTML = html;
@@ -1222,6 +1226,7 @@ function showQaIssuesModal(groupKey){
     console.warn('qaIssuesModal element missing');
   }
 }
+
 
 // Delegated handler for QA title links (works when rows are added dynamically)
 document.addEventListener('click', function (e) {
