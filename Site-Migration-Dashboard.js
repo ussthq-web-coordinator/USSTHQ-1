@@ -8,7 +8,6 @@ const _migrationSampleData = [
   { "Site Title": "Arkansas and Oklahoma", "Migration Date": "2025-10-02", "View Website URL": "https://www.salvationarmyusa.org/usa-southern-territory/arkansas-and-oklahoma/", "Division": "Alabama, Louisiana, and Mississippi" },
   { "Site Title": "Alabama, Louisiana, and Mississippi", "Migration Date": "", "View Website URL": "", "Division": "Alabama, Louisiana, and Mississippi" },
   { "Site Title": "Texas", "Migration Date": "", "View Website URL": "", "Division": "Texas" },
-  { "Site Title": "Arkansas and Oklahoma", "Migration Date": "", "View Website URL": "", "Division": "Arkansas and Oklahoma" },
   { "Site Title": "Florida", "Migration Date": "", "View Website URL": "", "Division": "Florida" },
   { "Site Title": "Georgia", "Migration Date": "", "View Website URL": "", "Division": "Georgia" }
 ];
@@ -1300,11 +1299,20 @@ function updateDashboard(){
       const list = document.createElement('div'); list.className = 'list-group';
 
   groups[k].sort((a,b)=> new Date(a['Migration Date']||8640000000000000) - new Date(b['Migration Date']||8640000000000000)).forEach(r=>{
-        const item = document.createElement('a');
-        item.className = 'list-group-item list-group-item-action d-flex justify-content-between align-items-start';
-        item.href = r['View Website URL'] || '#'; item.target = '_blank';
+        const url = r['View Website URL'] || r.viewUrl || r.viewWebsiteUrl || '';
+        let item;
+        if (url) {
+          item = document.createElement('a');
+          item.href = url;
+          item.target = '_blank';
+          item.className = 'list-group-item list-group-item-action d-flex justify-content-between align-items-start';
+        } else {
+          // Use a non-clickable container when there's no URL
+          item = document.createElement('div');
+          item.className = 'list-group-item d-flex justify-content-between align-items-start';
+        }
         const left = document.createElement('div'); left.innerHTML = '<div class="fw-bold">'+(r['Site Title']||'(No Title)')+'</div>'+(r['Division']?'<small class="text-muted">'+r['Division']+'</small>':'');
-        const right = document.createElement('div'); right.className='text-end'; right.innerHTML = '<div>'+formatDateISO(r['Migration Date'])+'</div>'+(r['View Website URL']?'<div><small class="text-primary">Visit</small></div>':'');
+        const right = document.createElement('div'); right.className='text-end'; right.innerHTML = '<div>'+formatDateISO(r['Migration Date'])+'</div>'+(url?'<div><small class="text-primary">Visit</small></div>':'');
         item.appendChild(left); item.appendChild(right); list.appendChild(item);
       });
 
