@@ -537,76 +537,100 @@ function renderQaAccordion(data){
   container.appendChild(rowDiv);
 }
 
-
-// --- QA Modal (multiple accordions if multiple issues per page) ---
+// --- QA Modal with Tabulator and accordion per issue ---
 function showQaIssuesModal(pageTitleEncoded) {
+  const modalEl = document.getElementById("qaIssuesModal");
+  const modalBody = document.getElementById("qaIssuesModalBody");
+  if (!modalEl || !modalBody) return console.warn('Modal elements missing');
+
   const pageTitle = decodeURIComponent(pageTitleEncoded);
   const rows = qaGroupedCache[pageTitle] || [];
-  const modalBody = document.getElementById("qaIssuesModalBody");
-  const modalEl = document.getElementById("qaIssuesModal");
-  if (!modalBody) return console.warn('qaIssuesModalBody missing');
 
-  if (rows.length === 0) {
+  if (!rows.length) {
     modalBody.innerHTML = "<p>No QA Issues for this page.</p>";
+    new bootstrap.Modal(modalEl).show();
     return;
   }
 
   const page = pageCache[rows[0]._id];
-  let html = `
-  <h4 class="mb-3">${escapeHtml(page["Site Title"] || page.Title || "Untitled Page")}</h4>
-  <div class="table-responsive">
-    <table class="table table-sm table-bordered align-middle">
-      <thead class="table-light">
-        <tr>
-          <th>Title</th>
-          <th class="text-center">Edit</th>
-          <th class="text-center">SD</th>
-          <th class="text-center">ZD</th>
-          <th>Status</th>
-          <th>Priority</th>
-          <th>QA Notes</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr>
-          <td>${page.Title}</td>
-          <td class="text-center">-</td>
-          <td class="text-center">${page["Page URL"] ? `<a href="${page["Page URL"]}" target="_blank">🔗</a>` : ""}</td>
-          <td class="text-center">${page["Zesty URL Path Part"] ? `<a href="https://8hxvw8tw-dev.webengine.zesty.io${page["Zesty URL Path Part"]}?zpw=tsasecret123&redirect=false&_bypassError=true" target="_blank">🟢</a>` : ""}</td>
-          <td>${page.Status || "N/A"}</td>
-          <td>${page.Priority || "N/A"}</td>
-          <td>${page["QA Notes"] || ""}</td>
-        </tr>
-      </tbody>
-    </table>
-  </div>
-  `;
+  if (!page) {
+    console.warn("Page not found in pageCache:", rows[0]._id);
+    modalBody.innerHTML = "<p>Page data not available.</p>";
+    new bootstrap.Modal(modalEl).show();
+    return;
+  }
 
-  // Accordion: one per QA Issue
-  html += `<div class="accordion mt-4" id="qaIssueAccordion_${encodeURIComponent(pageTitle)}">`;
+  // Clear modal body
+  modalBody.innerHTML = `<h4 class="mb-3">${escapeHtml(page["Site Title"] || page.Title || "Untitled Page")}</h4>`;
+
+  // Tabulator container
+  const tableContainer = document.createElement("div");
+  modalBody.appendChild(tableContainer);
+
+  const tableData = [{
+    ID: page.ID,
+    Title: page.Title,
+    "Page URL": page["Page URL"],
+    "Zesty URL Path Part": page["Zesty URL Path Part"],
+    Status: page.Status || "N/A",
+    Priority: page.Priority || "N/A",
+    "QA Notes": page["QA Notes"] || "",
+    "Symphony Site Type": page["Symphony Site Type"] || ""
+  }];
+
+  // Initialize Tabulator
+  const table = new Tabulator(tableContainer, {
+    data: tableData,
+    layout: window.innerWidth < 600 ? "fitDataFill" : "fitColumns",
+    reactiveData: true,
+    autoColumns: false,
+    columns: [
+      {title:"Title", field:"Title", formatter: cell => `<div class="tabulator-cell">${escapeHtml(cell.getValue())}</div>`},
+      { 
+        title:"Edit", field:"Form", hozAlign:"center",
+        formatter: cell => {
+          const row = cell.getRow().getData();
+          const id = row.ID; 
+          const type = (row["Symphony Site Type"] || "").trim();
+          let url = "#";
+          if(type === "Metro Area") url = `https://sauss.sharepoint.com/sites/USSWEBADM/Lists/MetroAreaSitesInfoPagesSymphony/DispForm.aspx?ID=${encodeURIComponent(id)}&e=mY8mhG`;
+          else if(type === "Corps") url = `https://sauss.sharepoint.com/sites/USSWEBADM/Lists/CorpsSitesPageMigrationReport/DispForm.aspx?ID=${encodeURIComponent(id)}&e=dF11LG`;
+          return `<div class="tabulator-cell"><a href="${escapeHtml(url)}" target="_blank">Form</a></div>`;
+        }
+      },
+      {title:"SD", field:"Page URL", hozAlign:"center", formatter: cell => `<div class="tabulator-cell">${cell.getValue() ? `<a href="${escapeHtml(cell.getValue())}" target="_blank">🔗</a>` : ""}</div>`},
+      {title:"ZD", field:"Zesty URL Path Part", hozAlign:"center", formatter: cell => `<div class="tabulator-cell">${cell.getValue() ? `<a href="https://8hxvw8tw-dev.webengine.zesty.io${escapeHtml(cell.getValue())}?zpw=tsasecret123&redirect=false&_bypassError=true" target="_blank">🟢</a>` : ""}</div>`},
+      {title:"Status", field:"Status", formatter: cell => `<div class="tabulator-cell">${escapeHtml(cell.getValue())}</div>`},
+      {title:"Priority", field:"Priority", formatter: cell => `<div class="tabulator-cell">${escapeHtml(cell.getValue())}</div>`},
+      {title:"QA Notes", field:"QA Notes", formatter: cell => `<div class="tabulator-cell">${escapeHtml(cell.getValue())}</div>`}
+    ],
+    responsiveLayout: "collapse",
+    responsiveLayoutCollapseStartOpen: true,
+    tooltips: true,
+    height: "100%"
+  });
+
+  // Accordion per QA issue
+  const accordionId = `qaIssueAccordion_${Math.random().toString(36).substr(2,6)}`;
+  let accordionHtml = `<div class="accordion mt-4" id="${accordionId}">`;
   rows.forEach((r, idx) => {
-    const issueId = `${encodeURIComponent(pageTitle)}_issue_${idx}`;
+    const issueId = `issue_${idx}`;
     const lookup = r["QA Issues.lookupValue"] || "Unnamed Issue";
 
-    // helper: split on ; and take last non-empty
-    const getLast = (val) => {
-      if (!val) return "";
-      const parts = val.split(";").map(s => s.trim()).filter(Boolean);
-      return parts.length ? parts[parts.length - 1] : "";
-    };
+    const getLast = (val) => val ? val.split(";").map(s=>s.trim()).filter(Boolean).pop() || "" : "";
 
     const why = getLast(r["QA Issues:Why This Is Important"]);
     const how = getLast(r["QA Issues:How to Fix"]);
     const howDetails = getLast(r["QA Issues:How to Fix Details"]);
 
-    html += `
+    accordionHtml += `
       <div class="accordion-item">
         <h2 class="accordion-header" id="heading_${issueId}">
           <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse_${issueId}">
             ${escapeHtml(lookup)}
           </button>
         </h2>
-        <div id="collapse_${issueId}" class="accordion-collapse collapse" data-bs-parent="#qaIssueAccordion_${encodeURIComponent(pageTitle)}">
+        <div id="collapse_${issueId}" class="accordion-collapse collapse" data-bs-parent="#${accordionId}">
           <div class="accordion-body">
             ${why ? `<h6>Why This Is Important</h6><p>${escapeHtml(why)}</p>` : ""}
             ${how ? `<h6>How to Fix</h6><p>${escapeHtml(how)}</p>` : ""}
@@ -616,17 +640,24 @@ function showQaIssuesModal(pageTitleEncoded) {
       </div>
     `;
   });
-  html += `</div>`;
+  accordionHtml += `</div>`;
+  modalBody.insertAdjacentHTML("beforeend", accordionHtml);
 
-  modalBody.innerHTML = html;
-  if (modalEl) {
-    try { new bootstrap.Modal(modalEl).show(); } catch(e) {}
-  }
+  // Launch modal after DOM populated
+  new bootstrap.Modal(modalEl).show();
 }
 
 
-
-
+// Small helper to escape HTML
+function escapeHtml(str){
+  if (str === null || str === undefined) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
 
 
 function renderCards(){

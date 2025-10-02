@@ -35,6 +35,13 @@ h1, h2, h3, h4, h5, h6 {
 .modal-body td, .modal-body th { padding:0.25rem; vertical-align:top; border:1px solid #ddd; font-size:0.85rem; }
 .table-header-links { font-size:1rem; margin-left:1rem; }
 .hidden-group { display:none; }
+/* Tabulator cell wrap */
+.tabulator-cell {
+  white-space: normal !important;  /* allow text to wrap */
+  word-break: break-word;          /* break long words */
+  overflow: visible !important;    /* ensure content is visible */
+}
+/* Thinner Tabulator columns for Effort Needed, Published Symphony, Site Title */
 .tabulator-cell[data-field="Effort Needed"], 
 .tabulator-cell[data-field="Published Symphony"], 
 .tabulator-cell[data-field="Site Title"] {
