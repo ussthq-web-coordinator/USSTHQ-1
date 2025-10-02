@@ -465,12 +465,13 @@ function updateACDropdown(filteredData) {
   }).join("");
 }
 
-
+  // --- QA Accordion rendering (pages first, issues as subtitle) ---
 function renderQaAccordion(data){
   const container = document.getElementById("qaGroupsBody");
   if (!container) return;
   container.innerHTML = "";
-  const qaRows = Array.isArray(data) ? data.filter(d=>d["QA Issues.lookupValue"]) : [];
+
+  const qaRows = Array.isArray(data) ? data.filter(d => d["QA Issues.lookupValue"]) : [];
 
   // Update badge with total count
   const badge = document.getElementById("qaBadge");
@@ -481,51 +482,52 @@ function renderQaAccordion(data){
     return;
   }
 
-  qaGroupedCache={};
-  qaRows.forEach(d=>{
-    const key=d["QA Issues.lookupValue"];
-    qaGroupedCache[key]=qaGroupedCache[key]||[];
-    qaGroupedCache[key].push(d._id);
+  // Group rows by page ID
+  qaGroupedCache = {};
+  qaRows.forEach(d => {
+    const pageId = d._id;
+    qaGroupedCache[pageId] = qaGroupedCache[pageId] || [];
+    qaGroupedCache[pageId].push(d);
   });
 
-  // Build responsive card grid: up to 4 cards per row using Bootstrap cols
-  const keys = Object.keys(qaGroupedCache).sort();
+  const pageIds = Object.keys(qaGroupedCache);
   const rowDiv = document.createElement('div');
   rowDiv.className = 'row g-3';
 
-  keys.forEach(k=>{
-    const count = qaGroupedCache[k].length;
+  pageIds.forEach(id => {
+    const rows = qaGroupedCache[id];
+    const page = pageCache[id];
+    if (!page) return;
+
+    // Collect unique issues for subtitle
+    const issues = Array.from(new Set(rows.map(r => r["QA Issues.lookupValue"]).filter(Boolean)));
+    let subtitleHtml = '';
+    if (issues.length === 1) {
+      subtitleHtml = escapeHtml(issues[0]);
+    } else if (issues.length > 1) {
+      const first = escapeHtml(issues[0]);
+      const restCount = issues.length - 1;
+      const full = escapeHtml(issues.join(' | '));
+      subtitleHtml = `${first} <small class="text-muted" title="${full}">(+${restCount} more)</small>`;
+    }
+
     const col = document.createElement('div');
-    // 4 per row on lg, 3 per row on md, 2 per row on sm, 1 per row on xs
     col.className = 'col-12 col-sm-6 col-md-4 col-lg-3';
 
     const card = document.createElement('div');
-    card.className = 'card h-100 qa-issue-card';
-    // Collect unique non-empty 'Why This Is Important' values for this QA key
-    const matchingRows = qaRows.filter(r => r["QA Issues.lookupValue"] === k);
-    const reasons = Array.from(new Set(matchingRows.map(r => (r["QA Issues:Why This Is Important"] || '').toString().trim()).filter(Boolean)));
-    let subtitleHtml = '';
-    if (reasons.length === 1) {
-      subtitleHtml = escapeHtml(reasons[0]);
-    } else if (reasons.length > 1) {
-      const first = escapeHtml(reasons[0]);
-      const restCount = reasons.length - 1;
-      const full = escapeHtml(reasons.join(' | ')); // safer for title attribute
-      // show first reason and a small hint for more; full list available in title tooltip
-      subtitleHtml = `${first} <small class="text-muted" title="${full}">(+${restCount} more)</small>`;
-    }
+    card.className = 'card h-100 qa-page-card';
 
     card.innerHTML = `
       <div class="card-body d-flex flex-column">
         <div class="d-flex justify-content-between align-items-start mb-2">
           <div>
-            <h6 class="card-title mb-1">${escapeHtml(k)}</h6>
+            <h6 class="card-title mb-1">${escapeHtml(page.Title || "Untitled Page")}</h6>
             <p class="card-subtitle text-muted small mb-0">${subtitleHtml}</p>
           </div>
-          <span class="badge bg-warning qa-badge">${count}</span>
+          <span class="badge bg-warning qa-badge">${rows.length}</span>
         </div>
         <div class="mt-auto pt-2">
-          <button class="btn btn-sm btn-outline-primary" onclick="showQaIssuesModal('${k.replace(/'/g,"\\'")}')">View Pages</button>
+          <button class="btn btn-sm btn-outline-primary" onclick="showQaIssuesModal('${id}')">View Issues</button>
         </div>
       </div>
     `;
@@ -535,6 +537,84 @@ function renderQaAccordion(data){
   });
 
   container.appendChild(rowDiv);
+}
+
+
+// --- QA Modal (title = Page Title, accordion for issues) ---
+function showQaIssuesModal(pageId) {
+  const rows = qaGroupedCache[pageId] || [];
+  const modalBody = document.getElementById("qaIssuesModalBody");
+  const modalEl = document.getElementById("qaIssuesModal");
+  if (!modalBody) return console.warn('qaIssuesModalBody missing');
+
+  if (rows.length === 0) {
+    modalBody.innerHTML = "<p>No QA Issues for this page.</p>";
+    return;
+  }
+
+  const page = pageCache[pageId];
+  let html = `
+  <h4 class="mb-3">${escapeHtml(page.Title || "Untitled Page")}</h4>
+  <div class="table-responsive">
+    <table class="table table-sm table-bordered align-middle">
+      <thead class="table-light">
+        <tr>
+          <th>Title</th>
+          <th class="text-center">Edit</th>
+          <th class="text-center">SD</th>
+          <th class="text-center">ZD</th>
+          <th>Status</th>
+          <th>Priority</th>
+          <th>QA Notes</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>${page.Title}</td>
+          <td class="text-center">-</td>
+          <td class="text-center">${page["Page URL"] ? `<a href="${page["Page URL"]}" target="_blank">🔗</a>` : ""}</td>
+          <td class="text-center">${page["Zesty URL Path Part"] ? `<a href="https://8hxvw8tw-dev.webengine.zesty.io${page["Zesty URL Path Part"]}?zpw=tsasecret123&redirect=false&_bypassError=true" target="_blank">🟢</a>` : ""}</td>
+          <td>${page.Status || "N/A"}</td>
+          <td>${page.Priority || "N/A"}</td>
+          <td>${page["QA Notes"] || ""}</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  `;
+
+  // Accordion for issues
+  html += `<div class="accordion mt-4" id="qaIssueAccordion_${pageId}">`;
+  rows.forEach((r, idx) => {
+    const issueId = `${pageId}_issue_${idx}`;
+    const lookup = r["QA Issues.lookupValue"] || "Unnamed Issue";
+    const why = r["QA Issues:Why This Is Important"]?.trim();
+    const how = r["QA Issues:How to Fix"]?.trim();
+    const howDetails = r["QA Issues:How to Fix Details"]?.trim();
+
+    html += `
+      <div class="accordion-item">
+        <h2 class="accordion-header" id="heading_${issueId}">
+          <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse_${issueId}">
+            ${escapeHtml(lookup)}
+          </button>
+        </h2>
+        <div id="collapse_${issueId}" class="accordion-collapse collapse" data-bs-parent="#qaIssueAccordion_${pageId}">
+          <div class="accordion-body">
+            ${why ? `<h6>Why This Is Important</h6><p>${escapeHtml(why)}</p>` : ""}
+            ${how ? `<h6>How to Fix</h6><p>${escapeHtml(how)}</p>` : ""}
+            ${howDetails ? `<h6>How to Fix Details</h6><p>${escapeHtml(howDetails)}</p>` : ""}
+          </div>
+        </div>
+      </div>
+    `;
+  });
+  html += `</div>`;
+
+  modalBody.innerHTML = html;
+  if (modalEl) {
+    try { new bootstrap.Modal(modalEl).show(); } catch(e) {}
+  }
 }
 
 
@@ -1128,181 +1208,6 @@ function showTableModal(page){
     try { new bootstrap.Modal(modalEl).show(); } catch(e) { console.warn('bootstrap.Modal not available or failed to show table detail modal', e); }
   }
 }
-
-
-// --- QA Modal: now a responsive table with SD/ZD icons and clickable title ---
-// --- FIXED: QA Modal shows only details tied to the groupKey ---
-function showQaIssuesModal(groupKey) {
-  const ids = qaGroupedCache[groupKey] || [];
-  const modalBody = document.getElementById("qaIssuesModalBody");
-  const modalEl = document.getElementById("qaIssuesModal");
-  if (!modalBody) return console.warn('qaIssuesModalBody missing');
-
-  if (ids.length === 0) {
-    modalBody.innerHTML = "<p>No pages in this group.</p>";
-    return;
-  }
-
-  let html = `
-  <div class="mb-2"><strong>Issue: </strong><p style="font-size: 1rem;">${groupKey}</p></div>
-  <div class="table-responsive">
-    <table class="table table-sm table-bordered align-middle">
-      <thead class="table-light">
-        <tr>
-          <th>Title</th>
-          <th class="text-center">Edit</th>
-          <th class="text-center">SD</th>
-          <th class="text-center">ZD</th>
-          <th>Status</th>
-          <th>Priority</th>
-          <th>QA Notes</th>
-        </tr>
-      </thead>
-      <tbody>
-  `;
-
-  // Track details just for this groupKey
-  let whyImportant = null;
-  let howToFix = null;
-  let howToFixDetails = null;
-
-  ids.forEach(id => {
-    const p = pageCache[id];
-    const sdLink = p["Page URL"] ? `<a href="${p["Page URL"]}" target="_blank">🔗</a>` : "";
-    const zdLink = p["Zesty URL Path Part"]
-      ? `<a href="https://8hxvw8tw-dev.webengine.zesty.io${p["Zesty URL Path Part"]}?zpw=tsasecret123&redirect=false&_bypassError=true"
-           target="_blank">🟢</a>` : "";
-
-    const type = (p["Symphony Site Type"] || "").trim();
-    let formLink = "-";
-    if(type==="Metro Area") formLink = `<a href="...MetroArea...${p.ID}" target="_blank">Form</a>`;
-    else if(type==="Corps") formLink = `<a href="...Corps...${p.ID}" target="_blank">Form</a>`;
-
-    html += `
-      <tr>
-        <td>${p.Title}</td>  
-        <td class="text-center">${formLink}</td>
-        <td class="text-center">${sdLink}</td>
-        <td class="text-center">${zdLink}</td>
-        <td>${p.Status || "N/A"}</td>
-        <td>${p.Priority || "N/A"}</td>
-        <td>${p["QA Notes"] || ""}</td>
-      </tr>
-    `;
-
-    // ✅ Capture the fields (first non-empty value wins)
-    if (!whyImportant && p["QA Issues:Why This Is Important"]) {
-      whyImportant = p["QA Issues:Why This Is Important"].trim();
-    }
-    if (!howToFix && p["QA Issues:How to Fix"]) {
-      howToFix = p["QA Issues:How to Fix"].trim();
-    }
-    if (!howToFixDetails && p["QA Issues:How to Fix Details"]) {
-      howToFixDetails = p["QA Issues:How to Fix Details"].trim();
-    }
-  });
-
-  html += "</tbody></table></div>";
-
-  if (whyImportant) {
-    html += `<div class="mt-3"><h5>Why Fixing This Is Important</h5><p>${whyImportant}</p></div>`;
-  }
-  if (howToFix) {
-    html += `<div class="mt-3"><h5>How to Fix This Issue</h5><p>${howToFix}</p></div>`;
-  }
-  if (howToFixDetails) {
-    html += `<div class="mt-3"><h6>How to Fix Details</h6><p>${howToFixDetails}</p></div>`;
-  }
-
-  modalBody.innerHTML = html;
-  if (modalEl) {
-    try { new bootstrap.Modal(modalEl).show(); } catch(e) {}
-  }
-}
-
-
-
-// Delegated handler for QA title links (works when rows are added dynamically)
-document.addEventListener('click', function (e) {
-  const link = e.target.closest && e.target.closest('.qaTitleLink');
-  if (!link) return;
-  e.preventDefault();
-  const rowId = link.dataset && (link.dataset.id || link.dataset.rowid);
-  if (!rowId) return console.warn('qaTitleLink clicked but no data-id found');
-
-  // Prefer pageCache lookup (we populate _id on fetch)
-  const page = pageCache[rowId];
-  if (page) return showTableModal(page);
-
-  // fallback: if there is a table and Tabulator row, try to find by ID
-  if (table && typeof table.getData === 'function') {
-    const found = table.getData().find(r => String(r._id) === String(rowId) || String(r.ID) === String(rowId));
-    if (found) return showTableModal(found);
-  }
-
-  console.warn('No page found for qaTitleLink id', rowId);
-});
-
-
-// Function to show all QA issues in the modal
-function showAllQaIssues() {
-    const tbody = document.querySelector("#allQaTable tbody");
-    tbody.innerHTML = "";
-
-    // ✅ Get currently filtered data first
-    const filteredData = getFilteredData();
-
-    // Filter QA issues within the filtered dataset
-    const allQaIssuesFiltered = filteredData.filter(p => p["QA Issues.lookupValue"]);
-
-    // Build table rows
-    allQaIssuesFiltered.forEach(p => {
-        const tr = document.createElement("tr");
-        const type = (p["Symphony Site Type"] || "").trim();
-        const formLink = type === "Metro Area"
-            ? `https://sauss.sharepoint.com/sites/USSWEBADM/Lists/MetroAreaSitesInfoPagesSymphony/DispForm.aspx?ID=${p.ID}&e=mY8mhG`
-            : type === "Corps"
-                ? `https://sauss.sharepoint.com/sites/USSWEBADM/Lists/CorpsSitesPageMigrationReport/DispForm.aspx?ID=${p.ID}&e=dF11LG`
-                : "#";
-
-        const sdLink = p["Page URL"] || "#";
-        const zdLink = p["Zesty URL Path Part"]
-            ? `https://8hxvw8tw-dev.webengine.zesty.io${p["Zesty URL Path Part"]}?zpw=tsasecret123&redirect=false&_bypassError=true`
-            : "#";
-
-        tr.innerHTML = `
-            <td>${p.Title}</td>
-            <td><a href="${formLink}" target="_blank">Form</a></td>
-            <td class="text-center"><a href="${sdLink}" target="_blank">Live</a></td>
-            <td class="text-center"><a href="${zdLink}" target="_blank">Zesty</a></td>
-            <td>${p.Status || ""}</td>
-            <td>${p.Priority || ""}</td>
-            <td>${p["QA Notes"] || ""}</td>
-            <td>${p["QA Issues.lookupValue"]}</td>
-            <td>${p["QA Issues:Why This Is Important"]}</td>
-            <td>${p["QA Issues:How to Fix"]}</td>
-            <td class="qa-fix-details">${p["QA Issues:How to Fix Details"]}</td>
-        `;
-        tbody.appendChild(tr);
-    });
-
-    // Show modal
-    const modalEl = document.getElementById('allQaModal');
-    new bootstrap.Modal(modalEl).show();
-}
-
-
-// Attach handler
-const viewAllQaBtn = document.getElementById("viewAllQaBtn");
-if (viewAllQaBtn) viewAllQaBtn.addEventListener("click", showAllQaIssues);
-
-
-
-
-
-
-
-
 
 // helper: count occurrences by key
 function countBy(arr, key){
