@@ -465,7 +465,7 @@ function updateACDropdown(filteredData) {
   }).join("");
 }
 
-  // --- QA Accordion rendering (pages first, issues as subtitle) ---
+  // --- QA Accordion rendering (unique cards per page) ---
 function renderQaAccordion(data){
   const container = document.getElementById("qaGroupsBody");
   if (!container) return;
@@ -473,7 +473,7 @@ function renderQaAccordion(data){
 
   const qaRows = Array.isArray(data) ? data.filter(d => d["QA Issues.lookupValue"]) : [];
 
-  // Update badge with total count
+  // Update badge with total count (all issues across all pages)
   const badge = document.getElementById("qaBadge");
   if (badge) badge.textContent = qaRows.length;
 
@@ -482,7 +482,7 @@ function renderQaAccordion(data){
     return;
   }
 
-  // Group rows by page ID
+  // Group issues by Page ID (avoid duplicate cards)
   qaGroupedCache = {};
   qaRows.forEach(d => {
     const pageId = d._id;
@@ -519,15 +519,13 @@ function renderQaAccordion(data){
 
     card.innerHTML = `
       <div class="card-body d-flex flex-column">
-        <div class="d-flex justify-content-between align-items-start mb-2">
-          <div>
-            <h6 class="card-title mb-1">${escapeHtml(page.Title || "Untitled Page")}</h6>
-            <p class="card-subtitle text-muted small mb-0">${subtitleHtml}</p>
-          </div>
-          <span class="badge bg-warning qa-badge">${rows.length}</span>
+        <div>
+          <h6 class="card-title mb-1">${escapeHtml(page["Site Title"] || page.Title || "Untitled Page")}</h6>
+          <p class="card-subtitle text-muted small mb-2">${subtitleHtml}</p>
         </div>
-        <div class="mt-auto pt-2">
+        <div class="mt-auto pt-1"><!-- reduced margin -->
           <button class="btn btn-sm btn-outline-primary" onclick="showQaIssuesModal('${id}')">View Issues</button>
+          <span class="badge bg-warning qa-badge ms-2">${rows.length}</span>
         </div>
       </div>
     `;
@@ -540,7 +538,7 @@ function renderQaAccordion(data){
 }
 
 
-// --- QA Modal (title = Page Title, accordion for issues) ---
+// --- QA Modal (title = Site Title, multiple issue accordions) ---
 function showQaIssuesModal(pageId) {
   const rows = qaGroupedCache[pageId] || [];
   const modalBody = document.getElementById("qaIssuesModalBody");
@@ -554,7 +552,7 @@ function showQaIssuesModal(pageId) {
 
   const page = pageCache[pageId];
   let html = `
-  <h4 class="mb-3">${escapeHtml(page.Title || "Untitled Page")}</h4>
+  <h4 class="mb-3">${escapeHtml(page["Site Title"] || page.Title || "Untitled Page")}</h4>
   <div class="table-responsive">
     <table class="table table-sm table-bordered align-middle">
       <thead class="table-light">
@@ -583,14 +581,22 @@ function showQaIssuesModal(pageId) {
   </div>
   `;
 
-  // Accordion for issues
+  // Accordion for each QA issue
   html += `<div class="accordion mt-4" id="qaIssueAccordion_${pageId}">`;
   rows.forEach((r, idx) => {
     const issueId = `${pageId}_issue_${idx}`;
     const lookup = r["QA Issues.lookupValue"] || "Unnamed Issue";
-    const why = r["QA Issues:Why This Is Important"]?.trim();
-    const how = r["QA Issues:How to Fix"]?.trim();
-    const howDetails = r["QA Issues:How to Fix Details"]?.trim();
+
+    // helper: split on ; and take last non-empty
+    const getLast = (val) => {
+      if (!val) return "";
+      const parts = val.split(";").map(s => s.trim()).filter(Boolean);
+      return parts.length ? parts[parts.length - 1] : "";
+    };
+
+    const why = getLast(r["QA Issues:Why This Is Important"]);
+    const how = getLast(r["QA Issues:How to Fix"]);
+    const howDetails = getLast(r["QA Issues:How to Fix Details"]);
 
     html += `
       <div class="accordion-item">
@@ -616,6 +622,8 @@ function showQaIssuesModal(pageId) {
     try { new bootstrap.Modal(modalEl).show(); } catch(e) {}
   }
 }
+
+
 
 
 
