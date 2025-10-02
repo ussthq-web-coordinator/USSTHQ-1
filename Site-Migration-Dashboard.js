@@ -10,8 +10,8 @@ const _migrationSampleData = [
   { "Site Title": "Texas", "Migration Date": "", "View Website URL": "", "Division": "Texas" },
   { "Site Title": "Florida", "Migration Date": "", "View Website URL": "", "Division": "Florida" },
   { "Site Title": "Georgia", "Migration Date": "", "View Website URL": "", "Division": "Georgia" },
-  { "Site Title": "Area Command Site Pages", "Migration Date": "", "View Website URL": "", "Division": "Review the migration report to determine pages planned to migrate and understand the level of effort needed." },
-  { "Site Title": "Location Site Pages", "Migration Date": "", "View Website URL": "", "Division": "Review the migration report to determine pages planned to migrate and understand the level of effort needed." }
+  { "Site Title": "Area Command Site Pages", "Migration Date": "", "View Website URL": "", "Division": "There is no expectation that sites migrate during the giving season, but we would still like site admins to review the migration report to determine pages planned to migrate and understand the level of effort needed." },
+  { "Site Title": "Location Site Pages", "Migration Date": "", "View Website URL": "", "Division": "There is no expectation that sites migrate during the giving season, but we would still like site admins to review the migration report to determine pages planned to migrate and understand the level of effort needed." }
 ];
 
 
