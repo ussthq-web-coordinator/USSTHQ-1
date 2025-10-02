@@ -482,21 +482,21 @@ function renderQaAccordion(data){
     return;
   }
 
-  // Group issues by Page ID (avoid duplicate cards)
+  // Group issues by Page Title (to ensure one card per unique page)
   qaGroupedCache = {};
   qaRows.forEach(d => {
-    const pageId = d._id;
-    qaGroupedCache[pageId] = qaGroupedCache[pageId] || [];
-    qaGroupedCache[pageId].push(d);
+    const pageTitle = d.Title || "Untitled Page";
+    qaGroupedCache[pageTitle] = qaGroupedCache[pageTitle] || [];
+    qaGroupedCache[pageTitle].push(d);
   });
 
-  const pageIds = Object.keys(qaGroupedCache);
+  const pageTitles = Object.keys(qaGroupedCache).sort();
   const rowDiv = document.createElement('div');
   rowDiv.className = 'row g-3';
 
-  pageIds.forEach(id => {
-    const rows = qaGroupedCache[id];
-    const page = pageCache[id];
+  pageTitles.forEach(title => {
+    const rows = qaGroupedCache[title];
+    const page = pageCache[rows[0]._id]; // take the first row to reference page data
     if (!page) return;
 
     // Collect unique issues for subtitle
@@ -520,12 +520,12 @@ function renderQaAccordion(data){
     card.innerHTML = `
       <div class="card-body d-flex flex-column">
         <div>
-          <h6 class="card-title mb-1">${escapeHtml(page["Site Title"] || page.Title || "Untitled Page")}</h6>
-          <p class="card-subtitle text-muted small mb-2">${subtitleHtml}</p>
+          <h6 class="card-title mb-1">${escapeHtml(title)}</h6>
+          <p class="card-subtitle text-muted small mb-1">${subtitleHtml}</p>
         </div>
-        <div class="mt-auto pt-1"><!-- reduced margin -->
-          <button class="btn btn-sm btn-outline-primary" onclick="showQaIssuesModal('${id}')">View Issues</button>
-          <span class="badge bg-warning qa-badge ms-2">${rows.length}</span>
+        <div class="mt-auto pt-1">
+          <button class="btn btn-sm btn-outline-primary" onclick="showQaIssuesModal('${encodeURIComponent(title)}')">View Issues</button>
+          <span class="badge bg-warning qa-badge ms-2">${issues.length}</span>
         </div>
       </div>
     `;
@@ -538,9 +538,10 @@ function renderQaAccordion(data){
 }
 
 
-// --- QA Modal (title = Site Title, multiple issue accordions) ---
-function showQaIssuesModal(pageId) {
-  const rows = qaGroupedCache[pageId] || [];
+// --- QA Modal (multiple accordions if multiple issues per page) ---
+function showQaIssuesModal(pageTitleEncoded) {
+  const pageTitle = decodeURIComponent(pageTitleEncoded);
+  const rows = qaGroupedCache[pageTitle] || [];
   const modalBody = document.getElementById("qaIssuesModalBody");
   const modalEl = document.getElementById("qaIssuesModal");
   if (!modalBody) return console.warn('qaIssuesModalBody missing');
@@ -550,7 +551,7 @@ function showQaIssuesModal(pageId) {
     return;
   }
 
-  const page = pageCache[pageId];
+  const page = pageCache[rows[0]._id];
   let html = `
   <h4 class="mb-3">${escapeHtml(page["Site Title"] || page.Title || "Untitled Page")}</h4>
   <div class="table-responsive">
@@ -581,10 +582,10 @@ function showQaIssuesModal(pageId) {
   </div>
   `;
 
-  // Accordion for each QA issue
-  html += `<div class="accordion mt-4" id="qaIssueAccordion_${pageId}">`;
+  // Accordion: one per QA Issue
+  html += `<div class="accordion mt-4" id="qaIssueAccordion_${encodeURIComponent(pageTitle)}">`;
   rows.forEach((r, idx) => {
-    const issueId = `${pageId}_issue_${idx}`;
+    const issueId = `${encodeURIComponent(pageTitle)}_issue_${idx}`;
     const lookup = r["QA Issues.lookupValue"] || "Unnamed Issue";
 
     // helper: split on ; and take last non-empty
@@ -605,7 +606,7 @@ function showQaIssuesModal(pageId) {
             ${escapeHtml(lookup)}
           </button>
         </h2>
-        <div id="collapse_${issueId}" class="accordion-collapse collapse" data-bs-parent="#qaIssueAccordion_${pageId}">
+        <div id="collapse_${issueId}" class="accordion-collapse collapse" data-bs-parent="#qaIssueAccordion_${encodeURIComponent(pageTitle)}">
           <div class="accordion-body">
             ${why ? `<h6>Why This Is Important</h6><p>${escapeHtml(why)}</p>` : ""}
             ${how ? `<h6>How to Fix</h6><p>${escapeHtml(how)}</p>` : ""}
@@ -622,6 +623,7 @@ function showQaIssuesModal(pageId) {
     try { new bootstrap.Modal(modalEl).show(); } catch(e) {}
   }
 }
+
 
 
 
