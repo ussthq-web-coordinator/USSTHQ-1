@@ -9,7 +9,9 @@ const _migrationSampleData = [
   { "Site Title": "Alabama, Louisiana, and Mississippi", "Migration Date": "", "View Website URL": "", "Division": "Alabama, Louisiana, and Mississippi" },
   { "Site Title": "Texas", "Migration Date": "", "View Website URL": "", "Division": "Texas" },
   { "Site Title": "Florida", "Migration Date": "", "View Website URL": "", "Division": "Florida" },
-  { "Site Title": "Georgia", "Migration Date": "", "View Website URL": "", "Division": "Georgia" }
+  { "Site Title": "Georgia", "Migration Date": "", "View Website URL": "", "Division": "Georgia" },
+  { "Site Title": "Area Command Site Pages", "Migration Date": "", "View Website URL": "", "Division": "Review the migration report to determine pages planned to migrate and understand the level of effort needed." },
+  { "Site Title": "Location Site Pages", "Migration Date": "", "View Website URL": "", "Division": "Review the migration report to determine pages planned to migrate and understand the level of effort needed." }
 ];
 
 
@@ -1129,14 +1131,12 @@ function showTableModal(page){
 
 
 // --- QA Modal: now a responsive table with SD/ZD icons and clickable title ---
-function showQaIssuesModal(groupKey){
+// --- FIXED: QA Modal shows only details tied to the groupKey ---
+function showQaIssuesModal(groupKey) {
   const ids = qaGroupedCache[groupKey] || [];
   const modalBody = document.getElementById("qaIssuesModalBody");
   const modalEl = document.getElementById("qaIssuesModal");
-  if (!modalBody) {
-    console.warn('qaIssuesModalBody missing');
-    return;
-  }
+  if (!modalBody) return console.warn('qaIssuesModalBody missing');
 
   if (ids.length === 0) {
     modalBody.innerHTML = "<p>No pages in this group.</p>";
@@ -1145,39 +1145,38 @@ function showQaIssuesModal(groupKey){
 
   let html = `
   <div class="mb-2"><strong>Issue: </strong><p style="font-size: 1rem;">${groupKey}</p></div>
-    <div class="table-responsive">
-      <table class="table table-sm table-bordered align-middle">
-        <thead class="table-light">
-          <tr>
-            <th>Title</th>
-            <th class="text-center">Edit</th>
-            <th class="text-center">SD</th>
-            <th class="text-center">ZD</th>
-            <th>Status</th>
-            <th>Priority</th>
-            <th>QA Notes</th>
-          </tr>
-        </thead>
-        <tbody>
+  <div class="table-responsive">
+    <table class="table table-sm table-bordered align-middle">
+      <thead class="table-light">
+        <tr>
+          <th>Title</th>
+          <th class="text-center">Edit</th>
+          <th class="text-center">SD</th>
+          <th class="text-center">ZD</th>
+          <th>Status</th>
+          <th>Priority</th>
+          <th>QA Notes</th>
+        </tr>
+      </thead>
+      <tbody>
   `;
 
-  // ✅ collect ALL unique values across this group
-  const whyImportantList = new Set();
-  const howToFixList = new Set();
-  const howToFixDetailsList = new Set();
+  // Track details just for this groupKey
+  let whyImportant = null;
+  let howToFix = null;
+  let howToFixDetails = null;
 
   ids.forEach(id => {
     const p = pageCache[id];
-    const sdLink = p["Page URL"]
-      ? `<a href="${p["Page URL"]}" target="_blank" title="Site Link">🔗</a>` : "";
+    const sdLink = p["Page URL"] ? `<a href="${p["Page URL"]}" target="_blank">🔗</a>` : "";
     const zdLink = p["Zesty URL Path Part"]
       ? `<a href="https://8hxvw8tw-dev.webengine.zesty.io${p["Zesty URL Path Part"]}?zpw=tsasecret123&redirect=false&_bypassError=true"
-           target="_blank" title="Zesty Preview">🟢</a>` : "";
+           target="_blank">🟢</a>` : "";
 
     const type = (p["Symphony Site Type"] || "").trim();
     let formLink = "-";
-    if(type==="Metro Area") formLink = `<a href="https://sauss.sharepoint.com/sites/USSWEBADM/Lists/MetroAreaSitesInfoPagesSymphony/DispForm.aspx?ID=${p.ID}&e=mY8mhG" target="_blank">Form</a>`;
-    else if(type==="Corps") formLink = `<a href="https://sauss.sharepoint.com/sites/USSWEBADM/Lists/CorpsSitesPageMigrationReport/DispForm.aspx?ID=${p.ID}&e=dF11LG" target="_blank">Form</a>`;
+    if(type==="Metro Area") formLink = `<a href="...MetroArea...${p.ID}" target="_blank">Form</a>`;
+    else if(type==="Corps") formLink = `<a href="...Corps...${p.ID}" target="_blank">Form</a>`;
 
     html += `
       <tr>
@@ -1191,41 +1190,36 @@ function showQaIssuesModal(groupKey){
       </tr>
     `;
 
-    // ✅ add to sets
-    if (p["QA Issues:Why This Is Important"]) {
-      whyImportantList.add(p["QA Issues:Why This Is Important"].trim());
+    // ✅ Capture the fields (first non-empty value wins)
+    if (!whyImportant && p["QA Issues:Why This Is Important"]) {
+      whyImportant = p["QA Issues:Why This Is Important"].trim();
     }
-    if (p["QA Issues:How to Fix"]) {
-      howToFixList.add(p["QA Issues:How to Fix"].trim());
+    if (!howToFix && p["QA Issues:How to Fix"]) {
+      howToFix = p["QA Issues:How to Fix"].trim();
     }
-    if (p["QA Issues:How to Fix Details"]) {
-      howToFixDetailsList.add(p["QA Issues:How to Fix Details"].trim());
+    if (!howToFixDetails && p["QA Issues:How to Fix Details"]) {
+      howToFixDetails = p["QA Issues:How to Fix Details"].trim();
     }
   });
 
   html += "</tbody></table></div>";
 
-  // ✅ render distinct values
-  if (whyImportantList.size) {
-    html += `<div class="mt-3"><h5>Why Fixing This Is Important</h5>
-               <ul>${[...whyImportantList].map(v=>`<li>${v}</li>`).join('')}</ul></div>`;
+  if (whyImportant) {
+    html += `<div class="mt-3"><h5>Why Fixing This Is Important</h5><p>${whyImportant}</p></div>`;
   }
-  if (howToFixList.size) {
-    html += `<div class="mt-3"><h5>How to Fix This Issue</h5>
-               <ul>${[...howToFixList].map(v=>`<li>${v}</li>`).join('')}</ul></div>`;
+  if (howToFix) {
+    html += `<div class="mt-3"><h5>How to Fix This Issue</h5><p>${howToFix}</p></div>`;
   }
-  if (howToFixDetailsList.size) {
-    html += `<div class="mt-3"><h6>How to Fix Details</h6>
-               <ul>${[...howToFixDetailsList].map(v=>`<li>${v}</li>`).join('')}</ul></div>`;
+  if (howToFixDetails) {
+    html += `<div class="mt-3"><h6>How to Fix Details</h6><p>${howToFixDetails}</p></div>`;
   }
 
   modalBody.innerHTML = html;
   if (modalEl) {
-    try { new bootstrap.Modal(modalEl).show(); } catch(e) { console.warn('bootstrap.Modal not available or failed', e); }
-  } else {
-    console.warn('qaIssuesModal element missing');
+    try { new bootstrap.Modal(modalEl).show(); } catch(e) {}
   }
 }
+
 
 
 // Delegated handler for QA title links (works when rows are added dynamically)
