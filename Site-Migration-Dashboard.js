@@ -537,7 +537,7 @@ function renderQaAccordion(data){
   container.appendChild(rowDiv);
 }
 
-// --- QA Modal with Tabulator and accordion per issue ---
+// --- QA Modal with Tabulator and DOM-built accordion per issue ---
 function showQaIssuesModal(pageTitleEncoded) {
   const modalEl = document.getElementById("qaIssuesModal");
   const modalBody = document.getElementById("qaIssuesModalBody");
@@ -560,10 +560,10 @@ function showQaIssuesModal(pageTitleEncoded) {
     return;
   }
 
-  // Clear modal body
+  // Clear modal body and add page title
   modalBody.innerHTML = `<h4 class="mb-3">${escapeHtml(page["Site Title"] || page.Title || "Untitled Page")}</h4>`;
 
-  // Tabulator container
+  // --- Tabulator Table ---
   const tableContainer = document.createElement("div");
   modalBody.appendChild(tableContainer);
 
@@ -578,8 +578,7 @@ function showQaIssuesModal(pageTitleEncoded) {
     "Symphony Site Type": page["Symphony Site Type"] || ""
   }];
 
-  // Initialize Tabulator
-  const table = new Tabulator(tableContainer, {
+  new Tabulator(tableContainer, {
     data: tableData,
     layout: window.innerWidth < 600 ? "fitDataFill" : "fitColumns",
     reactiveData: true,
@@ -610,45 +609,69 @@ function showQaIssuesModal(pageTitleEncoded) {
     height: "100%"
   });
 
-  // Accordion per QA issue
-  const accordionId = `qaIssueAccordion_${Math.random().toString(36).substr(2,6)}`;
-  let accordionHtml = `<div class="accordion mt-4" id="${accordionId}">`;
-  rows.forEach((r, idx) => {
-    const issueId = `issue_${idx}`;
-    const lookup = r["QA Issues.lookupValue"] || "Unnamed Issue";
+  // --- Build array of QA issues ---
+  const qaIssues = [];
 
-    const getLast = (val) => val ? val.split(";").map(s=>s.trim()).filter(Boolean).pop() || "" : "";
+  rows.forEach(r => {
+    const lookups = (r["QA Issues.lookupValue"] || "").split(";").map(s => s.trim()).filter(Boolean);
+    const whys = (r["QA Issues:Why This Is Important"] || "").split(";").map(s => s.trim());
+    const hows = (r["QA Issues:How to Fix"] || "").split(";").map(s => s.trim());
+    const howDetailsArr = (r["QA Issues:How to Fix Details"] || "").split(";").map(s => s.trim());
 
-    const why = getLast(r["QA Issues:Why This Is Important"]);
-    const how = getLast(r["QA Issues:How to Fix"]);
-    const howDetails = getLast(r["QA Issues:How to Fix Details"]);
-
-    accordionHtml += `
-      <div class="accordion-item">
-        <h2 class="accordion-header" id="heading_${issueId}">
-          <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse_${issueId}">
-            ${escapeHtml(lookup)}
-          </button>
-        </h2>
-        <div id="collapse_${issueId}" class="accordion-collapse collapse" data-bs-parent="#${accordionId}">
-          <div class="accordion-body">
-            ${why ? `<h6>Why This Is Important</h6><p>${escapeHtml(why)}</p>` : ""}
-            ${how ? `<h6>How to Fix</h6><p>${escapeHtml(how)}</p>` : ""}
-            ${howDetails ? `<h6>How to Fix Details</h6><p>${escapeHtml(howDetails)}</p>` : ""}
-          </div>
-        </div>
-      </div>
-    `;
+    lookups.forEach((lookup, i) => {
+      qaIssues.push({
+        lookupValue: lookup,
+        why: whys[i] || "",
+        how: hows[i] || "",
+        howDetails: howDetailsArr[i] || ""
+      });
+    });
   });
-  accordionHtml += `</div>`;
-  modalBody.insertAdjacentHTML("beforeend", accordionHtml);
 
-  // Launch modal after DOM populated
+  // --- DOM-built accordion ---
+  const accordionDiv = document.createElement("div");
+  accordionDiv.className = "accordion mt-4";
+  const accordionId = `qaIssueAccordion_${page.ID}_${Math.random().toString(36).substr(2,6)}`;
+  accordionDiv.id = accordionId;
+
+ qaIssues.forEach((issue, idx) => {
+  const issueId = `issue_${page.ID}_${idx}`;
+
+  const itemDiv = document.createElement("div");
+  itemDiv.className = "accordion-item";
+
+  // Build accordion item without mutating `issue`
+  itemDiv.innerHTML = `
+    <h2 class="accordion-header" id="heading_${issueId}">
+      <button class="accordion-button ${idx === 0 ? "" : "collapsed"}" 
+              type="button" 
+              data-bs-toggle="collapse" 
+              data-bs-target="#collapse_${issueId}">
+        ${escapeHtml(issue.lookupValue)}
+      </button>
+    </h2>
+    <div id="collapse_${issueId}" 
+         class="accordion-collapse collapse ${idx === 0 ? "show" : ""}" 
+         data-bs-parent="#${accordionId}">
+      <div class="accordion-body">
+        ${issue.why ? `<h6>Why This Is Important</h6><p>${escapeHtml(issue.why)}</p>` : ""}
+        ${issue.how ? `<h6>How to Fix</h6><p>${escapeHtml(issue.how)}</p>` : ""}
+        ${issue.howDetails ? `<h6>How to Fix Details</h6><p>${escapeHtml(issue.howDetails)}</p>` : ""}
+      </div>
+    </div>
+  `;
+
+  accordionDiv.appendChild(itemDiv);
+});
+
+
+  modalBody.appendChild(accordionDiv);
+
+  // --- Show modal ---
   new bootstrap.Modal(modalEl).show();
 }
 
-
-// Small helper to escape HTML
+// --- HTML escape helper ---
 function escapeHtml(str){
   if (str === null || str === undefined) return '';
   return String(str)
@@ -658,6 +681,8 @@ function escapeHtml(str){
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
 }
+
+
 
 
 function renderCards(){
@@ -1022,7 +1047,8 @@ function renderBreakdown(data){
 
       const colorClass = prog < 40 ? 'bg-danger' : prog < 70 ? 'bg-warning' : 'bg-success';
       const progressHtml = `\n          <div class="progress mt-1">\n            <div class="progress-bar ${colorClass}" style="width:${prog}%">${prog}%</div>\n          </div>`;
-      sectionHtml += `
+
+      sectionHtml += `      
         <div class="mb-1 ${hiddenClass}" data-key="${encodeURIComponent(rawKey)}" style="display:${hiddenClass ? 'none' : 'block'}">
           <strong>${display}</strong> <small class="text-muted">(${total} pages${siteCount? ' across '+siteCount+' sites':''})</small>${progressHtml}
         </div>`;
@@ -1032,7 +1058,7 @@ function renderBreakdown(data){
     container.innerHTML += sectionHtml;
   });
 
-  // --- Toggle button logic with hidden group count ---
+  // --- Toggle button logic based on number of 0% progress bars ---
   const toggleBtn = document.getElementById('toggleHiddenGroups');
   let showHidden = false;
 
@@ -1040,13 +1066,17 @@ function renderBreakdown(data){
     if (!toggleBtn) return;
     const hiddenElems = container.querySelectorAll('.hidden-group');
     const count = hiddenElems.length;
-    if(count === 0){
+
+    // Show button only if more than 10 zero-percent bars
+    if(count === 0 || count <= 10){
       toggleBtn.style.display = 'none';
+      showHidden = true; // auto-show hidden bars if <=10 (optional)
+      hiddenElems.forEach(e => e.style.display = 'block');
     } else {
       toggleBtn.style.display = 'inline-block';
-      toggleBtn.innerText = showHidden 
-        ? `Hide 0% Groups (${count})` 
-        : `Show 0% Groups (${count})`;
+      hiddenElems.forEach(e => e.style.display = 'none'); // hide initially
+      showHidden = false;
+      toggleBtn.innerText = `Show 0% Groups (${count})`;
     }
   }
 
@@ -1055,12 +1085,15 @@ function renderBreakdown(data){
       showHidden = !showHidden;
       const hiddenElems = container.querySelectorAll('.hidden-group');
       hiddenElems.forEach(e => e.style.display = showHidden ? 'block' : 'none');
-      updateHiddenCount();
+      toggleBtn.innerText = showHidden 
+        ? `Hide 0% Groups (${hiddenElems.length})` 
+        : `Show 0% Groups (${hiddenElems.length})`;
     };
-    // Initialize count on page load
     updateHiddenCount();
   }
 }
+
+
 
 
 // Table rendering
