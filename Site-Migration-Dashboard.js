@@ -966,26 +966,19 @@ function renderBreakdown(data){
     const grouped = {};
 
     data.forEach(d=>{
-      // Read raw values and normalize (trim) to avoid false mismatches due to whitespace
       const rawLocal = (d['Local Web Admin Group.title'] || '').toString().trim();
       const rawAC = (d['Area Command Admin Group.title'] || '').toString().trim();
       const rawVal = (d[g.field] || '').toString().trim();
 
-      // For Area Command grouping: if AC is missing, try to derive from Local (some rows only populate Local)
       let key;
       if (g.field === 'Area Command Admin Group.title') {
         key = rawAC || rawLocal || 'Not Set';
       } else if (g.field === 'Local Web Admin Group.title') {
-        // For Location grouping:
-        // - Use Local when present.
-        // - If Local is empty but Area Command exists, treat the AC as the location (AC's own site).
-        // - Fallback to 'Not Set' when neither is present.
         key = rawLocal || rawAC || 'Not Set';
       } else {
         key = rawVal || 'Not Set';
       }
 
-      // Use a normalized key for grouping
       const k = key || 'Not Set';
       grouped[k] = grouped[k] || { total: 0, done: 0, donot: 0, siteTitles: new Set() };
       grouped[k].total++;
@@ -995,7 +988,6 @@ function renderBreakdown(data){
       if (siteTitle) grouped[k].siteTitles.add(siteTitle);
     });
 
-    // Prepare display list: show human-friendly labels for AC and Location
     let entries = Object.keys(grouped).map(rawKey => {
       let display = rawKey;
       if (g.field === 'Area Command Admin Group.title') display = formatAcDisplay(rawKey);
@@ -1004,7 +996,6 @@ function renderBreakdown(data){
       return { rawKey, display };
     }).sort((a,b)=> a.display.localeCompare(b.display, undefined, { sensitivity: 'base' }));
 
-    // For Area Command group, only keep entries that appear to be Area Commands
     if (g.field === 'Area Command Admin Group.title'){
       entries = entries.filter(e => {
         const rk = (e.rawKey || '').toString().toLowerCase();
@@ -1013,24 +1004,22 @@ function renderBreakdown(data){
       });
     }
 
-    // Build a section wrapper so we can control spacing after the last progress bar
     let sectionHtml = `<div class="breakdown-section"><h3 class="mt-3">${g.name}</h3>`;
     if (g.field === 'Local Web Admin Group.title'){
       const childKeys = Object.keys(grouped).filter(k=>k && k !== 'Not Set');
-      try { console.debug('renderBreakdown: child locations for current filters', childKeys.slice(0,50)); } catch(e){}
       if (!childKeys.length) {
-        sectionHtml += `<div class="mb-2 text-muted"><em>No child locations found for the current filters. (Either Local is empty or there are no distinct Local values for the current filters.)</em></div>`;
+        sectionHtml += `<div class="mb-2 text-muted"><em>No child locations found for the current filters.</em></div>`;
       }
     }
+
     entries.forEach(({ rawKey, display }) => {
       const grp = grouped[rawKey];
       const total = grp.total;
       const prog = total ? Math.round((grp.done + grp.donot) / total * 100) : 0;
       const siteCount = grp.siteTitles ? grp.siteTitles.size : 0;
-      // Hide zero-percent groups by default for all group types; toggle will reveal them.
       let hiddenClass = (prog === 0) ? 'hidden-group' : '';
-      // Only hide Area Command rows that are across exactly one site AND have 0% progress
       if (g.field === 'Area Command Admin Group.title' && siteCount === 1 && prog === 0) hiddenClass = 'hidden-group';
+
       const colorClass = prog < 40 ? 'bg-danger' : prog < 70 ? 'bg-warning' : 'bg-success';
       const progressHtml = `\n          <div class="progress mt-1">\n            <div class="progress-bar ${colorClass}" style="width:${prog}%">${prog}%</div>\n          </div>`;
       sectionHtml += `
@@ -1038,22 +1027,41 @@ function renderBreakdown(data){
           <strong>${display}</strong> <small class="text-muted">(${total} pages${siteCount? ' across '+siteCount+' sites':''})</small>${progressHtml}
         </div>`;
     });
+
     sectionHtml += `</div>`;
     container.innerHTML += sectionHtml;
   });
 
-  // Make toggle robust even when there are no hidden items
+  // --- Toggle button logic with hidden group count ---
   const toggleBtn = document.getElementById('toggleHiddenGroups');
   let showHidden = false;
+
+  function updateHiddenCount() {
+    if (!toggleBtn) return;
+    const hiddenElems = container.querySelectorAll('.hidden-group');
+    const count = hiddenElems.length;
+    if(count === 0){
+      toggleBtn.style.display = 'none';
+    } else {
+      toggleBtn.style.display = 'inline-block';
+      toggleBtn.innerText = showHidden 
+        ? `Hide 0% Groups (${count})` 
+        : `Show 0% Groups (${count})`;
+    }
+  }
+
   if (toggleBtn) {
     toggleBtn.onclick = () => {
       showHidden = !showHidden;
       const hiddenElems = container.querySelectorAll('.hidden-group');
       hiddenElems.forEach(e => e.style.display = showHidden ? 'block' : 'none');
-      toggleBtn.innerText = showHidden ? 'Hide 0% Groups' : 'Show 0% Groups';
+      updateHiddenCount();
     };
+    // Initialize count on page load
+    updateHiddenCount();
   }
 }
+
 
 // Table rendering
 function renderTable(){
