@@ -1046,7 +1046,10 @@ function renderBreakdown(data){
       if (g.field === 'Area Command Admin Group.title' && siteCount === 1 && prog === 0) hiddenClass = 'hidden-group';
 
       const colorClass = prog < 40 ? 'bg-danger' : prog < 70 ? 'bg-warning' : 'bg-success';
-      const progressHtml = `\n          <div class="progress mt-1">\n            <div class="progress-bar ${colorClass}" style="width:${prog}%">${prog}%</div>\n          </div>`;
+      const progressHtml = `
+          <div class="progress mt-1">
+            <div class="progress-bar ${colorClass}" style="width:${prog}%">${prog}%</div>
+          </div>`;
 
       sectionHtml += `      
         <div class="mb-1 ${hiddenClass}" data-key="${encodeURIComponent(rawKey)}" style="display:${hiddenClass ? 'none' : 'block'}">
@@ -1067,14 +1070,13 @@ function renderBreakdown(data){
     const hiddenElems = container.querySelectorAll('.hidden-group');
     const count = hiddenElems.length;
 
-    // Show button only if more than 10 zero-percent bars
     if(count === 0 || count <= 10){
       toggleBtn.style.display = 'none';
-      showHidden = true; // auto-show hidden bars if <=10 (optional)
+      showHidden = true;
       hiddenElems.forEach(e => e.style.display = 'block');
     } else {
       toggleBtn.style.display = 'inline-block';
-      hiddenElems.forEach(e => e.style.display = 'none'); // hide initially
+      hiddenElems.forEach(e => e.style.display = 'none');
       showHidden = false;
       toggleBtn.innerText = `Show 0% Groups (${count})`;
     }
@@ -1091,7 +1093,19 @@ function renderBreakdown(data){
     };
     updateHiddenCount();
   }
+
+  // --- Badge Update (always count all progress bars) ---
+  function updateBadge(){
+    const badge = document.getElementById("breakdownBadge");
+    if (!badge) return;
+    const allBars = container.querySelectorAll(".progress-bar");
+    badge.textContent = allBars.length;
+  }
+
+  // Update badge every render
+  updateBadge();
 }
+
 
 
 
