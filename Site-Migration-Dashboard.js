@@ -977,7 +977,7 @@ try{ addChartLegendModal(statusChart, 'Status'); }catch(e){}
 
 function renderBreakdown(data){
   const container = document.getElementById("progressBreakdownBody");
-  container.innerHTML="<button id='toggleHiddenGroups' class='btn btn-sm btn-secondary mb-2'>Show 0% Groups</button>";
+  container.innerHTML = "<button id='toggleHiddenGroups' class='btn btn-sm btn-secondary mb-2'>Show 0% Groups</button>";
 
   const groups = [
     {name:"Division", field:"Division"},
@@ -990,19 +990,16 @@ function renderBreakdown(data){
   groups.forEach(g=>{
     const grouped = {};
 
+    // --- Build grouped data ---
     data.forEach(d=>{
       const rawLocal = (d['Local Web Admin Group.title'] || '').toString().trim();
       const rawAC = (d['Area Command Admin Group.title'] || '').toString().trim();
       const rawVal = (d[g.field] || '').toString().trim();
 
       let key;
-      if (g.field === 'Area Command Admin Group.title') {
-        key = rawAC || rawLocal || 'Not Set';
-      } else if (g.field === 'Local Web Admin Group.title') {
-        key = rawLocal || rawAC || 'Not Set';
-      } else {
-        key = rawVal || 'Not Set';
-      }
+      if (g.field === 'Area Command Admin Group.title') key = rawAC || rawLocal || 'Not Set';
+      else if (g.field === 'Local Web Admin Group.title') key = rawLocal || rawAC || 'Not Set';
+      else key = rawVal || 'Not Set';
 
       const k = key || 'Not Set';
       grouped[k] = grouped[k] || { total: 0, done: 0, donot: 0, siteTitles: new Set() };
@@ -1013,6 +1010,7 @@ function renderBreakdown(data){
       if (siteTitle) grouped[k].siteTitles.add(siteTitle);
     });
 
+    // --- Build entries array ---
     let entries = Object.keys(grouped).map(rawKey => {
       let display = rawKey;
       if (g.field === 'Area Command Admin Group.title') display = formatAcDisplay(rawKey);
@@ -1021,6 +1019,7 @@ function renderBreakdown(data){
       return { rawKey, display };
     }).sort((a,b)=> a.display.localeCompare(b.display, undefined, { sensitivity: 'base' }));
 
+    // --- Filter Area Command entries ---
     if (g.field === 'Area Command Admin Group.title'){
       entries = entries.filter(e => {
         const rk = (e.rawKey || '').toString().toLowerCase();
@@ -1029,7 +1028,18 @@ function renderBreakdown(data){
       });
     }
 
-    let sectionHtml = `<div class="breakdown-section"><h3 class="mt-3">${g.name}</h3>`;
+    // --- Count entries for heading badge ---
+    const groupCount = entries.length;
+
+    // --- Start section HTML with badge ---
+    let sectionHtml = `
+      <div class="breakdown-section">
+        <h3 class="mt-3 d-flex align-items-center gap-2">
+          ${g.name} <span class="badge bg-dark text-light">${groupCount}</span>
+        </h3>
+    `;
+
+    // --- Show notice if no child locations (only for Local Web Admin Group) ---
     if (g.field === 'Local Web Admin Group.title'){
       const childKeys = Object.keys(grouped).filter(k=>k && k !== 'Not Set');
       if (!childKeys.length) {
@@ -1037,31 +1047,34 @@ function renderBreakdown(data){
       }
     }
 
+    // --- Render each entry ---
     entries.forEach(({ rawKey, display }) => {
       const grp = grouped[rawKey];
       const total = grp.total;
       const prog = total ? Math.round((grp.done + grp.donot) / total * 100) : 0;
       const siteCount = grp.siteTitles ? grp.siteTitles.size : 0;
+
+      // Determine hidden class for 0% bars
       let hiddenClass = (prog === 0) ? 'hidden-group' : '';
       if (g.field === 'Area Command Admin Group.title' && siteCount === 1 && prog === 0) hiddenClass = 'hidden-group';
 
       const colorClass = prog < 40 ? 'bg-danger' : prog < 70 ? 'bg-warning' : 'bg-success';
       const progressHtml = `
-          <div class="progress mt-1">
-            <div class="progress-bar ${colorClass}" style="width:${prog}%">${prog}%</div>
-          </div>`;
+        <div class="progress mt-1">
+          <div class="progress-bar ${colorClass}" style="width:${prog}%">${prog}%</div>
+        </div>`;
 
       sectionHtml += `      
         <div class="mb-1 ${hiddenClass}" data-key="${encodeURIComponent(rawKey)}" style="display:${hiddenClass ? 'none' : 'block'}">
-          <strong>${display}</strong> <small class="text-muted">(${total} pages${siteCount? ' across '+siteCount+' sites':''})</small>${progressHtml}
+          <strong>${display}</strong> <small class="text-muted">(${total} pages${siteCount ? ' across ' + siteCount + ' sites' : ''})</small>${progressHtml}
         </div>`;
     });
 
-    sectionHtml += `</div>`;
+    sectionHtml += `</div>`; // close breakdown-section
     container.innerHTML += sectionHtml;
   });
 
-  // --- Toggle button logic based on number of 0% progress bars ---
+  // --- Toggle button logic for 0% bars ---
   const toggleBtn = document.getElementById('toggleHiddenGroups');
   let showHidden = false;
 
@@ -1094,17 +1107,19 @@ function renderBreakdown(data){
     updateHiddenCount();
   }
 
-  // --- Badge Update (always count all progress bars) ---
+  // --- Accordion total badge update ---
   function updateBadge(){
     const badge = document.getElementById("breakdownBadge");
     if (!badge) return;
+
+    // Count all rendered progress bars
     const allBars = container.querySelectorAll(".progress-bar");
     badge.textContent = allBars.length;
   }
 
-  // Update badge every render
   updateBadge();
 }
+
 
 
 
