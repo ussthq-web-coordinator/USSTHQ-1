@@ -487,11 +487,11 @@ function renderQaAccordion(data){
 
     // Center the title within the card header
     const headerDiv = document.createElement('div'); headerDiv.className = 'd-flex flex-column align-items-center';
-    const titleEl = document.createElement('h6'); titleEl.className = 'card-title mb-1 text-center'; titleEl.style.cursor = 'pointer'; titleEl.innerText = page.Title || page['Site Title'] || title;
+    const titleEl = document.createElement('h6'); titleEl.className = 'card-title mb-1 text-center mx-3'; titleEl.style.cursor = 'pointer'; titleEl.innerText = page.Title || page['Site Title'] || title;
     headerDiv.appendChild(titleEl);
 
   // Site title (small muted) and lookup info
-  const siteTitleEl = document.createElement('div'); siteTitleEl.className = 'card-subtitle text-muted small mb-1'; siteTitleEl.innerText = page['Site Title'] || '';
+  const siteTitleEl = document.createElement('div'); siteTitleEl.className = 'card-subtitle text-muted small mb-1 mt-2'; siteTitleEl.innerText = page['Site Title'] || '';
   const lookupArray = Array.from(uniqueLookupsSet);
   const lookupText = lookupArray.length ? (lookupArray[0] + (lookupArray.length > 1 ? ` (+${lookupArray.length - 1} more)` : '')) : '';
   const lookupEl = document.createElement('div'); lookupEl.className = 'text-muted small mb-2'; lookupEl.innerText = lookupText;
