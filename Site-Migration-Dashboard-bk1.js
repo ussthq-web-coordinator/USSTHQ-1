@@ -54,38 +54,390 @@ const _migrationSampleData = [
   }
 })();
 
-// Inject CSS to ensure only clickable values in the QA modal Tabulator table show hover/active styles
-document.addEventListener('DOMContentLoaded', ()=>{
-  try{
-    const css = `
-      /* Prevent full-row hover highlight inside QA modal's Tabulator table */
-      #qaIssuesModalBody .tabulator-row:hover { background-color: transparent !important; }
-      /* Keep default cursor for cells */
-      #qaIssuesModalBody .tabulator-row .tabulator-cell { cursor: default !important; background-color: transparent !important; }
-      /* Make anchors visually responsive and clickable only */
-      #qaIssuesModalBody .tabulator-row .tabulator-cell a { cursor: pointer !important; display: inline-block; padding: 2px 4px; border-radius: 4px; }
-      #qaIssuesModalBody .tabulator-row .tabulator-cell a:hover { background-color: rgba(0,0,0,0.06); text-decoration: underline; }
-      /* Remove default focus outlines/shadows in this modal table while preserving accessibility (use subtle underline instead) */
-      #qaIssuesModalBody .tabulator-row .tabulator-cell:focus, #qaIssuesModalBody .tabulator-row .tabulator-cell a:focus {
-        outline: none !important;
-        box-shadow: none !important;
-        text-decoration: underline !important;
-      }
-      #qaIssuesModalBody .tabulator-row .tabulator-cell a:focus { background-color: rgba(0,0,0,0.04); }
-    `;
-    const s = document.createElement('style');
-    s.setAttribute('data-generated','qa-table-hover');
-    s.appendChild(document.createTextNode(css));
-    document.head.appendChild(s);
-  }catch(e){/* no-op */}
-});
+// If sample migration data is defined, try to populate the views via the public API
+if (typeof _migrationSampleData !== 'undefined' && Array.isArray(_migrationSampleData)){
+  const applySample = () => {
+    if (typeof window.setMigrationData === 'function'){
+      try { window.setMigrationData(_migrationSampleData); return true; } catch(e){ console.warn('setMigrationData threw', e); }
+    }
+    return false;
+  };
 
-// The earlier duplicate/partial renderQaAccordion implementation was removed to avoid
-// duplicate definitions and unbalanced braces. The full `renderQaAccordion` is defined
-// later in this file and will be used instead.
+  if (!applySample()){
+    // Retry a couple times in case module registers after this script runs
+    setTimeout(()=>{ if (!applySample()) setTimeout(applySample, 500); }, 200);
+  }
+}
+
+// Top-level data structures used across the dashboard
+let table, tableData = [], charts = {}, pageCache = {}, qaGroupedCache = {}, masterData;
+// Chart instances used by renderCharts
+let statusChart = null;
+let priorityChart = null;
+let pageTypeChart = null;
+let pubSymChart = null;
+// Application version (update as needed)
+const APP_VERSION = '1.0.0';
+
+// Set the refresh date element text to show version + ET timestamp
+function setRefreshDate(date){
+  try{
+    const el = document.getElementById('refreshDate');
+    if(!el) return;
+    const d = date ? new Date(date) : new Date();
+    const fmt = d.toLocaleString('en-US', { timeZone: 'America/New_York', year:'numeric', month:'short', day:'numeric', hour:'numeric', minute:'2-digit', second:'2-digit' });
+    el.textContent = `v${APP_VERSION} · Data refreshed: ${fmt} ET`;
+  }catch(e){ console.warn('Failed to set refresh date', e); }
+}
+
+// Try to load dashboard data: prefer local `DashboardData.json` when available, otherwise fall back to CDN.
+// Restore original behavior: try local DashboardData.json first, then fall back to CDN.
+(async function loadDashboardData(){
+  const localUrl = 'DashboardData.json';
+  const cdnUrl = 'https://hopewell.pages.dev/DashboardData.json';
+  let json = null;
+  try{
+    // Try local file first (user requested local behavior)
+    try{
+      const r = await fetch(localUrl);
+      if (r && r.ok) json = await r.json();
+    }catch(e){
+      // local fetch failed — we'll attempt CDN below
+      console.warn('Local DashboardData.json fetch failed, trying CDN...', e);
+    }
+
+    if (!json){
+      const r2 = await fetch(cdnUrl);
+      if (!r2.ok) throw new Error('Failed to load remote dashboard JSON');
+      json = await r2.json();
+    }
+
+    // 🔹 Show refreshDate if present in JSON
+    if (json.refreshDate){
+      const refreshEl = document.getElementById("refreshDate");
+      if (refreshEl){
+        // Try to parse the refreshDate into a Date object
+        let formatted = json.refreshDate;
+        const parsedDate = new Date(json.refreshDate);
+
+        if (!isNaN(parsedDate.getTime())) {
+          // Format to a friendly readable style
+          formatted = parsedDate.toLocaleString("en-US", {
+            year: "numeric",
+            month: "long",
+            day: "numeric",
+            hour: "numeric",
+            minute: "2-digit",
+            hour12: true,
+            timeZoneName: "short" // e.g., "ET"
+          });
+        }
+
+        refreshEl.textContent = `Data last refreshed: ${formatted}`;
+      }
+    }
+
+    // 🔹 Process table data
+    tableData = Array.isArray(json) ? json : (json.data || []);
+    pageCache = {};
+    tableData.forEach((d,i)=>{ d._id = i; pageCache[i] = d; });
+
+    masterData = tableData; // keep a reference (not a shallow copy)
+
+    // Initialize filters and render the dashboard — let errors surface
+    initFilters();
+    updateDashboard();
+  }catch(err){
+    console.error('Dashboard data load failed', err);
+    throw err;
+  }
+})();
+
+// Small helper to escape HTML in strings inserted via innerHTML
+function escapeHtml(str){
+  if (str === null || str === undefined) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+
+// status colors Old Blue 3B50B2
+const statusColors = {
+    "Completed": "#2ecc71",
+    "Do Not Migrate": "#e74c3c",
+    "In Progress": "#f39c12",
+    "In QA": "#CA5010",
+    "Needs Info": "#002056",
+    "Unknown": "#7f8c8d"
+};
+
+
+
+
+const chartOptions = {
+  plugins: {
+    legend: {
+      display: false, // hide the legend on the chart itself
+    },
+    tooltip: {
+      enabled: true,
+    }
+  }
+};
+
+
+
+function addChartLegendModal(chart, chartTitle) {
+  if (!chart || !chart.canvas) return;
+  const container = chart.canvas.parentNode;
+  if (!container) return;
+
+  // Only show legend on explicit user click/tap (not on hover or scroll)
+  container.addEventListener('click', (e) => {
+    try {
+      if (!chart || typeof chart.generateLegend !== 'function') return;
+      const legendHtml = chart.generateLegend();
+      if (!legendHtml || String(legendHtml).trim() === '') return;
+      showLegendModal(chart, chartTitle);
+    } catch (err) {
+      console.warn('Failed to check/generate chart legend', err);
+    }
+  }, { passive: true });
+}
+
+function showLegendModal(chart, title) {
+  if (!chart || typeof chart.generateLegend !== 'function') return;
+  const legendHtml = chart.generateLegend();
+  if (!legendHtml || String(legendHtml).trim() === '') return; // nothing to show
+
+  const titleEl = document.getElementById("chartLegendTitle");
+  const bodyEl = document.getElementById("chartLegendBody");
+  const modalEl = document.getElementById("chartLegendModal");
+  if (!titleEl || !bodyEl || !modalEl) {
+    console.warn('Chart legend modal elements missing');
+    return;
+  }
+  titleEl.innerText = title;
+  bodyEl.innerHTML = legendHtml;
+  try { new bootstrap.Modal(modalEl).show(); } catch(e) { console.warn('bootstrap.Modal not available or failed to show legend modal', e); }
+}
+
+
+function initFilters(){
+  const filterIds = ["filterDivision","filterAC","filterStatus","filterPageType","filterPubSym","filterSymType"];
+
+  filterIds.forEach(id=>{
+    const sel = document.getElementById(id);
+    if (sel) sel.addEventListener("change", debounce(updateFiltersAndDashboard, 150));
+  });
+
+  updateFiltersOptions();
+}
+
+// Safe helper to read select values when an element may be missing
+function getSelectValue(id){
+  const el = document.getElementById(id);
+  return el ? el.value : "";
+}
+
+// debounce helper to avoid excessive re-renders on rapid input changes
+function debounce(fn, wait){
+  let timer = null;
+  return function(...args){
+    const ctx = this;
+    clearTimeout(timer);
+    timer = setTimeout(()=> fn.apply(ctx, args), wait);
+  };
+}
+
+// 1. Adjust label for display only
+function adjustLabel(rawValue) {
+  if (!rawValue) return "Not Set";
+
+  // LOC titles: remove "INTLAPP_WM_LOC_USS_" but leave rest intact
+  if (rawValue.startsWith("INTLAPP_WM_LOC_USS_")) {
+    return rawValue.replace("INTLAPP_WM_LOC_USS_", "");
+  }
+
+  // DIV titles: reduce "INTLAPP_WM_DIV_USS_XXX" -> "XXX"
+  if (rawValue.startsWith("INTLAPP_WM_DIV_USS_")) {
+    return rawValue.replace("INTLAPP_WM_DIV_USS_", "");
+  }
+
+  // fallback
+  return rawValue;
+}
+
+// 2. Your filter mappings (derive Area Command from Local when AC is missing)
+const filterMapping = {
+  filterDivision: d => d.Division || "Not Set",
+  // Prefer Area Command title, but fallback to Local Web Admin Group.title when AC is empty
+  filterAC: d => (d["Area Command Admin Group.title"] || d["Local Web Admin Group.title"] || "Not Set"),
+  filterStatus: d => d.Status || "Not Set",
+  filterPageType: d => d["Page Type"] || "Not Set",
+  filterPubSym: d => d["Published Symphony"] || "Not Set",
+  filterSymType: d => d["Symphony Site Type"] || "Not Set"
+};
+
+// 3. When building dropdown options, apply `adjustLabel`
+function updateFiltersOptions() {
+  const selected = {
+    filterDivision: getSelectValue("filterDivision"),
+    filterAC: getSelectValue("filterAC"),
+    filterStatus: getSelectValue("filterStatus"),
+    filterPageType: getSelectValue("filterPageType"),
+    filterPubSym: getSelectValue("filterPubSym"),
+    filterSymType: getSelectValue("filterSymType")
+  };
+
+  // For each filter, compute available values based on OTHER selected filters
+  Object.keys(filterMapping).forEach(filterId => {
+    const dropdown = document.getElementById(filterId);
+    if (!dropdown) return;
+
+    // Build otherFilters (exclude current filter)
+    const otherSelected = { ...selected };
+    delete otherSelected[filterId];
+
+    // Filter tableData by otherSelected values
+    const filteredData = tableData.filter(d => {
+      return Object.keys(otherSelected).every(fId => {
+        const val = otherSelected[fId];
+        if (!val) return true; // no constraint
+        const fieldFn = filterMapping[fId];
+        return fieldFn(d) === val;
+      });
+    });
+
+    // Extract unique values for this filter
+    let values = [...new Set(filteredData.map(filterMapping[filterId]))];
+
+    // Sort by adjusted label for filterAC, otherwise by raw string
+    if (filterId === 'filterAC') {
+      values = values.sort((a, b) => adjustLabel(String(a)).localeCompare(adjustLabel(String(b)), undefined, { sensitivity: 'base' }));
+    } else {
+      values = values.sort((a, b) => String(a).localeCompare(String(b), undefined, { sensitivity: 'base' }));
+    }
+
+    // Preserve current selection if still available; if not, keep it as an unavailable option
+    const currentValue = selected[filterId];
+
+    let optionsHtml = "<option value=''>All</option>" + values.map(v => {
+      const label = adjustLabel(v);
+      return `<option value="${v}" ${currentValue === v ? 'selected' : ''}>${label}</option>`;
+    }).join("");
+
+    if (currentValue && !values.includes(currentValue)) {
+      // Add the unavailable current value (marked) so user's selection doesn't vanish
+      const label = adjustLabel(currentValue);
+      optionsHtml += `<option value="${currentValue}" selected>${label} (Unavailable)</option>`;
+    }
+
+    dropdown.innerHTML = optionsHtml;
+    try {
+      // Try to preserve selection explicitly (some browsers reset value when innerHTML changes)
+      if (currentValue) dropdown.value = currentValue;
+      else dropdown.value = "";
+    } catch(e) {
+      // ignore if setting value fails for any reason
+    }
+  });
+}
+
+
+function updateFiltersAndDashboard(){
+  updateFiltersOptions();
+  updateDashboard();
+}
+
+
+function getFilteredData(){
+  const div = getSelectValue("filterDivision");
+  const ac = getSelectValue("filterAC");
+  const status = getSelectValue("filterStatus");
+  const pageType = getSelectValue("filterPageType");
+  const pubSym = getSelectValue("filterPubSym");
+  const symType = getSelectValue("filterSymType");
+
+  return tableData.filter(d => 
+    (!div || d.Division===div) &&
+    // Match AC filter if it equals the row's AC OR the row's Local (derived AC)
+    (!ac || d["Area Command Admin Group.title"]===ac || d["Local Web Admin Group.title"]===ac) &&
+    (!status || d.Status===status) &&
+    (!pageType || d["Page Type"]===pageType) &&
+    (!pubSym || d["Published Symphony"]===pubSym) &&
+    (!symType || d["Symphony Site Type"]===symType)
+  );
+}
+
+    // Change order of overall progress legend
+// Normalize status string
+function normalizeStatus(status){
+  return (status || "").toString().trim();
+}
+
+// Map raw status values to canonical buckets used throughout the dashboard
+function getCanonicalStatus(status) {
+  if (!status) return "Unknown";
+  status = status.toString().trim();
+  if (/^4|^5/.test(status)) return "Completed";
+  if (status === "Do Not Migrate") return "Do Not Migrate";
+  if (/^2/.test(status)) return "In Progress";
+  if (/^1/.test(status)) return "Needs Info";
+  if (/^3[a-c]/.test(status)) return "In QA";
+  return "Unknown";
+}
+function renderOverallProgress(filtered){
+  if (!Array.isArray(filtered)) return;
+  const total = filtered.length;
+  const counts = { "Do Not Migrate":0, "Needs Info":0, "In Progress":0, "In QA":0, Unknown:0, Completed:0,};
+  
+  filtered.forEach(d=>{
+    const s = getCanonicalStatus(d.Status);
+    counts[s] = (counts[s] || 0) + 1;
+  });
+
+  const container = document.getElementById("progressBarContainer");
+  if (!container) return;
+  container.innerHTML = "";
+
+  const legendContainer = document.getElementById("progressLegend");
+  if (!legendContainer) return;
+  legendContainer.innerHTML = "";
+
+  Object.keys(counts).forEach(key=>{
+    const pct = total ? (counts[key]/total*100) : 0; // use float, not rounded
+    if(counts[key] > 0){  // render all non-zero counts
+      const div = document.createElement("div");
+      div.className = "progress-bar";
+      div.style.width = pct + "%";
+      div.style.backgroundColor = statusColors[key];
+      div.style.display="flex";
+      div.style.alignItems="center";
+      div.style.justifyContent="center";
+      div.innerText = `${Math.round(pct)}% (${counts[key]})`;
+      container.appendChild(div);
+
+      // Add legend
+      // Add legend
+    const legendItem = document.createElement("div");
+    legendItem.className = "d-flex align-items-center gap-1 legend-item";
+    legendItem.innerHTML =
+    `<span style="display:inline-block;width:14px;height:14px;background-color:${statusColors[key]};"></span>
+    ${key} – ${Math.round(pct)}% (${counts[key]})`;
+    legendContainer.appendChild(legendItem);
+
+    }
+  });
+}
+
 function formatAcDisplay(title) {
   if (!title) return "Not Set";
-  if (typeof title !== 'string') return String(title);
+
   // Case 1: Division codes (INTLAPP_WM_DIV_USS_XXX)
   if (title.startsWith("INTLAPP_WM_DIV_USS_")) {
     return title.replace("INTLAPP_WM_DIV_USS_", "");
@@ -93,9 +445,11 @@ function formatAcDisplay(title) {
 
   // Case 2: Location codes (INTLAPP_WM_LOC_USS_XXX ...)
   if (title.startsWith("INTLAPP_WM_LOC_USS_")) {
+    // remove INTLAPP_WM_LOC_USS_ and keep the rest
     return title.replace("INTLAPP_WM_LOC_USS_", "");
   }
 
+  // Default: return as-is
   return title;
 }
 
@@ -112,272 +466,13 @@ function updateACDropdown(filteredData) {
   }).join("");
 }
 
-// --- Filter utilities (borrowed from backup) ---
-// Adjust label for display only
-function adjustLabel(rawValue) {
-  if (!rawValue) return "Not Set";
-  if (typeof rawValue !== 'string') return String(rawValue);
-  if (rawValue.startsWith("INTLAPP_WM_LOC_USS_")) {
-    return rawValue.replace("INTLAPP_WM_LOC_USS_", "");
-  }
-  if (rawValue.startsWith("INTLAPP_WM_DIV_USS_")) {
-    return rawValue.replace("INTLAPP_WM_DIV_USS_", "");
-  }
-  return rawValue;
-}
-
-// Filter mapping helpers for updateFiltersOptions
-const filterMapping = {
-  filterDivision: d => d.Division || "Not Set",
-  filterAC: d => (d["Area Command Admin Group.title"] || d["Local Web Admin Group.title"] || "Not Set"),
-  filterStatus: d => d.Status || "Not Set",
-  filterPageType: d => d["Page Type"] || "Not Set",
-  filterPubSym: d => d["Published Symphony"] || "Not Set",
-  filterSymType: d => d["Symphony Site Type"] || "Not Set",
-  // New filters
-  filterPriority: d => d.Priority || "Not Set",
-  filterEffort: d => d["Effort Needed"] || "Not Set"
-};
-
-function updateFiltersOptions() {
-  const selected = {
-    filterDivision: getSelectValue("filterDivision"),
-    filterAC: getSelectValue("filterAC"),
-    filterStatus: getSelectValue("filterStatus"),
-    filterPageType: getSelectValue("filterPageType"),
-    filterPubSym: getSelectValue("filterPubSym"),
-    filterSymType: getSelectValue("filterSymType"),
-    filterPriority: getSelectValue("filterPriority"),
-    filterEffort: getSelectValue("filterEffort")
-  };
-
-  // Read Modified date inputs so option lists can be constrained by date range as well
-  const modFromEl = document.getElementById('filterModifiedFrom');
-  const modToEl = document.getElementById('filterModifiedTo');
-  const modFromMs = dateToUtcMidnightMs(modFromEl && modFromEl.value);
-  const modToMs = dateToUtcMidnightMs(modToEl && modToEl.value);
-
-  Object.keys(filterMapping).forEach(filterId => {
-    const dropdown = document.getElementById(filterId);
-    if (!dropdown) return;
-
-    const otherSelected = { ...selected };
-    delete otherSelected[filterId];
-
-    const filteredData = tableData.filter(d => {
-      // honor other selected dropdowns
-      const ok = Object.keys(otherSelected).every(fId => {
-        const val = otherSelected[fId];
-        if (!val) return true;
-        const fieldFn = filterMapping[fId];
-        return fieldFn(d) === val;
-      });
-      if (!ok) return false;
-
-      // honor Modified date range when computing options
-  if (modFromMs && (!d.Modified || dateToUtcMidnightMs(d.Modified) === null || dateToUtcMidnightMs(d.Modified) < modFromMs)) return false;
-  if (modToMs && (!d.Modified || dateToUtcMidnightMs(d.Modified) === null || dateToUtcMidnightMs(d.Modified) > modToMs)) return false;
-
-      return true;
-    });
-
-    let values = [...new Set(filteredData.map(filterMapping[filterId]))];
-    if (filterId === 'filterAC') {
-      values = values.sort((a, b) => adjustLabel(String(a)).localeCompare(adjustLabel(String(b)), undefined, { sensitivity: 'base' }));
-    } else {
-      values = values.sort((a, b) => String(a).localeCompare(String(b), undefined, { sensitivity: 'base' }));
-    }
-
-    const currentValue = selected[filterId];
-
-    let optionsHtml = "<option value=''>All</option>" + values.map(v => {
-      const label = adjustLabel(v);
-      return `<option value="${v}" ${currentValue === v ? 'selected' : ''}>${label}</option>`;
-    }).join("");
-
-    if (currentValue && !values.includes(currentValue)) {
-      const label = adjustLabel(currentValue);
-      optionsHtml += `<option value="${currentValue}" selected>${label} (Unavailable)</option>`;
-    }
-
-    dropdown.innerHTML = optionsHtml;
-    try { if (currentValue) dropdown.value = currentValue; else dropdown.value = ""; } catch(e) {}
-  });
-}
-
-function updateFiltersAndDashboard(){
-  updateFiltersOptions();
-  updateDashboard();
-}
-
-function getFilteredData(){
-  const div = getSelectValue("filterDivision");
-  const ac = getSelectValue("filterAC");
-  const status = getSelectValue("filterStatus");
-  const pageType = getSelectValue("filterPageType");
-  const pubSym = getSelectValue("filterPubSym");
-  const symType = getSelectValue("filterSymType");
-  const priority = getSelectValue("filterPriority");
-  const effort = getSelectValue("filterEffort");
-  const modFromEl = document.getElementById('filterModifiedFrom');
-  const modToEl = document.getElementById('filterModifiedTo');
-  const modifiedFromMs = dateToUtcMidnightMs(modFromEl && modFromEl.value);
-  const modifiedToMs = dateToUtcMidnightMs(modToEl && modToEl.value);
-
-  return tableData.filter(d => 
-    (!div || d.Division===div) &&
-    (!ac || d["Area Command Admin Group.title"]===ac || d["Local Web Admin Group.title"]===ac) &&
-    (!status || d.Status===status) &&
-    (!pageType || d["Page Type"]===pageType) &&
-    (!pubSym || d["Published Symphony"]===pubSym) &&
-    (!symType || d["Symphony Site Type"]===symType)
-    && (!priority || (d.Priority || "") === priority)
-    && (!effort || (d["Effort Needed"] || "") === effort)
-    && ( !modifiedFromMs || (d.Modified && dateToUtcMidnightMs(d.Modified) !== null && dateToUtcMidnightMs(d.Modified) >= modifiedFromMs) )
-    && ( !modifiedToMs || (d.Modified && dateToUtcMidnightMs(d.Modified) !== null && dateToUtcMidnightMs(d.Modified) <= modifiedToMs) )
-  );
-}
-
 const qaIssueDetailsMap = {};
-// Master lookup populated from CSV (lookupValue -> {why, how, howDetails})
-let qaLookupMaster = {};
 
-// Top-level runtime state (shared across functions)
-let table, tableData = [], charts = {}, pageCache = {}, qaGroupedCache = {}, masterData;
-// Top-level chart handles (Chart.js instances) — initialized to null so renderCharts can safely destroy/create
-let statusChart = null;
-let priorityChart = null;
-let pageTypeChart = null;
-let pubSymChart = null;
-// Application version (edit this value to bump the UI version shown on the page)
-// Keep this value here so you can edit it directly in the JS without relying on DashboardData.json
-const APP_VERSION = '2510.04.1216';
-// Also expose to window so you can tweak at runtime in the browser console if needed
-window.APP_VERSION = window.APP_VERSION || APP_VERSION;
-
-// Global status color map (used by multiple renderers)
-const statusColors = {
-  "Do Not Migrate": "#E74C3C", // red
-  "Completed": "#28a745",      // green
-  "In QA": "#fd7e14",          // orange
-  "Needs Info": "#002056",     // navy
-  "In Progress": "#6f42c1",    // purple
-  "Unknown": "#6c757d"         // gray
-};
-
-// Safe helper to read select values when an element may be missing
-function getSelectValue(id){
-  try{ const el = document.getElementById(id); return el ? el.value : ""; }catch(e){ return ""; }
-}
-
-// Tiny CSV parser for the QA lookup file (assumes first row headers)
-function parseCsv(text){
-  const lines = text.split(/\r?\n/);
-  if (!lines.length) return [];
-  const headers = lines[0].split(',').map(h => h.replace(/^"|"$/g,'').trim());
-  const rows = [];
-  for (let i = 1; i < lines.length; i++){
-    const line = lines[i];
-    if (!line.trim()) continue;
-    const parts = [];
-    let cur = '';
-    let inQuote = false;
-    for (let j=0;j<line.length;j++){
-      const ch = line[j];
-      if (ch === '"') { inQuote = !inQuote; cur += ch; }
-      else if (ch === ',' && !inQuote){ parts.push(cur.trim().replace(/^"|"$/g,'')); cur = ''; }
-      else cur += ch;
-    }
-    if (cur.length) parts.push(cur.trim().replace(/^"|"$/g,''));
-    const obj = {};
-    for (let k=0;k<headers.length;k++) obj[headers[k]] = parts[k] || '';
-    rows.push(obj);
-  }
-  return rows;
-}
-
-async function loadQaLookupCsv(){
-  const url = 'Website QA Issues.csv';
-  try{
-    const r = await fetch(url);
-    if (!r.ok) throw new Error('CSV not found');
-    const text = await r.text();
-    const rows = parseCsv(text);
-    qaLookupMaster = {};
-    rows.forEach(rw => {
-      const key = (rw['Item That May Need Fixing on the Page'] || '').trim();
-      if (!key) return;
-      qaLookupMaster[key] = {
-        why: rw['Why This Is Important'] || '',
-        how: rw['How to Fix'] || '',
-        howDetails: rw['How to Fix Details'] || ''
-      };
-    });
-    console.info('QA lookup CSV loaded', Object.keys(qaLookupMaster).length);
-  }catch(e){ console.warn('Failed to load QA CSV', e); qaLookupMaster = {}; }
-  
-}
-
-// Load dashboard data: prefer local `DashboardData.json` then CDN; populate runtime state and initialize UI
-(async function loadDashboardData(){
-  const localUrl = 'DashboardData.json';
-  const cdnUrl = 'https://hopewell.pages.dev/DashboardData.json';
-  let json = null;
-  try{
-    try{
-      const r = await fetch(localUrl);
-      if (r && r.ok) json = await r.json();
-    }catch(e){ console.warn('Local DashboardData.json fetch failed, trying CDN...', e); }
-
-    if (!json){
-      const r2 = await fetch(cdnUrl);
-      if (!r2.ok) throw new Error('Failed to load remote dashboard JSON');
-      json = await r2.json();
-    }
-
-    // Show refreshDate if present (use window.APP_VERSION as the authoritative version)
-    if (json && (json.refreshDate || json.refresh_date || json.refresh)){
-      const refreshEl = document.getElementById('refreshDate');
-      if (refreshEl){
-        const raw = json.refreshDate || json.refresh_date || json.refresh;
-        let formatted = raw;
-        const parsedDate = new Date(raw);
-        if (!isNaN(parsedDate.getTime())){
-          formatted = parsedDate.toLocaleString('en-US', { year:'numeric', month:'long', day:'numeric', hour:'numeric', minute:'2-digit', hour12:true, timeZoneName:'short' });
-        }
-        const ver = (window.APP_VERSION || APP_VERSION);
-        refreshEl.textContent = `v${ver} · Data last refreshed: ${formatted}`;
-      }
-    }
-
-    // Load QA lookup CSV (best-effort) so we can enrich per-page QA details
-    try{ await loadQaLookupCsv(); }catch(e){ console.warn('QA lookup CSV load failed', e); }
-
-    // Process table data
-    tableData = Array.isArray(json) ? json : (json.data || []);
-    pageCache = {};
-    tableData.forEach((d,i)=>{ d._id = i; pageCache[i] = d; });
-    masterData = tableData;
-
-    // Initialize filters and render the dashboard — let errors surface
-    if (typeof initFilters === 'function') initFilters();
-    if (typeof updateDashboard === 'function') updateDashboard();
-
-    try{ window.__SM_dashboard = window.__SM_dashboard || {}; window.__SM_dashboard.loaded = true; window.__SM_dashboard.rowCount = tableData.length; }catch(e){}
-    console.info('Site Migration Dashboard data loaded', { rows: tableData.length });
-  }catch(err){
-    console.error('Dashboard data load failed', err);
-  }
-})();
-
-// --- QA Accordion rendering (one card per page, aggregated issues) ---
+ // --- QA Accordion rendering (one card per issue with unique IDs) ---
 function renderQaAccordion(data){
   const container = document.getElementById("qaGroupsBody");
   if (!container) return;
   container.innerHTML = "";
-
-  // Clear previous per-instance QA details to avoid accumulating duplicates across re-renders
-  Object.keys(qaIssueDetailsMap).forEach(k => delete qaIssueDetailsMap[k]);
 
   const qaRows = Array.isArray(data) ? data.filter(d => d["QA Issues.lookupValue"]) : [];
 
@@ -389,7 +484,6 @@ function renderQaAccordion(data){
     return;
   }
 
-  // Group rows by page title
   qaGroupedCache = {};
   qaRows.forEach(d => {
     const pageTitle = d.Title || "Untitled Page";
@@ -400,108 +494,67 @@ function renderQaAccordion(data){
   const rowDiv = document.createElement('div');
   rowDiv.className = 'row g-3';
 
-  const frag = document.createDocumentFragment();
-
   Object.keys(qaGroupedCache).sort().forEach(title => {
     const rows = qaGroupedCache[title];
     const page = pageCache[rows[0]._id];
     if (!page) return;
 
-  // Per-page accumulators
-  const pageIssueIds = [];
-  const uniqueWhysSet = new Set();
-  const uniqueLookupsSet = new Set();
-
-    // Build issue instances for the page
     rows.forEach(r => {
       const lookups = (r["QA Issues.lookupValue"] || "").split(";").map(s => s.trim()).filter(Boolean);
       const whys = (r["QA Issues:Why This Is Important"] || "").split(";").map(s => s.trim());
       const hows = (r["QA Issues:How to Fix"] || "").split(";").map(s => s.trim());
       const howDetailsArr = (r["QA Issues:How to Fix Details"] || "").split(";").map(s => s.trim());
 
-      for (let idx = 0; idx < lookups.length; idx++) {
-        const issue = lookups[idx];
-        if (!issue) continue;
-        const why = whys[idx] || "";
-        const how = hows[idx] || "";
-        const howDetails = howDetailsArr[idx] || "";
+      const issueCount = lookups.length;
 
-        // Create a DOM-safe ID (only letters, numbers, hyphen, underscore)
-        const rawIssueId = `${page.ID}_${title}_${idx}_${Math.random().toString(36).substr(2,6)}`;
-        const issueId = String(rawIssueId).replace(/[^a-zA-Z0-9-_]/g, '_');
+for (let idx = 0; idx < issueCount; idx++) {
+  const issue = lookups[idx];
+  const why = whys[idx] || "";
+  const how = hows[idx] || "";
+  const howDetails = howDetailsArr[idx] || "";
 
-        // Prefer enriched details from QA lookup CSV when available
-        const master = qaLookupMaster && qaLookupMaster[issue];
-        const effectiveWhy = (master && master.why) ? master.why : why;
-        const effectiveHow = (master && master.how) ? master.how : how;
-        const effectiveHowDetails = (master && master.howDetails) ? master.howDetails : howDetails;
+  if (!issue) continue;
 
-        qaIssueDetailsMap[issueId] = {
-          pageTitle: title,
-          lookupValue: issue,
-          why: effectiveWhy,
-          how: effectiveHow,
-          howDetails: effectiveHowDetails,
-          pageId: page.ID
-        };
+  // Create a DOM-safe ID (only letters, numbers, hyphen, underscore)
+  const rawIssueId = `${page.ID}_${title}_${idx}_${Math.random().toString(36).substr(2,6)}`;
+  const issueId = String(rawIssueId).replace(/[^a-zA-Z0-9-_]/g, '_');
 
-        pageIssueIds.push(issueId);
-        if (effectiveWhy) uniqueWhysSet.add(effectiveWhy);
-        if (issue) uniqueLookupsSet.add(issue);
-      }
+  // Store details keyed by the sanitized issueId
+  qaIssueDetailsMap[issueId] = {
+    pageTitle: title,
+    lookupValue: issue,
+    why,
+    how,
+    howDetails,
+    pageId: page.ID
+  };
+
+  const col = document.createElement('div');
+  col.className = 'col-12 col-sm-6 col-md-4 col-lg-3';
+
+  const card = document.createElement('div');
+  card.className = 'card h-100 qa-page-card';
+
+  card.innerHTML = `
+    <div class="card-body d-flex flex-column">
+      <div>
+        <h6 class="card-title mb-1">${escapeHtml(title)}</h6>
+        <p class="card-subtitle text-muted small mb-1">${escapeHtml(issue)}</p>
+      </div>
+      <div class="mt-auto pt-1">
+        <button class="btn btn-sm btn-outline-primary" onclick="showQaIssuesModal('${issueId}')">View Issue</button>
+      </div>
+    </div>
+  `;
+
+  col.appendChild(card);
+  rowDiv.appendChild(col);
+}
+
     });
-
-    // After building all issues for the page, render one card representing the page
-    if (pageIssueIds.length){
-      const firstIssueId = pageIssueIds[0];
-      const uniqueWhys = Array.from(uniqueWhysSet);
-      const subtitleBase = uniqueWhys.length ? (uniqueWhys[0].length > 120 ? uniqueWhys[0].slice(0,120) + '…' : uniqueWhys[0]) : '';
-      const moreCount = Math.max(0, uniqueWhys.length - 1);
-      const subtitle = subtitleBase + (moreCount > 0 ? ` (+${moreCount} more)` : '');
-
-      const col = document.createElement('div');
-      col.className = 'col-12 col-sm-6 col-md-4 col-lg-3';
-      const card = document.createElement('div'); card.className = 'card h-100 qa-page-card';
-      const cardBody = document.createElement('div'); cardBody.className = 'card-body d-flex flex-column';
-
-    // Center the title within the card header
-    const headerDiv = document.createElement('div'); headerDiv.className = 'd-flex flex-column align-items-center';
-    const titleEl = document.createElement('h6'); titleEl.className = 'card-title mb-1 text-center'; titleEl.style.cursor = 'pointer'; titleEl.innerText = page.Title || page['Site Title'] || title;
-    headerDiv.appendChild(titleEl);
-
-  // Site title (small muted) and lookup info
-  const siteTitleEl = document.createElement('div'); siteTitleEl.className = 'card-subtitle text-muted small mb-1'; siteTitleEl.innerText = page['Site Title'] || '';
-  const lookupArray = Array.from(uniqueLookupsSet);
-  const lookupText = lookupArray.length ? (lookupArray[0] + (lookupArray.length > 1 ? ` (+${lookupArray.length - 1} more)` : '')) : '';
-  const lookupEl = document.createElement('div'); lookupEl.className = 'text-muted small mb-2'; lookupEl.innerText = lookupText;
-
-  const inlineDiv = document.createElement('div'); inlineDiv.className = 'collapse';
-      const quickWhy = uniqueWhys.length ? uniqueWhys[0] : '';
-      inlineDiv.innerHTML = `<div class="small text-muted mt-2">${escapeHtml(quickWhy)}</div>`;
-
-  const footer = document.createElement('div'); footer.className = 'mt-auto pt-1 d-flex justify-content-center align-items-center';
-  const btn = document.createElement('button'); btn.className = 'btn btn-sm btn-outline-primary';
-  btn.innerHTML = `View Issues <span class="badge bg-warning qa-badge ms-2">${pageIssueIds.length}</span>`;
-  btn.addEventListener('click', ()=> showQaIssuesModal(firstIssueId));
-  footer.appendChild(btn);
-
-      titleEl.addEventListener('click', ()=>{ inlineDiv.classList.toggle('show'); });
-
-  cardBody.appendChild(headerDiv);
-  // Page name/title shown as the main heading already in header; show site title and lookup under it
-  cardBody.appendChild(siteTitleEl);
-  cardBody.appendChild(lookupEl);
-  cardBody.appendChild(inlineDiv);
-      cardBody.appendChild(footer);
-      card.appendChild(cardBody);
-      col.appendChild(card);
-      rowDiv.appendChild(col);
-    }
   });
 
-  frag.appendChild(rowDiv);
-  // Defer appending to avoid layout thrash when many nodes are created
-  requestAnimationFrame(()=>{ container.appendChild(frag); });
+  container.appendChild(rowDiv);
 }
 
 
@@ -516,78 +569,70 @@ function showQaIssuesModal(issueId){
   const issueData = qaIssueDetailsMap[issueId];
   if (!issueData) {
     modalBody.innerHTML = `<p>Issue data not found for ID: ${escapeHtml(issueId)}</p>`;
-    new bootstrap.Modal(modalEl).show();
+    try { new bootstrap.Modal(modalEl).show(); } catch(e){}
     return;
   }
 
   const pageTitle = issueData.pageTitle;
   const rows = qaGroupedCache[pageTitle] || [];
-  const page = pageCache[rows[0]._id];
+  const page = pageCache[rows[0]?._id] || {};
 
-  // We'll defer building and inserting the heavy modal content until the modal is shown
+  // Header
   modalBody.innerHTML = '';
-  const headerH4 = document.createElement('h4'); headerH4.className = 'mb-3'; headerH4.innerText = (page["Site Title"] || page.Title || "Untitled Page");
-  modalBody.appendChild(headerH4);
+  const header = document.createElement('h4');
+  header.className = 'mb-3';
+  header.textContent = page["Site Title"] || page.Title || "Untitled Page";
+  modalBody.appendChild(header);
 
-  // Show the modal first, then append content and initialize Tabulator after it's visible to avoid aria-hidden focus issues
-  const bs = new bootstrap.Modal(modalEl);
-  bs.show();
+  // --- Tabulator Table ---
+  const tableContainer = document.createElement("div");
+  modalBody.appendChild(tableContainer);
 
-  const onShown = function(){
-    try{ modalEl.removeEventListener('shown.bs.modal', onShown); }catch(e){}
+  const tabData = [{
+    ID: page.ID,
+    Title: page.Title,
+    "Page URL": page["Page URL"],
+    "Zesty URL Path Part": page["Zesty URL Path Part"],
+    Status: page.Status || "N/A",
+    Priority: page.Priority || "N/A",
+    "QA Notes": page["QA Notes"] || "",
+    "Symphony Site Type": page["Symphony Site Type"] || ""
+  }];
 
-    requestAnimationFrame(()=>{
-      // --- Tabulator Table ---
-      const tableContainer = document.createElement("div");
-      modalBody.appendChild(tableContainer);
-
-      // Choose a smaller table height when the modal/body width is small to avoid tall tables on mobile
-      const modalWidth = modalBody.clientWidth || window.innerWidth;
-      const tableHeight = (modalWidth && modalWidth < 600) ? 240 : '100%';
-
-      const tableData = [{
-        ID: page.ID,
-        Title: page.Title,
-        "Page URL": page["Page URL"],
-        "Zesty URL Path Part": page["Zesty URL Path Part"],
-        Status: page.Status || "N/A",
-        Priority: page.Priority || "N/A",
-        "QA Notes": page["QA Notes"] || "",
-        "Symphony Site Type": page["Symphony Site Type"] || ""
-      }];
-
-      new Tabulator(tableContainer, {
-        data: tableData,
-        layout: window.innerWidth < 600 ? "fitDataFill" : "fitColumns",
-        reactiveData: true,
-        autoColumns: false,
-        height: tableHeight,
-        columns: [
-          {title:"Title", field:"Title", formatter: cell => `<div class="tabulator-cell">${escapeHtml(cell.getValue())}</div>`},
-          {title:"Edit", field:"Form", hozAlign:"center",
-            formatter: cell => {
-              const row = cell.getRow().getData();
-              const id = row.ID;
-              const type = (row["Symphony Site Type"] || "").trim();
-              let url = "#";
-              if(type==="Metro Area") url=`https://sauss.sharepoint.com/sites/USSWEBADM/Lists/MetroAreaSitesInfoPagesSymphony/DispForm.aspx?ID=${encodeURIComponent(id)}&e=mY8mhG`;
-          else if(type==="Corps") url=`https://sauss.sharepoint.com/sites/USSWEBADM/Lists/CorpsSitesPageMigrationReport/DispForm.aspx?ID=${encodeURIComponent(id)}&e=dF11LG`;
-          return `<div class="tabulator-cell"><a href="${escapeHtml(url)}" target="_blank">Form</a></div>`;
-        }
-      },
-      {title:"SD", field:"Page URL", hozAlign:"center", formatter: cell => `<div class="tabulator-cell">${cell.getValue() ? `<a href="${escapeHtml(cell.getValue())}" target="_blank">🔗</a>` : ""}</div>`},
-      {title:"ZD", field:"Zesty URL Path Part", hozAlign:"center", formatter: cell => `<div class="tabulator-cell">${cell.getValue() ? `<a href="https://8hxvw8tw-dev.webengine.zesty.io${escapeHtml(cell.getValue())}?zpw=tsasecret123&redirect=false&_bypassError=true" target="_blank">🟢</a>` : ""}</div>`},
-      {title:"Status", field:"Status", formatter: cell => `<div class="tabulator-cell">${escapeHtml(cell.getValue())}</div>`},
-      {title:"Priority", field:"Priority", formatter: cell => `<div class="tabulator-cell">${escapeHtml(cell.getValue())}</div>`},
-      {title:"QA Notes", field:"QA Notes", formatter: cell => `<div class="tabulator-cell">${escapeHtml(cell.getValue())}</div>`}
-    ],
-    responsiveLayout:"collapse",
-    responsiveLayoutCollapseStartOpen:true,
-    tooltips:true
-  });
+  // Initialize Tabulator with element (not selector) to avoid selector issues
+  try{
+    new Tabulator(tableContainer, {
+      data: tabData,
+      layout: window.innerWidth < 600 ? "fitDataFill" : "fitColumns",
+      reactiveData: true,
+      autoColumns: false,
+      columns: [
+        {title:"Title", field:"Title", formatter: cell => `<div class="tabulator-cell">${escapeHtml(cell.getValue())}</div>`},
+        {title:"Edit", field:"Form", hozAlign:"center",
+          formatter: cell => {
+            const row = cell.getRow().getData();
+            const id = row.ID;
+            const type = (row["Symphony Site Type"] || "").trim();
+            let url = "#";
+            if(type==="Metro Area") url=`https://sauss.sharepoint.com/sites/USSWEBADM/Lists/MetroAreaSitesInfoPagesSymphony/DispForm.aspx?ID=${encodeURIComponent(id)}&e=mY8mhG`;
+            else if(type==="Corps") url=`https://sauss.sharepoint.com/sites/USSWEBADM/Lists/CorpsSitesPageMigrationReport/DispForm.aspx?ID=${encodeURIComponent(id)}&e=dF11LG`;
+            return `<div class="tabulator-cell"><a href="${escapeHtml(url)}" target="_blank">Form</a></div>`;
+          }
+        },
+        {title:"SD", field:"Page URL", hozAlign:"center", formatter: cell => `<div class="tabulator-cell">${cell.getValue() ? `<a href="${escapeHtml(cell.getValue())}" target="_blank">🔗</a>` : ""}</div>`},
+        {title:"ZD", field:"Zesty URL Path Part", hozAlign:"center", formatter: cell => `<div class="tabulator-cell">${cell.getValue() ? `<a href="https://8hxvw8tw-dev.webengine.zesty.io${escapeHtml(cell.getValue())}?zpw=tsasecret123&redirect=false&_bypassError=true" target="_blank">🟢</a>` : ""}</div>`},
+        {title:"Status", field:"Status", formatter: cell => `<div class="tabulator-cell">${escapeHtml(cell.getValue())}</div>`},
+        {title:"Priority", field:"Priority", formatter: cell => `<div class="tabulator-cell">${escapeHtml(cell.getValue())}</div>`},
+        {title:"QA Notes", field:"QA Notes", formatter: cell => `<div class="tabulator-cell">${escapeHtml(cell.getValue())}</div>`}
+      ],
+      responsiveLayout:"collapse",
+      responsiveLayoutCollapseStartOpen:true,
+      tooltips:true,
+      height:"100%"
+    });
+  }catch(e){ console.warn('Tabulator init failed in QA modal', e); }
 
   // --- DOM-built accordion for this issue ---
-  // Build a unique accordion container id for this modal instance
   const modalAccordionIdRaw = `qa_issue_accordion_${page.ID}_${Math.random().toString(36).substr(2,6)}`;
   const modalAccordionId = String(modalAccordionIdRaw).replace(/[^a-zA-Z0-9-_]/g, '_');
 
@@ -595,67 +640,79 @@ function showQaIssuesModal(issueId){
   accordionDiv.className = "accordion mt-4";
   accordionDiv.id = modalAccordionId;
 
-  // Find all issue keys for this page (use pageId to be robust)
-  const allKeys = Object.keys(qaIssueDetailsMap).filter(k => qaIssueDetailsMap[k] && String(qaIssueDetailsMap[k].pageId) === String(page.ID));
+  // Collect instances for this page (id + data) to avoid accidental shared references
+  const instances = Object.keys(qaIssueDetailsMap)
+    .map(k => ({ id: k, data: qaIssueDetailsMap[k] }))
+    .filter(it => it.data && String(it.data.pageId) === String(page.ID));
 
-  // Deduplicate by lookupValue so we show one accordion per logical issue (not per instance)
-  const lookupToKey = {};
-  allKeys.forEach(k => {
-    const lv = (qaIssueDetailsMap[k] && qaIssueDetailsMap[k].lookupValue) ? String(qaIssueDetailsMap[k].lookupValue).trim() : k;
-    if (!lookupToKey[lv]) lookupToKey[lv] = k;
-  });
+  if (!instances.length) instances.push({ id: issueId, data: issueData });
 
-  let issueKeys = Object.values(lookupToKey);
+  // Ensure the clicked issue appears first (and expanded)
+  const clickedIndex = instances.findIndex(it => it.id === issueId);
+  if (clickedIndex > 0) instances.unshift(instances.splice(clickedIndex, 1)[0]);
 
-  // If we have no other keys, fall back to the provided issueId
-  if (!issueKeys.length) issueKeys = [issueId];
-
-  // Determine which index to show: prefer the requested issueId if present, otherwise show the first
-  let showIndex = issueKeys.indexOf(issueId);
-  if (showIndex === -1) showIndex = 0;
-
-  issueKeys.forEach((k, index) => {
-    const idSafe = k;
-    const dataObj = qaIssueDetailsMap[k];
-    const showClass = (index === showIndex) ? 'show' : '';
+  instances.forEach((inst, idx) => {
+    const k = inst.id;
+    const dataObj = inst.data || {};
+    const idSafe = String(k).replace(/[^a-zA-Z0-9-_]/g, '_');
+    const show = (k === issueId);
 
     const item = document.createElement('div');
     item.className = 'accordion-item';
-    const whyPresent = dataObj.why && dataObj.why.toString().trim();
-    const howPresent = dataObj.how && dataObj.how.toString().trim();
-    const howDetailsPresent = dataObj.howDetails && dataObj.howDetails.toString().trim();
 
-    item.innerHTML = `
-      <h2 class="accordion-header" id="heading_${idSafe}">
-        <button class="accordion-button ${showClass ? '' : 'collapsed'}" type="button" data-bs-toggle="collapse" data-bs-target="#collapse_${idSafe}" aria-expanded="${showClass ? 'true' : 'false'}" aria-controls="collapse_${idSafe}">
-          ${escapeHtml(dataObj.lookupValue || ('Issue ' + (index+1)))}
-        </button>
-      </h2>
-      <div id="collapse_${idSafe}" class="accordion-collapse collapse ${showClass}" data-bs-parent="#${modalAccordionId}">
-        <div class="accordion-body">
-          ${whyPresent ? `<h6>Why This Is Important</h6><p>${escapeHtml(dataObj.why)}</p>` : ""}
-          ${howPresent ? `<h6>How to Fix</h6><p>${escapeHtml(dataObj.how)}</p>` : ""}
-          ${howDetailsPresent ? `<h6>How to Fix Details</h6><p>${escapeHtml(dataObj.howDetails)}</p>` : ""}
-        </div>
-      </div>
-    `;
+    // Header
+    const h2 = document.createElement('h2');
+    h2.className = 'accordion-header';
+    h2.id = `heading_${idSafe}`;
 
+    const btn = document.createElement('button');
+    btn.className = `accordion-button ${show ? '' : 'collapsed'}`;
+    btn.type = 'button';
+    btn.setAttribute('data-bs-toggle', 'collapse');
+    btn.setAttribute('data-bs-target', `#collapse_${idSafe}`);
+    btn.setAttribute('aria-expanded', show ? 'true' : 'false');
+    btn.setAttribute('aria-controls', `collapse_${idSafe}`);
+    btn.textContent = dataObj.lookupValue || (`Issue ${idx+1}`);
+
+    h2.appendChild(btn);
+    item.appendChild(h2);
+
+    // Collapse body
+    const collapse = document.createElement('div');
+    collapse.id = `collapse_${idSafe}`;
+    collapse.className = `accordion-collapse collapse${show ? ' show' : ''}`;
+    collapse.setAttribute('data-bs-parent', `#${modalAccordionId}`);
+
+    const body = document.createElement('div');
+    body.className = 'accordion-body';
+
+    if (dataObj.why) {
+      const hWhy = document.createElement('h6'); hWhy.textContent = 'Why This Is Important';
+      const pWhy = document.createElement('p'); pWhy.textContent = dataObj.why;
+      body.appendChild(hWhy); body.appendChild(pWhy);
+    }
+    if (dataObj.how) {
+      const hHow = document.createElement('h6'); hHow.textContent = 'How to Fix';
+      const pHow = document.createElement('p'); pHow.textContent = dataObj.how;
+      body.appendChild(hHow); body.appendChild(pHow);
+    }
+    if (dataObj.howDetails) {
+      const hDetails = document.createElement('h6'); hDetails.textContent = 'How to Fix Details';
+      const pDetails = document.createElement('p'); pDetails.textContent = dataObj.howDetails;
+      body.appendChild(hDetails); body.appendChild(pDetails);
+    }
+
+    collapse.appendChild(body);
+    item.appendChild(collapse);
     accordionDiv.appendChild(item);
   });
 
   modalBody.appendChild(accordionDiv);
- 
 
-    // Focus first actionable element for accessibility (after shown)
-    const firstAction = modalBody.querySelector('button, a');
-    if (firstAction) firstAction.focus();
+  try { new bootstrap.Modal(modalEl).show(); } catch(e){ console.warn('bootstrap.Modal failed to show QA modal', e); }
 
-    console.log("Modal opened with issueId:", issueId);
-    console.log("Available keys:", Object.keys(qaIssueDetailsMap));
-  });
-  };
-
-  modalEl.addEventListener('shown.bs.modal', onShown);
+  console.log("Modal opened with issueId:", issueId);
+  console.log("Available keys:", Object.keys(qaIssueDetailsMap));
 }
 
 // (duplicate escapeHtml removed - single definition exists earlier)
@@ -667,41 +724,45 @@ function renderCards(){
   renderOverallProgress(filtered);
 
 
-    // --- metrics object ---
-  const metrics = {
-    "Migration Progress": (() => {
+    // --- replace the metrics object ---
+const metrics = {
+  "Migration Progress": (() => {
       const total = filtered.length;
-      const completed = filtered.filter(d => (d.Status || '').toString().trim().startsWith('4') || (d.Status || '').toString().trim().startsWith('5')).length;
-      const doNotMigrate = filtered.filter(d => (d.Status || '').toString().trim() === "Do Not Migrate").length;
+      const completed = filtered.filter(d => ["4","5"].some(s => d.Status?.trim().startsWith(s))).length;
+      const doNotMigrate = filtered.filter(d => d.Status?.trim() === "Do Not Migrate").length;
       const progressCount = completed + doNotMigrate;
       const progressPct = total > 0 ? Math.round((progressCount / total) * 100) : 0;
       return `${progressPct}% (${progressCount} of ${total} Total Pages)`;
-    })(),
+  })(),
 
-    "Completed": filtered.filter(d => ((d.Status || '').toString().trim().startsWith('4') || (d.Status || '').toString().trim().startsWith('5'))).length,
-    "Do Not Migrate": filtered.filter(d => (d.Status || '').toString().trim() === "Do Not Migrate").length,
+  "Completed": filtered.filter(d => ["4","5"].some(s => d.Status?.trim().startsWith(s))).length,
+  "Do Not Migrate": filtered.filter(d => d.Status?.trim() === "Do Not Migrate").length,
 
-    "Weekly Modified": (() => {
+  "Weekly Modified": (() => {
       const today = new Date();
       const thisWeekStart = new Date(today);
       thisWeekStart.setDate(today.getDate() - 7);
+
       const thisWeekCount = filtered.filter(d => d.Modified && new Date(d.Modified) >= thisWeekStart).length;
+
       const prevWeekStart = new Date(today);
       prevWeekStart.setDate(today.getDate() - 14);
       const prevWeekEnd = new Date(today);
       prevWeekEnd.setDate(today.getDate() - 7);
-      const prevWeekCount = filtered.filter(d => d.Modified && new Date(d.Modified) >= prevWeekStart && new Date(d.Modified) < prevWeekEnd).length;
-      return `This Week: ${thisWeekCount} | Last Week: ${prevWeekCount}`;
-    })(),
 
-    "QA Issues": (() => {
+      const prevWeekCount = filtered.filter(d => d.Modified && new Date(d.Modified) >= prevWeekStart && new Date(d.Modified) < prevWeekEnd).length;
+
+      return `This Week: ${thisWeekCount} | Last Week: ${prevWeekCount}`;
+  })(),
+
+  "QA Issues": (() => {
       const total = filtered.filter(d => d["QA Issues.lookupValue"]).length;
       const high = filtered.filter(d => d["QA Issues.lookupValue"] && d.Priority === "High").length;
       const low = total - high;
       renderCharts(filtered);
       return `High: ${high} | Low: ${low} | Total: ${total}`;
-    })()
-  };
+  })()
+};
 
 
 
@@ -750,7 +811,7 @@ filtered.forEach(d => {
   // Status chart
 // Map of status to color
 const statusColors = {
-  "Do Not Migrate": "#E74C3C", // red
+  "Do Not Migrate": "#dc3545", // red
   "Completed": "#28a745",      // green
   "In QA": "#fd7e14",          // orange 
   "Needs Info": "#002056",     // navy/
@@ -866,7 +927,6 @@ try{ addChartLegendModal(statusChart, 'Status'); }catch(e){}
   });
       try{ addChartLegendModal(pubSymChart, 'Published Symphony'); }catch(e){}
 }
-    // (No global exposures required — keep functions top-level and add runtime guards.)
 
 // Cards rendering
 // Old Colors '#f1c40f','#2ecc71','#e74c3c','#f39c12','#3498db','#9b59b6','#16a085','#d35400','#ff6b6b', '#f7b32b', '#4ecdc4'
@@ -1198,131 +1258,6 @@ title: "Title",
   });
 }
 
-// Render overall progress bar and legend
-function renderOverallProgress(filtered){
-  if (!Array.isArray(filtered)) return;
-  const total = filtered.length;
-  const counts = { "Do Not Migrate":0, "Needs Info":0, "In Progress":0, "In QA":0, Unknown:0, Completed:0 };
-  
-  filtered.forEach(d=>{
-    const s = getCanonicalStatus(d.Status);
-    counts[s] = (counts[s] || 0) + 1;
-  });
-
-  const container = document.getElementById("progressBarContainer");
-  if (!container) return;
-  container.innerHTML = "";
-
-  const legendContainer = document.getElementById("progressLegend");
-  if (!legendContainer) return;
-  legendContainer.innerHTML = "";
-
-  Object.keys(counts).forEach(key=>{
-    const pct = total ? (counts[key]/total*100) : 0; // use float, not rounded
-    if(counts[key] > 0){  // render all non-zero counts
-      const div = document.createElement("div");
-      div.className = "progress-bar";
-      div.style.width = pct + "%";
-      div.style.backgroundColor = statusColors[key];
-      div.style.display="flex";
-      div.style.alignItems="center";
-      div.style.justifyContent="center";
-      div.innerText = `${Math.round(pct)}% (${counts[key]})`;
-      container.appendChild(div);
-
-      // Add legend
-      const legendItem = document.createElement("div");
-      legendItem.className = "d-flex align-items-center gap-1 legend-item";
-      legendItem.innerHTML =
-        `<span style="display:inline-block;width:14px;height:14px;background-color:${statusColors[key]};"></span> ${key} – ${Math.round(pct)}% (${counts[key]})`;
-      legendContainer.appendChild(legendItem);
-
-    }
-  });
-}
-
-// Normalize status string
-function normalizeStatus(status){
-  return (status || "").toString().trim();
-}
-
-// Map raw status values to canonical buckets used throughout the dashboard
-function getCanonicalStatus(status) {
-  if (!status) return "Unknown";
-  status = status.toString().trim();
-  if (/^4|^5/.test(status)) return "Completed";
-  if (status === "Do Not Migrate") return "Do Not Migrate";
-  if (/^2/.test(status)) return "In Progress";
-  if (/^1/.test(status)) return "Needs Info";
-  if (/^3[a-c]/.test(status)) return "In QA";
-  return "Unknown";
-}
-
-// Small helper to escape HTML in strings inserted via innerHTML
-function escapeHtml(str){
-  if (str === null || str === undefined) return '';
-  return String(str)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
-}
-
-// Normalize a value (date-only string or timestamp) to UTC midnight milliseconds.
-// This ensures date-only strings like '2025-09-30' and full timestamps are compared
-// on the same UTC date boundary regardless of client timezone.
-function dateToUtcMidnightMs(v){
-  if (!v && v !== 0) return null;
-  // If already a number, treat as ms
-  if (typeof v === 'number' && !isNaN(v)) return Date.UTC(new Date(v).getUTCFullYear(), new Date(v).getUTCMonth(), new Date(v).getUTCDate());
-  if (typeof v === 'string'){
-    const s = v.trim();
-    // YYYY-MM-DD exact match
-    const m = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-    if (m){
-      const y = parseInt(m[1],10), mo = parseInt(m[2],10)-1, d = parseInt(m[3],10);
-      return Date.UTC(y, mo, d);
-    }
-    const dt = new Date(s);
-    if (!isNaN(dt)) return Date.UTC(dt.getUTCFullYear(), dt.getUTCMonth(), dt.getUTCDate());
-    return null;
-  }
-  if (v instanceof Date){
-    if (isNaN(v)) return null;
-    return Date.UTC(v.getUTCFullYear(), v.getUTCMonth(), v.getUTCDate());
-  }
-  return null;
-}
-
-// debounce helper to avoid excessive re-renders on rapid input changes
-function debounce(fn, wait){
-  let timer = null;
-  return function(...args){
-    const ctx = this;
-    clearTimeout(timer);
-    timer = setTimeout(()=> fn.apply(ctx, args), wait);
-  };
-}
-
-// Initialize filter controls: attach change listeners and populate options
-function initFilters(){
-  const filterIds = ["filterDivision","filterAC","filterStatus","filterPageType","filterPubSym","filterSymType","filterPriority","filterEffort"];
-
-  filterIds.forEach(id=>{
-    const sel = document.getElementById(id);
-    if (sel) sel.addEventListener("change", debounce(updateFiltersAndDashboard, 150));
-  });
-
-  // Wire Modified date range inputs (optional date inputs with IDs filterModifiedFrom and filterModifiedTo)
-  const modFrom = document.getElementById('filterModifiedFrom');
-  const modTo = document.getElementById('filterModifiedTo');
-  if (modFrom) modFrom.addEventListener('change', debounce(updateFiltersAndDashboard, 150));
-  if (modTo) modTo.addEventListener('change', debounce(updateFiltersAndDashboard, 150));
-
-  updateFiltersOptions();
-}
-
 // Make sure masterData references tableData (assign to previously declared variable)
 masterData = tableData;
 
@@ -1435,98 +1370,11 @@ function palette(n){
 
 
 // --- Priority chart ---
-function renderCharts(filtered) {
-  if (!Array.isArray(filtered)) filtered = [];
-  try{
-    const ctxStatusEl = document.getElementById("statusChart");
-    const ctxPriorityEl = document.getElementById("priorityChart");
-    const ctxPageTypeEl = document.getElementById("pageTypeChart");
-    const ctxPubSymEl = document.getElementById("pubSymChart");
-    if (!ctxStatusEl || !ctxPriorityEl || !ctxPageTypeEl || !ctxPubSymEl) return;
-
-    const ctxStatus = ctxStatusEl.getContext("2d");
-    const ctxPriority = ctxPriorityEl.getContext("2d");
-    const ctxPageType = ctxPageTypeEl.getContext("2d");
-    const ctxPubSym = ctxPubSymEl.getContext("2d");
-
-    const statusCounts = {};
-    filtered.forEach(d => {
-      let s = normalizeStatus(d.Status) || "Unknown";
-      if (/^(4|5)/.test(s)) s = "Completed";
-      else if (s === "Do Not Migrate") s = "Do Not Migrate";
-      else if (/^2/.test(s)) s = "In Progress";
-      else if (/^1/.test(s)) s = "Needs Info";
-      else if (/^3[a-c]/.test(s)) s = "In QA";
-      else s = s || "Unknown";
-      statusCounts[s] = (statusCounts[s] || 0) + 1;
-    });
-
-    const labels = Object.keys(statusCounts);
-    const data = Object.values(statusCounts);
-    const backgroundColor = labels.map(label => statusColors[label] || "#6c757d");
-
-    if (statusChart) try{ statusChart.destroy(); }catch(e){}
-    statusChart = new Chart(ctxStatus, {
-      type: 'pie',
-      data: { labels: labels, datasets: [{ data: data, backgroundColor }] },
-      options: { plugins: { legend: { display: false }, tooltip: { enabled: true } } }
-    });
-    try{ addChartLegendModal(statusChart, 'Status'); }catch(e){}
-
-    // Priority
-    const priorityCounts = {};
-    filtered.forEach(d => { const p = d.Priority || 'None'; priorityCounts[p] = (priorityCounts[p] || 0) + 1; });
-    if (priorityChart) try{ priorityChart.destroy(); }catch(e){}
-    priorityChart = new Chart(ctxPriority, {
-      type: 'pie',
-      data: { labels: Object.keys(priorityCounts), datasets: [{ data: Object.values(priorityCounts), backgroundColor: ["#002056","#f1c40f","#f39c12","#e74c3c","#3498db","#9b59b6","#16a085","#d35400","#ff6b6b"] }] },
-      options: { plugins: { legend: { display: false }, tooltip: { enabled: true } } }
-    });
-    try{ addChartLegendModal(priorityChart, 'Priority'); }catch(e){}
-
-    // Page Type
-    const pageTypeCounts = {};
-    filtered.forEach(d => { const pt = d['Page Type'] || 'Not Set'; pageTypeCounts[pt] = (pageTypeCounts[pt] || 0) + 1; });
-    if (pageTypeChart) try{ pageTypeChart.destroy(); }catch(e){}
-    pageTypeChart = new Chart(ctxPageType, {
-      type: 'pie',
-      data: { labels: Object.keys(pageTypeCounts), datasets: [{ data: Object.values(pageTypeCounts), backgroundColor: ["#002056","#2ecc71","#e74c3c","#f39c12","#3498db"] }] },
-      options: { plugins: { legend: { display: false }, tooltip: { enabled: true } } }
-    });
-    try{ addChartLegendModal(pageTypeChart, 'Page Type'); }catch(e){}
-
-    // Published Symphony
-    const pubSymCounts = {};
-    filtered.forEach(d => { const ps = d['Published Symphony'] || 'Not Set'; pubSymCounts[ps] = (pubSymCounts[ps] || 0) + 1; });
-    if (pubSymChart) try{ pubSymChart.destroy(); }catch(e){}
-    pubSymChart = new Chart(ctxPubSym, {
-      type: 'pie',
-      data: { labels: Object.keys(pubSymCounts), datasets: [{ data: Object.values(pubSymCounts), backgroundColor: ["#002056","#e74c3c","#f39c12","#3498db","#9b59b6"] }] },
-      options: { plugins: { legend: { display: false }, tooltip: { enabled: true } } }
-    });
-    try{ addChartLegendModal(pubSymChart, 'Published Symphony'); }catch(e){}
-  }catch(err){ console.warn('renderCharts failed', err); }
-}
-
 function updateDashboard(){
   renderCards();
-  // Only render the table if Tabulator is available
-  if (typeof Tabulator !== 'undefined') {
-    try { renderTable(); } catch(e){ console.warn('renderTable failed', e); }
-  }
-
-  // Only render charts if Chart.js is present
-  if (typeof Chart !== 'undefined') {
-    try { renderCharts(getFilteredData()); } catch(e){ console.warn('renderCharts failed', e); }
-  }
-
-  try { renderOverallProgress(getFilteredData()); } catch(e){ console.warn('renderOverallProgress failed', e); }
-
-  // Update Page Details badge with current filtered count
-  try{
-    const badge = document.getElementById('pageDetailsBadge');
-    if (badge) badge.textContent = String(getFilteredData().length || 0);
-  }catch(e){}
+  renderTable();
+  renderCharts(getFilteredData());
+  renderOverallProgress(getFilteredData());
 }
 
 /* Migration Dates module: FullCalendar (grid) + Agenda (list) + Table (Tabulator) */

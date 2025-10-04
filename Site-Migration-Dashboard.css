@@ -211,6 +211,14 @@ h1, h2, h3, h4, h5, h6 {
     flex: 0 0 auto;         /* prevent flex items from shrinking */
     width: auto;            /* let each filter keep its natural width */
   }
+
+  /* Ensure date inputs visually match the select controls in the filters row */
+  .filters-row input.form-control-sm[type="date"] {
+    height: calc(1.5em + .5rem + 2px); /* similar to .form-select height for small inputs */
+    padding: .25rem .5rem;
+    font-size: 0.875rem;
+    line-height: 1.5;
+  }
 }
 
 /* Horizontal scroll for charts on md/sm screens */
@@ -334,6 +342,14 @@ h1, h2, h3, h4, h5, h6 {
   color: darkslategray;
 }
 
+/* Small spacer under the Page Details badge to separate it from the table below */
+#pageDetailsBadge {
+  display: inline-block; /* allow vertical margin */
+  margin-left: 0.5rem;    /* slight gap from heading text */
+  margin-top: -0.5rem;   /* pull the badge upward to overlap less space above */
+  margin-bottom: 1rem;  /* create more space beneath the badge */
+}
+
 /* Wider QA 'How to Fix Details' column in modals */
 .modal-body td.qa-fix-details {
   min-width: 320px;    /* make the column noticeably wider */
@@ -398,4 +414,15 @@ h1, h2, h3, h4, h5, h6 {
 }
 .qa-issue-card .card-body .mt-auto {
   margin-top: 0.5rem; /* ensure button sits slightly separated from subtitle */
+}
+
+/* Wider right-hand detail panel inside QA modal to emphasize How-to-Fix Details */
+#qaIssueDetailPanel {
+  min-width: 360px;
+  max-width: 720px;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 575px) {
+  #qaIssueDetailPanel { min-width: auto; max-width: none; }
 }
