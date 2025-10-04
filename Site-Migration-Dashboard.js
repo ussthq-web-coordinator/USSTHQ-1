@@ -251,7 +251,7 @@ let pageTypeChart = null;
 let pubSymChart = null;
 // Application version (edit this value to bump the UI version shown on the page)
 // Keep this value here so you can edit it directly in the JS without relying on DashboardData.json
-const APP_VERSION = '2510.04.1216';
+const APP_VERSION = '2510.04.1344';
 // Also expose to window so you can tweak at runtime in the browser console if needed
 window.APP_VERSION = window.APP_VERSION || APP_VERSION;
 
@@ -434,7 +434,11 @@ function renderQaAccordion(data){
         const master = qaLookupMaster && qaLookupMaster[issue];
         const effectiveWhy = (master && master.why) ? master.why : why;
         const effectiveHow = (master && master.how) ? master.how : how;
-        const effectiveHowDetails = (master && master.howDetails) ? master.howDetails : howDetails;
+  // If a master lookup row exists, prefer its howDetails value even if empty.
+  // This ensures that when the CSV doesn't provide How to Fix Details we do
+  // NOT fall back to the page row's value and therefore the accordion
+  // section will be hidden for that issue.
+  const effectiveHowDetails = master ? (master.howDetails || "") : howDetails;
 
         qaIssueDetailsMap[issueId] = {
           pageTitle: title,
