@@ -1323,25 +1323,96 @@ function truncateExact(str, limit){
 // This ensures date-only strings like '2025-09-30' and full timestamps are compared
 // on the same UTC date boundary regardless of client timezone.
 function dateToUtcMidnightMs(v){
+  // Fast, memoized conversion of a value to the UTC ms corresponding to midnight in America/New_York.
+  // Initialize one-time formatters and caches on first call to avoid repeated Intl construction.
+  if (!dateToUtcMidnightMs._init){
+    const TZ = 'America/New_York';
+    dateToUtcMidnightMs._TZ = TZ;
+    dateToUtcMidnightMs._dtfFull = new Intl.DateTimeFormat('en-US', { timeZone: TZ, hour12: false, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    dateToUtcMidnightMs._dtfDay = new Intl.DateTimeFormat('en-US', { timeZone: TZ, year: 'numeric', month: '2-digit', day: '2-digit' });
+    dateToUtcMidnightMs._offsetCache = new Map(); // key: 'YYYY-MM-DD' -> offset minutes
+    dateToUtcMidnightMs._resultCache = new Map(); // key: typed input -> utcMs
+    dateToUtcMidnightMs._init = true;
+  }
+
   if (!v && v !== 0) return null;
-  // If already a number, treat as ms
-  if (typeof v === 'number' && !isNaN(v)) return Date.UTC(new Date(v).getUTCFullYear(), new Date(v).getUTCMonth(), new Date(v).getUTCDate());
+
+  const TZ = dateToUtcMidnightMs._TZ;
+  const dtfFull = dateToUtcMidnightMs._dtfFull;
+  const dtfDay = dateToUtcMidnightMs._dtfDay;
+  const offsetCache = dateToUtcMidnightMs._offsetCache;
+  const resultCache = dateToUtcMidnightMs._resultCache;
+
+  function partsFromFormatter(dtf, date){
+    const parts = dtf.formatToParts(date); const p = {}; parts.forEach(x=>{ if (x.type) p[x.type] = x.value; }); return p;
+  }
+
+  function utcMsForTzMidnight(y, mo, d){
+    const key = `${y}-${mo}-${d}`;
+    if (offsetCache.has(key)){
+      const offsetMin = offsetCache.get(key);
+      return Date.UTC(y, mo, d, 0, 0, 0) - (offsetMin * 60000);
+    }
+    // Use midday UTC (12:00) to reliably detect DST offset for that local date
+    const middayUtc = Date.UTC(y, mo, d, 12, 0, 0);
+    try{
+      const p = partsFromFormatter(dtfFull, new Date(middayUtc));
+      const hh = parseInt(p.hour||'0',10), mm = parseInt(p.minute||'0',10), ss = parseInt(p.second||'0',10);
+      const asUtc = Date.UTC(parseInt(p.year,10), parseInt(p.month,10)-1, parseInt(p.day,10), hh, mm, ss);
+      const offsetMin = Math.round((asUtc - middayUtc)/60000);
+      offsetCache.set(key, offsetMin);
+      return Date.UTC(y, mo, d, 0, 0, 0) - (offsetMin * 60000);
+    }catch(e){
+      // fallback to naive UTC midnight
+      offsetCache.set(key, 0);
+      return Date.UTC(y, mo, d, 0, 0, 0);
+    }
+  }
+
+  function cacheKeyFor(v){
+    if (typeof v === 'number' && !isNaN(v)) return `n:${v}`;
+    if (typeof v === 'string') return `s:${v}`;
+    if (v instanceof Date) return `d:${v.getTime()}`;
+    return `o:${String(v)}`;
+  }
+
+  const key = cacheKeyFor(v);
+  if (resultCache.has(key)) return resultCache.get(key);
+
+  // compute
+  let result = null;
+  if (typeof v === 'number' && !isNaN(v)){
+    const p = partsFromFormatter(dtfDay, new Date(v));
+    const y = parseInt(p.year,10), mo = parseInt(p.month,10)-1, d = parseInt(p.day,10);
+    result = utcMsForTzMidnight(y, mo, d);
+    resultCache.set(key, result); return result;
+  }
+
   if (typeof v === 'string'){
     const s = v.trim();
-    // YYYY-MM-DD exact match
     const m = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-    if (m){
-      const y = parseInt(m[1],10), mo = parseInt(m[2],10)-1, d = parseInt(m[3],10);
-      return Date.UTC(y, mo, d);
-    }
+    if (m){ const y = parseInt(m[1],10), mo = parseInt(m[2],10)-1, d = parseInt(m[3],10); result = utcMsForTzMidnight(y, mo, d); resultCache.set(key, result); return result; }
+    const m2 = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+    if (m2){ const mo = parseInt(m2[1],10)-1, d = parseInt(m2[2],10), y = parseInt(m2[3],10); result = utcMsForTzMidnight(y, mo, d); resultCache.set(key, result); return result; }
     const dt = new Date(s);
-    if (!isNaN(dt)) return Date.UTC(dt.getUTCFullYear(), dt.getUTCMonth(), dt.getUTCDate());
-    return null;
+    if (!isNaN(dt)){
+      const p = partsFromFormatter(dtfDay, dt);
+      const y = parseInt(p.year,10), mo = parseInt(p.month,10)-1, d = parseInt(p.day,10);
+      result = utcMsForTzMidnight(y, mo, d);
+      resultCache.set(key, result); return result;
+    }
+    resultCache.set(key, null); return null;
   }
+
   if (v instanceof Date){
-    if (isNaN(v)) return null;
-    return Date.UTC(v.getUTCFullYear(), v.getUTCMonth(), v.getUTCDate());
+    if (isNaN(v)) { resultCache.set(key, null); return null; }
+    const p = partsFromFormatter(dtfDay, v);
+    const y = parseInt(p.year,10), mo = parseInt(p.month,10)-1, d = parseInt(p.day,10);
+    result = utcMsForTzMidnight(y, mo, d);
+    resultCache.set(key, result); return result;
   }
+
+  resultCache.set(key, null);
   return null;
 }
 
@@ -1722,6 +1793,20 @@ function updateDashboard(){
     const search = document.getElementById('migrationSearch');
     const modal = document.getElementById('migrationDatesModal');
     const exportBtn = document.getElementById('exportMigrationJson');
+
+  // Force a consistent height for the Modified From/To date inputs via inline style
+  // This guarantees the visual change even if a framework rule is stronger.
+  ['filterModifiedFrom','filterModifiedTo'].forEach(id=>{
+    try{
+      const el = document.getElementById(id);
+      if(el){
+        el.style.height = '38px';
+        el.style.minHeight = '38px';
+        el.style.padding = '6px 8px';
+        el.style.boxSizing = 'border-box';
+      }
+    }catch(e){}
+  });
 
   function showCalendar(){ document.getElementById('migrationFullCalendar').style.display=''; document.getElementById('migrationAgenda').style.display='none'; if(btnCal) btnCal.classList.add('btn-primary'); if(btnCal) btnCal.classList.remove('btn-outline-primary'); if(btnAgenda) btnAgenda.classList.remove('btn-primary'); if(btnAgenda) btnAgenda.classList.add('btn-outline-primary'); }
   function showAgenda(){ document.getElementById('migrationFullCalendar').style.display='none'; document.getElementById('migrationAgenda').style.display=''; if(btnAgenda) btnAgenda.classList.add('btn-secondary'); if(btnAgenda) btnAgenda.classList.remove('btn-outline-primary'); if(btnCal) btnCal.classList.remove('btn-primary'); if(btnCal) btnCal.classList.add('btn-outline-primary'); }
