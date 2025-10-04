@@ -356,7 +356,6 @@ input#filterModifiedTo.form-control.form-control-sm {
   @media (max-width: 575px) {
     .qa-modal-table-container .tabulator .tabulator-row .tabulator-cell:not([data-field="Title"]):not([data-field="QA Notes"]) {
       max-height: 30px !important;    /* prefer smaller rows on mobile */
-      min-height: 0 !important;
       line-height: 1.1 !important;    /* let text determine true height when necessary */
       display: flex !important;
       align-items: center !important;  /* vertically center single-line content */

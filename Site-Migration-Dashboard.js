@@ -1202,6 +1202,7 @@ function renderTable(){
     data: filtered,
     layout:"fitDataStretch",
     responsiveLayout:"collapse",
+    rowHeight: 27,
     initialSort: [              
         { column: "Title", dir: "asc" },
   ],
