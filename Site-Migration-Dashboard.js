@@ -6,7 +6,7 @@ const _migrationSampleData = [
   { "Site Title": "North and South Carolina", "Migration Date": "2025-08-21", "View Website URL": "https://www.salvationarmyusa.org/usa-southern-territory/north-and-south-carolina/", "Division": "North and South Carolina" },
   { "Site Title": "Potomac", "Migration Date": "2025-09-05", "View Website URL": "https://www.salvationarmyusa.org/usa-southern-territory/potomac/", "Division": "Potomac" },
   { "Site Title": "Kentucky and Tennessee", "Migration Date": "2025-10-01", "View Website URL": "https://www.salvationarmyusa.org/usa-southern-territory/kentucky-and-tennessee/", "Division": "Kentucky and Tennessee" },
-  { "Site Title": "Arkansas and Oklahoma", "Migration Date": "2025-10-02", "View Website URL": "https://www.salvationarmyusa.org/usa-southern-territory/arkansas-and-oklahoma/", "Division": "Alabama, Louisiana, and Mississippi" },
+  { "Site Title": "Arkansas and Oklahoma", "Migration Date": "2025-10-02", "View Website URL": "https://www.salvationarmyusa.org/usa-southern-territory/arkansas-and-oklahoma/", "Division": "Arkansas and Oklahoma" },
   { "Site Title": "Alabama, Louisiana, and Mississippi", "Migration Date": "", "View Website URL": "", "Division": "Alabama, Louisiana, and Mississippi" },
   { "Site Title": "Texas", "Migration Date": "", "View Website URL": "", "Division": "Texas" },
   { "Site Title": "Florida", "Migration Date": "", "View Website URL": "", "Division": "Florida" },
@@ -130,6 +130,7 @@ function adjustLabel(rawValue) {
 const filterMapping = {
   filterDivision: d => d.Division || "Not Set",
   filterAC: d => (d["Area Command Admin Group.title"] || d["Local Web Admin Group.title"] || "Not Set"),
+  filterSiteTitle: d => d["Site Title"] || "Not Set",
   filterStatus: d => d.Status || "Not Set",
   filterPageType: d => d["Page Type"] || "Not Set",
   filterPubSym: d => d["Published Symphony"] || "Not Set",
@@ -143,6 +144,7 @@ function updateFiltersOptions() {
   const selected = {
     filterDivision: getSelectValue("filterDivision"),
     filterAC: getSelectValue("filterAC"),
+    filterSiteTitle: getSelectValue("filterSiteTitle"),
     filterStatus: getSelectValue("filterStatus"),
     filterPageType: getSelectValue("filterPageType"),
     filterPubSym: getSelectValue("filterPubSym"),
@@ -219,6 +221,7 @@ function getFilteredData(){
   const symType = getSelectValue("filterSymType");
   const priority = getSelectValue("filterPriority");
   const effort = getSelectValue("filterEffort");
+  const siteTitle = getSelectValue("filterSiteTitle");
   const modFromEl = document.getElementById('filterModifiedFrom');
   const modToEl = document.getElementById('filterModifiedTo');
   const modifiedFromMs = dateToUtcMidnightMs(modFromEl && modFromEl.value);
@@ -233,6 +236,7 @@ function getFilteredData(){
     (!symType || d["Symphony Site Type"]===symType)
     && (!priority || (d.Priority || "") === priority)
     && (!effort || (d["Effort Needed"] || "") === effort)
+    && (!siteTitle || d["Site Title"] === siteTitle)
     && ( !modifiedFromMs || (d.Modified && dateToUtcMidnightMs(d.Modified) !== null && dateToUtcMidnightMs(d.Modified) >= modifiedFromMs) )
     && ( !modifiedToMs || (d.Modified && dateToUtcMidnightMs(d.Modified) !== null && dateToUtcMidnightMs(d.Modified) <= modifiedToMs) )
   );
@@ -264,7 +268,7 @@ function transformCountsForPie(rawCounts, method = 'sqrt'){
 }
 // Application version (edit this value to bump text shown on the page)
 // Keep this value here so you can edit it directly in the JS without relying on DashboardData.json
-const APP_VERSION = '2510.04.1840';
+const APP_VERSION = '2510.04.1922';
 // Also expose to window so you can tweak at runtime in the browser console if needed
 window.APP_VERSION = window.APP_VERSION || APP_VERSION;
 
@@ -497,7 +501,7 @@ function renderQaAccordion(data){
       inlineDiv.innerHTML = `<div class="small text-muted mt-2">${escapeHtml(quickWhy)}</div>`;
 
   const footer = document.createElement('div'); footer.className = 'mt-auto pt-1 d-flex justify-content-center align-items-center';
-  const btn = document.createElement('button'); btn.className = 'btn btn-sm btn-outline-primary';
+  const btn = document.createElement('button'); btn.className = 'btn btn-sm btn-primary';
   btn.innerHTML = `View Issues <span class="badge bg-warning qa-badge ms-2">${pageIssueIds.length}</span>`;
   btn.addEventListener('click', ()=> showQaIssuesModal(firstIssueId));
   footer.appendChild(btn);
@@ -1484,7 +1488,7 @@ function debounce(fn, wait){
 
 // Initialize filter controls: attach change listeners and populate options
 function initFilters(){
-  const filterIds = ["filterDivision","filterAC","filterStatus","filterPageType","filterPubSym","filterSymType","filterPriority","filterEffort"];
+  const filterIds = ["filterDivision","filterAC","filterStatus","filterPageType","filterPubSym","filterSymType","filterPriority","filterEffort","filterSiteTitle"];
 
   filterIds.forEach(id=>{
     const sel = document.getElementById(id);
@@ -1947,11 +1951,13 @@ function updateDashboard(){
 
   // Table view removed — migration modal shows Calendar and Agenda only
 
-  function refreshFullCalendar(){
+  // Refresh the FullCalendar instance using an optional data array (filteredResults).
+  // If no data is provided, fall back to migrationData or sample data.
+  function refreshFullCalendar(filteredResults){
     const el = document.getElementById('migrationFullCalendar'); if(!el || typeof FullCalendar==='undefined') return;
-    // Use migrationData if present, otherwise fall back to sample data
-    const source = (Array.isArray(migrationData) && migrationData.length) ? migrationData : (typeof _migrationSampleData !== 'undefined' ? _migrationSampleData : []);
-    const events = source.filter(r=>r['Migration Date']).map(toEvent);
+    // Use provided filteredResults if present, otherwise migrationData, otherwise sample data
+    const source = Array.isArray(filteredResults) ? filteredResults : ((Array.isArray(migrationData) && migrationData.length) ? migrationData : (typeof _migrationSampleData !== 'undefined' ? _migrationSampleData : []));
+    const events = (Array.isArray(source) ? source : []).filter(r=>r['Migration Date']).map(toEvent);
     if (!fullCalendar){
       fullCalendar = new FullCalendar.Calendar(el,{
         initialView: 'dayGridMonth',
@@ -1965,6 +1971,7 @@ function updateDashboard(){
       });
       fullCalendar.render();
     } else {
+      // Replace existing events with the filtered set
       fullCalendar.removeAllEvents();
       events.forEach(e=>fullCalendar.addEvent(e));
     }
@@ -1992,7 +1999,13 @@ function updateDashboard(){
     }catch(e){}
   }
 
-  function filterMigrationData(q){ if(!q) return migrationData.slice(); const s=q.toLowerCase(); return migrationData.filter(r=> (r['Site Title']||'').toLowerCase().includes(s) || (r['Division']||'').toLowerCase().includes(s)); }
+  function filterMigrationData(q){
+    // Use migrationData when populated; otherwise fall back to sample data so search works even without an external data source
+    const source = (Array.isArray(migrationData) && migrationData.length) ? migrationData : (typeof _migrationSampleData !== 'undefined' ? _migrationSampleData : []);
+    if(!q) return Array.isArray(source) ? source.slice() : [];
+    const s = q.toLowerCase();
+    return (Array.isArray(source) ? source : []).filter(r=> (r['Site Title']||'').toLowerCase().includes(s) || (r['Division']||'').toLowerCase().includes(s));
+  }
 
   document.addEventListener('DOMContentLoaded', ()=>{
   const btnCal = document.getElementById('viewCalendarBtn');
@@ -2054,10 +2067,20 @@ function updateDashboard(){
 
     if (search) search.addEventListener('input', ()=>{
       const q = search.value.trim(); const filtered = filterMigrationData(q);
-      renderAgenda(filtered); if (fullCalendar) refreshFullCalendar();
+      renderAgenda(filtered);
+      // update calendar with filtered dataset
+      refreshFullCalendar(filtered);
     });
 
-  if (modal) modal.addEventListener('shown.bs.modal', ()=>{ renderAgenda(migrationData && migrationData.length ? migrationData : (typeof _migrationSampleData !== 'undefined' ? _migrationSampleData.slice() : [])); if (!fullCalendar) refreshFullCalendar(); else fullCalendar.render(); });
+  if (modal) modal.addEventListener('shown.bs.modal', ()=>{
+      const source = (Array.isArray(migrationData) && migrationData.length) ? migrationData : (typeof _migrationSampleData !== 'undefined' ? _migrationSampleData.slice() : []);
+      // apply any active search filter when opening
+      const q = search && search.value ? search.value.trim() : '';
+      const filtered = q ? filterMigrationData(q) : source;
+      renderAgenda(filtered);
+      refreshFullCalendar(filtered);
+      if (fullCalendar) fullCalendar.render();
+    });
 
     if (exportBtn) exportBtn.addEventListener('click', function(e){ e.preventDefault(); const blob=new Blob([JSON.stringify(migrationData,null,2)],{type:'application/json'}); const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download='migration-dates.json'; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url); });
 
