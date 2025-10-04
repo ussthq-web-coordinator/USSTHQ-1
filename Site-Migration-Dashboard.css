@@ -26,11 +26,33 @@ body { font-family: 'Inter', sans-serif; background:#f9f9f9; font-size: 0.84rem;
 h1, h2, h3, h4, h5, h6 {
   font-weight: 700;
 }
+
+/* ================================
+   Additional Custom Styles
+   ================================ */
+
+
+
 .progress { height: 1.75rem; margin-bottom: 1rem; }
 .card-text { font-size:0.9rem; }
 .chart-container { margin-bottom:1rem; }
 .tabulator { font-size:0.85rem; }
 .tabulator .tabulator-header { background-color: #2c3e50; color: #fff; font-weight:bold; }
+/* Make Tabulator headers consistently navy with light text on all sizes */
+.tabulator .tabulator-header,
+.tabulator .tabulator-header .tabulator-col,
+.tabulator .tabulator-header .tabulator-col .tabulator-col-title,
+.tabulator .tabulator-header .tabulator-col .tabulator-col-resize-handle,
+.tabulator .tabulator-header .tabulator-col .tabulator-col-content {
+  background-color: #002056 !important; /* navy */
+  color: #f8f9fa !important;            /* light text */
+}
+
+/* Ensure responsive collapsed header cells also inherit the same navy background */
+.tabulator .tabulator-responsive-collapse, .tabulator .tabulator-responsive-collapse .tabulator-row {
+  background-color: #002056 !important;
+  color: #f8f9fa !important;
+}
 .modal-body table { width:100%; border-collapse:collapse; }
 .modal-body td, .modal-body th { padding:0.25rem; vertical-align:top; border:1px solid #ddd; font-size:0.85rem; }
 .table-header-links { font-size:1rem; margin-left:1rem; }
@@ -126,15 +148,17 @@ h1, h2, h3, h4, h5, h6 {
 /* Desktop charts smaller */
 .chart-container canvas {
   width: 100% !important;
-  max-width: 250px; /* smaller than default */
-  height: 250px !important;
+  max-width: 220px; /* smaller target size for desktop */
+  aspect-ratio: 1 / 1; /* keep canvas square */
+  height: auto !important; /* allow aspect-ratio to control height */
   margin: 0 auto;
 }
 
 @media(min-width: 1200px){
   .chart-container canvas {
-    max-width: 250px;
-    height: 250px !important;
+    max-width: 240px; /* slightly larger on wide screens */
+    aspect-ratio: 1 / 1;
+    height: auto !important;
   }
 }
 
@@ -150,18 +174,19 @@ h1, h2, h3, h4, h5, h6 {
   text-overflow: ellipsis;
 }
 
-/* Desktop charts smaller */
 .chart-container canvas {
   width: 100% !important;
-  max-width: 250px; /* reduced from 250px */
-  height: 250px !important; /* reduced from 250px */
+  max-width: 220px; /* consistent smaller size */
+  aspect-ratio: 1 / 1; /* keep charts square */
+  height: auto !important;
   margin: 0 auto;
 }
 
 @media(min-width: 1200px){
   .chart-container canvas {
-    max-width: 250px;
-    height: 250px !important;
+    max-width: 240px;
+    aspect-ratio: 1 / 1;
+    height: auto !important;
   }
 }
 
@@ -214,11 +239,20 @@ h1, h2, h3, h4, h5, h6 {
 
   /* Ensure date inputs visually match the select controls in the filters row */
   .filters-row input.form-control-sm[type="date"] {
-    height: calc(1.5em + .5rem + 2px); /* similar to .form-select height for small inputs */
+    height: 38px; /* similar to .form-select height for small inputs calc(1.5em + .5rem + 2px); */
     padding: .25rem .5rem;
     font-size: 0.875rem;
     line-height: 1.5;
   }
+
+/* Explicit height for the Modified From/To inputs per UX request */
+input#filterModifiedFrom.form-control.form-control-sm,
+input#filterModifiedTo.form-control.form-control-sm {
+  height: 38px !important;
+  line-height: 1.2 !important;
+  padding-top: 6px !important; /* small vertical padding to visually center text */
+  padding-bottom: 6px !important;
+}
 }
 
 /* Horizontal scroll for charts on md/sm screens */
@@ -226,9 +260,9 @@ h1, h2, h3, h4, h5, h6 {
   .charts-row {
     display: flex;
     flex-wrap: nowrap;      /* keep charts in a single row */
-    overflow-x: auto;       /* allow horizontal scroll */
+    /* overflow moved to outer .charts-scroll-wrapper to avoid double scrollbars */
     -webkit-overflow-scrolling: touch; /* smooth scrolling on iOS */
-    gap: 1rem;              /* spacing between charts */
+    gap: 0.75rem;           /* slightly tighter spacing between charts */
     padding-bottom: 0.5rem; /* padding for scroll area */
   }
 
@@ -236,14 +270,129 @@ h1, h2, h3, h4, h5, h6 {
   .charts-row .col-md-6,
   .charts-row .col-sm-12 {
     flex: 0 0 auto;         /* prevent flex items from shrinking */
-    width: 400px;           /* optional: fixed width per chart */
+    width: 180px;           /* smaller fixed width per chart for mobile */
   }
 }
 
-/* Chart top margin */
+/* On very small screens, truncate Site Title after ~30 characters with an ellipsis */
+@media (max-width: 580px) {
+  .tabulator-cell[data-field="Site Title"] {
+    /* approx 30 characters wide; adapt naturally to font */
+    max-width: 30ch !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+  }
+
+  /* If Tabulator injects inner wrapper, ensure it also truncates */
+  .tabulator-cell[data-field="Site Title"] .col-ellipsis {
+    display: inline-block !important;
+    max-width: 30ch !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+  }
+}
+
+/* Mobile: force table to fit container width and truncate cells with ellipsis where needed */
+@media (max-width: 575px) {
+  /* Ensure the Tabulator root occupies the container width */
+  #tableContainer, #tableContainer .tabulator {
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box;
+    overflow-x: hidden !important; /* avoid horizontal scroll inside table */
+  }
+
+  /* Default: truncate cell content to a single line with ellipsis to preserve layout */
+  #tableContainer .tabulator .tabulator-row .tabulator-cell {
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    max-width: 100% !important;
+  }
+
+  /* Keep Site Title wrapping as previously requested */
+  #tableContainer .tabulator .tabulator-row .tabulator-cell[data-field="Site Title"] {
+    white-space: normal !important;
+    overflow: visible !important;
+  }
+}
+
+  /* QA modal specific: ensure Title and QA Notes wrap so text isn't hidden on small screens */
+  .qa-modal-table-container .tabulator .tabulator-row .tabulator-cell[data-field="Title"],
+  .qa-modal-table-container .tabulator .tabulator-row .tabulator-cell[data-field="QA Notes"] {
+    white-space: normal !important;    /* allow wrapping */
+    word-break: break-word !important; /* break long words */
+    overflow: visible !important;      /* show full content */
+    max-height: none !important;       /* ensure no max-height clipping */
+  }
+
+  /* Ensure any inner ellipsis wrappers inside the modal also allow wrapping */
+  .qa-modal-table-container .tabulator .tabulator-row .tabulator-cell .col-ellipsis {
+    white-space: normal !important;
+    overflow: visible !important;
+    text-overflow: clip !important;
+  }
+
+  /* Ensure the actual cell children and any plain table td/th in the modal wrap their content */
+  .qa-modal-table-container table td,
+  .qa-modal-table-container table th {
+    white-space: normal !important;
+    word-break: break-word !important;
+    overflow: visible !important;
+  }
+
+  .qa-modal-table-container .tabulator .tabulator-row .tabulator-cell[data-field="Title"] > *,
+  .qa-modal-table-container .tabulator .tabulator-row .tabulator-cell[data-field="QA Notes"] > * {
+    display: block !important;         /* ensure inner element can take full width */
+    white-space: normal !important;    /* allow wrapping */
+    word-break: break-word !important; /* break long words */
+    overflow: visible !important;
+  }
+
+  /* On small screens, reduce modal Tabulator cell height so rows aren't excessively tall.
+     Use max-height instead of a hard height so cells can still expand when needed. */
+  @media (max-width: 575px) {
+    .qa-modal-table-container .tabulator .tabulator-row .tabulator-cell:not([data-field="Title"]):not([data-field="QA Notes"]) {
+      max-height: 30px !important;    /* prefer smaller rows on mobile */
+      min-height: 0 !important;
+      line-height: 1.1 !important;    /* let text determine true height when necessary */
+      display: flex !important;
+      align-items: center !important;  /* vertically center single-line content */
+      overflow: hidden !important;
+    }
+  }
+
+/* Chart title styling: allow wrapping so long titles push the chart down */
 .charts-row .chart-container p {
-  margin-top: 1rem;
-  font-size: 0.95rem;
+  margin-top: 0.5rem;
+  margin-bottom: 0.5rem;
+  font-size: 0.92rem;
+  line-height: 1.1;
+  white-space: normal;    /* allow wrapping */
+  word-break: break-word; /* break long words */
+  text-align: center;     /* keep titles centered */
+}
+
+/* Make chart container a vertical flex so title and canvas stack and long titles push canvas down */
+.charts-row .chart-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+/* Wrapper that enables horizontal scrolling for charts: allow on all viewports so desktop can reach the 5th chart */
+.charts-scroll-wrapper {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.charts-scroll-wrapper .charts-row {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 1rem;
+  align-items: stretch;
 }
 
 /* Mobile swipe hint only on small screens */
@@ -425,4 +574,209 @@ h1, h2, h3, h4, h5, h6 {
 
 @media (max-width: 575px) {
   #qaIssueDetailPanel { min-width: auto; max-width: none; }
+}
+
+
+
+/* ================================
+   Salvation Army Brand Bootstrap Overrides
+   ================================ */
+
+/* TSA brand palette */
+:root {
+  --bs-primary: #002056;   /* Navy */
+  --bs-secondary: #4DA6FF; /* Light Blue */
+  --bs-success: #0072CE;   /* Blue Accent */
+  --bs-info: #FFCC00;      /* Warm Yellow */
+  --bs-warning: #FFCC00;   /* Same Yellow */
+  --bs-danger: #EE1C25;    /* Red (same as original primary) */
+  --bs-light: #F8F9FA;     /* Bootstrap default light */
+  --bs-dark: #212529;      /* Bootstrap default dark */
+}
+
+/* ================================
+   Button Overrides (solid)
+   ================================ */
+
+/* Primary (Navy) */
+.btn-primary {
+  --bs-btn-bg: var(--bs-primary);
+  --bs-btn-border-color: var(--bs-primary);
+  --bs-btn-hover-bg: #001940;
+  --bs-btn-hover-border-color: #001633;
+  --bs-btn-active-bg: #000F2A;
+  --bs-btn-active-border-color: #000A1F;
+}
+
+/* Secondary (Light Blue) */
+.btn-secondary {
+  --bs-btn-bg: var(--bs-secondary);
+  --bs-btn-border-color: var(--bs-secondary);
+  --bs-btn-hover-bg: #3C9EFF;
+  --bs-btn-hover-border-color: #3399FF;
+  --bs-btn-active-bg: #2E8CFF;
+  --bs-btn-active-border-color: #267ACC;
+}
+
+/* Success (Blue Accent) */
+.btn-success {
+  --bs-btn-bg: var(--bs-success);
+  --bs-btn-border-color: var(--bs-success);
+  --bs-btn-hover-bg: #005A9F;
+  --bs-btn-hover-border-color: #004C84;
+  --bs-btn-active-bg: #003F6C;
+  --bs-btn-active-border-color: #003258;
+}
+
+/* Info (Warm Yellow) */
+.btn-info {
+  --bs-btn-bg: var(--bs-info);
+  --bs-btn-border-color: var(--bs-info);
+  --bs-btn-color: #000;
+  --bs-btn-hover-bg: #E6B800;
+  --bs-btn-hover-border-color: #CC9900;
+  --bs-btn-active-bg: #B38600;
+  --bs-btn-active-border-color: #996600;
+}
+
+/* Warning (Yellow) */
+.btn-warning {
+  --bs-btn-bg: var(--bs-warning);
+  --bs-btn-border-color: var(--bs-warning);
+  --bs-btn-color: #000;
+  --bs-btn-hover-bg: #E6B800;
+  --bs-btn-hover-border-color: #CC9900;
+  --bs-btn-active-bg: #B38600;
+  --bs-btn-active-border-color: #996600;
+}
+
+/* Danger (Red) */
+.btn-danger {
+  --bs-btn-bg: var(--bs-danger);
+  --bs-btn-border-color: var(--bs-danger);
+  --bs-btn-hover-bg: #C4121A;
+  --bs-btn-hover-border-color: #B01018;
+  --bs-btn-active-bg: #A10E16;
+  --bs-btn-active-border-color: #900C14;
+}
+
+/* Light */
+.btn-light {
+  --bs-btn-bg: var(--bs-light);
+  --bs-btn-border-color: var(--bs-light);
+  --bs-btn-hover-bg: #E2E6EA;
+  --bs-btn-hover-border-color: #D6D8DB;
+  --bs-btn-active-bg: #C6C8CA;
+  --bs-btn-active-border-color: #B9BBBD;
+  --bs-btn-color: #000;
+}
+
+/* Dark */
+.btn-dark {
+  --bs-btn-bg: var(--bs-dark);
+  --bs-btn-border-color: var(--bs-dark);
+  --bs-btn-hover-bg: #16191C;
+  --bs-btn-hover-border-color: #0E1012;
+  --bs-btn-active-bg: #0B0D0F;
+  --bs-btn-active-border-color: #050607;
+}
+
+/* ================================
+   Outline Buttons
+   ================================ */
+
+/* Primary (Navy) */
+.btn-outline-primary {
+  color: var(--bs-primary);
+  border-color: var(--bs-primary);
+}
+.btn-outline-primary:hover,
+.btn-outline-primary:focus {
+  color: #fff;
+  background-color: var(--bs-primary);
+  border-color: #001940;
+}
+
+/* Secondary (Light Blue) */
+.btn-outline-secondary {
+  color: var(--bs-secondary);
+  border-color: var(--bs-secondary);
+}
+.btn-outline-secondary:hover,
+.btn-outline-secondary:focus {
+  color: #fff;
+  background-color: var(--bs-secondary);
+  border-color: #3C9EFF;
+}
+
+/* Success (Blue Accent) */
+.btn-outline-success {
+  color: var(--bs-success);
+  border-color: var(--bs-success);
+}
+.btn-outline-success:hover,
+.btn-outline-success:focus {
+  color: #fff;
+  background-color: var(--bs-success);
+  border-color: #005A9F;
+}
+
+/* Info (Warm Yellow) */
+.btn-outline-info {
+  color: var(--bs-info);
+  border-color: var(--bs-info);
+}
+.btn-outline-info:hover,
+.btn-outline-info:focus {
+  color: #000;
+  background-color: var(--bs-info);
+  border-color: #E6B800;
+}
+
+/* Warning (Yellow) */
+.btn-outline-warning {
+  color: var(--bs-warning);
+  border-color: var(--bs-warning);
+}
+.btn-outline-warning:hover,
+.btn-outline-warning:focus {
+  color: #000;
+  background-color: var(--bs-warning);
+  border-color: #E6B800;
+}
+
+/* Danger (Red) */
+.btn-outline-danger {
+  color: var(--bs-danger);
+  border-color: var(--bs-danger);
+}
+.btn-outline-danger:hover,
+.btn-outline-danger:focus {
+  color: #fff;
+  background-color: var(--bs-danger);
+  border-color: #C4121A;
+}
+
+/* Light */
+.btn-outline-light {
+  color: var(--bs-light);
+  border-color: var(--bs-light);
+}
+.btn-outline-light:hover,
+.btn-outline-light:focus {
+  color: #000;
+  background-color: var(--bs-light);
+  border-color: #E2E6EA;
+}
+
+/* Dark */
+.btn-outline-dark {
+  color: var(--bs-dark);
+  border-color: var(--bs-dark);
+}
+.btn-outline-dark:hover,
+.btn-outline-dark:focus {
+  color: #fff;
+  background-color: var(--bs-dark);
+  border-color: #16191C;
 }

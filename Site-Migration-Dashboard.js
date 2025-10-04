@@ -244,11 +244,13 @@ let qaLookupMaster = {};
 
 // Top-level runtime state (shared across functions)
 let table, tableData = [], charts = {}, pageCache = {}, qaGroupedCache = {}, masterData;
+let tableResizeListenerAdded = false;
 // Top-level chart handles (Chart.js instances) — initialized to null so renderCharts can safely destroy/create
 let statusChart = null;
 let priorityChart = null;
 let pageTypeChart = null;
 let pubSymChart = null;
+let effortChart = null;
 // Application version (edit this value to bump the UI version shown on the page)
 // Keep this value here so you can edit it directly in the JS without relying on DashboardData.json
 const APP_VERSION = '2510.04.1344';
@@ -542,12 +544,19 @@ function showQaIssuesModal(issueId){
 
     requestAnimationFrame(()=>{
       // --- Tabulator Table ---
-      const tableContainer = document.createElement("div");
-      modalBody.appendChild(tableContainer);
+  const tableContainer = document.createElement("div");
+  // class for modal-specific table styling (wrapping Title and QA Notes)
+  tableContainer.className = 'qa-modal-table-container';
+  modalBody.appendChild(tableContainer);
 
-      // Choose a smaller table height when the modal/body width is small to avoid tall tables on mobile
+      // Choose a dynamic table height on small screens so the user doesn't have to scroll as much.
+      // Use a percentage of the viewport height with a sensible minimum.
       const modalWidth = modalBody.clientWidth || window.innerWidth;
-      const tableHeight = (modalWidth && modalWidth < 600) ? 240 : '100%';
+      const rowsCount = 1; // local data here is usually a single page object; keep placeholder if logic changes
+      // If the result set is small, let Tabulator size to content (auto). Only apply a bounded
+      // numeric height when there are many rows so the modal doesn't become enormous.
+      let tableHeight;
+      // We'll compute rowsCount from tableData below and pick sizing accordingly
 
       const tableData = [{
         ID: page.ID,
@@ -560,35 +569,64 @@ function showQaIssuesModal(issueId){
         "Symphony Site Type": page["Symphony Site Type"] || ""
       }];
 
-      new Tabulator(tableContainer, {
+      // Rows count for the small per-page table (usually 1). If this ever becomes multiple rows
+      // the sizing will grow accordingly. Use 'auto' when few rows so table matches content.
+      const actualRows = Array.isArray(tableData) ? tableData.length : 0;
+      if (actualRows <= 6) {
+        tableHeight = 'auto';
+        tableContainer.style.minHeight = '';
+      } else {
+        const vh = (window.innerHeight || document.documentElement.clientHeight) || 640;
+        // Use 45% of viewport height, bounded between 180px and 320px for reasonable sizes
+        const computed = Math.floor(vh * 0.45);
+        const bounded = Math.max(180, Math.min(320, computed));
+        tableHeight = bounded;
+        tableContainer.style.minHeight = tableHeight + 'px';
+      }
+
+      const table = new Tabulator(tableContainer, {
         data: tableData,
         layout: window.innerWidth < 600 ? "fitDataFill" : "fitColumns",
         reactiveData: true,
         autoColumns: false,
         height: tableHeight,
+        initialSort: [{ column: "Title", dir: "asc" }], // sort by Title for QA modal table
         columns: [
-          {title:"Title", field:"Title", formatter: cell => `<div class="tabulator-cell">${escapeHtml(cell.getValue())}</div>`},
+          {title:"Title", field:"Title", formatter: function(cell){
+            const v = cell.getValue() || "";
+            // On very small viewports enforce exact 30-char truncation per UX request
+            if (window.innerWidth <= 580) return escapeHtml(truncateExact(v, 30));
+            return escapeHtml(v);
+          }},
           {title:"Edit", field:"Form", hozAlign:"center",
-            formatter: cell => {
+            formatter: function(cell){
               const row = cell.getRow().getData();
               const id = row.ID;
               const type = (row["Symphony Site Type"] || "").trim();
               let url = "#";
               if(type==="Metro Area") url=`https://sauss.sharepoint.com/sites/USSWEBADM/Lists/MetroAreaSitesInfoPagesSymphony/DispForm.aspx?ID=${encodeURIComponent(id)}&e=mY8mhG`;
-          else if(type==="Corps") url=`https://sauss.sharepoint.com/sites/USSWEBADM/Lists/CorpsSitesPageMigrationReport/DispForm.aspx?ID=${encodeURIComponent(id)}&e=dF11LG`;
-          return `<div class="tabulator-cell"><a href="${escapeHtml(url)}" target="_blank">Form</a></div>`;
-        }
-      },
-      {title:"SD", field:"Page URL", hozAlign:"center", formatter: cell => `<div class="tabulator-cell">${cell.getValue() ? `<a href="${escapeHtml(cell.getValue())}" target="_blank">🔗</a>` : ""}</div>`},
-      {title:"ZD", field:"Zesty URL Path Part", hozAlign:"center", formatter: cell => `<div class="tabulator-cell">${cell.getValue() ? `<a href="https://8hxvw8tw-dev.webengine.zesty.io${escapeHtml(cell.getValue())}?zpw=tsasecret123&redirect=false&_bypassError=true" target="_blank">🟢</a>` : ""}</div>`},
-      {title:"Status", field:"Status", formatter: cell => `<div class="tabulator-cell">${escapeHtml(cell.getValue())}</div>`},
-      {title:"Priority", field:"Priority", formatter: cell => `<div class="tabulator-cell">${escapeHtml(cell.getValue())}</div>`},
-      {title:"QA Notes", field:"QA Notes", formatter: cell => `<div class="tabulator-cell">${escapeHtml(cell.getValue())}</div>`}
-    ],
-    responsiveLayout:"collapse",
-    responsiveLayoutCollapseStartOpen:true,
-    tooltips:true
-  });
+              else if(type==="Corps") url=`https://sauss.sharepoint.com/sites/USSWEBADM/Lists/CorpsSitesPageMigrationReport/DispForm.aspx?ID=${encodeURIComponent(id)}&e=dF11LG`;
+              return `<a href="${escapeHtml(url)}" target="_blank">Form</a>`;
+            }
+          },
+          {title:"SD", field:"Page URL", hozAlign:"center", formatter: function(cell){
+            const v = cell.getValue();
+            return v ? `<a href="${escapeHtml(v)}" target="_blank">🔗</a>` : "";
+          }},
+          {title:"ZD", field:"Zesty URL Path Part", hozAlign:"center", formatter: function(cell){
+            const v = cell.getValue();
+            return v ? `<a href="https://8hxvw8tw-dev.webengine.zesty.io${escapeHtml(v)}?zpw=tsasecret123&redirect=false&_bypassError=true" target="_blank">🟢</a>` : "";
+          }},
+          {title:"Status", field:"Status", formatter: function(cell){ return escapeHtml(cell.getValue()); }},
+          {title:"Priority", field:"Priority", formatter: function(cell){ return escapeHtml(cell.getValue()); }},
+          {title:"QA Notes", field:"QA Notes", formatter: function(cell){ return escapeHtml(cell.getValue()); }}
+        ],
+        responsiveLayout:"collapse",
+        responsiveLayoutCollapseStartOpen:true,
+        tooltips:true
+      });
+
+      // Table created with initialSort above; avoid calling methods that may not exist
 
   // --- DOM-built accordion for this issue ---
   // Build a unique accordion container id for this modal instance
@@ -1273,6 +1311,14 @@ function escapeHtml(str){
     .replace(/'/g, '&#39;');
 }
 
+// truncate helper (keeps whole string if shorter than limit)
+function truncateExact(str, limit){
+  if (str === null || str === undefined) return '';
+  const s = String(str);
+  if (s.length <= limit) return s;
+  return s.slice(0, limit) + '…';
+}
+
 // Normalize a value (date-only string or timestamp) to UTC midnight milliseconds.
 // This ensures date-only strings like '2025-09-30' and full timestamps are compared
 // on the same UTC date boundary regardless of client timezone.
@@ -1442,16 +1488,18 @@ function palette(n){
 function renderCharts(filtered) {
   if (!Array.isArray(filtered)) filtered = [];
   try{
-    const ctxStatusEl = document.getElementById("statusChart");
-    const ctxPriorityEl = document.getElementById("priorityChart");
-    const ctxPageTypeEl = document.getElementById("pageTypeChart");
-    const ctxPubSymEl = document.getElementById("pubSymChart");
-    if (!ctxStatusEl || !ctxPriorityEl || !ctxPageTypeEl || !ctxPubSymEl) return;
+  const ctxStatusEl = document.getElementById("statusChart");
+  const ctxPriorityEl = document.getElementById("priorityChart");
+  const ctxPageTypeEl = document.getElementById("pageTypeChart");
+  const ctxPubSymEl = document.getElementById("pubSymChart");
+  const ctxEffortEl = document.getElementById("effortChart");
+  if (!ctxStatusEl || !ctxPriorityEl || !ctxPageTypeEl || !ctxPubSymEl || !ctxEffortEl) return;
 
-    const ctxStatus = ctxStatusEl.getContext("2d");
-    const ctxPriority = ctxPriorityEl.getContext("2d");
-    const ctxPageType = ctxPageTypeEl.getContext("2d");
-    const ctxPubSym = ctxPubSymEl.getContext("2d");
+  const ctxStatus = ctxStatusEl.getContext("2d");
+  const ctxPriority = ctxPriorityEl.getContext("2d");
+  const ctxPageType = ctxPageTypeEl.getContext("2d");
+  const ctxPubSym = ctxPubSymEl.getContext("2d");
+  const ctxEffort = ctxEffortEl.getContext("2d");
 
     const statusCounts = {};
     filtered.forEach(d => {
@@ -1509,6 +1557,17 @@ function renderCharts(filtered) {
       options: { plugins: { legend: { display: false }, tooltip: { enabled: true } } }
     });
     try{ addChartLegendModal(pubSymChart, 'Published Symphony'); }catch(e){}
+
+      // Effort Needed
+      const effortCounts = {};
+      filtered.forEach(d => { const ef = d['Effort Needed'] || 'Not Set'; effortCounts[ef] = (effortCounts[ef] || 0) + 1; });
+      if (effortChart) try{ effortChart.destroy(); }catch(e){}
+      effortChart = new Chart(ctxEffort, {
+        type: 'pie',
+        data: { labels: Object.keys(effortCounts), datasets: [{ data: Object.values(effortCounts), backgroundColor: ["#002056","#f1c40f","#f39c12","#e74c3c","#3498db","#9b59b6","#16a085","#d35400","#ff6b6b"] }] },
+        options: { plugins: { legend: { display: false }, tooltip: { enabled: true } } }
+      });
+      try{ addChartLegendModal(effortChart, 'Effort Needed'); }catch(e){}
   }catch(err){ console.warn('renderCharts failed', err); }
 }
 
@@ -1563,10 +1622,10 @@ function updateDashboard(){
       return dt.toLocaleDateString();
     }
   }
-
+  
   function toEvent(r){
     const raw = r['Migration Date'] || r.migrationDate || r.MigrationDate || null;
-    const isDateOnly = typeof raw === 'string' && /^\d{4}-\d{2}-\d{2}$$/.test(raw);
+    const isDateOnly = typeof raw === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(raw);
     const parsed = parseDateForDisplay(raw);
     const ev = {
       title: r['Site Title'] || r.siteTitle || '(No Title)',
