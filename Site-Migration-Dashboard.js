@@ -1,3 +1,4 @@
+
 /* Migration Dates module: FullCalendar (grid) + Agenda (list) + Table (Tabulator) */
 const _migrationSampleData = [
   { "Site Title": "USA National Homepage", "Migration Date": "2025-04-03", "View Website URL": "https://www.salvationarmyusa.org/", "Division": "USA National" },
@@ -465,7 +466,9 @@ function updateACDropdown(filteredData) {
   }).join("");
 }
 
-  // --- QA Accordion rendering (unique cards per page) ---
+const qaIssueDetailsMap = {};
+
+ // --- QA Accordion rendering (one card per issue with unique IDs) ---
 function renderQaAccordion(data){
   const container = document.getElementById("qaGroupsBody");
   if (!container) return;
@@ -473,7 +476,6 @@ function renderQaAccordion(data){
 
   const qaRows = Array.isArray(data) ? data.filter(d => d["QA Issues.lookupValue"]) : [];
 
-  // Update badge with total count (all issues across all pages)
   const badge = document.getElementById("qaBadge");
   if (badge) badge.textContent = qaRows.length;
 
@@ -482,7 +484,6 @@ function renderQaAccordion(data){
     return;
   }
 
-  // Group issues by Page Title (to ensure one card per unique page)
   qaGroupedCache = {};
   qaRows.forEach(d => {
     const pageTitle = d.Title || "Untitled Page";
@@ -490,78 +491,95 @@ function renderQaAccordion(data){
     qaGroupedCache[pageTitle].push(d);
   });
 
-  const pageTitles = Object.keys(qaGroupedCache).sort();
   const rowDiv = document.createElement('div');
   rowDiv.className = 'row g-3';
 
-  pageTitles.forEach(title => {
+  Object.keys(qaGroupedCache).sort().forEach(title => {
     const rows = qaGroupedCache[title];
-    const page = pageCache[rows[0]._id]; // take the first row to reference page data
+    const page = pageCache[rows[0]._id];
     if (!page) return;
 
-    // Collect unique issues for subtitle
-    const issues = Array.from(new Set(rows.map(r => r["QA Issues.lookupValue"]).filter(Boolean)));
-    let subtitleHtml = '';
-    if (issues.length === 1) {
-      subtitleHtml = escapeHtml(issues[0]);
-    } else if (issues.length > 1) {
-      const first = escapeHtml(issues[0]);
-      const restCount = issues.length - 1;
-      const full = escapeHtml(issues.join(' | '));
-      subtitleHtml = `${first} <small class="text-muted" title="${full}">(+${restCount} more)</small>`;
-    }
+    rows.forEach(r => {
+      const lookups = (r["QA Issues.lookupValue"] || "").split(";").map(s => s.trim()).filter(Boolean);
+      const whys = (r["QA Issues:Why This Is Important"] || "").split(";").map(s => s.trim());
+      const hows = (r["QA Issues:How to Fix"] || "").split(";").map(s => s.trim());
+      const howDetailsArr = (r["QA Issues:How to Fix Details"] || "").split(";").map(s => s.trim());
 
-    const col = document.createElement('div');
-    col.className = 'col-12 col-sm-6 col-md-4 col-lg-3';
+      const issueCount = lookups.length;
 
-    const card = document.createElement('div');
-    card.className = 'card h-100 qa-page-card';
+for (let idx = 0; idx < issueCount; idx++) {
+  const issue = lookups[idx];
+  const why = whys[idx] || "";
+  const how = hows[idx] || "";
+  const howDetails = howDetailsArr[idx] || "";
 
-    card.innerHTML = `
-      <div class="card-body d-flex flex-column">
-        <div>
-          <h6 class="card-title mb-1">${escapeHtml(title)}</h6>
-          <p class="card-subtitle text-muted small mb-1">${subtitleHtml}</p>
-        </div>
-        <div class="mt-auto pt-1">
-          <button class="btn btn-sm btn-outline-primary" onclick="showQaIssuesModal('${encodeURIComponent(title)}')">View Issues</button>
-          <span class="badge bg-warning qa-badge ms-2">${issues.length}</span>
-        </div>
+  if (!issue) continue;
+
+  // Create a DOM-safe ID (only letters, numbers, hyphen, underscore)
+  const rawIssueId = `${page.ID}_${title}_${idx}_${Math.random().toString(36).substr(2,6)}`;
+  const issueId = String(rawIssueId).replace(/[^a-zA-Z0-9-_]/g, '_');
+
+  // Store details keyed by the sanitized issueId
+  qaIssueDetailsMap[issueId] = {
+    pageTitle: title,
+    lookupValue: issue,
+    why,
+    how,
+    howDetails,
+    pageId: page.ID
+  };
+
+  const col = document.createElement('div');
+  col.className = 'col-12 col-sm-6 col-md-4 col-lg-3';
+
+  const card = document.createElement('div');
+  card.className = 'card h-100 qa-page-card';
+
+  card.innerHTML = `
+    <div class="card-body d-flex flex-column">
+      <div>
+        <h6 class="card-title mb-1">${escapeHtml(title)}</h6>
+        <p class="card-subtitle text-muted small mb-1">${escapeHtml(issue)}</p>
       </div>
-    `;
+      <div class="mt-auto pt-1">
+        <button class="btn btn-sm btn-outline-primary" onclick="showQaIssuesModal('${issueId}')">View Issue</button>
+      </div>
+    </div>
+  `;
 
-    col.appendChild(card);
-    rowDiv.appendChild(col);
+  col.appendChild(card);
+  rowDiv.appendChild(col);
+}
+
+    });
   });
 
   container.appendChild(rowDiv);
 }
 
-// --- QA Modal with Tabulator and DOM-built accordion per issue ---
-function showQaIssuesModal(pageTitleEncoded) {
+
+// --- QA Modal with one accordion per unique issue ID ---
+
+
+function showQaIssuesModal(issueId){
   const modalEl = document.getElementById("qaIssuesModal");
   const modalBody = document.getElementById("qaIssuesModalBody");
   if (!modalEl || !modalBody) return console.warn('Modal elements missing');
 
-  const pageTitle = decodeURIComponent(pageTitleEncoded);
+  const issueData = qaIssueDetailsMap[issueId];
+  if (!issueData) {
+    modalBody.innerHTML = `<p>Issue data not found for ID: ${escapeHtml(issueId)}</p>`;
+    new bootstrap.Modal(modalEl).show();
+    return;
+  }
+
+  const pageTitle = issueData.pageTitle;
   const rows = qaGroupedCache[pageTitle] || [];
-
-  if (!rows.length) {
-    modalBody.innerHTML = "<p>No QA Issues for this page.</p>";
-    new bootstrap.Modal(modalEl).show();
-    return;
-  }
-
   const page = pageCache[rows[0]._id];
-  if (!page) {
-    console.warn("Page not found in pageCache:", rows[0]._id);
-    modalBody.innerHTML = "<p>Page data not available.</p>";
-    new bootstrap.Modal(modalEl).show();
-    return;
-  }
 
-  // Clear modal body and add page title
   modalBody.innerHTML = `<h4 class="mb-3">${escapeHtml(page["Site Title"] || page.Title || "Untitled Page")}</h4>`;
+
+
 
   // --- Tabulator Table ---
   const tableContainer = document.createElement("div");
@@ -585,15 +603,14 @@ function showQaIssuesModal(pageTitleEncoded) {
     autoColumns: false,
     columns: [
       {title:"Title", field:"Title", formatter: cell => `<div class="tabulator-cell">${escapeHtml(cell.getValue())}</div>`},
-      { 
-        title:"Edit", field:"Form", hozAlign:"center",
+      {title:"Edit", field:"Form", hozAlign:"center",
         formatter: cell => {
           const row = cell.getRow().getData();
-          const id = row.ID; 
+          const id = row.ID;
           const type = (row["Symphony Site Type"] || "").trim();
           let url = "#";
-          if(type === "Metro Area") url = `https://sauss.sharepoint.com/sites/USSWEBADM/Lists/MetroAreaSitesInfoPagesSymphony/DispForm.aspx?ID=${encodeURIComponent(id)}&e=mY8mhG`;
-          else if(type === "Corps") url = `https://sauss.sharepoint.com/sites/USSWEBADM/Lists/CorpsSitesPageMigrationReport/DispForm.aspx?ID=${encodeURIComponent(id)}&e=dF11LG`;
+          if(type==="Metro Area") url=`https://sauss.sharepoint.com/sites/USSWEBADM/Lists/MetroAreaSitesInfoPagesSymphony/DispForm.aspx?ID=${encodeURIComponent(id)}&e=mY8mhG`;
+          else if(type==="Corps") url=`https://sauss.sharepoint.com/sites/USSWEBADM/Lists/CorpsSitesPageMigrationReport/DispForm.aspx?ID=${encodeURIComponent(id)}&e=dF11LG`;
           return `<div class="tabulator-cell"><a href="${escapeHtml(url)}" target="_blank">Form</a></div>`;
         }
       },
@@ -603,87 +620,61 @@ function showQaIssuesModal(pageTitleEncoded) {
       {title:"Priority", field:"Priority", formatter: cell => `<div class="tabulator-cell">${escapeHtml(cell.getValue())}</div>`},
       {title:"QA Notes", field:"QA Notes", formatter: cell => `<div class="tabulator-cell">${escapeHtml(cell.getValue())}</div>`}
     ],
-    responsiveLayout: "collapse",
-    responsiveLayoutCollapseStartOpen: true,
-    tooltips: true,
-    height: "100%"
+    responsiveLayout:"collapse",
+    responsiveLayoutCollapseStartOpen:true,
+    tooltips:true,
+    height:"100%"
   });
 
-  // --- Build array of QA issues ---
-  const qaIssues = [];
+  // --- DOM-built accordion for this issue ---
+  // Build a unique accordion container id for this modal instance
+  const modalAccordionIdRaw = `qa_issue_accordion_${page.ID}_${Math.random().toString(36).substr(2,6)}`;
+  const modalAccordionId = String(modalAccordionIdRaw).replace(/[^a-zA-Z0-9-_]/g, '_');
 
-  rows.forEach(r => {
-    const lookups = (r["QA Issues.lookupValue"] || "").split(";").map(s => s.trim()).filter(Boolean);
-    const whys = (r["QA Issues:Why This Is Important"] || "").split(";").map(s => s.trim());
-    const hows = (r["QA Issues:How to Fix"] || "").split(";").map(s => s.trim());
-    const howDetailsArr = (r["QA Issues:How to Fix Details"] || "").split(";").map(s => s.trim());
-
-    lookups.forEach((lookup, i) => {
-      qaIssues.push({
-        lookupValue: lookup,
-        why: whys[i] || "",
-        how: hows[i] || "",
-        howDetails: howDetailsArr[i] || ""
-      });
-    });
-  });
-
-  // --- DOM-built accordion ---
   const accordionDiv = document.createElement("div");
   accordionDiv.className = "accordion mt-4";
-  const accordionId = `qaIssueAccordion_${page.ID}_${Math.random().toString(36).substr(2,6)}`;
-  accordionDiv.id = accordionId;
+  accordionDiv.id = modalAccordionId;
 
- qaIssues.forEach((issue, idx) => {
-  const issueId = `issue_${page.ID}_${idx}`;
+  // Find all issue keys for this page (use pageId to be robust)
+  const issueKeys = Object.keys(qaIssueDetailsMap).filter(k => qaIssueDetailsMap[k] && String(qaIssueDetailsMap[k].pageId) === String(page.ID));
 
-  const itemDiv = document.createElement("div");
-  itemDiv.className = "accordion-item";
+  // If we have no other keys, fall back to the provided issueId
+  if (!issueKeys.length) issueKeys.push(issueId);
 
-  // Build accordion item without mutating `issue`
-  itemDiv.innerHTML = `
-    <h2 class="accordion-header" id="heading_${issueId}">
-      <button class="accordion-button ${idx === 0 ? "" : "collapsed"}" 
-              type="button" 
-              data-bs-toggle="collapse" 
-              data-bs-target="#collapse_${issueId}">
-        ${escapeHtml(issue.lookupValue)}
-      </button>
-    </h2>
-    <div id="collapse_${issueId}" 
-         class="accordion-collapse collapse ${idx === 0 ? "show" : ""}" 
-         data-bs-parent="#${accordionId}">
-      <div class="accordion-body">
-        ${issue.why ? `<h6>Why This Is Important</h6><p>${escapeHtml(issue.why)}</p>` : ""}
-        ${issue.how ? `<h6>How to Fix</h6><p>${escapeHtml(issue.how)}</p>` : ""}
-        ${issue.howDetails ? `<h6>How to Fix Details</h6><p>${escapeHtml(issue.howDetails)}</p>` : ""}
+  issueKeys.forEach((k, index) => {
+    const idSafe = k;
+    const dataObj = qaIssueDetailsMap[k];
+    const showClass = (k === issueId) ? 'show' : '';
+
+    const item = document.createElement('div');
+    item.className = 'accordion-item';
+    item.innerHTML = `
+      <h2 class="accordion-header" id="heading_${idSafe}">
+        <button class="accordion-button ${showClass ? '' : 'collapsed'}" type="button" data-bs-toggle="collapse" data-bs-target="#collapse_${idSafe}" aria-expanded="${showClass ? 'true' : 'false'}" aria-controls="collapse_${idSafe}">
+          ${escapeHtml(dataObj.lookupValue || ('Issue ' + (index+1)))}
+        </button>
+      </h2>
+      <div id="collapse_${idSafe}" class="accordion-collapse collapse ${showClass}" data-bs-parent="#${modalAccordionId}">
+        <div class="accordion-body">
+          ${dataObj.why ? `<h6>Why This Is Important</h6><p>${escapeHtml(dataObj.why)}</p>` : ""}
+          ${dataObj.how ? `<h6>How to Fix</h6><p>${escapeHtml(dataObj.how)}</p>` : ""}
+          ${dataObj.howDetails ? `<h6>How to Fix Details</h6><p>${escapeHtml(dataObj.howDetails)}</p>` : ""}
+        </div>
       </div>
-    </div>
-  `;
+    `;
 
-  accordionDiv.appendChild(itemDiv);
-});
-
+    accordionDiv.appendChild(item);
+  });
 
   modalBody.appendChild(accordionDiv);
 
-  // --- Show modal ---
   new bootstrap.Modal(modalEl).show();
+
+  console.log("Modal opened with issueId:", issueId);
+  console.log("Available keys:", Object.keys(qaIssueDetailsMap));
 }
 
-// --- HTML escape helper ---
-function escapeHtml(str){
-  if (str === null || str === undefined) return '';
-  return String(str)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
-}
-
-
-
+// (duplicate escapeHtml removed - single definition exists earlier)
 
 function renderCards(){
   const filtered = getFilteredData();
@@ -1356,7 +1347,7 @@ function updateDashboard(){
   // by creating a UTC-noon instant so timezone conversions won't push it to the previous day.
   function parseDateForDisplay(v){
     if (!v) return null;
-    if (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v)){
+    if (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$$/.test(v)){
       // Use UTC noon to avoid timezone day shifting when formatting
       return new Date(v + 'T12:00:00Z');
     }
@@ -1378,7 +1369,7 @@ function updateDashboard(){
 
   function toEvent(r){
     const raw = r['Migration Date'] || r.migrationDate || r.MigrationDate || null;
-    const isDateOnly = typeof raw === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(raw);
+    const isDateOnly = typeof raw === 'string' && /^\d{4}-\d{2}-\d{2}$$/.test(raw);
     const parsed = parseDateForDisplay(raw);
     const ev = {
       title: r['Site Title'] || r.siteTitle || '(No Title)',
@@ -1511,3 +1502,4 @@ function updateDashboard(){
   };
 
 })();
+
