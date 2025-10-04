@@ -251,6 +251,17 @@ let priorityChart = null;
 let pageTypeChart = null;
 let pubSymChart = null;
 let effortChart = null;
+// Helper: transform raw counts to visually compressed values for pie slices
+// while preserving raw counts for tooltips. Methods: 'sqrt' (default), 'log', or 'none'.
+function transformCountsForPie(rawCounts, method = 'sqrt'){
+  if (!Array.isArray(rawCounts)) return rawCounts;
+  const fn = method === 'log' ? (v => v > 0 ? Math.log10(v + 1) : 0) : (v => v > 0 ? Math.sqrt(v) : 0);
+  // Map numbers, preserving zeros and coercing non-numeric to 0
+  return rawCounts.map(v => {
+    const n = Number(v) || 0;
+    return n === 0 ? 0 : fn(n);
+  });
+}
 // Application version (edit this value to bump the UI version shown on the page)
 // Keep this value here so you can edit it directly in the JS without relying on DashboardData.json
 const APP_VERSION = '2510.04.1344';
@@ -805,21 +816,37 @@ const labels = Object.keys(statusCounts);
 const data = Object.values(statusCounts);
 const backgroundColor = labels.map(label => statusColors[label] || "#6c757d"); // fallback gray
 
-// Status chart
+// Status chart (use transformed values for visual scaling)
 if(statusChart) statusChart.destroy();
 statusChart = new Chart(ctxStatus, {
   type: "pie",
   data: {
     labels: labels,
     datasets: [{
-      data: data,
+      // Use sqrt scaling so small categories remain visible
+      data: transformCountsForPie(data, 'sqrt'),
+      // Keep raw counts nearby so tooltips can reference them
+      _rawCounts: data,
       backgroundColor: backgroundColor
     }]
   },
   options: {
     plugins: {
       legend: { display: false },
-      tooltip: { enabled: true },
+      tooltip: {
+        enabled: true,
+        callbacks: {
+          label: function(ctx){
+            try{
+              const ds = ctx.dataset;
+              const raw = ds._rawCounts && ds._rawCounts[ctx.dataIndex] ? ds._rawCounts[ctx.dataIndex] : ctx.parsed || 0;
+              const total = ds._rawCounts ? ds._rawCounts.reduce((a,b)=>a+(Number(b)||0),0) : ctx.chart._metasets[ctx.datasetIndex].total;
+              const pct = total ? ((raw/total)*100).toFixed(1) : '0.0';
+              return `${raw} (${pct}%)`;
+            }catch(e){ return `${ctx.parsed}`; }
+          }
+        }
+      },
       datalabels: { anchor: 'end', align: 'top' }
     }
   },
@@ -842,14 +869,28 @@ try{ addChartLegendModal(statusChart, 'Status'); }catch(e){}
     data: {
       labels: Object.keys(priorityCounts),
       datasets: [{
-        data: Object.values(priorityCounts),
+        data: transformCountsForPie(Object.values(priorityCounts), 'sqrt'),
+        _rawCounts: Object.values(priorityCounts),
         backgroundColor: ["#002056","#f1c40f","#f39c12","#e74c3c","#3498db","#9b59b6","#16a085","#d35400","#ff6b6b"]
       }]
     },
     options: {
       plugins: {
         legend: { display: false },
-        tooltip: { enabled: true },
+        tooltip: {
+          enabled: true,
+          callbacks: {
+            label: function(ctx){
+              try{
+                const ds = ctx.dataset;
+                const raw = ds._rawCounts && ds._rawCounts[ctx.dataIndex] ? ds._rawCounts[ctx.dataIndex] : ctx.parsed || 0;
+                const total = ds._rawCounts ? ds._rawCounts.reduce((a,b)=>a+(Number(b)||0),0) : ctx.chart._metasets[ctx.datasetIndex].total;
+                const pct = total ? ((raw/total)*100).toFixed(1) : '0.0';
+                return `${raw} (${pct}%)`;
+              }catch(e){ return `${ctx.parsed}`; }
+            }
+          }
+        },
         datalabels: { anchor: 'end', align: 'top' }
       }
     },
@@ -869,14 +910,22 @@ try{ addChartLegendModal(statusChart, 'Status'); }catch(e){}
     data: {
       labels: Object.keys(pageTypeCounts),
       datasets: [{
-        data: Object.values(pageTypeCounts),
+        data: transformCountsForPie(Object.values(pageTypeCounts), 'sqrt'),
+        _rawCounts: Object.values(pageTypeCounts),
         backgroundColor: ["#002056","#2ecc71","#e74c3c","#f39c12","#3498db"]
       }]
     },
     options: {
       plugins: {
         legend: { display: false },
-        tooltip: { enabled: true },
+        tooltip: {
+          enabled: true,
+          callbacks: {
+            label: function(ctx){
+              try{ const ds = ctx.dataset; const raw = ds._rawCounts && ds._rawCounts[ctx.dataIndex] ? ds._rawCounts[ctx.dataIndex] : ctx.parsed || 0; const total = ds._rawCounts ? ds._rawCounts.reduce((a,b)=>a+(Number(b)||0),0) : 0; const pct = total ? ((raw/total)*100).toFixed(1) : '0.0'; return `${raw} (${pct}%)`; }catch(e){ return `${ctx.parsed}`; }
+            }
+          }
+        },
       }
     }
   });
@@ -895,14 +944,20 @@ try{ addChartLegendModal(statusChart, 'Status'); }catch(e){}
     data:{
       labels:Object.keys(pubSymCounts),
       datasets:[{
-        data:Object.values(pubSymCounts),
+        data: transformCountsForPie(Object.values(pubSymCounts), 'sqrt'),
+        _rawCounts: Object.values(pubSymCounts),
         backgroundColor:["#002056","#e74c3c","#f39c12","#3498db","#9b59b6"]
       }]
     },
     options: {
       plugins: {
         legend: { display: false },
-        tooltip: { enabled: true }
+        tooltip: {
+          enabled: true,
+          callbacks: {
+            label: function(ctx){ try{ const ds = ctx.dataset; const raw = ds._rawCounts && ds._rawCounts[ctx.dataIndex] ? ds._rawCounts[ctx.dataIndex] : ctx.parsed || 0; const total = ds._rawCounts ? ds._rawCounts.reduce((a,b)=>a+(Number(b)||0),0) : 0; const pct = total ? ((raw/total)*100).toFixed(1) : '0.0'; return `${raw} (${pct}%)`; }catch(e){ return `${ctx.parsed}`; } }
+          }
+        }
       }
     }
   });
@@ -1588,57 +1643,184 @@ function renderCharts(filtered) {
     const data = Object.values(statusCounts);
     const backgroundColor = labels.map(label => statusColors[label] || "#6c757d");
 
-    if (statusChart) try{ statusChart.destroy(); }catch(e){}
+// Removed ${ctx.label}: from tooltip label callback to simplify display
+
+    if (statusChart) try { statusChart.destroy(); } catch (e) {}
     statusChart = new Chart(ctxStatus, {
       type: 'pie',
-      data: { labels: labels, datasets: [{ data: data, backgroundColor }] },
-      options: { plugins: { legend: { display: false }, tooltip: { enabled: true } } }
+      data: {
+        labels: labels,
+        datasets: [{
+          data: transformCountsForPie(data, 'sqrt'),
+          _rawCounts: data,
+          backgroundColor: backgroundColor
+        }]
+      },
+      options: {
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            enabled: true,
+            callbacks: {
+              label: function (ctx) {
+                try {
+                  const ds = ctx.dataset;
+                  const raw = ds._rawCounts && ds._rawCounts[ctx.dataIndex] ? ds._rawCounts[ctx.dataIndex] : ctx.parsed || 0;
+                  const total = ds._rawCounts ? ds._rawCounts.reduce((a, b) => a + (Number(b) || 0), 0) : (ctx.chart && ctx.chart._metasets && ctx.chart._metasets[ctx.datasetIndex] ? ctx.chart._metasets[ctx.datasetIndex].total : 0);
+                  const pct = total ? ((raw / total) * 100).toFixed(1) : '0.0';
+                  return `${raw} (${pct}%)`;
+                } catch (e) { return `${ctx.parsed}`; }
+              }
+            }
+          }
+        }
+      }
     });
-    try{ addChartLegendModal(statusChart, 'Status'); }catch(e){}
+    try { addChartLegendModal(statusChart, 'Status'); } catch (e) {}
 
     // Priority
     const priorityCounts = {};
     filtered.forEach(d => { const p = d.Priority || 'None'; priorityCounts[p] = (priorityCounts[p] || 0) + 1; });
-    if (priorityChart) try{ priorityChart.destroy(); }catch(e){}
+    if (priorityChart) try { priorityChart.destroy(); } catch (e) {}
     priorityChart = new Chart(ctxPriority, {
       type: 'pie',
-      data: { labels: Object.keys(priorityCounts), datasets: [{ data: Object.values(priorityCounts), backgroundColor: ["#002056","#f1c40f","#f39c12","#e74c3c","#3498db","#9b59b6","#16a085","#d35400","#ff6b6b"] }] },
-      options: { plugins: { legend: { display: false }, tooltip: { enabled: true } } }
+      data: {
+        labels: Object.keys(priorityCounts),
+        datasets: [{
+          data: transformCountsForPie(Object.values(priorityCounts), 'sqrt'),
+          _rawCounts: Object.values(priorityCounts),
+          backgroundColor: ["#002056", "#f1c40f", "#f39c12", "#e74c3c", "#3498db", "#9b59b6", "#16a085", "#d35400", "#ff6b6b"]
+        }]
+      },
+      options: {
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            enabled: true,
+            callbacks: {
+              label: function (ctx) {
+                try {
+                  const ds = ctx.dataset;
+                  const raw = ds._rawCounts && ds._rawCounts[ctx.dataIndex] ? ds._rawCounts[ctx.dataIndex] : ctx.parsed || 0;
+                  const total = ds._rawCounts ? ds._rawCounts.reduce((a, b) => a + (Number(b) || 0), 0) : 0;
+                  const pct = total ? ((raw / total) * 100).toFixed(1) : '0.0';
+                  return `${raw} (${pct}%)`;
+                } catch (e) { return `${ctx.parsed}`; }
+              }
+            }
+          }
+        }
+      }
     });
-    try{ addChartLegendModal(priorityChart, 'Priority'); }catch(e){}
+    try { addChartLegendModal(priorityChart, 'Priority'); } catch (e) {}
 
     // Page Type
     const pageTypeCounts = {};
     filtered.forEach(d => { const pt = d['Page Type'] || 'Not Set'; pageTypeCounts[pt] = (pageTypeCounts[pt] || 0) + 1; });
-    if (pageTypeChart) try{ pageTypeChart.destroy(); }catch(e){}
+    if (pageTypeChart) try { pageTypeChart.destroy(); } catch (e) {}
     pageTypeChart = new Chart(ctxPageType, {
       type: 'pie',
-      data: { labels: Object.keys(pageTypeCounts), datasets: [{ data: Object.values(pageTypeCounts), backgroundColor: ["#002056","#2ecc71","#e74c3c","#f39c12","#3498db"] }] },
-      options: { plugins: { legend: { display: false }, tooltip: { enabled: true } } }
+      data: {
+        labels: Object.keys(pageTypeCounts),
+        datasets: [{
+          data: transformCountsForPie(Object.values(pageTypeCounts), 'sqrt'),
+          _rawCounts: Object.values(pageTypeCounts),
+          backgroundColor: ["#002056", "#2ecc71", "#e74c3c", "#f39c12", "#3498db"]
+        }]
+      },
+      options: {
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            enabled: true,
+            callbacks: {
+              label: function (ctx) {
+                try {
+                  const ds = ctx.dataset;
+                  const raw = ds._rawCounts && ds._rawCounts[ctx.dataIndex] ? ds._rawCounts[ctx.dataIndex] : ctx.parsed || 0;
+                  const total = ds._rawCounts ? ds._rawCounts.reduce((a, b) => a + (Number(b) || 0), 0) : 0;
+                  const pct = total ? ((raw / total) * 100).toFixed(1) : '0.0';
+                  return `${raw} (${pct}%)`;
+                } catch (e) { return `${ctx.parsed}`; }
+              }
+            }
+          }
+        }
+      }
     });
-    try{ addChartLegendModal(pageTypeChart, 'Page Type'); }catch(e){}
+    try { addChartLegendModal(pageTypeChart, 'Page Type'); } catch (e) {}
 
     // Published Symphony
     const pubSymCounts = {};
     filtered.forEach(d => { const ps = d['Published Symphony'] || 'Not Set'; pubSymCounts[ps] = (pubSymCounts[ps] || 0) + 1; });
-    if (pubSymChart) try{ pubSymChart.destroy(); }catch(e){}
+    if (pubSymChart) try { pubSymChart.destroy(); } catch (e) {}
     pubSymChart = new Chart(ctxPubSym, {
       type: 'pie',
-      data: { labels: Object.keys(pubSymCounts), datasets: [{ data: Object.values(pubSymCounts), backgroundColor: ["#002056","#e74c3c","#f39c12","#3498db","#9b59b6"] }] },
-      options: { plugins: { legend: { display: false }, tooltip: { enabled: true } } }
+      data: {
+        labels: Object.keys(pubSymCounts),
+        datasets: [{
+          data: transformCountsForPie(Object.values(pubSymCounts), 'sqrt'),
+          _rawCounts: Object.values(pubSymCounts),
+          backgroundColor: ["#002056", "#e74c3c", "#f39c12", "#3498db", "#9b59b6"]
+        }]
+      },
+      options: {
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            enabled: true,
+            callbacks: {
+              label: function (ctx) {
+                try {
+                  const ds = ctx.dataset;
+                  const raw = ds._rawCounts && ds._rawCounts[ctx.dataIndex] ? ds._rawCounts[ctx.dataIndex] : ctx.parsed || 0;
+                  const total = ds._rawCounts ? ds._rawCounts.reduce((a, b) => a + (Number(b) || 0), 0) : 0;
+                  const pct = total ? ((raw / total) * 100).toFixed(1) : '0.0';
+                  return `${raw} (${pct}%)`;
+                } catch (e) { return `${ctx.parsed}`; }
+              }
+            }
+          }
+        }
+      }
     });
-    try{ addChartLegendModal(pubSymChart, 'Published Symphony'); }catch(e){}
+    try { addChartLegendModal(pubSymChart, 'Published Symphony'); } catch (e) {}
 
       // Effort Needed
       const effortCounts = {};
       filtered.forEach(d => { const ef = d['Effort Needed'] || 'Not Set'; effortCounts[ef] = (effortCounts[ef] || 0) + 1; });
-      if (effortChart) try{ effortChart.destroy(); }catch(e){}
+      if (effortChart) try { effortChart.destroy(); } catch (e) {}
       effortChart = new Chart(ctxEffort, {
         type: 'pie',
-        data: { labels: Object.keys(effortCounts), datasets: [{ data: Object.values(effortCounts), backgroundColor: ["#002056","#f1c40f","#f39c12","#e74c3c","#3498db","#9b59b6","#16a085","#d35400","#ff6b6b"] }] },
-        options: { plugins: { legend: { display: false }, tooltip: { enabled: true } } }
+        data: {
+          labels: Object.keys(effortCounts),
+          datasets: [{
+            data: transformCountsForPie(Object.values(effortCounts), 'sqrt'),
+            _rawCounts: Object.values(effortCounts),
+            backgroundColor: ["#002056", "#f1c40f", "#f39c12", "#e74c3c", "#3498db", "#9b59b6", "#16a085", "#d35400", "#ff6b6b"]
+          }]
+        },
+        options: {
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              enabled: true,
+              callbacks: {
+                label: function (ctx) {
+                  try {
+                    const ds = ctx.dataset;
+                    const raw = ds._rawCounts && ds._rawCounts[ctx.dataIndex] ? ds._rawCounts[ctx.dataIndex] : ctx.parsed || 0;
+                    const total = ds._rawCounts ? ds._rawCounts.reduce((a, b) => a + (Number(b) || 0), 0) : 0;
+                    const pct = total ? ((raw / total) * 100).toFixed(1) : '0.0';
+                    return `${raw} (${pct}%)`;
+                  } catch (e) { return `${ctx.parsed}`; }
+                }
+              }
+            }
+          }
+        }
       });
-      try{ addChartLegendModal(effortChart, 'Effort Needed'); }catch(e){}
+      try { addChartLegendModal(effortChart, 'Effort Needed'); } catch (e) {}
   }catch(err){ console.warn('renderCharts failed', err); }
 }
 
@@ -1766,7 +1948,9 @@ function updateDashboard(){
 
   function refreshFullCalendar(){
     const el = document.getElementById('migrationFullCalendar'); if(!el || typeof FullCalendar==='undefined') return;
-    const events = migrationData.filter(r=>r['Migration Date']).map(toEvent);
+    // Use migrationData if present, otherwise fall back to sample data
+    const source = (Array.isArray(migrationData) && migrationData.length) ? migrationData : (typeof _migrationSampleData !== 'undefined' ? _migrationSampleData : []);
+    const events = source.filter(r=>r['Migration Date']).map(toEvent);
     if (!fullCalendar){
       fullCalendar = new FullCalendar.Calendar(el,{
         initialView: 'dayGridMonth',
@@ -1783,6 +1967,28 @@ function updateDashboard(){
       fullCalendar.removeAllEvents();
       events.forEach(e=>fullCalendar.addEvent(e));
     }
+    // Remove any previously injected custom calendar buttons (cleanup)
+    try{
+      const oldPrev = document.getElementById('calendarPrevBtn'); if (oldPrev) oldPrev.remove();
+      const oldNext = document.getElementById('calendarNextBtn'); if (oldNext) oldNext.remove();
+    }catch(e){}
+
+    // Enhance the existing FullCalendar prev/next buttons: add icons, titles and ensure bootstrap button classes
+    try{
+      const calRoot = el;
+      const prev = calRoot.querySelector('.fc-prev-button');
+      const next = calRoot.querySelector('.fc-next-button');
+      if (prev){
+        prev.classList.add('btn','btn-primary','btn-sm');
+        prev.innerHTML = '&#x2190;'; // left arrow
+        prev.setAttribute('title','Previous month');
+      }
+      if (next){
+        next.classList.add('btn','btn-primary','btn-sm');
+        next.innerHTML = '&#x2192;'; // right arrow
+        next.setAttribute('title','Next month');
+      }
+    }catch(e){}
   }
 
   function filterMigrationData(q){ if(!q) return migrationData.slice(); const s=q.toLowerCase(); return migrationData.filter(r=> (r['Site Title']||'').toLowerCase().includes(s) || (r['Division']||'').toLowerCase().includes(s)); }
@@ -1808,11 +2014,42 @@ function updateDashboard(){
     }catch(e){}
   });
 
-  function showCalendar(){ document.getElementById('migrationFullCalendar').style.display=''; document.getElementById('migrationAgenda').style.display='none'; if(btnCal) btnCal.classList.add('btn-primary'); if(btnCal) btnCal.classList.remove('btn-outline-primary'); if(btnAgenda) btnAgenda.classList.remove('btn-primary'); if(btnAgenda) btnAgenda.classList.add('btn-outline-primary'); }
-  function showAgenda(){ document.getElementById('migrationFullCalendar').style.display='none'; document.getElementById('migrationAgenda').style.display=''; if(btnAgenda) btnAgenda.classList.add('btn-secondary'); if(btnAgenda) btnAgenda.classList.remove('btn-outline-primary'); if(btnCal) btnCal.classList.remove('btn-primary'); if(btnCal) btnCal.classList.add('btn-outline-primary'); }
+  // Toggle views: preserve original button classes (e.g. btn btn-outline-primary btn-sm)
+  // and only toggle an 'active' state and aria-pressed for accessibility.
+  function showCalendar(){
+    document.getElementById('migrationFullCalendar').style.display = '';
+    document.getElementById('migrationAgenda').style.display = 'none';
+    if (btnCal) {
+      btnCal.classList.add('active');
+      btnCal.setAttribute('aria-pressed', 'true');
+    }
+    if (btnAgenda) {
+      btnAgenda.classList.remove('active');
+      btnAgenda.setAttribute('aria-pressed', 'false');
+    }
+  }
+
+  function showAgenda(){
+    document.getElementById('migrationFullCalendar').style.display = 'none';
+    document.getElementById('migrationAgenda').style.display = '';
+    if (btnAgenda) {
+      btnAgenda.classList.add('active');
+      btnAgenda.setAttribute('aria-pressed', 'true');
+    }
+    if (btnCal) {
+      btnCal.classList.remove('active');
+      btnCal.setAttribute('aria-pressed', 'false');
+    }
+  }
 
     if (btnCal) btnCal.addEventListener('click', ()=>{ showCalendar(); if(!fullCalendar) refreshFullCalendar(); else fullCalendar.changeView('dayGridMonth'); });
     if (btnAgenda) btnAgenda.addEventListener('click', ()=>{ showAgenda(); });
+
+    // Initialize button pressed state and ensure original classes are preserved.
+    try{
+      if (btnCal){ btnCal.classList.remove('active'); btnCal.setAttribute('aria-pressed','false'); }
+      if (btnAgenda){ btnAgenda.classList.remove('active'); btnAgenda.setAttribute('aria-pressed','false'); }
+    }catch(e){}
 
     if (search) search.addEventListener('input', ()=>{
       const q = search.value.trim(); const filtered = filterMigrationData(q);
@@ -1823,8 +2060,8 @@ function updateDashboard(){
 
     if (exportBtn) exportBtn.addEventListener('click', function(e){ e.preventDefault(); const blob=new Blob([JSON.stringify(migrationData,null,2)],{type:'application/json'}); const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download='migration-dates.json'; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url); });
 
-    // default to Agenda view on open
-    if (btnAgenda) btnAgenda.click();
+  // default to Agenda view on open (will set 'active' on the Agenda button)
+  if (btnAgenda) btnAgenda.click();
   });
 
   window.setMigrationData = function(dataArray){

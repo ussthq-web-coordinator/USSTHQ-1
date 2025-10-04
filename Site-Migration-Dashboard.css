@@ -780,3 +780,64 @@ input#filterModifiedTo.form-control.form-control-sm {
   background-color: var(--bs-dark);
   border-color: #16191C;
 }
+
+/* Modal-scoped: make outline primary appear filled when active inside the Migration Dates modal */
+#migrationDatesModal .btn-outline-primary.active,
+#migrationDatesModal .btn-outline-primary.active:focus,
+#migrationDatesModal .btn-outline-primary.active:hover {
+  background-color: var(--bs-primary) !important;
+  border-color: var(--bs-primary) !important;
+  color: #fff !important;
+  box-shadow: none !important;
+}
+
+/* Reduce search input width inside the Migration Dates modal so it doesn't dominate the header */
+#migrationDatesModal .modal-header .form-control,
+#migrationDatesModal .modal-body #migrationSearch {
+  min-width: 180px !important;
+  max-width: 320px !important;
+  width: auto !important;
+}
+
+/* Style FullCalendar's prev/next buttons inside the migration modal to show arrows.
+   Responsive width via clamp() keeps them usable on small screens while allowing
+   larger tappable area on desktop. Add margin so they don't crowd nearby controls. */
+#migrationDatesModal .fc-prev-button,
+#migrationDatesModal .fc-next-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: clamp(30px, 4.2vh, 36px);
+  width: clamp(28px, 4.2vw, 40px);
+  padding: 6px 10px;
+  font-family: Inter, sans-serif;
+  font-size: clamp(14px, 1.5vw, 16px);
+  line-height: 1;
+  color: #fff !important;
+  background-color: #002056 !important;
+  border: 1px solid #002056 !important;
+  border-top-left-radius: 6px !important;
+  border-bottom-left-radius: 6px !important;
+  border-top-right-radius: 6px !important;
+  border-bottom-right-radius: 6px !important;
+  text-align: center;
+  box-sizing: border-box;
+}
+
+/* Keep a comfortable gap between the prev/next buttons and other controls */
+#migrationDatesModal .fc-prev-button { margin-right: 0.5rem; }
+#migrationDatesModal .fc-next-button { margin-left: 0.5rem; }
+
+/* On very small screens reduce padding so controls fit but remain tappable */
+@media (max-width: 480px) {
+  #migrationDatesModal .fc-prev-button,
+  #migrationDatesModal .fc-next-button {
+    width: clamp(24px, 8vw, 32px);
+    padding: 4px 6px;
+    font-size: 14px;
+  }
+}
+
+/* Ensure FullCalendar built-in pseudo content doesn't conflict with our glyphs */
+#migrationDatesModal .fc-prev-button::before,
+#migrationDatesModal .fc-next-button::before { content: none !important; }
