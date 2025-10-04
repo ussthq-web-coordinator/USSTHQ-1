@@ -262,9 +262,9 @@ function transformCountsForPie(rawCounts, method = 'sqrt'){
     return n === 0 ? 0 : fn(n);
   });
 }
-// Application version (edit this value to bump the UI version shown on the page)
+// Application version (edit this value to bump text shown on the page)
 // Keep this value here so you can edit it directly in the JS without relying on DashboardData.json
-const APP_VERSION = '2510.04.1344';
+const APP_VERSION = '2510.04.1840';
 // Also expose to window so you can tweak at runtime in the browser console if needed
 window.APP_VERSION = window.APP_VERSION || APP_VERSION;
 
