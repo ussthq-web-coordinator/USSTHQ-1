@@ -231,19 +231,70 @@ function getFilteredData(){
   const modifiedFromMs = dateToUtcMidnightMs(modFromEl && modFromEl.value);
   const modifiedToMs = dateToUtcMidnightMs(modToEl && modToEl.value);
 
-  return tableData.filter(d => 
-    (!div || d.Division===div) &&
-    (!ac || d["Area Command Admin Group.title"]===ac || d["Local Web Admin Group.title"]===ac) &&
-    (!status || d.Status===status) &&
-    (!pageType || d["Page Type"]===pageType) &&
-    (!pubSym || d["Published Symphony"]===pubSym) &&
-    (!symType || d["Symphony Site Type"]===symType)
-    && (!priority || (d.Priority || "") === priority)
-    && (!effort || (d["Effort Needed"] || "") === effort)
-    && (!siteTitle || d["Site Title"] === siteTitle)
-    && ( !modifiedFromMs || (d.Modified && dateToUtcMidnightMs(d.Modified) !== null && dateToUtcMidnightMs(d.Modified) >= modifiedFromMs) )
-    && ( !modifiedToMs || (d.Modified && dateToUtcMidnightMs(d.Modified) !== null && dateToUtcMidnightMs(d.Modified) <= modifiedToMs) )
-  );
+  return tableData.filter(d => {
+    // Helper to match Not Set (blank/null/missing)
+    function isNotSet(val) {
+      return val === undefined || val === null || String(val).trim() === '';
+    }
+    // Division
+    if (div) {
+      if (div === 'Not Set') {
+        if (!isNotSet(d.Division)) return false;
+      } else if (d.Division !== div) return false;
+    }
+    // Area Command
+    if (ac) {
+      if (ac === 'Not Set') {
+        if (!isNotSet(d["Area Command Admin Group.title"]) && !isNotSet(d["Local Web Admin Group.title"])) return false;
+      } else if (d["Area Command Admin Group.title"] !== ac && d["Local Web Admin Group.title"] !== ac) return false;
+    }
+    // Status
+    if (status) {
+      if (status === 'Not Set') {
+        if (!isNotSet(d.Status)) return false;
+      } else if (d.Status !== status) return false;
+    }
+    // Page Type
+    if (pageType) {
+      if (pageType === 'Not Set') {
+        if (!isNotSet(d["Page Type"])) return false;
+      } else if (d["Page Type"] !== pageType) return false;
+    }
+    // Published Symphony
+    if (pubSym) {
+      if (pubSym === 'Not Set') {
+        if (!isNotSet(d["Published Symphony"])) return false;
+      } else if (d["Published Symphony"] !== pubSym) return false;
+    }
+    // Symphony Site Type
+    if (symType) {
+      if (symType === 'Not Set') {
+        if (!isNotSet(d["Symphony Site Type"])) return false;
+      } else if (d["Symphony Site Type"] !== symType) return false;
+    }
+    // Priority
+    if (priority) {
+      if (priority === 'Not Set') {
+        if (!isNotSet(d.Priority)) return false;
+      } else if ((d.Priority || '') !== priority) return false;
+    }
+    // Effort Needed
+    if (effort) {
+      if (effort === 'Not Set') {
+        if (!isNotSet(d["Effort Needed"])) return false;
+      } else if ((d["Effort Needed"] || '') !== effort) return false;
+    }
+    // Site Title
+    if (siteTitle) {
+      if (siteTitle === 'Not Set') {
+        if (!isNotSet(d["Site Title"])) return false;
+      } else if (d["Site Title"] !== siteTitle) return false;
+    }
+    // Modified date range
+    if (modifiedFromMs && (!d.Modified || dateToUtcMidnightMs(d.Modified) === null || dateToUtcMidnightMs(d.Modified) < modifiedFromMs)) return false;
+    if (modifiedToMs && (!d.Modified || dateToUtcMidnightMs(d.Modified) === null || dateToUtcMidnightMs(d.Modified) > modifiedToMs)) return false;
+    return true;
+  });
 }
 
 const qaIssueDetailsMap = {};
@@ -1060,7 +1111,7 @@ try{ addChartLegendModal(statusChart, 'Status'); }catch(e){}
       datasets: [{
         data: transformCountsForPie(Object.values(pageTypeCounts), 'sqrt'),
         _rawCounts: Object.values(pageTypeCounts),
-        backgroundColor: ["#002056","#2ecc71","#e74c3c","#f39c12","#3498db"]
+        backgroundColor: ["#002056","#2ecc71","#e74c3c","#f39c12","#3498db","#6f42c1"]
       }]
     },
     options: {
@@ -1891,7 +1942,7 @@ function renderCharts(filtered) {
         datasets: [{
           data: transformCountsForPie(Object.values(pageTypeCounts), 'sqrt'),
           _rawCounts: Object.values(pageTypeCounts),
-          backgroundColor: ["#002056", "#2ecc71", "#e74c3c", "#f39c12", "#3498db"]
+          backgroundColor: ["#002056", "#2ecc71", "#e74c3c", "#f39c12", "#3498db", "#6f42c1"]
         }]
       },
       options: {
