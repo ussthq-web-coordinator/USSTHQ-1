@@ -866,20 +866,24 @@ function showAllQaModal(){
  //         {title:'QA Details', field:'QA How to Fix Details', formatter: function(cell){ return escapeHtml(cell.getValue()); } },
 
 
-          // Build accordion of unique QA lookup entries (why/how) across all filtered pages
-          const lookupMap = {};
-          rows.forEach(row => {
-            const lookups = (row['QA Issues.lookupValue'] || '').split(';').map(s => s.trim()).filter(Boolean);
-            lookups.forEach(lv => {
-              // Use qaIssueDetailsMap if available for details
-              let details = qaIssueDetailsMap && qaIssueDetailsMap[lv] ? qaIssueDetailsMap[lv] : {};
-              if (!lookupMap[lv]) lookupMap[lv] = {
-                why: details.why || '',
-                how: details.how || '',
-                howDetails: details.howDetails || ''
-              };
-            });
+      // Build accordion of unique QA lookup entries (why/how/details) across all filtered pages
+      const lookupMap = {};
+      rows.forEach(row => {
+        const lookups = (row['QA Issues.lookupValue'] || '').split(';').map(s => s.trim()).filter(Boolean);
+        lookups.forEach(lv => {
+          // Use qaIssueDetailsMap for per-page details, qaLookupMaster for raw details
+          let details = qaIssueDetailsMap && qaIssueDetailsMap[lv] ? qaIssueDetailsMap[lv] : {};
+          if (!lookupMap[lv]) lookupMap[lv] = [];
+          lookupMap[lv].push({
+            why: details.why || '',
+            how: details.how || '',
+            howDetails: details.howDetails || '',
+            pageTitle: details.pageTitle || row.Title || row['Site Title'] || '',
+            siteTitle: row['Site Title'] || '',
+            notes: row['QA Notes'] || ''
           });
+        });
+      });
 
       if(Object.keys(lookupMap).length){
         const accId = `allqa_acc_${Math.random().toString(36).substr(2,6)}`;
@@ -887,6 +891,32 @@ function showAllQaModal(){
         Object.keys(lookupMap).sort().forEach((lv, idx) => {
           const safe = String(lv).replace(/[^a-zA-Z0-9-_]/g,'_') + '_' + idx;
           const item = document.createElement('div'); item.className = 'accordion-item';
+          // Compose body with all details for this lookup value
+          let bodyHtml = '';
+          lookupMap[lv].forEach((detail, i) => {
+            bodyHtml += `<div class=\"mb-3 border-top\">
+              ${detail.pageTitle ? `<h6 class=\"mt-2 fw-bold\">${escapeHtml(detail.pageTitle)} - <em>${escapeHtml(detail.siteTitle)}</em></h6>` : ''}
+              ${detail.why ? `<h2>Why This Is Important</h2><p>${escapeHtml(detail.why)}</p>` : ''}
+              ${detail.how ? `<h2>How to Fix</h2><p>${escapeHtml(detail.how)}</p>` : ''}
+              ${detail.howDetails ? `<h2>How to Fix Details</h2><p>${escapeHtml(detail.howDetails)}</p>` : ''}
+              ${detail.notes ? `<em class=\"pt-1\">&#x1F7E1; QA Notes</em><p>${escapeHtml(detail.notes)}</p>` : ''}
+            </div>`;
+          });
+          // Add a second details section using the raw qaLookupMaster for this lookup value
+          let extraHtml = '';
+          const rawDataObj = qaLookupMaster && qaLookupMaster[lv] ? qaLookupMaster[lv] : null;
+          if (rawDataObj) {
+            const whyPresent = rawDataObj.why && rawDataObj.why.toString().trim();
+            const howPresent = rawDataObj.how && rawDataObj.how.toString().trim();
+            const howDetailsPresent = rawDataObj.howDetails && rawDataObj.howDetails.toString().trim();
+            if (whyPresent || howPresent || howDetailsPresent) {
+              extraHtml += `<div class="mt-4 pt-2">`;
+              extraHtml += whyPresent ? `<h4>Why This Is Important</h4><p>${escapeHtml(rawDataObj.why)}</p>` : '';
+              extraHtml += howPresent ? `<h4>How to Fix</h4><p>${escapeHtml(rawDataObj.how)}</p>` : '';
+              extraHtml += howDetailsPresent ? `<h4>How to Fix Details</h4><p>${escapeHtml(rawDataObj.howDetails)}</p>` : '';
+              extraHtml += `</div>`;
+            }
+          }
           item.innerHTML = `
             <h2 class="accordion-header" id="heading_all_${safe}">
               <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse_all_${safe}" aria-expanded="false" aria-controls="collapse_all_${safe}">
@@ -895,9 +925,9 @@ function showAllQaModal(){
             </h2>
             <div id="collapse_all_${safe}" class="accordion-collapse collapse" data-bs-parent="#${accId}">
               <div class="accordion-body">
-                ${lookupMap[lv].why ? `<h6>Why This Is Important</h6><p>${escapeHtml(lookupMap[lv].why)}</p>` : ''}
-                ${lookupMap[lv].how ? `<h6>How to Fix</h6><p>${escapeHtml(lookupMap[lv].how)}</p>` : ''}
-                ${lookupMap[lv].howDetails ? `<h6>How to Fix Details</h6><p>${escapeHtml(lookupMap[lv].howDetails)}</p>` : ''}
+                ${extraHtml}
+                <h6 class=\"mt-2\">Pages Affected:</h6>
+                ${bodyHtml}
               </div>
             </div>
           `;
