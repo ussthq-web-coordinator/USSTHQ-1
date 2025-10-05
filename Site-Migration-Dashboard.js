@@ -624,7 +624,7 @@ function showQaIssuesModal(issueId){
             if (window.innerWidth <= 580) return escapeHtml(truncateExact(v, 30));
             return escapeHtml(v);
           }},
-          {title:"Edit", field:"Form", hozAlign:"center",
+          {title:"Edit", field:"Form", hozAlign:"center", width:60, maxWidth:90,
             formatter: function(cell){
               const row = cell.getRow().getData();
               const id = row.ID;
@@ -635,16 +635,16 @@ function showQaIssuesModal(issueId){
               return `<a href="${escapeHtml(url)}" target="_blank">Form</a>`;
             }
           },
-          {title:"SD", field:"Page URL", hozAlign:"center", formatter: function(cell){
+          {title:"SD", field:"Page URL", hozAlign:"center", width:55, maxWidth:64, formatter: function(cell){
             const v = cell.getValue();
             return v ? `<a href="${escapeHtml(v)}" target="_blank">🔗</a>` : "";
           }},
-          {title:"ZD", field:"Zesty URL Path Part", hozAlign:"center", formatter: function(cell){
+          {title:"ZD", field:"Zesty URL Path Part", hozAlign:"center", width:55, maxWidth:64, formatter: function(cell){
             const v = cell.getValue();
             return v ? `<a href="https://8hxvw8tw-dev.webengine.zesty.io${escapeHtml(v)}?zpw=tsasecret123&redirect=false&_bypassError=true" target="_blank">🟢</a>` : "";
           }},
           {title:"Status", field:"Status", formatter: function(cell){ return escapeHtml(cell.getValue()); }},
-          {title:"Priority", field:"Priority", formatter: function(cell){ return escapeHtml(cell.getValue()); }},
+          {title:"Priority", field:"Priority", width:55, maxWidth:64, formatter: function(cell){ return escapeHtml(cell.getValue()); }},
           {title:"QA Notes", field:"QA Notes", formatter: function(cell){ return escapeHtml(cell.getValue()); }}
         ],
         responsiveLayout:"collapse",
@@ -780,11 +780,11 @@ function showAllQaModal(){
         initialSort: [{ column: 'Title', dir: 'asc' }],
         columns: [
           {title:'Title', field:'Title', formatter: function(cell){ const v = cell.getValue()||''; if(window.innerWidth<=580) return escapeHtml(truncateExact(v,30)); return escapeHtml(v);} },
-          {title:'Edit', field:'Form', hozAlign:'center', formatter: function(cell){ const row = cell.getRow().getData(); const id = row.ID; const type = (row['Symphony Site Type']||'').trim(); let url='#'; if(type==='Metro Area') url=`https://sauss.sharepoint.com/sites/USSWEBADM/Lists/MetroAreaSitesInfoPagesSymphony/DispForm.aspx?ID=${encodeURIComponent(id)}&e=mY8mhG`; else if(type==='Corps') url=`https://sauss.sharepoint.com/sites/USSWEBADM/Lists/CorpsSitesPageMigrationReport/DispForm.aspx?ID=${encodeURIComponent(id)}&e=dF11LG`; return `<a href="${escapeHtml(url)}" target="_blank">Form</a>`;} },
-          {title:'SD', field:'Page URL', hozAlign:'center', formatter: function(cell){ const v = cell.getValue(); return v ? `<a href="${escapeHtml(v)}" target="_blank">🔗</a>` : ''; } },
-          {title:'ZD', field:'Zesty URL Path Part', hozAlign:'center', formatter: function(cell){ const v = cell.getValue(); return v ? `<a href="https://8hxvw8tw-dev.webengine.zesty.io${escapeHtml(v)}?zpw=tsasecret123&redirect=false&_bypassError=true" target="_blank">🟢</a>` : ''; } },
+          {title:'Edit', field:'Form', hozAlign:'center', width:60, maxWidth:90, formatter: function(cell){ const row = cell.getRow().getData(); const id = row.ID; const type = (row['Symphony Site Type']||'').trim(); let url='#'; if(type==='Metro Area') url=`https://sauss.sharepoint.com/sites/USSWEBADM/Lists/MetroAreaSitesInfoPagesSymphony/DispForm.aspx?ID=${encodeURIComponent(id)}&e=mY8mhG`; else if(type==='Corps') url=`https://sauss.sharepoint.com/sites/USSWEBADM/Lists/CorpsSitesPageMigrationReport/DispForm.aspx?ID=${encodeURIComponent(id)}&e=dF11LG`; return `<a href="${escapeHtml(url)}" target="_blank">Form</a>`;} },
+          {title:'SD', field:'Page URL', hozAlign:'center', width:55, maxWidth:64, formatter: function(cell){ const v = cell.getValue(); return v ? `<a href="${escapeHtml(v)}" target="_blank">🔗</a>` : ''; } },
+          {title:'ZD', field:'Zesty URL Path Part', hozAlign:'center', width:55, maxWidth:64, formatter: function(cell){ const v = cell.getValue(); return v ? `<a href="https://8hxvw8tw-dev.webengine.zesty.io${escapeHtml(v)}?zpw=tsasecret123&redirect=false&_bypassError=true" target="_blank">🟢</a>` : ''; } },
           {title:'Status', field:'Status', formatter: function(cell){ return escapeHtml(cell.getValue()); } },
-          {title:'Priority', field:'Priority', formatter: function(cell){ return escapeHtml(cell.getValue()); } },
+          {title:'Priority', field:'Priority', width:55, maxWidth:64, formatter: function(cell){ return escapeHtml(cell.getValue()); } },
           {title:'QA Notes', field:'QA Notes', formatter: function(cell){ return escapeHtml(cell.getValue()); } },
           {title:'QA Issue', field:'QA Issue', formatter: function(cell){ return escapeHtml(cell.getValue()); } },
           // New column: Site Title placed at the end per request
