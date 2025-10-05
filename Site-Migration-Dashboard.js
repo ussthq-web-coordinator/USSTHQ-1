@@ -268,7 +268,7 @@ function transformCountsForPie(rawCounts, method = 'sqrt'){
 }
 // Application version (edit this value to bump text shown on the page)
 // Keep this value here so you can edit it directly in the JS without relying on DashboardData.json
-const APP_VERSION = '2510.04.1922';
+const APP_VERSION = '2510.05.0629';
 // Also expose to window so you can tweak at runtime in the browser console if needed
 window.APP_VERSION = window.APP_VERSION || APP_VERSION;
 
@@ -523,6 +523,17 @@ function renderQaAccordion(data){
   frag.appendChild(rowDiv);
   // Defer appending to avoid layout thrash when many nodes are created
   requestAnimationFrame(()=>{ container.appendChild(frag); });
+
+  // Update the 'View All Issues' button count and wire it up
+  try{
+    const viewBtn = document.getElementById('viewAllQaBtn');
+    const viewCount = document.getElementById('viewAllQaCount');
+    if(viewCount) viewCount.textContent = qaRows.length || 0;
+    if(viewBtn){
+      viewBtn.removeEventListener('click', showAllQaModal);
+      viewBtn.addEventListener('click', showAllQaModal);
+    }
+  }catch(e){ /* no-op */ }
 }
 
 
@@ -712,6 +723,117 @@ function showQaIssuesModal(issueId){
   });
   };
 
+  modalEl.addEventListener('shown.bs.modal', onShown);
+}
+
+// Show modal listing all QA issues across pages (Tabulator + accordion of lookup entries)
+function showAllQaModal(){
+  const modalEl = document.getElementById('allQaModal');
+  const modalBody = document.getElementById('allQaModalBody');
+  if(!modalEl || !modalBody) return console.warn('All QA modal elements missing');
+
+  // Build rows: include only rows that have QA Issues.lookupValue
+  const rows = Array.isArray(tableData) ? tableData.filter(d => d['QA Issues.lookupValue']) : [];
+
+  // Prepare data for Tabulator: flatten QA lookup fields into the row so each page appears once
+  const tabData = rows.map(r => ({
+    ID: r.ID,
+    Title: r.Title || r['Site Title'] || '',
+    'Page URL': r['Page URL'] || '',
+    'Zesty URL Path Part': r['Zesty URL Path Part'] || '',
+    Status: r.Status || '',
+    Priority: r.Priority || '',
+    'QA Notes': r['QA Notes'] || '',
+    'QA Issue': r['QA Issues.lookupValue'] || '',
+    'Site Title': r['Site Title'] || ''
+  }));
+// Hold these columns for reference if we want to add them later
+// 'QA Why This Is Important': r['QA Issues:Why This Is Important'] || '',
+// 'QA How to Fix': r['QA Issues:How to Fix'] || '',
+// 'QA How to Fix Details': r['QA Issues:How to Fix Details'] || '',
+
+
+  // Show modal then create Tabulator after shown to avoid display issues
+  const bs = new bootstrap.Modal(modalEl);
+  modalBody.innerHTML = '';
+  const headerH5 = document.createElement('h5'); headerH5.className = 'mb-3'; headerH5.innerText = `All Pages with QA Issues (${tabData.length})`;
+  modalBody.appendChild(headerH5);
+
+  const tableContainer = document.createElement('div'); tableContainer.className = 'qa-modal-table-container';
+  modalBody.appendChild(tableContainer);
+
+  const accordionContainer = document.createElement('div'); accordionContainer.className = 'mt-4';
+  modalBody.appendChild(accordionContainer);
+
+  bs.show();
+
+  const onShown = function(){
+    try{ modalEl.removeEventListener('shown.bs.modal', onShown); }catch(e){}
+    requestAnimationFrame(()=>{
+      // Create Tabulator
+      const tbl = new Tabulator(tableContainer, {
+        data: tabData,
+        layout: window.innerWidth < 600 ? 'fitDataFill' : 'fitColumns',
+        reactiveData: true,
+        autoColumns: false,
+        height: tabData.length <= 8 ? 'auto' : Math.max(220, Math.min(480, Math.floor((window.innerHeight || 700) * 0.5))),
+        initialSort: [{ column: 'Title', dir: 'asc' }],
+        columns: [
+          {title:'Title', field:'Title', formatter: function(cell){ const v = cell.getValue()||''; if(window.innerWidth<=580) return escapeHtml(truncateExact(v,30)); return escapeHtml(v);} },
+          {title:'Edit', field:'Form', hozAlign:'center', formatter: function(cell){ const row = cell.getRow().getData(); const id = row.ID; const type = (row['Symphony Site Type']||'').trim(); let url='#'; if(type==='Metro Area') url=`https://sauss.sharepoint.com/sites/USSWEBADM/Lists/MetroAreaSitesInfoPagesSymphony/DispForm.aspx?ID=${encodeURIComponent(id)}&e=mY8mhG`; else if(type==='Corps') url=`https://sauss.sharepoint.com/sites/USSWEBADM/Lists/CorpsSitesPageMigrationReport/DispForm.aspx?ID=${encodeURIComponent(id)}&e=dF11LG`; return `<a href="${escapeHtml(url)}" target="_blank">Form</a>`;} },
+          {title:'SD', field:'Page URL', hozAlign:'center', formatter: function(cell){ const v = cell.getValue(); return v ? `<a href="${escapeHtml(v)}" target="_blank">🔗</a>` : ''; } },
+          {title:'ZD', field:'Zesty URL Path Part', hozAlign:'center', formatter: function(cell){ const v = cell.getValue(); return v ? `<a href="https://8hxvw8tw-dev.webengine.zesty.io${escapeHtml(v)}?zpw=tsasecret123&redirect=false&_bypassError=true" target="_blank">🟢</a>` : ''; } },
+          {title:'Status', field:'Status', formatter: function(cell){ return escapeHtml(cell.getValue()); } },
+          {title:'Priority', field:'Priority', formatter: function(cell){ return escapeHtml(cell.getValue()); } },
+          {title:'QA Notes', field:'QA Notes', formatter: function(cell){ return escapeHtml(cell.getValue()); } },
+          {title:'QA Issue', field:'QA Issue', formatter: function(cell){ return escapeHtml(cell.getValue()); } },
+          // New column: Site Title placed at the end per request
+          {title:'Site Title', field:'Site Title', formatter: function(cell){ return escapeHtml(cell.getValue()); } }
+        ],
+        responsiveLayout:'collapse',
+        responsiveLayoutCollapseStartOpen:true,
+        tooltips:true
+      });
+// Hold these columns for reference if we want to add them later
+  //        {title:'QA Why', field:'QA Why This Is Important', formatter: function(cell){ return escapeHtml(cell.getValue()); } },
+ //         {title:'QA How', field:'QA How to Fix', formatter: function(cell){ return escapeHtml(cell.getValue()); } },
+ //         {title:'QA Details', field:'QA How to Fix Details', formatter: function(cell){ return escapeHtml(cell.getValue()); } },
+
+
+      // Build accordion of unique QA lookup entries (why/how) across all pages
+      const lookupMap = {};
+      Object.keys(qaIssueDetailsMap).forEach(k => {
+        const obj = qaIssueDetailsMap[k];
+        if(!obj || !obj.lookupValue) return;
+        if(!lookupMap[obj.lookupValue]) lookupMap[obj.lookupValue] = { why: obj.why || '', how: obj.how || '', howDetails: obj.howDetails || '' };
+      });
+
+      if(Object.keys(lookupMap).length){
+        const accId = `allqa_acc_${Math.random().toString(36).substr(2,6)}`;
+        const acc = document.createElement('div'); acc.className = 'accordion'; acc.id = accId;
+        Object.keys(lookupMap).sort().forEach((lv, idx) => {
+          const safe = String(lv).replace(/[^a-zA-Z0-9-_]/g,'_') + '_' + idx;
+          const item = document.createElement('div'); item.className = 'accordion-item';
+          item.innerHTML = `
+            <h2 class="accordion-header" id="heading_all_${safe}">
+              <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse_all_${safe}" aria-expanded="false" aria-controls="collapse_all_${safe}">
+                ${escapeHtml(lv)}
+              </button>
+            </h2>
+            <div id="collapse_all_${safe}" class="accordion-collapse collapse" data-bs-parent="#${accId}">
+              <div class="accordion-body">
+                ${lookupMap[lv].why ? `<h6>Why This Is Important</h6><p>${escapeHtml(lookupMap[lv].why)}</p>` : ''}
+                ${lookupMap[lv].how ? `<h6>How to Fix</h6><p>${escapeHtml(lookupMap[lv].how)}</p>` : ''}
+                ${lookupMap[lv].howDetails ? `<h6>How to Fix Details</h6><p>${escapeHtml(lookupMap[lv].howDetails)}</p>` : ''}
+              </div>
+            </div>
+          `;
+          acc.appendChild(item);
+        });
+        accordionContainer.appendChild(acc);
+      }
+    });
+  };
   modalEl.addEventListener('shown.bs.modal', onShown);
 }
 

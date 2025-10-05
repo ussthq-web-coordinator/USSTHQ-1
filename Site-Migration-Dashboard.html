@@ -210,15 +210,20 @@
 <div class="accordion" id="qaAccordion">
   <div class="accordion-item">
     <h2 class="accordion-header" id="headingQA">
-      <button class="accordion-button collapsed d-flex justify-content-between align-items-center" 
-              type="button" data-bs-toggle="collapse" 
-              data-bs-target="#collapseQA" aria-expanded="false" 
-              aria-controls="collapseQA">
-        Pages with QA Issues
-        <span id="qaBadge" class="badge bg-warning">0</span>
-      </button>
+      <div class="d-flex align-items-center justify-content-between w-100">
+        <button class="accordion-button collapsed flex-grow-1 text-start me-2" 
+                type="button" data-bs-toggle="collapse" 
+                data-bs-target="#collapseQA" aria-expanded="false" 
+                aria-controls="collapseQA">
+          Pages with QA Issues
+          <span id="qaBadge" class="badge bg-warning ms-2">0</span>
+        </button>
+      </div>
     </h2>
     <div id="collapseQA" class="accordion-collapse collapse" aria-labelledby="headingQA" data-bs-parent="#qaAccordion">
+      <div class="d-flex justify-content-center mt-3">
+          <button id="viewAllQaBtn" class="btn btn-sm btn-secondary" type="button">View All Issues <span id="viewAllQaCount" class="badge bg-warning ms-1">0</span></button>
+        </div>
       <div class="accordion-body" id="qaGroupsBody">
         <!-- QA cards will be injected here -->
       </div>
@@ -279,30 +284,11 @@
   <div class="modal-dialog modal-xl modal-dialog-scrollable">
     <div class="modal-content">
       <div class="modal-header">
-        <h5 class="modal-title" id="allQaModalLabel">All Pages QA Issues</h5>
+        <h5 class="modal-title" id="allQaModalLabel"></h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
-      <div class="modal-body">
-        <table class="table table-striped" id="allQaTable">
-          <thead>
-            <tr>
-              <th>Title</th>
-              <th>Edit</th>
-              <th>SD</th>
-              <th>ZD</th>
-              <th>Status</th>
-              <th>Priority</th>
-              <th>QA Notes</th>
-              <th>QA Issue</th>
-              <th>QA Why This Is Important</th>
-              <th>QA How to Fix</th>
-              <th>QA How to Fix Details</th>
-            </tr>
-          </thead>
-          <tbody>
-            <!-- Rows injected by JS -->
-          </tbody>
-        </table>
+      <div class="modal-body" id="allQaModalBody">
+        <!-- Tabulator will be injected here. We'll also render an accordion of unique QA lookup entries below the table. -->
       </div>
     </div>
   </div>

@@ -584,7 +584,7 @@ input#filterModifiedTo.form-control.form-control-sm {
 /* TSA brand palette */
 :root {
   --bs-primary: #002056;   /* Navy */
-  --bs-secondary: #4DA6FF; /* Light Blue */
+  --bs-secondary: #2258A1; /* Light Blue */
   --bs-success: #0072CE;   /* Blue Accent */
   --bs-info: #FFCC00;      /* Warm Yellow */
   --bs-warning: #FFCC00;   /* Same Yellow */
@@ -611,10 +611,10 @@ input#filterModifiedTo.form-control.form-control-sm {
 .btn-secondary {
   --bs-btn-bg: var(--bs-secondary);
   --bs-btn-border-color: var(--bs-secondary);
-  --bs-btn-hover-bg: #3C9EFF;
-  --bs-btn-hover-border-color: #3399FF;
-  --bs-btn-active-bg: #2E8CFF;
-  --bs-btn-active-border-color: #267ACC;
+  --bs-btn-hover-bg: #2765BD;
+  --bs-btn-hover-border-color: #2765BD;
+  --bs-btn-active-bg: #2F80F5;
+  --bs-btn-active-border-color: #2F80F5;
 }
 
 /* Success (Blue Accent) */
@@ -705,7 +705,7 @@ input#filterModifiedTo.form-control.form-control-sm {
 .btn-outline-secondary:focus {
   color: #fff;
   background-color: var(--bs-secondary);
-  border-color: #3C9EFF;
+  border-color: #2765BD;
 }
 
 /* Success (Blue Accent) */
