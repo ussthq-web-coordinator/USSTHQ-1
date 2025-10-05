@@ -72,6 +72,10 @@ document.addEventListener('DOMContentLoaded', ()=>{
         text-decoration: underline !important;
       }
       #qaIssuesModalBody .tabulator-row .tabulator-cell a:focus { background-color: rgba(0,0,0,0.04); }
+
+      /* Zesty preview link style: use the link emoji with a yellow underline */
+      .zesty-link { text-decoration: underline; text-decoration-color: #f1c40f; text-decoration-thickness: 1px; text-underline-offset: 2px; color: inherit; font-size: 14px; display:inline-block; }
+      .zesty-link:hover { text-decoration-color: #f39c12; }
     `;
     const s = document.createElement('style');
     s.setAttribute('data-generated','qa-table-hover');
@@ -401,6 +405,14 @@ function renderQaAccordion(data){
   const badge = document.getElementById("qaBadge");
   if (badge) badge.textContent = qaRows.length;
 
+  // Always update the View All Issues button count, even if 0
+  try {
+    const viewBtn = document.getElementById('viewAllQaBtn');
+    const viewCount = document.getElementById('viewAllQaCount');
+    if (viewCount) viewCount.textContent = qaRows.length || 0;
+    if (viewBtn) viewBtn.style.display = (qaRows.length > 0) ? '' : 'none';
+  } catch(e) {}
+
   if(!qaRows.length){
     container.innerHTML = "<p>No QA Issues found.</p>";
     return;
@@ -641,7 +653,7 @@ function showQaIssuesModal(issueId){
           }},
           {title:"ZD", field:"Zesty URL Path Part", hozAlign:"center", width:55, maxWidth:64, formatter: function(cell){
             const v = cell.getValue();
-            return v ? `<a href="https://8hxvw8tw-dev.webengine.zesty.io${escapeHtml(v)}?zpw=tsasecret123&redirect=false&_bypassError=true" target="_blank">🟢</a>` : "";
+            return v ? `<a class="zesty-link" href="https://8hxvw8tw-dev.webengine.zesty.io${escapeHtml(v)}?zpw=tsasecret123&redirect=false&_bypassError=true" target="_blank" rel="noopener noreferrer" aria-label="Open Zesty preview">🔗</a>` : "--";
           }},
           {title:"Status", field:"Status", formatter: function(cell){ return escapeHtml(cell.getValue()); }},
           {title:"Priority", field:"Priority", width:55, maxWidth:64, formatter: function(cell){ return escapeHtml(cell.getValue()); }},
@@ -733,12 +745,15 @@ function showAllQaModal(){
   if(!modalEl || !modalBody) return console.warn('All QA modal elements missing');
 
   // Build rows: include only rows that have QA Issues.lookupValue
-  const rows = Array.isArray(tableData) ? tableData.filter(d => d['QA Issues.lookupValue']) : [];
+  // Use filtered data based on dashboard filters
+  const filteredData = typeof getFilteredData === 'function' ? getFilteredData() : tableData;
+  const rows = Array.isArray(filteredData) ? filteredData.filter(d => d['QA Issues.lookupValue']) : [];
 
   // Prepare data for Tabulator: flatten QA lookup fields into the row so each page appears once
   const tabData = rows.map(r => ({
     ID: r.ID,
     Title: r.Title || r['Site Title'] || '',
+    'Symphony Site Type': r['Symphony Site Type'] || '',
     'Page URL': r['Page URL'] || '',
     'Zesty URL Path Part': r['Zesty URL Path Part'] || '',
     Status: r.Status || '',
@@ -782,7 +797,7 @@ function showAllQaModal(){
           {title:'Title', field:'Title', formatter: function(cell){ const v = cell.getValue()||''; if(window.innerWidth<=580) return escapeHtml(truncateExact(v,30)); return escapeHtml(v);} },
           {title:'Edit', field:'Form', hozAlign:'center', width:60, maxWidth:90, formatter: function(cell){ const row = cell.getRow().getData(); const id = row.ID; const type = (row['Symphony Site Type']||'').trim(); let url='#'; if(type==='Metro Area') url=`https://sauss.sharepoint.com/sites/USSWEBADM/Lists/MetroAreaSitesInfoPagesSymphony/DispForm.aspx?ID=${encodeURIComponent(id)}&e=mY8mhG`; else if(type==='Corps') url=`https://sauss.sharepoint.com/sites/USSWEBADM/Lists/CorpsSitesPageMigrationReport/DispForm.aspx?ID=${encodeURIComponent(id)}&e=dF11LG`; return `<a href="${escapeHtml(url)}" target="_blank">Form</a>`;} },
           {title:'SD', field:'Page URL', hozAlign:'center', width:55, maxWidth:64, formatter: function(cell){ const v = cell.getValue(); return v ? `<a href="${escapeHtml(v)}" target="_blank">🔗</a>` : ''; } },
-          {title:'ZD', field:'Zesty URL Path Part', hozAlign:'center', width:55, maxWidth:64, formatter: function(cell){ const v = cell.getValue(); return v ? `<a href="https://8hxvw8tw-dev.webengine.zesty.io${escapeHtml(v)}?zpw=tsasecret123&redirect=false&_bypassError=true" target="_blank">🟢</a>` : ''; } },
+          {title:'ZD', field:'Zesty URL Path Part', hozAlign:'center', width:55, maxWidth:64, formatter: function(cell){ const v = cell.getValue(); return v ? `<a class="zesty-link" href="https://8hxvw8tw-dev.webengine.zesty.io${escapeHtml(v)}?zpw=tsasecret123&redirect=false&_bypassError=true" target="_blank" rel="noopener noreferrer" aria-label="Open Zesty preview">🔗</a>` : ''; } },
           {title:'Status', field:'Status', formatter: function(cell){ return escapeHtml(cell.getValue()); } },
           {title:'Priority', field:'Priority', width:55, maxWidth:64, formatter: function(cell){ return escapeHtml(cell.getValue()); } },
           {title:'QA Notes', field:'QA Notes', formatter: function(cell){ return escapeHtml(cell.getValue()); } },
@@ -800,13 +815,20 @@ function showAllQaModal(){
  //         {title:'QA Details', field:'QA How to Fix Details', formatter: function(cell){ return escapeHtml(cell.getValue()); } },
 
 
-      // Build accordion of unique QA lookup entries (why/how) across all pages
-      const lookupMap = {};
-      Object.keys(qaIssueDetailsMap).forEach(k => {
-        const obj = qaIssueDetailsMap[k];
-        if(!obj || !obj.lookupValue) return;
-        if(!lookupMap[obj.lookupValue]) lookupMap[obj.lookupValue] = { why: obj.why || '', how: obj.how || '', howDetails: obj.howDetails || '' };
-      });
+          // Build accordion of unique QA lookup entries (why/how) across all filtered pages
+          const lookupMap = {};
+          rows.forEach(row => {
+            const lookups = (row['QA Issues.lookupValue'] || '').split(';').map(s => s.trim()).filter(Boolean);
+            lookups.forEach(lv => {
+              // Use qaIssueDetailsMap if available for details
+              let details = qaIssueDetailsMap && qaIssueDetailsMap[lv] ? qaIssueDetailsMap[lv] : {};
+              if (!lookupMap[lv]) lookupMap[lv] = {
+                why: details.why || '',
+                how: details.how || '',
+                howDetails: details.howDetails || ''
+              };
+            });
+          });
 
       if(Object.keys(lookupMap).length){
         const accId = `allqa_acc_${Math.random().toString(36).substr(2,6)}`;
@@ -1327,7 +1349,8 @@ function renderTable(){
   table = new Tabulator("#tableContainer",{
     data: filtered,
     layout:"fitDataStretch",
-    responsiveLayout:"collapse",
+  responsiveLayout:"collapse",
+  responsiveLayoutCollapseStartOpen:true,
     rowHeight: 27,
     initialSort: [              
         { column: "Title", dir: "asc" },
@@ -1371,8 +1394,12 @@ title: "Title",
 },
 
 
-      {title:"SD", field:"Page URL", formatter:cell=>cell.getValue()?`<a href="${cell.getValue()}" target="_blank">&#128279;</a>`:""},
-      {title:"ZD", field:"Zesty URL Path Part", formatter:cell=>cell.getValue()?`<a href="https://8hxvw8tw-dev.webengine.zesty.io${cell.getValue()}?zpw=tsasecret123&redirect=false&_bypassError=true" target="_blank">&#128279;</a>`:""},
+      {title:"SD", field:"Page URL",  hozAlign:'center', formatter:cell=>cell.getValue()?`<a href="${escapeHtml(cell.getValue())}" target="_blank" rel="noopener noreferrer">&#128279;</a>`:""},
+  {title:"ZD", field:"Zesty URL Path Part", visible:true, hozAlign:"center", width:55, maxWidth:64, formatter:cell=>{
+    const v = cell.getValue();
+    console.log('[ZD formatter] Row ID:', cell.getRow().getData().ID, 'Zesty URL Path Part:', v);
+    return v ? `<a class="zesty-link" href="https://8hxvw8tw-dev.webengine.zesty.io${escapeHtml(v)}?zpw=tsasecret123&redirect=false&_bypassError=true" target="_blank" rel="noopener noreferrer" aria-label="Open Zesty preview">🔗</a>` : "--";
+  }},
       {title:"Status", field:"Status",
           width: 110,        
           minWidth: 80,
@@ -1420,6 +1447,13 @@ title: "Title",
     paginationSize:20,
     movableColumns:true
   });
+  // Diagnostics: log column fields and ZD value count after table creation
+  try {
+    const cols = table.getColumns().map(c => ({field: c.getField(), visible: c.isVisible()}));
+    const zdCount = filtered.filter(r => r['Zesty URL Path Part']).length;
+    console.log('[renderTable] Tabulator columns:', cols);
+    console.log('[renderTable] Filtered rows with Zesty URL Path Part:', zdCount);
+  } catch(e) { console.warn('Tabulator diagnostics failed', e); }
 }
 
 // Render overall progress bar and legend

@@ -793,9 +793,9 @@ input#filterModifiedTo.form-control.form-control-sm {
 /* Reduce search input width inside the Migration Dates modal so it doesn't dominate the header */
 #migrationDatesModal .modal-header .form-control,
 #migrationDatesModal .modal-body #migrationSearch {
-  min-width: 180px !important;
-  max-width: 320px !important;
-  width: auto !important;
+  min-width: 120px !important;
+  max-width: 220px !important;
+  /* allow explicit widths or inline styles to take precedence; removed width:auto !important */
 }
 
 /* Style FullCalendar's prev/next buttons inside the migration modal to show arrows.
