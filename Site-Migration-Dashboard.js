@@ -272,7 +272,7 @@ function transformCountsForPie(rawCounts, method = 'sqrt'){
 }
 // Application version (edit this value to bump text shown on the page)
 // Keep this value here so you can edit it directly in the JS without relying on DashboardData.json
-const APP_VERSION = '2510.04.1922';
+const APP_VERSION = '2510.05.0900';
 // Also expose to window so you can tweak at runtime in the browser console if needed
 window.APP_VERSION = window.APP_VERSION || APP_VERSION;
 
@@ -1475,9 +1475,15 @@ function renderOverallProgress(filtered){
   if (!legendContainer) return;
   legendContainer.innerHTML = "";
 
-  Object.keys(counts).forEach(key=>{
-    const pct = total ? (counts[key]/total*100) : 0; // use float, not rounded
-    if(counts[key] > 0){  // render all non-zero counts
+  // Apply sqrt scaling to progress bar segment widths
+  const rawCounts = Object.keys(counts).map(k => counts[k]);
+  const scaledCounts = transformCountsForPie(rawCounts, 'sqrt');
+  const scaledTotal = scaledCounts.reduce((a,b)=>a+b,0) || 1;
+  Object.keys(counts).forEach((key, idx) => {
+    const raw = counts[key];
+    const scaled = scaledCounts[idx];
+    const pct = scaledTotal ? (scaled/scaledTotal*100) : 0;
+    if(raw > 0){  // render all non-zero counts
       const div = document.createElement("div");
       div.className = "progress-bar";
       div.style.width = pct + "%";
@@ -1485,16 +1491,15 @@ function renderOverallProgress(filtered){
       div.style.display="flex";
       div.style.alignItems="center";
       div.style.justifyContent="center";
-      div.innerText = `${Math.round(pct)}% (${counts[key]})`;
+      div.innerText = `${Math.round(pct)}% (${raw})`;
       container.appendChild(div);
 
       // Add legend
       const legendItem = document.createElement("div");
       legendItem.className = "d-flex align-items-center gap-1 legend-item";
       legendItem.innerHTML =
-        `<span style="display:inline-block;width:14px;height:14px;background-color:${statusColors[key]};"></span> ${key} – ${Math.round(pct)}% (${counts[key]})`;
+        `<span style="display:inline-block;width:14px;height:14px;background-color:${statusColors[key]};"></span> ${key} – ${Math.round(pct)}% (${raw})`;
       legendContainer.appendChild(legendItem);
-
     }
   });
 }
