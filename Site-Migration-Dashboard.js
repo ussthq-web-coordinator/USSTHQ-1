@@ -1613,30 +1613,39 @@ function renderOverallProgress(filtered){
   if (!legendContainer) return;
   legendContainer.innerHTML = "";
 
-  // Apply sqrt scaling to progress bar segment widths
-  const rawCounts = Object.keys(counts).map(k => counts[k]);
+  // Compute percentages from raw counts. Percentages are (count / total) * 100
+  // and rounded to one decimal place for display. Widths use the raw percentage
+  // so visual segments match the textual percentages (minor rounding differences
+  // may cause the sums to be ~100%).
+  // Prepare arrays for sqrt-scaling widths while keeping raw percentages for text
+  const keys = Object.keys(counts);
+  const rawCounts = keys.map(k => counts[k] || 0);
   const scaledCounts = transformCountsForPie(rawCounts, 'sqrt');
   const scaledTotal = scaledCounts.reduce((a,b)=>a+b,0) || 1;
-  Object.keys(counts).forEach((key, idx) => {
-    const raw = counts[key];
-    const scaled = scaledCounts[idx];
-    const pct = scaledTotal ? (scaled/scaledTotal*100) : 0;
-    if(raw > 0){  // render all non-zero counts
+
+  keys.forEach((key, idx) => {
+    const raw = rawCounts[idx] || 0;
+    const pct = total > 0 ? (raw / total) * 100 : 0;
+    const pctDisplay = pct.toFixed(1); // one decimal place
+
+    if (raw > 0) { // render only non-zero categories
+      const scaled = scaledCounts[idx] || 0;
+      const widthPct = scaledTotal ? (scaled / scaledTotal) * 100 : 0;
+
       const div = document.createElement("div");
       div.className = "progress-bar";
-      div.style.width = pct + "%";
+      div.style.width = widthPct + "%"; // use sqrt-scaled percentage for visual width
       div.style.backgroundColor = statusColors[key];
-      div.style.display="flex";
-      div.style.alignItems="center";
-      div.style.justifyContent="center";
-      div.innerText = `${Math.round(pct)}% (${raw})`;
+      div.style.display = "flex";
+      div.style.alignItems = "center";
+      div.style.justifyContent = "center";
+      div.innerText = `${pctDisplay}% (${raw})`; // textual percentage uses raw counts
       container.appendChild(div);
 
-      // Add legend
+      // Add legend line formatted as: Category Name – X% (Count)
       const legendItem = document.createElement("div");
       legendItem.className = "d-flex align-items-center gap-1 legend-item";
-      legendItem.innerHTML =
-        `<span style="display:inline-block;width:14px;height:14px;background-color:${statusColors[key]};"></span> ${key} – ${Math.round(pct)}% (${raw})`;
+      legendItem.innerHTML = `<span style="display:inline-block;width:14px;height:14px;background-color:${statusColors[key]};"></span> ${key} – ${pctDisplay}% (${raw})`;
       legendContainer.appendChild(legendItem);
     }
   });
