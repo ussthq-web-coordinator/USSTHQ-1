@@ -74,7 +74,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
       #qaIssuesModalBody .tabulator-row .tabulator-cell a:focus { background-color: rgba(0,0,0,0.04); }
 
       /* Zesty preview link style: use the link emoji with a yellow underline */
-      .zesty-link { text-decoration: underline; text-decoration-color: #f1c40f; text-decoration-thickness: 1px; text-underline-offset: 2px; color: inherit; font-size: 14px; display:inline-block; }
+      .zesty-link { text-decoration: underline; text-decoration-color: #FF5D0A; text-decoration-thickness: 1px; text-underline-offset: 2px; color: inherit; font-size: 14px; display:inline-block; }
       .zesty-link:hover { text-decoration-color: #f39c12; }
     `;
     const s = document.createElement('style');
@@ -798,20 +798,27 @@ function showAllQaModal(){
   // Build rows: include only rows that have QA Issues.lookupValue
   // Use filtered data based on dashboard filters
   const filteredData = typeof getFilteredData === 'function' ? getFilteredData() : tableData;
-  const rows = Array.isArray(filteredData) ? filteredData.filter(d => d['QA Issues.lookupValue']) : [];
+  // Deduplicate by ID
+  const seenIds = new Set();
+  const rows = Array.isArray(filteredData) ? filteredData.filter(d => {
+    if (!d['QA Issues.lookupValue']) return false;
+    if (seenIds.has(d.ID)) return false;
+    seenIds.add(d.ID);
+    return true;
+  }) : [];
 
   // Prepare data for Tabulator: flatten QA lookup fields into the row so each page appears once
   const tabData = rows.map(r => ({
-    ID: r.ID,
-    Title: r.Title || r['Site Title'] || '',
-    'Symphony Site Type': r['Symphony Site Type'] || '',
-    'Page URL': r['Page URL'] || '',
-    'Zesty URL Path Part': r['Zesty URL Path Part'] || '',
-    Status: r.Status || '',
-    Priority: r.Priority || '',
-    'QA Notes': r['QA Notes'] || '',
-    'QA Issue': r['QA Issues.lookupValue'] || '',
-    'Site Title': r['Site Title'] || ''
+  ID: r.ID,
+  Title: r.Title || r['Site Title'] || '',
+  'Symphony Site Type': r['Symphony Site Type'] || '',
+  'Page URL': r['Page URL'] || '',
+  'Zesty URL Path Part': r['Zesty URL Path Part'] || '',
+  Status: r.Status || '',
+  Priority: r.Priority || '',
+  'QA Notes': r['QA Notes'] || '',
+  'QA Issue': escapeHtml(r['QA Issues.lookupValue'] || ''),
+  'Site Title': r['Site Title'] || ''
   }));
 // Hold these columns for reference if we want to add them later
 // 'QA Why This Is Important': r['QA Issues:Why This Is Important'] || '',
@@ -852,7 +859,7 @@ function showAllQaModal(){
           {title:'Status', field:'Status', formatter: function(cell){ return escapeHtml(cell.getValue()); } },
           {title:'Priority', field:'Priority', width:55, maxWidth:64, formatter: function(cell){ return escapeHtml(cell.getValue()); } },
           {title:'QA Notes', field:'QA Notes', formatter: function(cell){ return escapeHtml(cell.getValue()); } },
-          {title:'QA Issue', field:'QA Issue', formatter: function(cell){ return escapeHtml(cell.getValue()); } },
+          {title:'QA Issue', field:'QA Issue', formatter: function(cell){ return cell.getValue(); } },
           // New column: Site Title placed at the end per request
           {title:'Site Title', field:'Site Title', formatter: function(cell){ return escapeHtml(cell.getValue()); } }
         ],
@@ -875,12 +882,12 @@ function showAllQaModal(){
           let details = qaIssueDetailsMap && qaIssueDetailsMap[lv] ? qaIssueDetailsMap[lv] : {};
           if (!lookupMap[lv]) lookupMap[lv] = [];
           lookupMap[lv].push({
-            why: details.why || '',
-            how: details.how || '',
-            howDetails: details.howDetails || '',
-            pageTitle: details.pageTitle || row.Title || row['Site Title'] || '',
-            siteTitle: row['Site Title'] || '',
-            notes: row['QA Notes'] || ''
+            why: escapeHtml(details.why || ''),
+            how: escapeHtml(details.how || ''),
+            howDetails: escapeHtml(details.howDetails || ''),
+            pageTitle: escapeHtml(details.pageTitle || row.Title || row['Site Title'] || ''),
+            siteTitle: escapeHtml(row['Site Title'] || ''),
+            notes: escapeHtml(row['QA Notes'] || '')
           });
         });
       });
@@ -910,7 +917,7 @@ function showAllQaModal(){
             const howPresent = rawDataObj.how && rawDataObj.how.toString().trim();
             const howDetailsPresent = rawDataObj.howDetails && rawDataObj.howDetails.toString().trim();
             if (whyPresent || howPresent || howDetailsPresent) {
-              extraHtml += `<div class="mt-4 pt-2">`;
+              extraHtml += `<div class=\"mt-4 pt-2\">`;
               extraHtml += whyPresent ? `<h4>Why This Is Important</h4><p>${escapeHtml(rawDataObj.why)}</p>` : '';
               extraHtml += howPresent ? `<h4>How to Fix</h4><p>${escapeHtml(rawDataObj.how)}</p>` : '';
               extraHtml += howDetailsPresent ? `<h4>How to Fix Details</h4><p>${escapeHtml(rawDataObj.howDetails)}</p>` : '';
@@ -1426,7 +1433,14 @@ function renderBreakdown(data){
 // Table rendering
 function renderTable(){
   if(table) table.destroy();
-  const filtered = getFilteredData();
+  // Deduplicate filtered rows by ID
+  const rawFiltered = getFilteredData();
+  const seenIds = new Set();
+  const filtered = rawFiltered.filter(row => {
+    if (seenIds.has(row.ID)) return false;
+    seenIds.add(row.ID);
+    return true;
+  });
   table = new Tabulator("#tableContainer",{
     data: filtered,
     layout:"fitDataStretch",
@@ -1792,10 +1806,10 @@ document.addEventListener("DOMContentLoaded", () => {
   // --- Table Modal ---
 function showTableModalById(id){
   const page = pageCache[id];
-  if(page) showTableModal(page);
+  if(page) return showTableModal(page);
 }
 
-function showTableModal(page){
+async function showTableModal(page){
   const titleEl = document.getElementById("tableModalTitle");
   const bodyEl = document.getElementById("tableModalBody");
   const modalEl = document.getElementById('tableDetailModal');
@@ -1806,8 +1820,41 @@ function showTableModal(page){
 
   titleEl.innerText = page.Title;
 
-  let html = '<table class="table table-bordered">';
-
+  let html = '';
+  // Load field export config
+  let fieldConfig;
+  try {
+    const req = await fetch('FieldExport.json?_ts=' + Date.now());
+    fieldConfig = await req.json();
+    window.FieldExportConfig = fieldConfig;
+  } catch(e) { fieldConfig = null; }
+  const fields = fieldConfig && fieldConfig.Fields ? fieldConfig.Fields : [];
+  // Group fields by FieldGroup and sort by FieldNumberML
+  const visibleFields = fields.filter(f => f.SortOrder !== 'True');
+  const grouped = {};
+  visibleFields.forEach(f => {
+    const group = f.FieldPreferredName || 'Other';
+    if (!grouped[group]) grouped[group] = [];
+    grouped[group].push(f);
+  });
+  // Sort groups by FieldGroup (numeric)
+  // Sort groups by preferred display order
+  const preferredOrder = [
+    'Page Migration Report Details',
+    'Zesty Details',
+    'Symphony Details',
+    'Quality Assurance',
+    'Extra Details'
+  ];
+  const groupOrder = Object.keys(grouped).sort((a, b) => {
+    const idxA = preferredOrder.indexOf(a);
+    const idxB = preferredOrder.indexOf(b);
+    if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+    if (idxA !== -1) return -1;
+    if (idxB !== -1) return 1;
+    return a.localeCompare(b);
+  });
+  html += '<table class="table table-bordered">';
   // --- Form link ---
   const type = (page["Symphony Site Type"] || "").trim();
   let formUrl = "#";
@@ -1815,24 +1862,65 @@ function showTableModal(page){
       formUrl = `https://sauss.sharepoint.com/sites/USSWEBADM/Lists/MetroAreaSitesInfoPagesSymphony/DispForm.aspx?ID=${page.ID}&e=mY8mhG`;
   else if(type === "Corps") 
       formUrl = `https://sauss.sharepoint.com/sites/USSWEBADM/Lists/CorpsSitesPageMigrationReport/DispForm.aspx?ID=${page.ID}&e=dF11LG`;
-  
   html += `<tr><th>Form</th><td><a href="${formUrl}" target="_blank">Edit Form</a></td></tr>`;
+  // Render grouped fields
+  groupOrder.forEach(groupName => {
+    html += `<tr class="table-group"><th colspan="2" style="background-color:#223950;color:#fff;">${groupName}</th></tr>`;
+    const groupFields = grouped[groupName].sort((a,b) => {
+      // Sort by SortOrder ("True" last, "False" first), then FieldNumberML
+      if (a.SortOrder !== b.SortOrder) {
+        return (a.SortOrder === 'False' ? -1 : 1);
+      }
+      return Number(a.FieldNumberML) - Number(b.FieldNumberML);
+    });
+    groupFields.forEach(f => {
+      const k = f.FormField;
+      let val = page[k];
+      // Use Page Editor.title for Page Editor field
+      if (k === "Page Editor") {
+        val = page["Page Editor.title"] || val;
+      }
+      // Remove second Form field if empty
+      if (k === "Form" && !val) return;
+      if(k==="Page URL" && val) 
+          val = `<a href="${val}" target="_blank">${val}</a>`;
+      if(k==="Zesty URL Path Part" && val) 
+          val = `<a href="https://8hxvw8tw-dev.webengine.zesty.io${val}?zpw=tsasecret123&redirect=false&_bypassError=true" target="_blank">${val}</a>`;
+      if(k==="Zesty Content Mobile Editor Path") {
+        if(val) {
+          val = `<a href="https://salvationarmy.mobile.zesty.io${val}" target="_blank">${val}</a>`;
+        } else {
+          val = "--";
+        }
+      }
+      if(k==="Migration URL" && val) 
+          val = `<a href="${val}" target="_blank">${val}</a>`;
 
-  // --- Other fields ---
-  for(const k in page){
-    let val = page[k];
-    if(k==="Page URL" && val) 
-        val = `<a href="${val}" target="_blank">${val}</a>`;
-    if(k==="Zesty URL Path Part" && val) 
-        val = `<a href="https://8hxvw8tw-dev.webengine.zesty.io${val}?zpw=tsasecret123&redirect=false&_bypassError=true" target="_blank">${val}</a>`;
-    if(k==="Zesty Content Mobile Editor Path" && val) 
-        val = `<a href="${val}" target="_blank">${val}</a>`;
-    if(k==="Migration URL" && val) 
-        val = `<a href="${val}" target="_blank">${val}</a>`;
+      // Published Symphony visual cue (normalize value)
+      if(k==="Published Symphony") {
+        const normVal = String(val).toLowerCase();
+        if(val === true || val === 1 || val === "1" || normVal === "true") {
+          val = `<span style="color:#28a745;font-weight:bold;">Published</span>`;
+        } else {
+          val = `<span style="color:#e74c3c;font-weight:bold;">Not Published</span>`;
+        }
+      }
 
-    html += `<tr><th>${k}</th><td>${val}</td></tr>`;
-  }
+      // Page Type External with Redirect External URL
+      if(k==="Page Type" && (val === "external" || val === "External")) {
+        const redirectUrl = page["Redirect External URL"];
+        if(redirectUrl) {
+          val = `<span style="background:#ffeeba;color:#856404;padding:2px 8px;border-radius:6px;font-weight:bold;" title="To set up as an informational page in Zesty: 1) Copy the value in Redirect External URL to the External URL field. 2) Add the page to the navigation parent. 3) Set 'Display on Header Navigation' to Yes.">External Page <i class='bi bi-info-circle'></i></span> <a href='${redirectUrl}' target='_blank' style='color:#0a66c2;text-decoration:underline;margin-left:8px;'>${redirectUrl}</a>`;
+        } else {
+          val = `<span style="background:#ffeeba;color:#856404;padding:2px 8px;border-radius:6px;font-weight:bold;">External Page</span>`;
+        }
+      }
 
+      // Use FieldGroupSort if present, otherwise FieldPreferredName, otherwise FormField
+      let displayName = f.FieldGroupSort && f.FieldGroupSort.trim() ? f.FieldGroupSort : (f.FieldPreferredName && f.FieldPreferredName.trim() ? f.FieldPreferredName : k);
+      html += `<tr><th>${displayName}</th><td>${val ?? ''}</td></tr>`;
+    });
+  });
   html += "</table>";
   bodyEl.innerHTML = html;
   if (modalEl) {
