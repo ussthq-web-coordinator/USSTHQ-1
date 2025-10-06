@@ -794,31 +794,53 @@ function showAllQaModal(){
   const modalEl = document.getElementById('allQaModal');
   const modalBody = document.getElementById('allQaModalBody');
   if(!modalEl || !modalBody) return console.warn('All QA modal elements missing');
+  // Determine whether any dashboard filter is active. If none are active, prefer the
+  // full master dataset so "View All Issues" truly means all issues regardless of
+  // currently-visible filters.
+  function anyFilterActive(){
+    const ids = ["filterDivision","filterAC","filterStatus","filterPageType","filterPubSym","filterSymType","filterPriority","filterEffort","filterSiteTitle"];
+    for(const id of ids){ const el = document.getElementById(id); if(el && el.value) return true; }
+    const modFrom = document.getElementById('filterModifiedFrom'); const modTo = document.getElementById('filterModifiedTo');
+    if ((modFrom && modFrom.value) || (modTo && modTo.value)) return true;
+    return false;
+  }
 
-  // Build rows: include only rows that have QA Issues.lookupValue
-  // Use filtered data based on dashboard filters
-  const filteredData = typeof getFilteredData === 'function' ? getFilteredData() : tableData;
-  // Deduplicate by ID
-  const seenIds = new Set();
-  const rows = Array.isArray(filteredData) ? filteredData.filter(d => {
-    if (!d['QA Issues.lookupValue']) return false;
-    if (seenIds.has(d.ID)) return false;
-    seenIds.add(d.ID);
-    return true;
-  }) : [];
+  // Use masterData (all rows) when no filters are active so the modal shows everything.
+  const sourceData = (!anyFilterActive() && Array.isArray(masterData) && masterData.length) ? masterData : (typeof getFilteredData === 'function' ? getFilteredData() : tableData);
 
-  // Prepare data for Tabulator: flatten QA lookup fields into the row so each page appears once
-  const tabData = rows.map(r => ({
-  ID: r.ID,
-  Title: r.Title || r['Site Title'] || '',
-  'Symphony Site Type': r['Symphony Site Type'] || '',
-  'Page URL': r['Page URL'] || '',
-  'Zesty URL Path Part': r['Zesty URL Path Part'] || '',
-  Status: r.Status || '',
-  Priority: r.Priority || '',
-  'QA Notes': r['QA Notes'] || '',
-  'QA Issue': escapeHtml(r['QA Issues.lookupValue'] || ''),
-  'Site Title': r['Site Title'] || ''
+  // Expand multi-lookup rows into one row per individual lookup so the table shows
+  // every issue separately (instead of one row per page with semicolon-separated lookups).
+  const issueRows = [];
+  (Array.isArray(sourceData) ? sourceData : []).forEach(r => {
+    const lookups = (r['QA Issues.lookupValue'] || '').toString().split(';').map(s=>s.trim()).filter(Boolean);
+    if (!lookups.length) return;
+    lookups.forEach(lv => {
+      issueRows.push({
+        ID: r.ID,
+        Title: r.Title || r['Site Title'] || '',
+        'Symphony Site Type': r['Symphony Site Type'] || '',
+        'Page URL': r['Page URL'] || '',
+        'Zesty URL Path Part': r['Zesty URL Path Part'] || '',
+        Status: r.Status || '',
+        Priority: r.Priority || '',
+        'QA Notes': r['QA Notes'] || '',
+        'QA Issue': lv,
+        'Site Title': r['Site Title'] || ''
+      });
+    });
+  });
+
+  const tabData = issueRows.map(r => ({
+    ID: r.ID,
+    Title: r.Title,
+    'Symphony Site Type': r['Symphony Site Type'],
+    'Page URL': r['Page URL'],
+    'Zesty URL Path Part': r['Zesty URL Path Part'],
+    Status: r.Status,
+    Priority: r.Priority,
+    'QA Notes': r['QA Notes'],
+    'QA Issue': escapeHtml(r['QA Issue'] || ''),
+    'Site Title': r['Site Title'] || ''
   }));
 // Hold these columns for reference if we want to add them later
 // 'QA Why This Is Important': r['QA Issues:Why This Is Important'] || '',
@@ -829,7 +851,7 @@ function showAllQaModal(){
   // Show modal then create Tabulator after shown to avoid display issues
   const bs = new bootstrap.Modal(modalEl);
   modalBody.innerHTML = '';
-  const headerH5 = document.createElement('h5'); headerH5.className = 'mb-3'; headerH5.innerText = `All Pages with QA Issues (${tabData.length})`;
+  const headerH5 = document.createElement('h5'); headerH5.className = 'mb-3'; headerH5.innerText = `All QA Issues (${tabData.length})`;
   modalBody.appendChild(headerH5);
 
   const tableContainer = document.createElement('div'); tableContainer.className = 'qa-modal-table-container';
@@ -874,21 +896,28 @@ function showAllQaModal(){
 
 
       // Build accordion of unique QA lookup entries (why/how/details) across all filtered pages
+      // Use the expanded issueRows so each individual lookup is represented.
       const lookupMap = {};
-      rows.forEach(row => {
-        const lookups = (row['QA Issues.lookupValue'] || '').split(';').map(s => s.trim()).filter(Boolean);
-        lookups.forEach(lv => {
-          // Use qaIssueDetailsMap for per-page details, qaLookupMaster for raw details
-          let details = qaIssueDetailsMap && qaIssueDetailsMap[lv] ? qaIssueDetailsMap[lv] : {};
-          if (!lookupMap[lv]) lookupMap[lv] = [];
-          lookupMap[lv].push({
-            why: escapeHtml(details.why || ''),
-            how: escapeHtml(details.how || ''),
-            howDetails: escapeHtml(details.howDetails || ''),
-            pageTitle: escapeHtml(details.pageTitle || row.Title || row['Site Title'] || ''),
-            siteTitle: escapeHtml(row['Site Title'] || ''),
-            notes: escapeHtml(row['QA Notes'] || '')
-          });
+      issueRows.forEach(row => {
+        const lv = (row['QA Issue'] || '').toString().trim();
+        if (!lv) return;
+        // Prefer per-page enriched details from qaIssueDetailsMap when available; keep them
+        // separately so we can render master lookup fields once and page-specific
+        // overrides only when they differ.
+        const master = qaLookupMaster && qaLookupMaster[lv] ? qaLookupMaster[lv] : null;
+        const perPage = Object.keys(qaIssueDetailsMap).map(k => qaIssueDetailsMap[k]).find(o => o && String(o.lookupValue) === String(lv) && String(o.pageId) === String(row.ID));
+        const perPageWhy = perPage && perPage.why ? perPage.why : '';
+        const perPageHow = perPage && perPage.how ? perPage.how : '';
+        const perPageHowDetails = perPage && perPage.howDetails ? perPage.howDetails : '';
+        if (!lookupMap[lv]) lookupMap[lv] = [];
+        lookupMap[lv].push({
+          pageTitle: row.Title || row['Site Title'] || '',
+          siteTitle: row['Site Title'] || '',
+          notes: row['QA Notes'] || '',
+          perPageWhy: perPageWhy,
+          perPageHow: perPageHow,
+          perPageHowDetails: perPageHowDetails,
+          master: master // keep reference to master data for convenience
         });
       });
 
@@ -898,32 +927,46 @@ function showAllQaModal(){
         Object.keys(lookupMap).sort().forEach((lv, idx) => {
           const safe = String(lv).replace(/[^a-zA-Z0-9-_]/g,'_') + '_' + idx;
           const item = document.createElement('div'); item.className = 'accordion-item';
-          // Compose body with all details for this lookup value
-          let bodyHtml = '';
-          lookupMap[lv].forEach((detail, i) => {
-            bodyHtml += `<div class=\"mb-3 border-top\">
-              ${detail.pageTitle ? `<h6 class=\"mt-2 fw-bold\">${escapeHtml(detail.pageTitle)} - <em>${escapeHtml(detail.siteTitle)}</em></h6>` : ''}
-              ${detail.why ? `<h2>Why This Is Important</h2><p>${escapeHtml(detail.why)}</p>` : ''}
-              ${detail.how ? `<h2>How to Fix</h2><p>${escapeHtml(detail.how)}</p>` : ''}
-              ${detail.howDetails ? `<h2>How to Fix Details</h2><p>${escapeHtml(detail.howDetails)}</p>` : ''}
-              ${detail.notes ? `<em class=\"pt-1\">&#x1F7E1; QA Notes</em><p>${escapeHtml(detail.notes)}</p>` : ''}
-            </div>`;
-          });
-          // Add a second details section using the raw qaLookupMaster for this lookup value
-          let extraHtml = '';
+
+          // Use raw master data for the top-level QA fields (show once)
           const rawDataObj = qaLookupMaster && qaLookupMaster[lv] ? qaLookupMaster[lv] : null;
+          let extraHtml = '';
           if (rawDataObj) {
             const whyPresent = rawDataObj.why && rawDataObj.why.toString().trim();
             const howPresent = rawDataObj.how && rawDataObj.how.toString().trim();
             const howDetailsPresent = rawDataObj.howDetails && rawDataObj.howDetails.toString().trim();
             if (whyPresent || howPresent || howDetailsPresent) {
-              extraHtml += `<div class=\"mt-4 pt-2\">`;
+              extraHtml += `<div class="mt-0 mb-3">`;
               extraHtml += whyPresent ? `<h4>Why This Is Important</h4><p>${escapeHtml(rawDataObj.why)}</p>` : '';
               extraHtml += howPresent ? `<h4>How to Fix</h4><p>${escapeHtml(rawDataObj.how)}</p>` : '';
               extraHtml += howDetailsPresent ? `<h4>How to Fix Details</h4><p>${escapeHtml(rawDataObj.howDetails)}</p>` : '';
               extraHtml += `</div>`;
             }
           }
+
+          // Build pages affected list — deduplicate by page title + site
+          const seenPages = new Set();
+          let bodyHtml = '';
+          lookupMap[lv].forEach((detail) => {
+            const key = `${detail.pageTitle}||${detail.siteTitle}`;
+            if (seenPages.has(key)) return;
+            seenPages.add(key);
+            bodyHtml += `<div class="mb-3 border-top pt-2">`;
+            bodyHtml += detail.pageTitle ? `<h6 class="mt-1 fw-bold">${escapeHtml(detail.pageTitle)} - <em>${escapeHtml(detail.siteTitle)}</em></h6>` : '';
+            // Show per-page why/how only if they exist and differ from master
+            if (detail.perPageWhy && (!rawDataObj || rawDataObj.why !== detail.perPageWhy)) {
+              bodyHtml += `<h6>Why (page-specific)</h6><p>${escapeHtml(detail.perPageWhy)}</p>`;
+            }
+            if (detail.perPageHow && (!rawDataObj || rawDataObj.how !== detail.perPageHow)) {
+              bodyHtml += `<h6>How to Fix (page-specific)</h6><p>${escapeHtml(detail.perPageHow)}</p>`;
+            }
+            if (detail.perPageHowDetails && (!rawDataObj || rawDataObj.howDetails !== detail.perPageHowDetails)) {
+              bodyHtml += `<h6>How to Fix Details (page-specific)</h6><p>${escapeHtml(detail.perPageHowDetails)}</p>`;
+            }
+            if (detail.notes) bodyHtml += `<em class="pt-1">&#x1F7E1; QA Notes</em><p>${escapeHtml(detail.notes)}</p>`;
+            bodyHtml += `</div>`;
+          });
+
           item.innerHTML = `
             <h2 class="accordion-header" id="heading_all_${safe}">
               <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse_all_${safe}" aria-expanded="false" aria-controls="collapse_all_${safe}">
@@ -933,7 +976,7 @@ function showAllQaModal(){
             <div id="collapse_all_${safe}" class="accordion-collapse collapse" data-bs-parent="#${accId}">
               <div class="accordion-body">
                 ${extraHtml}
-                <h6 class=\"mt-2\">Pages Affected:</h6>
+                <h6 class="mt-2">Pages Affected:</h6>
                 ${bodyHtml}
               </div>
             </div>
