@@ -1,4 +1,4 @@
-{"RefreshDate": "2025-10-05T20:20:03",
+{"RefreshDate": "2025-10-06T04:09:07",
 "Fields": [
     {"FieldNumberML": "1","FormField": "Form","Hidden": "Edit Form","SortOrder": "False","FieldGroup": "1","FieldPreferredName": "Page Migration Report Details","FieldGroupSort": "Form"},
     {"FieldNumberML": "7","FormField": "Status","Hidden": "Do Not Migrate","SortOrder": "False","FieldGroup": "4","FieldPreferredName": "Page Migration Report Details","FieldGroupSort": "Status"},
@@ -18,8 +18,8 @@
     {"FieldNumberML": "24","FormField": "Redirect External URL","Hidden": "","SortOrder": "False","FieldGroup": "14","FieldPreferredName": "Symphony Details","FieldGroupSort": "Redirect External URL"},
     {"FieldNumberML": "23","FormField": "Page Title","Hidden": "Volunteer","SortOrder": "False","FieldGroup": "19","FieldPreferredName": "Symphony Details","FieldGroupSort": "Page Title"},
     {"FieldNumberML": "2","FormField": "Title","Hidden": "Volunteer - kentucky-tennessee","SortOrder": "False","FieldGroup": "2","FieldPreferredName": "Quality Assurance","FieldGroupSort": "Title"},
-    {"FieldNumberML": "12","FormField": "QA Issues.lookupValue","Hidden": "","SortOrder": "False","FieldGroup": "7","FieldPreferredName": "Quality Assurance","FieldGroupSort": "QA Issues.lookupValue"},
-    {"FieldNumberML": "14","FormField": "QA Notes","Hidden": "If a local sign up link is not provided, this page may not be needed since there is a general volunteering page already. Padding on mobile for sections with colored backgrounds needs to be increased. Programs available text is covered or cut off on mobile. Needs more images to break up text.","SortOrder": "False","FieldGroup": "8","FieldPreferredName": "Quality Assurance","FieldGroupSort": "QA Notes"},
+    {"FieldNumberML": "14","FormField": "QA Notes","Hidden": "If a local sign up link is not provided, this page may not be needed since there is a general volunteering page already. Padding on mobile for sections with colored backgrounds needs to be increased. Programs available text is covered or cut off on mobile. Needs more images to break up text.","SortOrder": "False","FieldGroup": "7","FieldPreferredName": "Quality Assurance","FieldGroupSort": "QA Notes"},
+    {"FieldNumberML": "12","FormField": "QA Issues.lookupValue","Hidden": "","SortOrder": "False","FieldGroup": "8","FieldPreferredName": "Quality Assurance","FieldGroupSort": "QA Issues.lookupValue"},
     {"FieldNumberML": "55","FormField": "QA Issues:Why This Is Important","Hidden": "","SortOrder": "False","FieldGroup": "9","FieldPreferredName": "Quality Assurance","FieldGroupSort": "QA Issues:Why This Is Important"},
     {"FieldNumberML": "56","FormField": "QA Issues:How to Fix","Hidden": "","SortOrder": "False","FieldGroup": "10","FieldPreferredName": "Quality Assurance","FieldGroupSort": "QA Issues:How to Fix"},
     {"FieldNumberML": "47","FormField": "QA Issues:How to Fix Details","Hidden": "","SortOrder": "False","FieldGroup": "11","FieldPreferredName": "Quality Assurance","FieldGroupSort": "QA Issues:How to Fix Details"},
