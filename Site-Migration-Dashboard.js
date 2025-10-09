@@ -334,6 +334,7 @@ const statusColors = {
   "In QA": "#fd7e14",          // orange
   "Needs Info": "#002056",     // navy
   "In Progress": "#6f42c1",    // purple
+  "THQ Redirect": "#00929C",    // teal
   "Unknown": "#6c757d"         // gray
 };
 
@@ -1047,6 +1048,7 @@ function renderCharts(filtered) {
   const canonicalStatus = {
     completed: ["4. THQ QA Complete, THQ will publish on migration date","5. THQ Published and URL Redirected"],
     doNotMigrate: ["Do Not Migrate"],
+    thqRedirect: ["THQ Redirect"],
     inProgress: ["2a. Started Content Migration","2b. Finished Content Migration; Zesty Columns Set in this list","2c. Updates Needed, See QA Notes/Comments"],
     inQA: ["3a. Ready for Area Command QA","3b. Ready for DHQ QA","3c. Ready for THQ QA"],
     needsInfo: ["1a. Need Migration Fields set","1b. Pending Migration"],
@@ -1080,15 +1082,7 @@ filtered.forEach(d => {
 });
 
   // Status chart
-// Map of status to color
-const statusColors = {
-  "Do Not Migrate": "#E74C3C", // red
-  "Completed": "#28a745",      // green
-  "In QA": "#fd7e14",          // orange 
-  "Needs Info": "#002056",     // navy/
-  "In Progress": "#6f42c1",    // purple
-  "Unknown": "#6c757d"         // gray
-};
+
 
 // Prepare data for chart
 const labels = Object.keys(statusCounts);
@@ -1598,7 +1592,7 @@ title: "Title",
 function renderOverallProgress(filtered){
   if (!Array.isArray(filtered)) return;
   const total = filtered.length;
-  const counts = { "Do Not Migrate":0, "Needs Info":0, "In Progress":0, "In QA":0, Unknown:0, Completed:0 };
+  const counts = { "Do Not Migrate":0, "Needs Info":0, "In Progress":0, "In QA":0, "THQ Redirect":0, Unknown:0, Completed:0 };
   
   filtered.forEach(d=>{
     const s = getCanonicalStatus(d.Status);
@@ -1662,6 +1656,7 @@ function getCanonicalStatus(status) {
   status = status.toString().trim();
   if (/^4|^5/.test(status)) return "Completed";
   if (status === "Do Not Migrate") return "Do Not Migrate";
+  if (status === "THQ Redirect") return "THQ Redirect";
   if (/^2/.test(status)) return "In Progress";
   if (/^1/.test(status)) return "Needs Info";
   if (/^3[a-c]/.test(status)) return "In QA";
