@@ -1523,7 +1523,7 @@ function renderTable(){
   responsiveLayoutCollapseStartOpen:true,
     rowHeight: 27,
     initialSort: [              
-        { column: "Title", dir: "asc" },
+        { column: "_ModifiedMs", dir: "desc" },
   ],
     placeholder:"No matching pages found",
     columns:[
