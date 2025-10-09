@@ -429,7 +429,45 @@ async function loadQaLookupCsv(){
     // Process table data
     tableData = Array.isArray(json) ? json : (json.data || []);
     pageCache = {};
-    tableData.forEach((d,i)=>{ d._id = i; pageCache[i] = d; });
+    tableData.forEach((d,i)=>{ 
+      d._id = i; 
+      // Compute a numeric timestamp to use for accurate sorting of the Modified column.
+      // Try Date.parse first (handles ISO timestamps), fall back to dateToUtcMidnightMs
+      // for date-only strings where timezone-aware midnight is desired.
+      let ms = null;
+      try {
+        if (d && d.Modified) {
+          const parsed = Date.parse(d.Modified);
+          if (!isNaN(parsed)) ms = parsed;
+          else {
+            const tzMs = dateToUtcMidnightMs(d.Modified);
+            if (tzMs !== null) ms = tzMs;
+          }
+        }
+      } catch(e) { ms = null; }
+      d._ModifiedMs = ms || 0;
+      pageCache[i] = d; 
+    });
+
+    // Diagnostics: report distribution of Modified strings and parsing success so
+    // we can understand why sorting shows only a couple of dates.
+    try {
+      const modCounts = {};
+      let parsedCount = 0;
+      const failedSamples = [];
+      tableData.forEach((r, idx) => {
+        const raw = (r && (r.Modified || '')).toString();
+        modCounts[raw] = (modCounts[raw] || 0) + 1;
+        if (r && r._ModifiedMs && Number(r._ModifiedMs) > 0) parsedCount++;
+        else if (failedSamples.length < 10) failedSamples.push({ idx, raw });
+      });
+      const distinct = Object.keys(modCounts).length;
+      console.info('[Diagnostics] Modified values: distinct=', distinct, 'parsedCount=', parsedCount, 'total=', tableData.length);
+      // show top 10 most common Modified strings
+      const top = Object.entries(modCounts).sort((a,b)=>b[1]-a[1]).slice(0,10);
+      console.info('[Diagnostics] Top Modified strings (value,count)=', top);
+      if (failedSamples.length) console.info('[Diagnostics] Sample parse failures (index,raw)=', failedSamples);
+    } catch(e) { console.warn('Diagnostics collection failed', e); }
     masterData = tableData;
 
     // Initialize filters and render the dashboard — let errors surface
@@ -1529,7 +1567,6 @@ title: "Title",
       {title:"SD", field:"Page URL",  hozAlign:'center', formatter:cell=>cell.getValue()?`<a href="${escapeHtml(cell.getValue())}" target="_blank" rel="noopener noreferrer">&#128279;</a>`:""},
   {title:"ZD", field:"Zesty URL Path Part", visible:true, hozAlign:"center", width:55, maxWidth:64, formatter:cell=>{
     const v = cell.getValue();
-    console.log('[ZD formatter] Row ID:', cell.getRow().getData().ID, 'Zesty URL Path Part:', v);
     return v ? `<a class="zesty-link" href="https://8hxvw8tw-dev.webengine.zesty.io${escapeHtml(v)}?zpw=tsasecret123&redirect=false&_bypassError=true" target="_blank" rel="noopener noreferrer" aria-label="Open Zesty preview">🔗</a>` : "--";
   }},
       {title:"Status", field:"Status",
@@ -1560,7 +1597,13 @@ title: "Title",
 
       {title:"Published", field:"Published Symphony"},
       {title:"Page Type", field:"Page Type"},
-      {title:"Modified", field:"Modified"},
+      // Use the numeric _ModifiedMs field for sorting, but display the human-friendly Modified string.
+      {title:"Modified", field:"_ModifiedMs", headerSort:true, sorter:"number", formatter: function(cell){
+        const row = cell.getRow().getData();
+        const v = row && row.Modified ? row.Modified : '';
+        const esc = String(v).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+        return `<div class="col-ellipsis" title="${esc}">${esc}</div>`;
+      }},
       {
   title:"Site Title", 
   field:"Site Title",
