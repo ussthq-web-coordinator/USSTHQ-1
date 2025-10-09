@@ -1,0 +1,21 @@
+{
+  "name": "api-data-comparison-app",
+  "version": "1.0.0",
+  "description": "An application to retrieve and compare location data from two different sources.",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js"
+  },
+  "dependencies": {
+    "axios": "^0.21.1"
+  },
+  "devDependencies": {},
+  "keywords": [
+    "API",
+    "data",
+    "comparison",
+    "locations"
+  ],
+  "author": "",
+  "license": "ISC"
+}
