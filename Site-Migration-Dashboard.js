@@ -1107,7 +1107,7 @@ filtered.forEach(d => {
   s = "In Progress";
 } else if (/^1/.test(s)) {
   s = "Needs Info";
-} else if (/^3[a-c]/.test(s)) {
+} else if (/^3[a-d]/.test(s)) {
   s = "In QA";
 } else if (s === "Needs Info") {
   s = "Needs Info";
@@ -1702,7 +1702,7 @@ function getCanonicalStatus(status) {
   if (status === "THQ Redirect") return "THQ Redirect";
   if (/^2/.test(status)) return "In Progress";
   if (/^1/.test(status)) return "Needs Info";
-  if (/^3[a-c]/.test(status)) return "In QA";
+  if (/^3[a-d]/.test(status)) return "In QA";
   return "Unknown";
 }
 
@@ -2059,7 +2059,7 @@ function renderCharts(filtered) {
       else if (s === "Do Not Migrate") s = "Do Not Migrate";
       else if (/^2/.test(s)) s = "In Progress";
       else if (/^1/.test(s)) s = "Needs Info";
-      else if (/^3[a-c]/.test(s)) s = "In QA";
+      else if (/^3[a-d]/.test(s)) s = "In QA";
       else s = s || "Unknown";
       statusCounts[s] = (statusCounts[s] || 0) + 1;
     });
