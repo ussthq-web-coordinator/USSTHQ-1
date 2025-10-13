@@ -176,7 +176,9 @@ var simplemaps_usmap_mapdata={
       name: "Oklahoma"
     },
     TX: {
-      name: "Texas"
+      name: "Texas",
+      url: "https://southernusa.salvationarmy.org/texas-volunteer", // Texas-specific URL
+      popup: "on_click" 
     },
     NM: {
       name: "New Mexico"
@@ -627,7 +629,6 @@ var simplemaps_usmap_mapdata={
     },
     "3": {
       states: [
-        "TX",
         "OK",
         "AR",
         "LA",
