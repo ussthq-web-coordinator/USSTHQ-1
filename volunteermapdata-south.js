@@ -158,13 +158,22 @@ var simplemaps_usmap_mapdata={
       name: "Kentucky"
     },
     AL: {
-      name: "Alabama"
+      name: "Alabama",
+      color: "#999999",
+      url: "https://forms.office.com/r/kshVE51gzN",
+      popup: "on_click" 
     },
     LA: {
-      name: "Louisiana"
+      name: "Louisiana",
+      color: "#999999",
+      url: "https://forms.office.com/r/kshVE51gzN",
+      popup: "on_click" 
     },
     MS: {
-      name: "Mississippi"
+      name: "Mississippi",
+      color: "#999999",
+      url: "https://forms.office.com/r/kshVE51gzN",
+      popup: "on_click"
     },
     IA: {
       name: "Iowa"
@@ -632,9 +641,6 @@ var simplemaps_usmap_mapdata={
       states: [
         "OK",
         "AR",
-        "LA",
-        "MS",
-        "AL",
         "GA",
         "FL",
         "TN",
@@ -650,7 +656,7 @@ var simplemaps_usmap_mapdata={
       color: "#999999",
       popup: "on_click",
       zoomable: "no",
-      url: "https://southernusa.salvationarmy.org/uss/volunteer"
+      url: "https://www.salvationarmyusa.org/location-finder/"
     }
   }
 };
