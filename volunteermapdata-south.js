@@ -64,7 +64,7 @@ var simplemaps_usmap_mapdata={
     images_directory: "/static/lib/simplemaps/map_images/",
     fade_time: 0.1,
     import_labels: "no",
-    link_text: "Volunteer Page",
+    link_text: "View Location Contact Info for Volunteer Opportunities",
     state_image_url: "",
     state_image_position: "",
     location_image_url: ""
