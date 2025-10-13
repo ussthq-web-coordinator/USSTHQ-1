@@ -166,7 +166,7 @@ var simplemaps_usmap_mapdata={
     AR: {
       name: "Arkansas",
       color: "#999999",
-      url: "https://www.salvationarmyusa.org/usa-southern-territory/arkanasas-and-oklahoma/contact-us#contact",
+      url: "https://www.salvationarmyusa.org/usa-southern-territory/arkansas-and-oklahoma/contact-us#contact",
       popup: "on_click" 
     },
     MO: {
