@@ -80,7 +80,10 @@ var simplemaps_usmap_mapdata={
       name: "Alaska"
     },
     FL: {
-      name: "Florida"
+      name: "Florida",
+      color: "#999999",
+      url: "https://southernusa.salvationarmy.org/florida/volunteer",
+      popup: "on_click"
     },
     NH: {
       name: "New Hampshire"
@@ -107,13 +110,22 @@ var simplemaps_usmap_mapdata={
       name: "Delaware"
     },
     MD: {
-      name: "Maryland"
+      name: "Maryland",
+      color: "#999999",
+      url: "https://www.salvationarmyusa.org/usa-southern-territory/potomac/contact-us/#contact",
+      popup: "on_click"
     },
     VA: {
-      name: "Virginia"
+      name: "Virginia",
+      color: "#999999",
+      url: "https://www.salvationarmyusa.org/usa-southern-territory/potomac/contact-us/#contact",
+      popup: "on_click"
     },
     WV: {
-      name: "West Virginia"
+      name: "West Virginia",
+      color: "#999999",
+      url: "https://www.salvationarmyusa.org/usa-southern-territory/potomac/contact-us/#contact",
+      popup: "on_click"
     },
     OH: {
       name: "Ohio"
@@ -131,31 +143,52 @@ var simplemaps_usmap_mapdata={
       name: "Wisconsin"
     },
     NC: {
-      name: "North Carolina"
+      name: "North Carolina",
+      color: "#999999",
+      url: "https://www.salvationarmyusa.org/usa-southern-territory/north-and-south-carolina/contact-us/#contact",
+      popup: "on_click"
     },
     DC: {
-      name: "District of Columbia"
+      name: "District of Columbia",
+      color: "#999999",
+      url: "https://www.salvationarmyusa.org/usa-southern-territory/potomac/contact-us/#contact",
+      popup: "on_click"
     },
     MA: {
       name: "Massachusetts"
     },
     TN: {
-      name: "Tennessee"
+      name: "Tennessee",
+      color: "#999999",
+      url: "https://www.salvationarmyusa.org/usa-southern-territory/kentucky-and-tennessee/contact-us#contact",
+      popup: "on_click"
     },
     AR: {
-      name: "Arkansas"
+      name: "Arkansas",
+      color: "#999999",
+      url: "https://www.salvationarmyusa.org/usa-southern-territory/arkanasas-and-oklahoma/contact-us#contact",
+      popup: "on_click" 
     },
     MO: {
       name: "Missouri"
     },
     GA: {
-      name: "Georgia"
+      name: "Georgia",
+      color: "#999999",
+      url: "https://www.salvationarmyusa.org/usa-southern-territory/contact-us#contact",
+      popup: "on_click" 
     },
     SC: {
-      name: "South Carolina"
+      name: "South Carolina",
+      color: "#999999",
+      url: "https://www.salvationarmyusa.org/usa-southern-territory/north-and-south-carolina/contact-us/#contact",
+      popup: "on_click"
     },
     KY: {
-      name: "Kentucky"
+      name: "Kentucky",
+      color: "#999999",
+      url: "https://www.salvationarmyusa.org/usa-southern-territory/kentucky-and-tennessee/contact-us#contact",
+      popup: "on_click"
     },
     AL: {
       name: "Alabama",
@@ -182,7 +215,10 @@ var simplemaps_usmap_mapdata={
       name: "Minnesota"
     },
     OK: {
-      name: "Oklahoma"
+      name: "Oklahoma",
+      color: "#999999",
+      url: "https://www.salvationarmyusa.org/usa-southern-territory/arkanasas-and-oklahoma/contact-us#contact",
+      popup: "on_click"
     },
     TX: {
       name: "Texas",
@@ -639,18 +675,6 @@ var simplemaps_usmap_mapdata={
     },
     "3": {
       states: [
-        "OK",
-        "AR",
-        "GA",
-        "FL",
-        "TN",
-        "NC",
-        "SC",
-        "KY",
-        "WV",
-        "VA",
-        "DC",
-        "MD"
       ],
       name: "Southern Territory",
       color: "#999999",
