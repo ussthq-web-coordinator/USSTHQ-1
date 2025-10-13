@@ -8,7 +8,7 @@ var simplemaps_usmap_mapdata={
     popups: "detect",
     
     //State defaults
-    state_description: "State Description",
+    state_description: "",
     state_color: "#88A4BC",
     state_hover_color: "#3B729F",
     state_url: "https://simplemaps.com",
@@ -177,7 +177,8 @@ var simplemaps_usmap_mapdata={
     },
     TX: {
       name: "Texas",
-      url: "https://southernusa.salvationarmy.org/texas-volunteer", // Texas-specific URL
+      color: "#999999",
+      url: "https://volunteer.salvationarmytexas.org/acts/console.php?console_type=event&console_id=0070&cat_id=&filter_choice=&cal_choice=&res_choice=&res_code=&source=", // Texas-specific URL
       popup: "on_click" 
     },
     NM: {
