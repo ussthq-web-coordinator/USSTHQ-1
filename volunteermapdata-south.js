@@ -656,7 +656,7 @@ var simplemaps_usmap_mapdata={
       color: "#999999",
       popup: "on_click",
       zoomable: "no",
-      url: "https://www.salvationarmyusa.org/location-finder/"
+      url: "https://www.salvationarmyusa.org/usa-southern-territory/contact-us#contact"
     }
   }
 };
