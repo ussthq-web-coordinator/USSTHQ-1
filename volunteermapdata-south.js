@@ -82,7 +82,7 @@ var simplemaps_usmap_mapdata={
     FL: {
       name: "Florida",
       color: "#999999",
-      url: "https://southernusa.salvationarmy.org/florida/volunteer",
+      url: "https://southernusa.salvationarmy.org/florida/volunteer#freeTextArea-1",
       popup: "on_click"
     },
     NH: {
