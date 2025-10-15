@@ -352,7 +352,7 @@ function correctValueFormatter(cell, formatterParams, onRendered) {
         <option value="GDOS" ${value === 'GDOS' ? 'selected' : ''}>GDOS</option>
         <option value="Zesty" ${value === 'Zesty' ? 'selected' : ''}>Zesty</option>
     `;
-    if (rowData.field === 'name') {
+    if (rowData.field === 'name' || rowData.field === 'siteTitle') {
         options += `<option value="Zesty Name to Site Title" ${value === 'Zesty Name to Site Title' ? 'selected' : ''}>Zesty Name to Site Title</option>`;
     }
     select.innerHTML = options;
@@ -780,6 +780,15 @@ function applyChanges(changes) {
             ['USE (GDOS)', useText],
             ['Zesty (LocationsData)', zestyDate]
         ];
+
+        // Populate the list with entries
+        entries.forEach(([label, dateText]) => {
+            const li = document.createElement('li');
+            li.className = 'list-group-item d-flex justify-content-between align-items-center';
+            li.innerHTML = `<strong>${label}</strong> <span>${dateText}</span>`;
+            list.appendChild(li);
+        });
+
             // Build one-line, alphabetically ordered territory: date pairs
             const footer = document.getElementById('refreshDatesFooter');
             if (footer) {
@@ -811,6 +820,14 @@ function applyChanges(changes) {
         // showRefreshDates will populate the #refreshDatesList so the collapse shows useful content
         showRefreshDates();
     });
+
+    // Also populate when the modal is shown
+    const refreshModal = document.getElementById('refreshDatesModal');
+    if (refreshModal) {
+        refreshModal.addEventListener('show.bs.modal', () => {
+            showRefreshDates();
+        });
+    }
 
 function renderDifferencesTable() {
     // Clear summary (we don't display the auto-generated summary line)
