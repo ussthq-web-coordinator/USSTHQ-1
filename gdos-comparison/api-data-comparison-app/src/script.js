@@ -20,7 +20,10 @@ Promise.all([
 .then(([uswData, ussData, locationsData]) => {
     if (!Array.isArray(uswData)) throw new Error('USW data is not an array');
     if (!Array.isArray(ussData)) throw new Error('USS data is not an array');
-    if (!Array.isArray(locationsData)) throw new Error('LocationsData is not an array');
+    if (!locationsData.data || !Array.isArray(locationsData.data)) throw new Error('LocationsData.data is not an array');
+    
+    // Extract the data array
+    locationsData = locationsData.data;
     
     // Create map from gdos_id to location data
     const locationMap = new Map();
