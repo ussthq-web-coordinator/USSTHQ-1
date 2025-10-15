@@ -5,6 +5,9 @@ let duplicateCheckRecords = [];
 // latestFilteredData holds the current set of rows matching active filters (all pages)
 let latestFilteredData = null;
 
+// Shared storage configuration - using Cloudflare Worker for storage
+const SHARED_STORAGE_URL = 'https://odd-breeze-03d9.uss-thq-cloudflare-account.workers.dev';
+
 // Raw JSONs for modal inspection
 let rawUsw = null;
 let rawUss = null;
@@ -341,19 +344,30 @@ Promise.all([
 
 function correctValueFormatter(cell, formatterParams, onRendered) {
     const value = cell.getValue();
+    const row = cell.getRow();
+    const rowData = row.getData();
     const select = document.createElement('select');
     select.className = 'form-select form-select-sm';
-    select.innerHTML = `
+    let options = `
         <option value="GDOS" ${value === 'GDOS' ? 'selected' : ''}>GDOS</option>
         <option value="Zesty" ${value === 'Zesty' ? 'selected' : ''}>Zesty</option>
     `;
+    if (rowData.field === 'name') {
+        options += `<option value="Zesty Name to Site Title" ${value === 'Zesty Name to Site Title' ? 'selected' : ''}>Zesty Name to Site Title</option>`;
+    }
+    select.innerHTML = options;
     select.addEventListener('change', function() {
         const newValue = this.value;
         // Update the row data (this will cause formatters to re-run)
         const row = cell.getRow();
         const rowData = row.getData();
         rowData.correct = newValue;
-        rowData.final_value = newValue === 'GDOS' ? rowData.gdos_value : rowData.zesty_value;
+        if (newValue === 'Zesty Name to Site Title') {
+            rowData.field = 'siteTitle';
+            rowData.final_value = rowData.zesty_value;
+        } else {
+            rowData.final_value = newValue === 'GDOS' ? rowData.gdos_value : rowData.zesty_value;
+        }
         row.update(rowData);
         // If this is a synthetic row and correct is changed to 'GDOS', remove it from the table
         if (rowData.synthetic && newValue === 'GDOS') {
@@ -371,7 +385,7 @@ function correctValueFormatter(cell, formatterParams, onRendered) {
             if (zestyCell) {
                 const el = zestyCell.getElement();
                 const span = el ? el.querySelector('.value-text') : null;
-                if (span) span.classList.toggle('selected-underline', newValue === 'Zesty');
+                if (span) span.classList.toggle('selected-underline', newValue === 'Zesty' || newValue === 'Zesty Name to Site Title');
             }
         } catch (e) {
             console.warn('toggle underline failed', e);
@@ -418,10 +432,41 @@ function saveChanges() {
     const table = Tabulator.findTable("#differencesTable")[0];
     if (table) {
         const data = table.getData();
-        // Save to localStorage
+        // Save to localStorage as backup
         localStorage.setItem('differencesChanges', JSON.stringify(data));
         console.log('Changes saved to localStorage');
-        // update metrics live
+
+        // Save to shared storage (JSONBin) - save corrections directly, omitting final_value to reduce size
+        const corrections = data.filter(r => r.correct !== 'GDOS').map(r => ({
+            gdos_id: r.gdos_id,
+            field: r.field,
+            correct: r.correct
+        }));
+        const updatedData = {
+            data: corrections,
+            lastUpdated: new Date().toISOString()
+        };
+        const payload = JSON.stringify(updatedData);
+        console.log('Payload size:', payload.length, 'bytes');
+        return fetch(SHARED_STORAGE_URL, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: payload
+        })
+        .then(response => {
+            if (!response.ok) {
+                console.error('Save failed with status:', response.status, response.statusText);
+                return response.text().then(text => {
+                    console.error('Response body:', text);
+                    throw new Error(`Save failed: ${response.status}`);
+                });
+            }
+            return response.text(); // PUT returns "OK" as text
+        })
+        .then(() => console.log('Changes saved to shared storage'))
+        .catch(error => console.warn('Shared storage save failed:', error));        // update metrics live
         updateMetrics();
     }
 }
@@ -477,21 +522,48 @@ function updateMetrics() {
 }
 
 function loadSavedChanges() {
-    const savedData = localStorage.getItem('differencesChanges');
-    if (savedData) {
-        const changes = JSON.parse(savedData);
-        // Apply saved changes to current data
-        changes.forEach(savedRow => {
-            const currentRow = differencesData.find(row => 
-                row.gdos_id === savedRow.gdos_id && row.field === savedRow.field
-            );
-            if (currentRow) {
-                currentRow.correct = savedRow.correct;
-                currentRow.final_value = savedRow.correct === 'GDOS' ? currentRow.gdos_value : currentRow.zesty_value;
+    // First try shared storage
+    fetch(SHARED_STORAGE_URL)
+        .then(response => {
+            if (!response.ok) throw new Error('Shared storage not available');
+            return response.json();
+        })
+        .then(data => {
+            const corrections = data.data;
+            if (Array.isArray(corrections)) {
+                applyChanges(corrections);
+                console.log('Shared corrections loaded');
+                return;
+            }
+            throw new Error('Invalid shared data');
+        })
+        .catch(() => {
+            // Fallback to localStorage
+            const savedData = localStorage.getItem('differencesChanges');
+            if (savedData) {
+                const changes = JSON.parse(savedData);
+                applyChanges(changes);
+                console.log('Local changes loaded (shared not available)');
             }
         });
-        console.log('Saved changes loaded from localStorage');
-    }
+}
+
+function applyChanges(changes) {
+    changes.forEach(savedRow => {
+        const currentRow = differencesData.find(row => 
+            row.gdos_id === savedRow.gdos_id && row.field === savedRow.field
+        );
+        if (currentRow) {
+            currentRow.correct = savedRow.correct;
+            // Compute final_value based on correct
+            if (savedRow.correct === 'Zesty Name to Site Title') {
+                currentRow.field = 'siteTitle';
+                currentRow.final_value = currentRow.zesty_value;
+            } else {
+                currentRow.final_value = savedRow.correct === 'GDOS' ? currentRow.gdos_value : currentRow.zesty_value;
+            }
+        }
+    });
 }
 
     // Build and download a CSV of corrections where GDOS is not the correct value
@@ -528,7 +600,8 @@ function loadSavedChanges() {
                     website: '',
                     division: r.division || '',
                     territory: r.territory || '',
-                    published: ''
+                    published: '',
+                    siteTitle: ''
                 });
             }
 
@@ -550,6 +623,9 @@ function loadSavedChanges() {
                     break;
                 case 'published':
                     entry.published = finalVal || entry.published;
+                    break;
+                case 'siteTitle':
+                    entry.siteTitle = finalVal || entry.siteTitle;
                     break;
                 case 'latitude':
                 case 'longitude':
@@ -614,7 +690,7 @@ function loadSavedChanges() {
             return;
         }
 
-        const headers = ['GDOS ID','Name','Address1','Address2','City','State','Zip','PhoneNumber','OpenHoursText','PrimaryWebsite','Published','Division','Territory'];
+        const headers = ['GDOS ID','Name','Address1','Address2','City','State','Zip','PhoneNumber','OpenHoursText','PrimaryWebsite','Published','Site Title','Division','Territory'];
         const csvLines = [headers.join(',')];
 
         rows.forEach(r => {
@@ -630,6 +706,7 @@ function loadSavedChanges() {
                 escapeCsv(r.openhours),
                 escapeCsv(r.website),
                 escapeCsv(r.published),
+                escapeCsv(r.siteTitle),
                 escapeCsv(r.division),
                 escapeCsv(r.territory)
             ];
@@ -793,8 +870,10 @@ function renderDifferencesTable() {
     // Populate global filters after table created
     populateGlobalFilters();
 
-    // Apply any saved global filters
-    applySavedGlobalFilters();
+    // Apply any saved global filters after table is built
+    table.on("tableBuilt", function(){
+        applySavedGlobalFilters();
+    });
     // Update metrics (immediately and shortly after render to ensure Tabulator has processed data)
     try { updateMetrics(); } catch (e) { console.warn('updateMetrics immediate failed', e); }
     // also attach listener for table data changes and schedule a delayed metrics update

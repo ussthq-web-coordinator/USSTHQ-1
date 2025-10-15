@@ -20,9 +20,10 @@
 </head>
 <body>
     <div class="container-fluid my-3">
-        <!-- Navbar / Menu (simplified to match the other dashboard's structure) -->
-        <nav class="navbar navbar-expand-lg navbar-light bg-light shadow-sm">
+        <!-- Navbar / Menu -->
+        <nav class="navbar navbar-expand-lg navbar-light bg-light shadow-sm mb-3">
             <div class="container-fluid">
+                <span class="navbar-brand mb-0 h1">GDOS Data Comparison Dashboard</span>
                 <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
                     <span class="navbar-toggler-icon"></span>
                 </button>
@@ -36,10 +37,8 @@
             </div>
         </nav>
 
-        <h1 class="mt-2 mb-1">GDOS Data Comparison Dashboard</h1>
-
         <!-- Filters -->
-        <div class="filters-row overflow-x-auto mb-2">
+        <div class="filters-row overflow-x-auto mb-3">
             <div class="d-flex flex-nowrap gap-2 pb-2">
                 <div class="flex-shrink-0">
                     <label for="territorySelect">Territories</label>
@@ -104,7 +103,7 @@
         </div>
 
         <!-- Metric Cards -->
-        <div class="metrics-row overflow-x-auto mb-2">
+        <div class="metrics-row overflow-x-auto mb-3">
             <div class="d-flex flex-nowrap gap-2 pb-2" id="cards"></div>
         </div>
 
