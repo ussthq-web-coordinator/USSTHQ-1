@@ -432,16 +432,13 @@ function saveChanges() {
     const table = Tabulator.findTable("#differencesTable")[0];
     if (table) {
         const data = table.getData();
-        // Save to localStorage as backup
-        localStorage.setItem('differencesChanges', JSON.stringify(data));
-        console.log('Changes saved to localStorage');
-
-        // Save to shared storage (JSONBin) - save corrections directly, omitting final_value to reduce size
+        // Save to shared storage only
         const corrections = data.filter(r => r.correct !== 'GDOS').map(r => ({
             gdos_id: r.gdos_id,
             field: r.field,
             correct: r.correct
         }));
+        console.log('Saving corrections to shared storage:', corrections);
         const updatedData = {
             data: corrections,
             lastUpdated: new Date().toISOString()
@@ -522,7 +519,7 @@ function updateMetrics() {
 }
 
 function loadSavedChanges() {
-    // First try shared storage
+    // Load from shared storage only
     fetch(SHARED_STORAGE_URL)
         .then(response => {
             if (!response.ok) throw new Error('Shared storage not available');
@@ -537,23 +534,20 @@ function loadSavedChanges() {
             }
             throw new Error('Invalid shared data');
         })
-        .catch(() => {
-            // Fallback to localStorage
-            const savedData = localStorage.getItem('differencesChanges');
-            if (savedData) {
-                const changes = JSON.parse(savedData);
-                applyChanges(changes);
-                console.log('Local changes loaded (shared not available)');
-            }
+        .catch(error => {
+            console.warn('Failed to load shared corrections:', error);
+            // No fallback to localStorage
         });
 }
 
 function applyChanges(changes) {
+    console.log('Applying changes from shared storage:', changes);
     changes.forEach(savedRow => {
         const currentRow = differencesData.find(row => 
             row.gdos_id === savedRow.gdos_id && row.field === savedRow.field
         );
         if (currentRow) {
+            console.log('Applying to row:', currentRow.gdos_id, currentRow.field, '-> correct:', savedRow.correct);
             currentRow.correct = savedRow.correct;
             // Compute final_value based on correct
             if (savedRow.correct === 'Zesty Name to Site Title') {
@@ -562,8 +556,11 @@ function applyChanges(changes) {
             } else {
                 currentRow.final_value = savedRow.correct === 'GDOS' ? currentRow.gdos_value : currentRow.zesty_value;
             }
+        } else {
+            console.warn('No matching row for:', savedRow);
         }
     });
+    console.log('Applied changes, updated differencesData length:', differencesData.length);
 }
 
     // Build and download a CSV of corrections where GDOS is not the correct value
