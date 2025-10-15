@@ -31,6 +31,10 @@ function shouldIgnoreField(field, zestyValue) {
     if (field === 'primaryWebsite' && zestyValue && zestyValue.toLowerCase() === 'https://satruck.org/') {
         return true;
     }
+    // Ignore latitude and longitude fields - GDOS value will be used for sync
+    if (field === 'latitude' || field === 'longitude') {
+        return true;
+    }
     return false;
 }
 
@@ -44,48 +48,79 @@ Promise.all([
         if (!response.ok) throw new Error('USS file not found');
         return response.json();
     }),
+    fetch('GDOS-10-15-04-22-USC.json').then(response => {
+        if (!response.ok) throw new Error('USC file not found');
+        return response.json();
+    }),
+    fetch('GDOS-10-15-04-57-USE.json').then(response => {
+        if (!response.ok) throw new Error('USE file not found');
+        return response.json();
+    }),
     fetch('./LocationsData.json?v=' + Date.now()).then(response => {
         if (!response.ok) throw new Error('LocationsData file not found');
         return response.json();
+    }),
+    fetch('./DuplicateLocationCheck.json?v=' + Date.now()).then(response => {
+        if (!response.ok) throw new Error('DuplicateLocationCheck file not found');
+        return response.json();
     })
 ])
-.then(([uswData, ussData, locationsData]) => {
+.then(([uswData, ussData, uscData, useData, locationsData, duplicateCheckData]) => {
     if (!Array.isArray(uswData)) throw new Error('USW data is not an array');
     if (!Array.isArray(ussData)) throw new Error('USS data is not an array');
+    if (!Array.isArray(uscData)) throw new Error('USC data is not an array');
+    if (!Array.isArray(useData)) throw new Error('USE data is not an array');
     if (!locationsData.data || !Array.isArray(locationsData.data)) throw new Error('LocationsData.data is not an array');
+    if (!duplicateCheckData.data || !Array.isArray(duplicateCheckData.data)) throw new Error('DuplicateLocationCheck.data is not an array');
 
-    // Extract the data array
+    // Extract the data arrays
     locationsData = locationsData.data.filter(loc => loc && typeof loc === 'object');
+    const duplicateCheckRecords = duplicateCheckData.data;
     console.log('First filtered loc:', locationsData[0]);
     console.log('LocationsData length after filter:', locationsData.length);
 
     console.log('GDOS USW data length:', uswData.length);
     console.log('GDOS USS data length:', ussData.length);
+    console.log('GDOS USC data length:', uscData.length);
+    console.log('GDOS USE data length:', useData.length);
     console.log('LocationsData length:', locationsData.length);
 
-    // Create map from gdos_id to location data
+    // Create map from GDOS ID to location data
     const locationMap = new Map();
-    locationsData.forEach((loc, index) => {
+    locationsData.forEach((loc) => {
         const gdosId = loc['Column1.content.gdos_id'];
         if (gdosId) {
-            locationMap.set(String(gdosId), loc);
+            locationMap.set(gdosId, loc);
+        }
+    });
+
+    // Create map from gdosid to duplicate check data
+    const duplicateMap = new Map();
+    duplicateCheckRecords.forEach(record => {
+        const gdosId = record.gdosid;
+        if (gdosId) {
+            duplicateMap.set(gdosId, record);
         }
     });
 
     console.log('Location map size:', locationMap.size);
     if (locationMap.size > 0) {
         const firstKey = locationMap.keys().next().value;
-        console.log('Sample location gdos_id:', firstKey, typeof firstKey);
+        console.log('Sample GDOS ID in map:', firstKey);
+        console.log('Sample Zesty record for ID:', locationMap.get(firstKey)['Column1.content.name']);
     }
 
     // Combine GDOS data with territory info
     const gdosData = [
         ...uswData.map(item => ({ ...item, territory: 'USW' })),
-        ...ussData.map(item => ({ ...item, territory: 'USS' }))
+        ...ussData.map(item => ({ ...item, territory: 'USS' })),
+        ...uscData.map(item => ({ ...item, territory: 'USC' })),
+        ...useData.map(item => ({ ...item, territory: 'USE' }))
     ];
     console.log('Total GDOS data length:', gdosData.length);
     if (gdosData.length > 0) {
-        console.log('Sample GDOS id:', gdosData[0].id, typeof gdosData[0].id);
+        console.log('Sample GDOS name:', gdosData[0].name);
+        console.log('Sample normalized GDOS name:', normalizeValue(gdosData[0].name, 'name'));
     }
 
     // Fields to compare - with mapping for GDOS nested fields and Zesty flattened fields
@@ -102,26 +137,28 @@ Promise.all([
     let skippedNoMatch = 0;
     let skippedNotPublished = 0;
     let totalComparisons = 0;
-    gdosData.forEach(gdos => {
+    gdosData.forEach((gdos, index) => {
         // Only include if published (gdospub = 1 equivalent)
         if (!gdos.published) {
             skippedNotPublished++;
             return;
         }
         
-        const loc = locationMap.get(String(gdos.id));
-        if (!loc || typeof loc !== 'object' || !loc['Column1']?.['content']) {
+        let loc = locationMap.get(gdos.id);
+        
+        if (!loc) {
             skippedNoMatch++;
             return;
         }
         
         matchCount++;
         if (matchCount === 1) { // Log first match
-            console.log('First match - GDOS:', gdos.id, gdos.name);
-            console.log('Zesty content:', loc['Column1']['content']);
+            console.log('First match - GDOS ID:', gdos.id, 'Name:', gdos.name);
+            console.log('Zesty GDOS ID:', loc['Column1.content.gdos_id'], 'Name:', loc['Column1.content.name']);
         }
         const division = getNestedValue(gdos, 'location.division.name') || 'Unknown';
         const territory = gdos.territory;
+        const duplicateRecord = duplicateMap.get(gdos.id);
         
         fieldsToCompare.forEach(fieldObj => {
             totalComparisons++;
@@ -139,8 +176,11 @@ Promise.all([
                 differencesData.push({
                     gdos_id: gdos.id,
                     name: gdos.name,
+                    property_type: getNestedValue(gdos, 'wm4SiteType.name') || 'Unknown',
                     division: division,
                     territory: territory,
+                    duplicate: duplicateRecord ? (duplicateRecord.duplicate === 'Not Found' ? '0' : duplicateRecord.duplicate) : '0',
+                    doNotImport: duplicateRecord ? duplicateRecord.doNotImport : 'False',
                     field: fieldObj.field,
                     gdos_value: gdosValue,
                     zesty_value: zestyValue,
@@ -197,8 +237,11 @@ function renderDifferencesTable() {
         columns: [
             { title: "GDOS ID", field: "gdos_id", width: 120 },
             { title: "Name", field: "name", width: 200 },
+            { title: "Property Type", field: "property_type", width: 150, headerFilter: "input" },
             { title: "Division", field: "division", width: 150, headerFilter: "input" },
             { title: "Territory", field: "territory", width: 100, headerFilter: "input" },
+            { title: "Duplicate", field: "duplicate", width: 100, headerFilter: "select", headerFilterParams: { values: {"0": "Not Duplicate", "1": "Duplicate"} } },
+            { title: "Do Not Import", field: "doNotImport", width: 120, headerFilter: "select", headerFilterParams: { values: {"False": "Import", "True": "Do Not Import"} } },
             { title: "Field", field: "field", width: 100 },
             { title: "GDOS Value", field: "gdos_value", width: 200 },
             { title: "Zesty Value", field: "zesty_value", width: 200 },
@@ -215,4 +258,26 @@ function renderDifferencesTable() {
         tooltips: true,
         resizableColumns: true
     });
+}
+
+// Filter functions for quick access
+function filterDuplicates() {
+    const table = Tabulator.findTable("#differencesTable")[0];
+    if (table) {
+        table.setFilter("duplicate", "=", "1");
+    }
+}
+
+function filterDoNotImport() {
+    const table = Tabulator.findTable("#differencesTable")[0];
+    if (table) {
+        table.setFilter("doNotImport", "=", "True");
+    }
+}
+
+function clearFilters() {
+    const table = Tabulator.findTable("#differencesTable")[0];
+    if (table) {
+        table.clearFilter();
+    }
 }

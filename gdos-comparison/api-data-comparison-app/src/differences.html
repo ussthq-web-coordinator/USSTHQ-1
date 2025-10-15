@@ -32,9 +32,20 @@
 
         <div class="d-flex justify-content-between align-items-center mb-3">
             <div id="differencesSummary" class="text-muted">Loading differences...</div>
-            <button type="button" class="btn btn-outline-primary btn-sm" data-bs-toggle="modal" data-bs-target="#rulesModal">
-                View Comparison Rules
-            </button>
+            <div class="d-flex gap-2">
+                <button type="button" class="btn btn-outline-secondary btn-sm" onclick="filterDuplicates()">
+                    Show Duplicates Only
+                </button>
+                <button type="button" class="btn btn-outline-warning btn-sm" onclick="filterDoNotImport()">
+                    Show Do Not Import
+                </button>
+                <button type="button" class="btn btn-outline-primary btn-sm" onclick="clearFilters()">
+                    Clear Filters
+                </button>
+                <button type="button" class="btn btn-outline-primary btn-sm" data-bs-toggle="modal" data-bs-target="#rulesModal">
+                    View Comparison Rules
+                </button>
+            </div>
         </div>
 
         <div id="differencesTable"></div>
@@ -64,21 +75,28 @@
                     <h6 class="mt-3">Exclusion Rules:</h6>
                     <ul>
                         <li><strong>Primary Website filter:</strong> Differences are ignored when Zesty's PrimaryWebsite equals "https://satruck.org/"</li>
+                        <li><strong>Latitude and Longitude:</strong> These fields are excluded from comparison - GDOS values are used for synchronization</li>
                         <li><strong>Publication status:</strong> Only GDOS records with published=true are included</li>
+                    </ul>
+                    
+                    <h6 class="mt-3">Data Sources:</h6>
+                    <ul>
+                        <li><strong>GDOS Territories:</strong> USA Western Territory (USW), USA Southern Territory (USS), USA Central Territory (USC), USA Eastern Territory (USE)</li>
+                        <li><strong>Zesty Data:</strong> LocationsData.json (flattened structure)</li>
                     </ul>
                     
                     <h6 class="mt-3">Data Matching/Keying:</h6>
                     <ul>
-                        <li><strong>GDOS ID Matching:</strong> GDOS records are matched to Zesty records using the GDOS ID field</li>
-                        <li><strong>GDOS Source:</strong> <code>gdos.id</code> (string identifier)</li>
-                        <li><strong>Zesty Source:</strong> <code>Column1.content.gdos_id</code> (flattened JSON key)</li>
-                        <li><strong>Matching Process:</strong> Only published GDOS records with matching Zesty gdos_id are compared</li>
-                        <li><strong>Unmatched Records:</strong> GDOS records without Zesty matches are excluded from comparison</li>
+                        <li><strong>ID-based Matching:</strong> GDOS records matched to Zesty by GDOS ID</li>
+                        <li><strong>GDOS Source:</strong> <code>gdos.id</code></li>
+                        <li><strong>Zesty Source:</strong> <code>Column1.content.gdos_id</code></li>
+                        <li><strong>Normalization:</strong> Case-insensitive, Family/Thrift equivalence applied for field comparisons</li>
                     </ul>
                     
                     <h6 class="mt-3">Fields Compared:</h6>
                     <ul>
-                        <li>Name, Address, Latitude, Longitude, Zipcode</li>
+                        <li>Name, Address, Zipcode</li>
+                        <li><em>Note: Latitude and Longitude are excluded from comparison (GDOS values used for sync)</em></li>
                     </ul>
                 </div>
                 <div class="modal-footer">

@@ -12,18 +12,34 @@ Promise.all([
         if (!response.ok) throw new Error('USS file not found');
         return response.json();
     }),
+    fetch('GDOS-10-15-04-22-USC.json').then(response => {
+        if (!response.ok) throw new Error('USC file not found');
+        return response.json();
+    }),
+    fetch('GDOS-10-15-04-57-USE.json').then(response => {
+        if (!response.ok) throw new Error('USE file not found');
+        return response.json();
+    }),
     fetch('./LocationsData.json?v=' + Date.now()).then(response => {
         if (!response.ok) throw new Error('LocationsData file not found');
         return response.json();
+    }),
+    fetch('./DuplicateLocationCheck.json?v=' + Date.now()).then(response => {
+        if (!response.ok) throw new Error('DuplicateLocationCheck file not found');
+        return response.json();
     })
 ])
-.then(([uswData, ussData, locationsData]) => {
+.then(([uswData, ussData, uscData, useData, locationsData, duplicateCheckData]) => {
     if (!Array.isArray(uswData)) throw new Error('USW data is not an array');
     if (!Array.isArray(ussData)) throw new Error('USS data is not an array');
+    if (!Array.isArray(uscData)) throw new Error('USC data is not an array');
+    if (!Array.isArray(useData)) throw new Error('USE data is not an array');
     if (!locationsData.data || !Array.isArray(locationsData.data)) throw new Error('LocationsData.data is not an array');
+    if (!duplicateCheckData.data || !Array.isArray(duplicateCheckData.data)) throw new Error('DuplicateLocationCheck.data is not an array');
     
-    // Extract the data array
+    // Extract the data arrays
     locationsData = locationsData.data;
+    const duplicateCheckRecords = duplicateCheckData.data;
     
     // Create map from gdos_id to location data
     const locationMap = new Map();
@@ -34,20 +50,63 @@ Promise.all([
         }
     });
     
-    // Add territory field and merge location data
-    uswData.forEach(d => {
-        d.territory = 'USA Western Territory';
-        const loc = locationMap.get(d.id);
-        if (loc) d.locationData = loc;
+    // Create map from gdosid to duplicate check data
+    const duplicateMap = new Map();
+    duplicateCheckRecords.forEach(record => {
+        const gdosId = record.gdosid;
+        if (gdosId) {
+            duplicateMap.set(gdosId, record);
+        }
     });
-    ussData.forEach(d => {
-        d.territory = 'USA Southern Territory';
+    
+    // Add territory field and merge location data (without mutating original data)
+    const uswDataWithTerritory = uswData.map(d => {
         const loc = locationMap.get(d.id);
-        if (loc) d.locationData = loc;
+        const duplicateRecord = duplicateMap.get(d.id);
+        return {
+            ...d,
+            territory: 'USA Western Territory',
+            ...(loc && { locationData: loc }),
+            duplicate: duplicateRecord ? (duplicateRecord.duplicate === 'Not Found' ? '0' : duplicateRecord.duplicate) : '0',
+            doNotImport: duplicateRecord ? duplicateRecord.doNotImport : 'False'
+        };
+    });
+    const ussDataWithTerritory = ussData.map(d => {
+        const loc = locationMap.get(d.id);
+        const duplicateRecord = duplicateMap.get(d.id);
+        return {
+            ...d,
+            territory: 'USA Southern Territory',
+            ...(loc && { locationData: loc }),
+            duplicate: duplicateRecord ? (duplicateRecord.duplicate === 'Not Found' ? '0' : duplicateRecord.duplicate) : '0',
+            doNotImport: duplicateRecord ? duplicateRecord.doNotImport : 'False'
+        };
+    });
+    const uscDataWithTerritory = uscData.map(d => {
+        const loc = locationMap.get(d.id);
+        const duplicateRecord = duplicateMap.get(d.id);
+        return {
+            ...d,
+            territory: 'USA Central Territory',
+            ...(loc && { locationData: loc }),
+            duplicate: duplicateRecord ? (duplicateRecord.duplicate === 'Not Found' ? '0' : duplicateRecord.duplicate) : '0',
+            doNotImport: duplicateRecord ? duplicateRecord.doNotImport : 'False'
+        };
+    });
+    const useDataWithTerritory = useData.map(d => {
+        const loc = locationMap.get(d.id);
+        const duplicateRecord = duplicateMap.get(d.id);
+        return {
+            ...d,
+            territory: 'USA Eastern Territory',
+            ...(loc && { locationData: loc }),
+            duplicate: duplicateRecord ? (duplicateRecord.duplicate === 'Not Found' ? '0' : duplicateRecord.duplicate) : '0',
+            doNotImport: duplicateRecord ? duplicateRecord.doNotImport : 'False'
+        };
     });
     
     // Combine data
-    data = [...uswData, ...ussData];
+    data = [...uswDataWithTerritory, ...ussDataWithTerritory, ...uscDataWithTerritory, ...useDataWithTerritory];
     
     populateFilterOptions(data, true);
     renderTable();
@@ -127,6 +186,34 @@ function populateFilterOptions(filteredData, addListeners = false, hasEmptyFilte
         siteTypeSelect.appendChild(option);
     });
 
+    // Duplicate filter
+    const duplicateSelect = document.getElementById('duplicateSelect');
+    const currentDuplicates = Array.from(duplicateSelect.selectedOptions).map(o => o.value);
+    duplicateSelect.innerHTML = '';
+    const allDuplicates = [...new Set(data.map(d => d.duplicate).filter(dup => dup !== undefined && dup !== null))];
+    const availableDuplicates = [...new Set(filteredData.map(d => d.duplicate).filter(dup => dup !== undefined && dup !== null))];
+    allDuplicates.forEach(dup => {
+        const option = document.createElement('option');
+        option.value = dup;
+        option.textContent = dup === '1' ? 'Duplicate' : 'Not Duplicate';
+        option.selected = hasEmptyFilter || currentDuplicates.length === 0 || (currentDuplicates.includes(dup) && availableDuplicates.includes(dup));
+        duplicateSelect.appendChild(option);
+    });
+
+    // Do Not Import filter
+    const doNotImportSelect = document.getElementById('doNotImportSelect');
+    const currentDoNotImport = Array.from(doNotImportSelect.selectedOptions).map(o => o.value);
+    doNotImportSelect.innerHTML = '';
+    const allDoNotImport = [...new Set(data.map(d => d.doNotImport).filter(dni => dni !== undefined && dni !== null))];
+    const availableDoNotImport = [...new Set(filteredData.map(d => d.doNotImport).filter(dni => dni !== undefined && dni !== null))];
+    allDoNotImport.forEach(dni => {
+        const option = document.createElement('option');
+        option.value = dni;
+        option.textContent = dni === 'True' ? 'Do Not Import' : 'Import';
+        option.selected = hasEmptyFilter || currentDoNotImport.length === 0 || (currentDoNotImport.includes(dni) && availableDoNotImport.includes(dni));
+        doNotImportSelect.appendChild(option);
+    });
+
     // Column visibility select
     const columnSelect = document.getElementById('columnSelect');
     columnSelect.innerHTML = '';
@@ -146,6 +233,8 @@ function populateFilterOptions(filteredData, addListeners = false, hasEmptyFilte
         stateSelect.addEventListener('change', applyFilters);
         divisionSelect.addEventListener('change', applyFilters);
         siteTypeSelect.addEventListener('change', applyFilters);
+        document.getElementById('duplicateSelect').addEventListener('change', applyFilters);
+        document.getElementById('doNotImportSelect').addEventListener('change', applyFilters);
         document.getElementById('openHoursSelect').addEventListener('change', applyFilters);
         document.getElementById('websiteSelect').addEventListener('change', applyFilters);
         document.getElementById('phoneSelect').addEventListener('change', applyFilters);
@@ -175,6 +264,8 @@ function applyFilters() {
     const selectedStates = Array.from(document.getElementById('stateSelect').selectedOptions).map(o => o.value);
     const selectedDivisions = Array.from(document.getElementById('divisionSelect').selectedOptions).map(o => o.value);
     const selectedSiteTypes = Array.from(document.getElementById('siteTypeSelect').selectedOptions).map(o => o.value);
+    const selectedDuplicates = Array.from(document.getElementById('duplicateSelect').selectedOptions).map(o => o.value);
+    const selectedDoNotImport = Array.from(document.getElementById('doNotImportSelect').selectedOptions).map(o => o.value);
     const openHoursFilter = document.getElementById('openHoursSelect').value;
     const websiteFilter = document.getElementById('websiteSelect').value;
     const phoneFilter = document.getElementById('phoneSelect').value;
@@ -195,6 +286,12 @@ function applyFilters() {
         // Site Type filter
         if (selectedSiteTypes.length > 0 && !selectedSiteTypes.includes(d.wm4SiteType?.name)) return false;
 
+        // Duplicate filter
+        if (selectedDuplicates.length > 0 && !selectedDuplicates.includes(d.duplicate)) return false;
+
+        // Do Not Import filter
+        if (selectedDoNotImport.length > 0 && !selectedDoNotImport.includes(d.doNotImport)) return false;
+
         // OpenHoursText filter
         if (openHoursFilter === 'empty' && (d.openHoursText !== null && d.openHoursText !== '')) return false;
         if (openHoursFilter === 'not-empty' && (d.openHoursText === null || d.openHoursText === '')) return false;
@@ -211,7 +308,7 @@ function applyFilters() {
     });
 
     table.setData(filtered);
-    const hasEmptyFilter = selectedTerritories.length === 0 || selectedPublished.length === 0 || selectedStates.length === 0 || selectedDivisions.length === 0 || selectedSiteTypes.length === 0;
+    const hasEmptyFilter = selectedTerritories.length === 0 || selectedPublished.length === 0 || selectedStates.length === 0 || selectedDivisions.length === 0 || selectedSiteTypes.length === 0 || selectedDuplicates.length === 0 || selectedDoNotImport.length === 0;
     populateFilterOptions(hasEmptyFilter ? data : filtered, false, hasEmptyFilter);
     renderCards(filtered);
 }
@@ -224,11 +321,21 @@ function renderTable() {
         keys.splice(nameIndex, 1);
         keys.unshift('name');
     }
-    // Swap 'id' and 'openHoursText' if both exist
-    const idIndex = keys.indexOf('id');
-    const openHoursIndex = keys.indexOf('openHoursText');
-    if (idIndex > -1 && openHoursIndex > -1) {
-        [keys[idIndex], keys[openHoursIndex]] = [keys[openHoursIndex], keys[idIndex]];
+    // Put territory, duplicate, and doNotImport columns early
+    const territoryIndex = keys.indexOf('territory');
+    if (territoryIndex > -1) {
+        keys.splice(territoryIndex, 1);
+        keys.splice(1, 0, 'territory');
+    }
+    const duplicateIndex = keys.indexOf('duplicate');
+    if (duplicateIndex > -1) {
+        keys.splice(duplicateIndex, 1);
+        keys.splice(2, 0, 'duplicate');
+    }
+    const doNotImportIndex = keys.indexOf('doNotImport');
+    if (doNotImportIndex > -1) {
+        keys.splice(doNotImportIndex, 1);
+        keys.splice(3, 0, 'doNotImport');
     }
     const columns = [];
     keys.forEach(key => {
@@ -285,15 +392,33 @@ function renderCards(filteredData) {
     cardsDiv.innerHTML = '';
 
     // Total records
+    const gdosTotal = filteredData.length;
+    const zestyTotal = filteredData.filter(d => d.locationData).length;
     const totalCard = document.createElement('div');
     totalCard.className = 'card flex-shrink-0 me-3 border-primary';
     totalCard.innerHTML = `
         <div class="card-body">
             <h5 class="card-title">Total Records</h5>
-            <p class="card-text">${filteredData.length}</p>
+            <p class="card-text">GDOS: ${gdosTotal}<br>Zesty: ${zestyTotal}</p>
         </div>
     `;
     cardsDiv.appendChild(totalCard);
+
+    // Published records
+    const gdosPublished = filteredData.filter(d => d.published).length;
+    const zestyPublished = filteredData.filter(d => d.locationData && 
+        (d.locationData['Column1.content.published'] === '1' || 
+         d.locationData['Column1.content.status'] === 'published' ||
+         d.locationData['Column1.content.is_active'] === '1')).length;
+    const publishedCard = document.createElement('div');
+    publishedCard.className = 'card flex-shrink-0 me-3 border-success';
+    publishedCard.innerHTML = `
+        <div class="card-body">
+            <h5 class="card-title">Published Records</h5>
+            <p class="card-text">GDOS: ${gdosPublished}<br>Zesty: ${zestyPublished}</p>
+        </div>
+    `;
+    cardsDiv.appendChild(publishedCard);
 
     if (filteredData.length === 0) return;
 
