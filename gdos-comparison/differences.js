@@ -1,5 +1,7 @@
 let differencesData = [];
 let gdosMap = new Map();
+let duplicateMap = new Map();
+let duplicateCheckRecords = [];
 // latestFilteredData holds the current set of rows matching active filters (all pages)
 let latestFilteredData = null;
 
@@ -112,7 +114,7 @@ Promise.all([
 
     // Extract the data arrays
     locationsData = locationsData.data.filter(loc => loc && typeof loc === 'object');
-    const duplicateCheckRecords = duplicateCheckData.data;
+    duplicateCheckRecords = duplicateCheckData.data;
     console.log('First filtered loc:', locationsData[0]);
     console.log('LocationsData length after filter:', locationsData.length);
 
@@ -133,7 +135,7 @@ Promise.all([
     });
 
     // Create map from gdosid to duplicate check data
-    const duplicateMap = new Map();
+    duplicateMap = new Map();
     duplicateCheckRecords.forEach(record => {
         // support several common key variants for GDOS id in the duplicate check data
         const gdosId = record && (record.gdosid ?? record.gdos_id ?? record.gdosId ?? record['gdos id'] ?? (record.gdos && record.gdos.id));
@@ -244,13 +246,11 @@ Promise.all([
             }
         });
 
-        // Additionally, if a GDOS record is identified as a duplicate or Do Not Import, or
-        // if it's in the Eastern territory (USE), show a synthetic 'published' row so
+        // Additionally, if a GDOS record is identified as a duplicate or Do Not Import, show a synthetic 'published' row so
         // the team can mark it unpublished (published=false) before import.
-        const isDuplicate = duplicateRecord && duplicateRecord.duplicate && duplicateRecord.duplicate !== 'Not Found' && duplicateRecord.duplicate !== '0';
+        const isDuplicate = duplicateRecord && duplicateRecord.duplicate === '1';
         const doNotImportFlag = duplicateRecord && (duplicateRecord.doNotImport === 'True' || duplicateRecord.doNotImport === true || String(duplicateRecord.doNotImport).toLowerCase() === 'true');
-        const inEastern = territory === 'USE';
-        if (isDuplicate || doNotImportFlag || inEastern) {
+        if (isDuplicate || doNotImportFlag) {
             // push a published-field difference if one doesn't already exist for this record
             const already = differencesData.find(d => d.gdos_id === gdos.id && d.field === 'published');
             if (!already) {
@@ -292,6 +292,10 @@ Promise.all([
                 return String(candidate) === String(gdos.id);
             }) || null;
         }
+
+        // Only add synthetic row if doNotImport is 'True' (meaning it cannot be imported as is, so needs to be unpublished)
+        const doNotImportFlag = duplicateRecord && (duplicateRecord.doNotImport === 'True' || duplicateRecord.doNotImport === true || String(duplicateRecord.doNotImport).toLowerCase() === 'true');
+        if (!doNotImportFlag) return;
 
         const division = getNestedValue(gdos, 'location.division.name') || 'Unknown';
         const territory = gdos.territory;
@@ -351,6 +355,10 @@ function correctValueFormatter(cell, formatterParams, onRendered) {
         rowData.correct = newValue;
         rowData.final_value = newValue === 'GDOS' ? rowData.gdos_value : rowData.zesty_value;
         row.update(rowData);
+        // If this is a synthetic row and correct is changed to 'GDOS', remove it from the table
+        if (rowData.synthetic && newValue === 'GDOS') {
+            row.delete();
+        }
         // Try toggling the underline on the rendered value spans so change is immediate
         try {
             const gdosCell = row.getCell('gdos_value');
@@ -519,7 +527,8 @@ function loadSavedChanges() {
                     openhours: '',
                     website: '',
                     division: r.division || '',
-                    territory: r.territory || ''
+                    territory: r.territory || '',
+                    published: ''
                 });
             }
 
@@ -539,6 +548,9 @@ function loadSavedChanges() {
                 case 'zipcode':
                     entry.zip = finalVal || entry.zip;
                     break;
+                case 'published':
+                    entry.published = finalVal || entry.published;
+                    break;
                 case 'latitude':
                 case 'longitude':
                     // ignore for import
@@ -555,6 +567,16 @@ function loadSavedChanges() {
         const rows = Array.from(grouped.values());
         rows.forEach(entry => {
             const gdosRecord = gdosMap.get(entry.gdos_id);
+            // Look up duplicate record for this entry
+            let duplicateRecord = duplicateMap.get(entry.gdos_id);
+            if (!duplicateRecord && Array.isArray(duplicateCheckRecords)) {
+                duplicateRecord = duplicateCheckRecords.find(r => {
+                    if (!r) return false;
+                    const candidate = r.gdosid ?? r.gdos_id ?? r.gdosId ?? r['gdos id'] ?? (r.gdos && r.gdos.id);
+                    return String(candidate) === String(entry.gdos_id);
+                }) || null;
+            }
+            const doNotImportFlag = duplicateRecord && (duplicateRecord.doNotImport === 'True' || duplicateRecord.doNotImport === true || String(duplicateRecord.doNotImport).toLowerCase() === 'true');
                 if (gdosRecord) {
                     // pull common GDOS fields if empty
                     entry.address1 = entry.address1 || getNestedValue(gdosRecord, 'address1') || '';
@@ -571,6 +593,7 @@ function loadSavedChanges() {
                     entry.division = entry.division || getNestedValue(gdosRecord, 'location.division.name') || '';
                     entry.territory = entry.territory || gdosRecord.territory || '';
                     entry.name = entry.name || getNestedValue(gdosRecord, 'name') || '';
+                    entry.published = entry.published || (gdosRecord.published ? 'True' : 'False');
 
                     // If state still missing, try to look up from the Zesty locations raw data (rawLocations)
                     if (!entry.state && rawLocations && Array.isArray(rawLocations.data)) {
@@ -581,13 +604,17 @@ function loadSavedChanges() {
                         }
                     }
                 }
+            // Override published to 'False' if doNotImport is 'True', to ensure these records are unpublished in the import
+            if (doNotImportFlag) {
+                entry.published = 'False';
+            }
         });
         if (rows.length === 0) {
             alert('No corrections where GDOS is not the correct value were found.');
             return;
         }
 
-        const headers = ['GDOS ID','Name','Address1','Address2','City','State','Zip','PhoneNumber','OpenHoursText','PrimaryWebsite','Division','Territory'];
+        const headers = ['GDOS ID','Name','Address1','Address2','City','State','Zip','PhoneNumber','OpenHoursText','PrimaryWebsite','Published','Division','Territory'];
         const csvLines = [headers.join(',')];
 
         rows.forEach(r => {
@@ -602,6 +629,7 @@ function loadSavedChanges() {
                 escapeCsv(r.phone),
                 escapeCsv(r.openhours),
                 escapeCsv(r.website),
+                escapeCsv(r.published),
                 escapeCsv(r.division),
                 escapeCsv(r.territory)
             ];
