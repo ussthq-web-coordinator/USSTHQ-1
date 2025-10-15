@@ -530,6 +530,11 @@ function loadSavedChanges() {
             if (Array.isArray(corrections)) {
                 applyChanges(corrections);
                 console.log('Shared corrections loaded');
+                // Update the table with the modified data
+                const table = window.differencesTable || Tabulator.findTable("#differencesTable")[0];
+                if (table) {
+                    table.setData(differencesData);
+                }
                 return;
             }
             throw new Error('Invalid shared data');
@@ -869,6 +874,7 @@ function renderDifferencesTable() {
             const data = row.getData();
             if (data && data.synthetic) {
                 row.getElement().classList.add('synthetic-row');
+                row.getElement().title = 'Synthetic row: This row was added to represent a workflow decision (e.g., published status) and is not a direct field comparison.';
             }
         },
         pagination: "local",
