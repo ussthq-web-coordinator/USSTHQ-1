@@ -45,63 +45,69 @@ Promise.all([
     const locationMap = new Map();
     locationsData.forEach(loc => {
         const gdosId = loc['Column1.content.gdos_id'];
-        if (gdosId) {
-            locationMap.set(gdosId, loc);
+        if (gdosId || gdosId === 0) {
+            // normalize key type to string to avoid mismatches
+            locationMap.set(String(gdosId), loc);
         }
     });
     
     // Create map from gdosid to duplicate check data
     const duplicateMap = new Map();
     duplicateCheckRecords.forEach(record => {
-        const gdosId = record.gdosid;
-        if (gdosId) {
-            duplicateMap.set(gdosId, record);
+        // support several common key variants for GDOS id in the duplicate check data
+        const gdosId = record && (record.gdosid ?? record.gdos_id ?? record.gdosId ?? record['gdos id'] ?? (record.gdos && record.gdos.id));
+        if (gdosId || gdosId === 0) {
+            duplicateMap.set(String(gdosId), record);
         }
     });
     
     // Add territory field and merge location data (without mutating original data)
     const uswDataWithTerritory = uswData.map(d => {
-        const loc = locationMap.get(d.id);
-        const duplicateRecord = duplicateMap.get(d.id);
+        const loc = locationMap.get(String(d.id));
+        const duplicateRecord = duplicateMap.get(String(d.id));
         return {
             ...d,
             territory: 'USA Western Territory',
             ...(loc && { locationData: loc }),
-            duplicate: duplicateRecord ? (duplicateRecord.duplicate === 'Not Found' ? '0' : duplicateRecord.duplicate) : '0',
-            doNotImport: duplicateRecord ? duplicateRecord.doNotImport : 'False'
+            // If duplicateRecord exists, use the file values exactly (stringified); otherwise use defaults
+            duplicate: duplicateRecord && duplicateRecord.duplicate != null ? String(duplicateRecord.duplicate) : '0',
+            doNotImport: duplicateRecord && duplicateRecord.doNotImport != null ? String(duplicateRecord.doNotImport) : 'False'
         };
     });
     const ussDataWithTerritory = ussData.map(d => {
-        const loc = locationMap.get(d.id);
-        const duplicateRecord = duplicateMap.get(d.id);
+        const loc = locationMap.get(String(d.id));
+        const duplicateRecord = duplicateMap.get(String(d.id));
         return {
             ...d,
             territory: 'USA Southern Territory',
             ...(loc && { locationData: loc }),
-            duplicate: duplicateRecord ? (duplicateRecord.duplicate === 'Not Found' ? '0' : duplicateRecord.duplicate) : '0',
-            doNotImport: duplicateRecord ? duplicateRecord.doNotImport : 'False'
+            // If duplicateRecord exists, use the file values exactly (stringified); otherwise use defaults
+            duplicate: duplicateRecord && duplicateRecord.duplicate != null ? String(duplicateRecord.duplicate) : '0',
+            doNotImport: duplicateRecord && duplicateRecord.doNotImport != null ? String(duplicateRecord.doNotImport) : 'False'
         };
     });
     const uscDataWithTerritory = uscData.map(d => {
-        const loc = locationMap.get(d.id);
-        const duplicateRecord = duplicateMap.get(d.id);
+        const loc = locationMap.get(String(d.id));
+        const duplicateRecord = duplicateMap.get(String(d.id));
         return {
             ...d,
             territory: 'USA Central Territory',
             ...(loc && { locationData: loc }),
-            duplicate: duplicateRecord ? (duplicateRecord.duplicate === 'Not Found' ? '0' : duplicateRecord.duplicate) : '0',
-            doNotImport: duplicateRecord ? duplicateRecord.doNotImport : 'False'
+            // If duplicateRecord exists, use the file values exactly (stringified); otherwise use defaults
+            duplicate: duplicateRecord && duplicateRecord.duplicate != null ? String(duplicateRecord.duplicate) : '0',
+            doNotImport: duplicateRecord && duplicateRecord.doNotImport != null ? String(duplicateRecord.doNotImport) : 'False'
         };
     });
     const useDataWithTerritory = useData.map(d => {
-        const loc = locationMap.get(d.id);
-        const duplicateRecord = duplicateMap.get(d.id);
+        const loc = locationMap.get(String(d.id));
+        const duplicateRecord = duplicateMap.get(String(d.id));
         return {
             ...d,
             territory: 'USA Eastern Territory',
             ...(loc && { locationData: loc }),
-            duplicate: duplicateRecord ? (duplicateRecord.duplicate === 'Not Found' ? '0' : duplicateRecord.duplicate) : '0',
-            doNotImport: duplicateRecord ? duplicateRecord.doNotImport : 'False'
+            // If duplicateRecord exists, use the file values exactly (stringified); otherwise use defaults
+            duplicate: duplicateRecord && duplicateRecord.duplicate != null ? String(duplicateRecord.duplicate) : '0',
+            doNotImport: duplicateRecord && duplicateRecord.doNotImport != null ? String(duplicateRecord.doNotImport) : 'False'
         };
     });
     
@@ -404,21 +410,29 @@ function renderCards(filteredData) {
     `;
     cardsDiv.appendChild(totalCard);
 
-    // Published records
-    const gdosPublished = filteredData.filter(d => d.published).length;
-    const zestyPublished = filteredData.filter(d => d.locationData && 
-        (d.locationData['Column1.content.published'] === '1' || 
-         d.locationData['Column1.content.status'] === 'published' ||
-         d.locationData['Column1.content.is_active'] === '1')).length;
-    const publishedCard = document.createElement('div');
-    publishedCard.className = 'card flex-shrink-0 me-3 border-success';
-    publishedCard.innerHTML = `
+    // Duplicate records
+    const duplicateCount = filteredData.filter(d => d.duplicate === '1').length;
+    const duplicateCard = document.createElement('div');
+    duplicateCard.className = 'card flex-shrink-0 me-3 border-warning';
+    duplicateCard.innerHTML = `
         <div class="card-body">
-            <h5 class="card-title">Published Records</h5>
-            <p class="card-text">GDOS: ${gdosPublished}<br>Zesty: ${zestyPublished}</p>
+            <h5 class="card-title">Duplicate Records</h5>
+            <p class="card-text">${duplicateCount} records</p>
         </div>
     `;
-    cardsDiv.appendChild(publishedCard);
+    cardsDiv.appendChild(duplicateCard);
+
+    // Do Not Import records
+    const doNotImportCount = filteredData.filter(d => d.doNotImport === 'True').length;
+    const doNotImportCard = document.createElement('div');
+    doNotImportCard.className = 'card flex-shrink-0 me-3 border-danger';
+    doNotImportCard.innerHTML = `
+        <div class="card-body">
+            <h5 class="card-title">Do Not Import</h5>
+            <p class="card-text">${doNotImportCount} records</p>
+        </div>
+    `;
+    cardsDiv.appendChild(doNotImportCard);
 
     if (filteredData.length === 0) return;
 

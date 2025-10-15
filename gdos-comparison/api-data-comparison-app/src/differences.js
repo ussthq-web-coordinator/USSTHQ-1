@@ -1,8 +1,34 @@
 let differencesData = [];
+let gdosMap = new Map();
+// latestFilteredData holds the current set of rows matching active filters (all pages)
+let latestFilteredData = null;
+
+// Raw JSONs for modal inspection
+let rawUsw = null;
+let rawUss = null;
+let rawUsc = null;
+let rawUse = null;
+let rawLocations = null;
+// filenames for GDOS JSONs (used to parse refresh timestamps)
+let rawUswFilename = null;
+let rawUssFilename = null;
+let rawUscFilename = null;
+let rawUseFilename = null;
 
 // Function to get nested value from object
 function getNestedValue(obj, path) {
     return path.split('.').reduce((current, key) => current && current[key], obj);
+}
+
+// Normalize a state value which may be a string or an object (e.g. { id, name })
+function extractStateValue(stateVal) {
+    if (stateVal == null) return null;
+    if (typeof stateVal === 'string') return stateVal;
+    if (typeof stateVal === 'object') {
+        // common name properties
+        return stateVal.name || stateVal.text || stateVal.state || null;
+    }
+    return null;
 }
 
 // Normalization functions for comparison
@@ -66,6 +92,17 @@ Promise.all([
     })
 ])
 .then(([uswData, ussData, uscData, useData, locationsData, duplicateCheckData]) => {
+    // store raw JSONs for modal use
+    rawUsw = uswData;
+    rawUss = ussData;
+    rawUsc = uscData;
+    rawUse = useData;
+        // store filenames so we can parse refresh dates from filenames
+        rawUswFilename = 'GDOS-10-14-18-53-USW.json';
+        rawUssFilename = 'GDOS-10-14-18-10-USS.json';
+        rawUscFilename = 'GDOS-10-15-04-22-USC.json';
+        rawUseFilename = 'GDOS-10-15-04-57-USE.json';
+    rawLocations = locationsData;
     if (!Array.isArray(uswData)) throw new Error('USW data is not an array');
     if (!Array.isArray(ussData)) throw new Error('USS data is not an array');
     if (!Array.isArray(uscData)) throw new Error('USC data is not an array');
@@ -89,17 +126,19 @@ Promise.all([
     const locationMap = new Map();
     locationsData.forEach((loc) => {
         const gdosId = loc['Column1.content.gdos_id'];
-        if (gdosId) {
-            locationMap.set(gdosId, loc);
+        if (gdosId || gdosId === 0) {
+            // normalize key type to string to avoid mismatches
+            locationMap.set(String(gdosId), loc);
         }
     });
 
     // Create map from gdosid to duplicate check data
     const duplicateMap = new Map();
     duplicateCheckRecords.forEach(record => {
-        const gdosId = record.gdosid;
-        if (gdosId) {
-            duplicateMap.set(gdosId, record);
+        // support several common key variants for GDOS id in the duplicate check data
+        const gdosId = record && (record.gdosid ?? record.gdos_id ?? record.gdosId ?? record['gdos id'] ?? (record.gdos && record.gdos.id));
+        if (gdosId || gdosId === 0) {
+            duplicateMap.set(String(gdosId), record);
         }
     });
 
@@ -117,6 +156,10 @@ Promise.all([
         ...uscData.map(item => ({ ...item, territory: 'USC' })),
         ...useData.map(item => ({ ...item, territory: 'USE' }))
     ];
+    // populate gdosMap for lookups by id
+    gdosData.forEach(g => {
+        if (g && g.id) gdosMap.set(g.id, g);
+    });
     console.log('Total GDOS data length:', gdosData.length);
     if (gdosData.length > 0) {
         console.log('Sample GDOS name:', gdosData[0].name);
@@ -138,13 +181,14 @@ Promise.all([
     let skippedNotPublished = 0;
     let totalComparisons = 0;
     gdosData.forEach((gdos, index) => {
-        // Only include if published (gdospub = 1 equivalent)
-        if (!gdos.published) {
+        // Skip if not published, but still track for statistics
+        const isPublished = gdos.published;
+        if (!isPublished) {
             skippedNotPublished++;
-            return;
         }
         
-        let loc = locationMap.get(gdos.id);
+    // look up by stringified GDOS id to match how we keyed the maps
+    let loc = locationMap.get(String(gdos.id));
         
         if (!loc) {
             skippedNoMatch++;
@@ -158,7 +202,16 @@ Promise.all([
         }
         const division = getNestedValue(gdos, 'location.division.name') || 'Unknown';
         const territory = gdos.territory;
-        const duplicateRecord = duplicateMap.get(gdos.id);
+        let duplicateRecord = duplicateMap.get(String(gdos.id));
+        // Fallback: if map lookup missed (due to different key shapes or missing entries),
+        // try scanning the raw duplicateCheckRecords array for common id variants.
+        if (!duplicateRecord && Array.isArray(duplicateCheckRecords)) {
+            duplicateRecord = duplicateCheckRecords.find(r => {
+                if (!r) return false;
+                const candidate = r.gdosid ?? r.gdos_id ?? r.gdosId ?? r['gdos id'] ?? (r.gdos && r.gdos.id);
+                return String(candidate) === String(gdos.id);
+            }) || null;
+        }
         
         fieldsToCompare.forEach(fieldObj => {
             totalComparisons++;
@@ -179,14 +232,86 @@ Promise.all([
                     property_type: getNestedValue(gdos, 'wm4SiteType.name') || 'Unknown',
                     division: division,
                     territory: territory,
-                    duplicate: duplicateRecord ? (duplicateRecord.duplicate === 'Not Found' ? '0' : duplicateRecord.duplicate) : '0',
-                    doNotImport: duplicateRecord ? duplicateRecord.doNotImport : 'False',
+                    published: isPublished ? 'True' : 'False',
+                    // If duplicateRecord exists, use the file values exactly (stringified); otherwise use defaults
+                    duplicate: duplicateRecord && duplicateRecord.duplicate != null ? String(duplicateRecord.duplicate) : '0',
+                    doNotImport: duplicateRecord && duplicateRecord.doNotImport != null ? String(duplicateRecord.doNotImport) : 'False',
                     field: fieldObj.field,
                     gdos_value: gdosValue,
                     zesty_value: zestyValue,
                     correct: 'GDOS' // default
                 });
             }
+        });
+
+        // Additionally, if a GDOS record is identified as a duplicate or Do Not Import, or
+        // if it's in the Eastern territory (USE), show a synthetic 'published' row so
+        // the team can mark it unpublished (published=false) before import.
+        const isDuplicate = duplicateRecord && duplicateRecord.duplicate && duplicateRecord.duplicate !== 'Not Found' && duplicateRecord.duplicate !== '0';
+        const doNotImportFlag = duplicateRecord && (duplicateRecord.doNotImport === 'True' || duplicateRecord.doNotImport === true || String(duplicateRecord.doNotImport).toLowerCase() === 'true');
+        const inEastern = territory === 'USE';
+        if (isDuplicate || doNotImportFlag || inEastern) {
+            // push a published-field difference if one doesn't already exist for this record
+            const already = differencesData.find(d => d.gdos_id === gdos.id && d.field === 'published');
+            if (!already) {
+                differencesData.push({
+                    gdos_id: gdos.id,
+                    name: gdos.name,
+                    property_type: getNestedValue(gdos, 'wm4SiteType.name') || 'Unknown',
+                    division: division,
+                    territory: territory,
+                    published: isPublished ? 'True' : 'False',
+                    // reflect duplicate/doNotImport exactly as present in DuplicateLocationCheck.json when available
+                    duplicate: duplicateRecord && duplicateRecord.duplicate != null ? String(duplicateRecord.duplicate) : '0',
+                    doNotImport: duplicateRecord && duplicateRecord.doNotImport != null ? String(duplicateRecord.doNotImport) : 'False',
+                    field: 'published',
+                    gdos_value: isPublished ? 'True' : 'False',
+                    zesty_value: 'False',
+                    correct: 'Zesty',
+                    synthetic: true
+                });
+            }
+        }
+    });
+
+    // Now, add synthetic 'published' rows for all published GDOS records that have no Zesty match,
+    // so they can be marked as unpublished before import.
+    gdosData.forEach((gdos) => {
+        const isPublished = gdos.published;
+        if (!isPublished) return; // Only for published records
+
+        const hasMatch = locationMap.has(String(gdos.id));
+        if (hasMatch) return; // Already handled in the main loop
+
+        // Look up duplicate record
+        let duplicateRecord = duplicateMap.get(String(gdos.id));
+        if (!duplicateRecord && Array.isArray(duplicateCheckRecords)) {
+            duplicateRecord = duplicateCheckRecords.find(r => {
+                if (!r) return false;
+                const candidate = r.gdosid ?? r.gdos_id ?? r.gdosId ?? r['gdos id'] ?? (r.gdos && r.gdos.id);
+                return String(candidate) === String(gdos.id);
+            }) || null;
+        }
+
+        const division = getNestedValue(gdos, 'location.division.name') || 'Unknown';
+        const territory = gdos.territory;
+
+        // Add synthetic 'published' row
+        differencesData.push({
+            gdos_id: gdos.id,
+            name: gdos.name,
+            property_type: getNestedValue(gdos, 'wm4SiteType.name') || 'Unknown',
+            division: division,
+            territory: territory,
+            published: 'True', // Since it's published in GDOS
+            // Use file values if available, else defaults
+            duplicate: duplicateRecord && duplicateRecord.duplicate != null ? String(duplicateRecord.duplicate) : '0',
+            doNotImport: duplicateRecord && duplicateRecord.doNotImport != null ? String(duplicateRecord.doNotImport) : 'False',
+            field: 'published',
+            gdos_value: 'True',
+            zesty_value: 'False', // Default to unpublished
+            correct: 'Zesty',
+            synthetic: true
         });
     });
 
@@ -200,6 +325,9 @@ Promise.all([
         console.log('Sample difference:', differencesData[0]);
     }
 
+    // Load any previously saved changes
+    loadSavedChanges();
+    
     renderDifferencesTable();
 })
 .catch(error => {
@@ -216,48 +344,569 @@ function correctValueFormatter(cell, formatterParams, onRendered) {
         <option value="Zesty" ${value === 'Zesty' ? 'selected' : ''}>Zesty</option>
     `;
     select.addEventListener('change', function() {
-        cell.setValue(this.value);
+        const newValue = this.value;
+        // Update the row data (this will cause formatters to re-run)
+        const row = cell.getRow();
+        const rowData = row.getData();
+        rowData.correct = newValue;
+        rowData.final_value = newValue === 'GDOS' ? rowData.gdos_value : rowData.zesty_value;
+        row.update(rowData);
+        // Try toggling the underline on the rendered value spans so change is immediate
+        try {
+            const gdosCell = row.getCell('gdos_value');
+            const zestyCell = row.getCell('zesty_value');
+            if (gdosCell) {
+                const el = gdosCell.getElement();
+                const span = el ? el.querySelector('.value-text') : null;
+                if (span) span.classList.toggle('selected-underline', newValue === 'GDOS');
+            }
+            if (zestyCell) {
+                const el = zestyCell.getElement();
+                const span = el ? el.querySelector('.value-text') : null;
+                if (span) span.classList.toggle('selected-underline', newValue === 'Zesty');
+            }
+        } catch (e) {
+            console.warn('toggle underline failed', e);
+        }
+
+        // Save changes
+        saveChanges();
     });
     return select;
 }
 
-function renderDifferencesTable() {
-    // Calculate summary
-    const uniqueTerritories = new Set(differencesData.map(d => d.territory)).size;
+function finalValueFormatter(cell, formatterParams, onRendered) {
+    const row = cell.getRow();
+    const correctValue = row.getData().correct;
+    const gdosValue = row.getData().gdos_value;
+    const zestyValue = row.getData().zesty_value;
     
-    // Update summary
+    return correctValue === 'GDOS' ? gdosValue : zestyValue;
+}
+
+function gdosValueFormatter(cell, formatterParams, onRendered) {
+    const row = cell.getRow();
+    const correctValue = row.getData().correct;
+    const value = cell.getValue();
+
+    const span = document.createElement('span');
+    span.className = 'value-text' + (correctValue === 'GDOS' ? ' selected-underline' : '');
+    span.textContent = value;
+    return span;
+}
+
+function zestyValueFormatter(cell, formatterParams, onRendered) {
+    const row = cell.getRow();
+    const correctValue = row.getData().correct;
+    const value = cell.getValue();
+
+    const span = document.createElement('span');
+    span.className = 'value-text' + (correctValue === 'Zesty' ? ' selected-underline' : '');
+    span.textContent = value;
+    return span;
+}
+
+function saveChanges() {
+    const table = Tabulator.findTable("#differencesTable")[0];
+    if (table) {
+        const data = table.getData();
+        // Save to localStorage
+        localStorage.setItem('differencesChanges', JSON.stringify(data));
+        console.log('Changes saved to localStorage');
+        // update metrics live
+        updateMetrics();
+    }
+}
+
+function updateMetrics() {
+    const table = window.differencesTable || Tabulator.findTable("#differencesTable")[0];
+    if (!table) return;
+    // If Tabulator provided the full filtered set (latestFilteredData), prefer that
+    let data = null;
+    if (Array.isArray(latestFilteredData)) {
+        data = latestFilteredData;
+    } else {
+        // Otherwise, attempt to compute from visible rows (covers header filters) or fall back
+        try {
+            if (typeof table.getRows === 'function') {
+                const rows = table.getRows();
+                const visibleRows = rows.filter(r => {
+                    try {
+                        const el = r.getElement();
+                        return !!(el && el.offsetParent !== null);
+                    } catch (e) {
+                        return true;
+                    }
+                });
+                data = visibleRows.map(r => r.getData());
+            }
+        } catch (e) {
+            // ignore and fallback
+        }
+        if (!Array.isArray(data)) data = table.getData();
+    }
+    const total = data.length;
+    const gdosCount = data.filter(r => r.correct === 'GDOS').length;
+    const zestyCount = data.filter(r => r.correct === 'Zesty').length;
+
+    // per-field counts
+    const fieldCounts = data.reduce((acc, r) => {
+        const f = r.field || 'unknown';
+        acc[f] = (acc[f] || 0) + 1;
+        return acc;
+    }, {});
+
+    const metricTotal = document.getElementById('metricTotal');
+    const metricGdos = document.getElementById('metricGdos');
+    const metricZesty = document.getElementById('metricZesty');
+    const metricFields = document.getElementById('metricFields');
+    if (metricTotal) metricTotal.textContent = total;
+    if (metricGdos) metricGdos.textContent = gdosCount;
+    if (metricZesty) metricZesty.textContent = zestyCount;
+    if (metricFields) {
+        metricFields.innerHTML = Object.keys(fieldCounts).sort().map(k => `${k}: ${fieldCounts[k]}`).join('  •  ');
+    }
+}
+
+function loadSavedChanges() {
+    const savedData = localStorage.getItem('differencesChanges');
+    if (savedData) {
+        const changes = JSON.parse(savedData);
+        // Apply saved changes to current data
+        changes.forEach(savedRow => {
+            const currentRow = differencesData.find(row => 
+                row.gdos_id === savedRow.gdos_id && row.field === savedRow.field
+            );
+            if (currentRow) {
+                currentRow.correct = savedRow.correct;
+                currentRow.final_value = savedRow.correct === 'GDOS' ? currentRow.gdos_value : currentRow.zesty_value;
+            }
+        });
+        console.log('Saved changes loaded from localStorage');
+    }
+}
+
+    // Build and download a CSV of corrections where GDOS is not the correct value
+    function downloadCorrectionsCsv() {
+        // We want one row per GDOS record where the chosen correct value is Zesty (i.e., not GDOS)
+        // Columns: GDOS ID, Name (with correct value), Address1, Address2, City, State, Zip, PhoneNumber, OpenHoursText, PrimaryWebsite, Division, Territory
+        const table = Tabulator.findTable("#differencesTable")[0];
+        if (!table) {
+            alert('Table not initialized yet');
+            return;
+        }
+
+        const allRows = table.getData();
+
+        // Group by gdos_id and collect the final values for fields
+        const grouped = new Map();
+        allRows.forEach(r => {
+            // use final_value and correct to determine whether GDOS is NOT correct
+            if (!r.gdos_id) return;
+            if (r.correct === 'GDOS') return; // only collect rows where correct is not GDOS
+
+            const gid = r.gdos_id;
+            if (!grouped.has(gid)) {
+                grouped.set(gid, {
+                    gdos_id: gid,
+                    name: r.name || '',
+                    address1: '',
+                    address2: '',
+                    city: '',
+                    state: '',
+                    zip: '',
+                    phone: '',
+                    openhours: '',
+                    website: '',
+                    division: r.division || '',
+                    territory: r.territory || ''
+                });
+            }
+
+            const entry = grouped.get(gid);
+            // The field indicates which property changed; final_value holds the chosen value
+            const field = r.field;
+            const finalVal = r.final_value;
+
+            // Map the comparison field names to import sheet columns
+            switch (field) {
+                case 'name':
+                    entry.name = finalVal || entry.name;
+                    break;
+                case 'address':
+                    entry.address1 = finalVal || entry.address1;
+                    break;
+                case 'zipcode':
+                    entry.zip = finalVal || entry.zip;
+                    break;
+                case 'latitude':
+                case 'longitude':
+                    // ignore for import
+                    break;
+                default:
+                    // other fields might map to phone, openhours, website - try to infer by field name
+                    if (/phone/i.test(field)) entry.phone = finalVal || entry.phone;
+                    if (/openhours/i.test(field)) entry.openhours = finalVal || entry.openhours;
+                    if (/website|primarywebsite/i.test(field)) entry.website = finalVal || entry.website;
+            }
+        });
+
+        // Fill missing fields from GDOS source data (gdosMap) and convert grouped Map to CSV
+        const rows = Array.from(grouped.values());
+        rows.forEach(entry => {
+            const gdosRecord = gdosMap.get(entry.gdos_id);
+                if (gdosRecord) {
+                    // pull common GDOS fields if empty
+                    entry.address1 = entry.address1 || getNestedValue(gdosRecord, 'address1') || '';
+                    entry.address2 = entry.address2 || getNestedValue(gdosRecord, 'address2') || '';
+                    entry.city = entry.city || getNestedValue(gdosRecord, 'city') || '';
+                    // State in GDOS may be an object; normalize to the name if so
+                    const gdosStateRaw = getNestedValue(gdosRecord, 'state') || getNestedValue(gdosRecord, 'address.state') || null;
+                    const gdosState = extractStateValue(gdosStateRaw);
+                    entry.state = entry.state || gdosState || '';
+                    entry.zip = entry.zip || getNestedValue(gdosRecord, 'zip.zipcode') || getNestedValue(gdosRecord, 'zipcode') || '';
+                    entry.phone = entry.phone || getNestedValue(gdosRecord, 'phone') || getNestedValue(gdosRecord, 'phoneNumber') || '';
+                    entry.openhours = entry.openhours || getNestedValue(gdosRecord, 'openHoursText') || '';
+                    entry.website = entry.website || getNestedValue(gdosRecord, 'primaryWebsite') || '';
+                    entry.division = entry.division || getNestedValue(gdosRecord, 'location.division.name') || '';
+                    entry.territory = entry.territory || gdosRecord.territory || '';
+                    entry.name = entry.name || getNestedValue(gdosRecord, 'name') || '';
+
+                    // If state still missing, try to look up from the Zesty locations raw data (rawLocations)
+                    if (!entry.state && rawLocations && Array.isArray(rawLocations.data)) {
+                        const zestyRec = rawLocations.data.find(l => l && l['Column1.content.gdos_id'] == entry.gdos_id);
+                        if (zestyRec) {
+                            const zstate = extractZestyStateValue(zestyRec);
+                            if (zstate) entry.state = zstate;
+                        }
+                    }
+                }
+        });
+        if (rows.length === 0) {
+            alert('No corrections where GDOS is not the correct value were found.');
+            return;
+        }
+
+        const headers = ['GDOS ID','Name','Address1','Address2','City','State','Zip','PhoneNumber','OpenHoursText','PrimaryWebsite','Division','Territory'];
+        const csvLines = [headers.join(',')];
+
+        rows.forEach(r => {
+            const vals = [
+                escapeCsv(r.gdos_id),
+                escapeCsv(r.name),
+                escapeCsv(r.address1),
+                escapeCsv(r.address2),
+                escapeCsv(r.city),
+                escapeCsv(r.state),
+                escapeCsv(r.zip),
+                escapeCsv(r.phone),
+                escapeCsv(r.openhours),
+                escapeCsv(r.website),
+                escapeCsv(r.division),
+                escapeCsv(r.territory)
+            ];
+            csvLines.push(vals.join(','));
+        });
+
+        const csvContent = csvLines.join('\n');
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'gdos_corrections.csv';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    }
+
+    function escapeCsv(str) {
+        if (str == null) return '';
+        const s = String(str);
+        if (s.includes(',') || s.includes('\n') || s.includes('"')) {
+            return '"' + s.replace(/"/g, '""') + '"';
+        }
+        return s;
+    }
+
+    // Try common places for a refresh/timestamp in the raw JSONs
+    function extractRefreshDate(source) {
+        if (!source) return null;
+        // If source has top-level metadata or timestamp fields
+        const possibleKeys = ['updated_at','updatedAt','last_updated','lastUpdated','refreshed','refreshDate','refresh_date','timestamp','generated_at','generatedAt'];
+        // If object with meta
+        if (source.meta && typeof source.meta === 'object') {
+            for (const k of possibleKeys) if (source.meta[k]) return source.meta[k];
+        }
+        // If it's an array, try first item's meta
+        if (Array.isArray(source) && source.length > 0) {
+            const first = source[0];
+            for (const k of possibleKeys) if (first[k]) return first[k];
+        }
+        // Try top-level keys
+        for (const k of possibleKeys) if (source[k]) return source[k];
+        return null;
+    }
+
+    function showRefreshDates() {
+        const list = document.getElementById('refreshDatesList');
+        if (!list) return;
+        list.innerHTML = '';
+
+            // Prefer parsing the filename for GDOS refresh dates
+            const uswDate = parseGdosFilenameDate(rawUswFilename) || extractRefreshDate(rawUsw) || '(unknown)';
+            const ussDate = parseGdosFilenameDate(rawUssFilename) || extractRefreshDate(rawUss) || '(unknown)';
+            const uscDate = parseGdosFilenameDate(rawUscFilename) || extractRefreshDate(rawUsc) || '(unknown)';
+            const useDate = parseGdosFilenameDate(rawUseFilename) || extractRefreshDate(rawUse) || '(unknown)';
+            // Zesty (locations) may have date in different spots; fallback to 10/15 4 AM if not present
+            const zestyDate = (function(){
+                const d = extractRefreshDate(rawLocations);
+                if (d) return d;
+                return '2025-10-15 04:00';
+            })();
+
+        // Prefer showing the filename text (e.g. '10-14-18-53-USW') if available
+        const uswText = filenameDateText(rawUswFilename) || uswDate;
+        const ussText = filenameDateText(rawUssFilename) || ussDate;
+        const uscText = filenameDateText(rawUscFilename) || uscDate;
+        const useText = filenameDateText(rawUseFilename) || useDate;
+
+        const entries = [
+            ['USW (GDOS)', uswText],
+            ['USS (GDOS)', ussText],
+            ['USC (GDOS)', uscText],
+            ['USE (GDOS)', useText],
+            ['Zesty (LocationsData)', zestyDate]
+        ];
+            // Build one-line, alphabetically ordered territory: date pairs
+            const footer = document.getElementById('refreshDatesFooter');
+            if (footer) {
+                const pairs = entries.map(([label, date]) => {
+                    // convert label like 'USW (GDOS)' to just 'USW' for sorting/display
+                    const short = label.split(' ')[0];
+                    // prefer filename text (e.g., '10-14-18-53-USW') and include parsed readable date
+                    const fnameText = (typeof date === 'string' ? date : '') || '';
+                    const parsed = (function(){
+                        if (short === 'USW') return formatParsedFilenameDate(rawUswFilename);
+                        if (short === 'USS') return formatParsedFilenameDate(rawUssFilename);
+                        if (short === 'USC') return formatParsedFilenameDate(rawUscFilename);
+                        if (short === 'USE') return formatParsedFilenameDate(rawUseFilename);
+                        if (label.startsWith('Zesty')) return `(${zestyDate})`;
+                        return '';
+                    })();
+                    const display = `${fnameText} ${parsed}`.trim();
+                    return { short, display };
+                });
+
+                pairs.sort((a,b) => a.short.localeCompare(b.short));
+
+                footer.textContent = pairs.map(p => `${p.short}: ${p.display}`).join('  •  ');
+            }
+    }
+
+    // Populate the inline refresh dates list when the DOM is ready
+    document.addEventListener('DOMContentLoaded', () => {
+        // showRefreshDates will populate the #refreshDatesList so the collapse shows useful content
+        showRefreshDates();
+    });
+
+function renderDifferencesTable() {
+    // Clear summary (we don't display the auto-generated summary line)
     const summaryDiv = document.getElementById('differencesSummary');
     if (summaryDiv) {
-        summaryDiv.innerHTML = `Showing ${differencesData.length} differences across ${uniqueTerritories} territories.`;
+        summaryDiv.innerHTML = '';
     }
     
     const table = new Tabulator("#differencesTable", {
         data: differencesData,
         layout: "fitColumns",
         columns: [
-            { title: "GDOS ID", field: "gdos_id", width: 120 },
-            { title: "Name", field: "name", width: 200 },
-            { title: "Property Type", field: "property_type", width: 150, headerFilter: "input" },
-            { title: "Division", field: "division", width: 150, headerFilter: "input" },
-            { title: "Territory", field: "territory", width: 100, headerFilter: "input" },
-            { title: "Duplicate", field: "duplicate", width: 100, headerFilter: "select", headerFilterParams: { values: {"0": "Not Duplicate", "1": "Duplicate"} } },
-            { title: "Do Not Import", field: "doNotImport", width: 120, headerFilter: "select", headerFilterParams: { values: {"False": "Import", "True": "Do Not Import"} } },
-            { title: "Field", field: "field", width: 100 },
-            { title: "GDOS Value", field: "gdos_value", width: 200 },
-            { title: "Zesty Value", field: "zesty_value", width: 200 },
+            { title: "Field", field: "field", width: 100, cssClass: "field-highlight" },
+            { title: "GDOS Value", field: "gdos_value", width: 200, formatter: gdosValueFormatter },
+            { title: "Zesty Value", field: "zesty_value", width: 200, formatter: zestyValueFormatter },
             {
                 title: "Correct Value",
                 field: "correct",
                 width: 150,
                 formatter: correctValueFormatter
-            }
+            },
+            {
+                title: "Final Value",
+                field: "final_value",
+                width: 300,
+                formatter: finalValueFormatter,
+                cssClass: "final-value-highlight"
+            },
+            { title: "GDOS ID", field: "gdos_id", width: 120 },
+            { title: "Name", field: "name", width: 200 },
+            { title: "Property Type", field: "property_type", width: 150, headerFilter: "input" },
+            { title: "Division", field: "division", width: 80, headerFilter: "input" },
+            { title: "Territory", field: "territory", width: 70, headerFilter: "input" },
+            { title: "Published", field: "published", width: 70, headerFilter: "list", headerFilterParams: { values: {"True": "Published", "False": "Not Published"} } },
+            { title: "Duplicate", field: "duplicate", width: 70, headerFilter: "list", headerFilterParams: { values: {"0": "Not Duplicate", "1": "Duplicate"} } },
+            { title: "Do Not Import", field: "doNotImport", width: 80, headerFilter: "list", headerFilterParams: { values: {"False": "Import", "True": "Do Not Import"} } }
         ],
+        rowFormatter: function(row){
+            const data = row.getData();
+            if (data && data.synthetic) {
+                row.getElement().classList.add('synthetic-row');
+            }
+        },
         pagination: "local",
         paginationSize: 20,
         paginationSizeSelector: [10, 20, 50, 100],
         tooltips: true,
         resizableColumns: true
     });
+
+    // Expose table globally for filters and other actions
+    window.differencesTable = table;
+
+    // Populate global filters after table created
+    populateGlobalFilters();
+
+    // Apply any saved global filters
+    applySavedGlobalFilters();
+    // Update metrics (immediately and shortly after render to ensure Tabulator has processed data)
+    try { updateMetrics(); } catch (e) { console.warn('updateMetrics immediate failed', e); }
+    // also attach listener for table data changes and schedule a delayed metrics update
+    try {
+        if (table && typeof table.on === 'function') {
+            table.on('dataChanged', updateMetrics);
+            // dataFiltered fires when Tabulator applies filters (header filters, setFilter, clearFilter, etc.)
+            table.on('dataFiltered', function(filters, rows){
+                try {
+                    // rows is an array of RowComponent objects; capture their data for metrics
+                    try {
+                        latestFilteredData = rows.map(r => r.getData());
+                    } catch (e) {
+                        latestFilteredData = null;
+                    }
+                    updateMetrics();
+                } catch(e) { console.warn('updateMetrics failed on dataFiltered', e); }
+            });
+        }
+    } catch (e) { console.warn('could not attach dataChanged listener', e); }
+    setTimeout(() => {
+        try { updateMetrics(); } catch (e) { console.warn('delayed updateMetrics failed', e); }
+    }, 100);
+}
+
+// Populate the territory select with values from differencesData
+function populateGlobalFilters() {
+    const territorySelect = document.getElementById('globalTerritoryFilter');
+    const correctSelect = document.getElementById('globalCorrectFilter');
+    const fieldSelect = document.getElementById('globalFieldFilter');
+    if (!territorySelect || !correctSelect) return;
+
+    // gather unique territories from differencesData
+    const territories = Array.from(new Set(differencesData.map(d => d.territory || 'Unknown'))).sort();
+
+    // clear existing (preserve 'all')
+    while (territorySelect.options.length > 1) territorySelect.remove(1);
+
+    territories.forEach(t => {
+        const opt = document.createElement('option');
+        opt.value = t;
+        opt.textContent = t;
+        territorySelect.appendChild(opt);
+    });
+
+    // attach change listeners (only once)
+    if (!territorySelect._listenerAdded) {
+        territorySelect.addEventListener('change', function() {
+            localStorage.setItem('globalTerritoryFilter', this.value);
+            applyGlobalFilters();
+            // update metrics when filters change
+            try { updateMetrics(); } catch(e) { console.warn('updateMetrics failed', e); }
+        });
+        territorySelect._listenerAdded = true;
+    }
+
+    if (!correctSelect._listenerAdded) {
+        correctSelect.addEventListener('change', function() {
+            localStorage.setItem('globalCorrectFilter', this.value);
+            applyGlobalFilters();
+            // update metrics when filters change
+            try { updateMetrics(); } catch(e) { console.warn('updateMetrics failed', e); }
+        });
+        correctSelect._listenerAdded = true;
+    }
+
+    // populate field select options from differencesData
+    if (fieldSelect) {
+        // gather unique fields
+        const fields = Array.from(new Set(differencesData.map(d => d.field || 'unknown'))).sort();
+        // clear existing (preserve 'all')
+        while (fieldSelect.options.length > 1) fieldSelect.remove(1);
+        fields.forEach(f => {
+            const opt = document.createElement('option');
+            opt.value = f;
+            opt.textContent = f;
+            fieldSelect.appendChild(opt);
+        });
+
+        if (!fieldSelect._listenerAdded) {
+            fieldSelect.addEventListener('change', function() {
+                localStorage.setItem('globalFieldFilter', this.value);
+                applyGlobalFilters();
+                // update metrics when field filter changes
+                try { updateMetrics(); } catch(e) { console.warn('updateMetrics failed', e); }
+            });
+            fieldSelect._listenerAdded = true;
+        }
+    }
+}
+
+function applyGlobalFilters() {
+    const table = window.differencesTable;
+    if (!table) return;
+    const territorySelect = document.getElementById('globalTerritoryFilter');
+    const correctSelect = document.getElementById('globalCorrectFilter');
+    const fieldSelect = document.getElementById('globalFieldFilter');
+
+    const filters = [];
+    if (territorySelect && territorySelect.value && territorySelect.value !== 'all') {
+        filters.push({ field: 'territory', type: '=', value: territorySelect.value });
+    }
+    if (correctSelect && correctSelect.value && correctSelect.value !== 'all') {
+        filters.push({ field: 'correct', type: '=', value: correctSelect.value });
+    }
+    if (fieldSelect && fieldSelect.value && fieldSelect.value !== 'all') {
+        filters.push({ field: 'field', type: '=', value: fieldSelect.value });
+    }
+
+    if (filters.length === 0) {
+        table.clearFilter();
+    } else if (filters.length === 1) {
+        table.setFilter(filters[0].field, filters[0].type, filters[0].value);
+    } else {
+        table.setFilter(filters);
+    }
+}
+
+function applySavedGlobalFilters() {
+    const territorySelect = document.getElementById('globalTerritoryFilter');
+    const correctSelect = document.getElementById('globalCorrectFilter');
+    const fieldSelect = document.getElementById('globalFieldFilter');
+    const savedTerr = localStorage.getItem('globalTerritoryFilter');
+    const savedCorrect = localStorage.getItem('globalCorrectFilter');
+    const savedField = localStorage.getItem('globalFieldFilter');
+    if (territorySelect && savedTerr) {
+        // only set if option exists (safety)
+        const opt = Array.from(territorySelect.options).find(o => o.value === savedTerr);
+        if (opt) territorySelect.value = savedTerr;
+    }
+    if (correctSelect && savedCorrect) {
+        const opt2 = Array.from(correctSelect.options).find(o => o.value === savedCorrect);
+        if (opt2) correctSelect.value = savedCorrect;
+    }
+    if (fieldSelect && savedField) {
+        const opt3 = Array.from(fieldSelect.options).find(o => o.value === savedField);
+        if (opt3) fieldSelect.value = savedField;
+    }
+    // apply after setting
+    applyGlobalFilters();
 }
 
 // Filter functions for quick access
@@ -265,6 +914,7 @@ function filterDuplicates() {
     const table = Tabulator.findTable("#differencesTable")[0];
     if (table) {
         table.setFilter("duplicate", "=", "1");
+        try { updateMetrics(); } catch(e) { console.warn('updateMetrics failed', e); }
     }
 }
 
@@ -272,6 +922,7 @@ function filterDoNotImport() {
     const table = Tabulator.findTable("#differencesTable")[0];
     if (table) {
         table.setFilter("doNotImport", "=", "True");
+        try { updateMetrics(); } catch(e) { console.warn('updateMetrics failed', e); }
     }
 }
 
@@ -279,5 +930,78 @@ function clearFilters() {
     const table = Tabulator.findTable("#differencesTable")[0];
     if (table) {
         table.clearFilter();
+        try { updateMetrics(); } catch(e) { console.warn('updateMetrics failed', e); }
     }
+}
+
+// Try to pull a usable state string from a Zesty flattened record
+function extractZestyStateValue(zestyRec) {
+    if (!zestyRec) return null;
+    const candidates = [
+        'Column1.content.state',
+        'Column1.content.addressState',
+        'Column1.content.state.data',
+        'state',
+        'addressState'
+    ];
+    for (const k of candidates) {
+        const v = zestyRec[k];
+        if (v == null) continue;
+        if (typeof v === 'string') {
+            // Sometimes Zesty embeds JSON-like strings or markers like "[Record]"; try to ignore those
+            if (v.trim() === '' || v.trim() === '[Record]') continue;
+            return v;
+        }
+        if (typeof v === 'object') {
+            // try common nested shapes
+            if (v.name) return v.name;
+            if (v.data && typeof v.data === 'object') {
+                if (v.data.name) return v.data.name;
+                // if data is array
+                if (Array.isArray(v.data) && v.data.length > 0 && v.data[0].name) return v.data[0].name;
+            }
+        }
+    }
+    return null;
+}
+
+// Parse GDOS filename of form GDOS-M-D-H-M-Territory.json and return a formatted date string
+function parseGdosFilenameDate(filename) {
+    if (!filename || typeof filename !== 'string') return null;
+    // Match patterns like GDOS-10-14-18-53-USW.json or GDOS-10-15-04-22-USC.json
+    const re = /GDOS-(\d{1,2})-(\d{1,2})-(\d{1,2})-(\d{1,2})-[A-Za-z]+\.json/;
+    const m = filename.match(re);
+    if (!m) return null;
+    const year = (new Date()).getFullYear();
+    const month = String(m[1]).padStart(2, '0');
+    const day = String(m[2]).padStart(2, '0');
+    const hour = String(m[3]).padStart(2, '0');
+    const minute = String(m[4]).padStart(2, '0');
+    return `${year}-${month}-${day} ${hour}:${minute}`;
+}
+
+// Extract the middle filename text after 'GDOS-' and before the extension, e.g. '10-14-18-53-USW'
+function filenameDateText(filename) {
+    if (!filename || typeof filename !== 'string') return null;
+    const m = filename.replace(/^GDOS-/, '').replace(/\.json$/i, '');
+    return m || null;
+}
+
+function formatParsedFilenameDate(filename) {
+    const parsed = parseGdosFilenameDate(filename);
+    return parsed ? `(${parsed})` : '';
+}
+
+function copyToClipboard(text) {
+    if (!navigator.clipboard) {
+        // fallback
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        document.body.appendChild(ta);
+        ta.select();
+        try { document.execCommand('copy'); } catch (e) { console.warn('copy failed', e); }
+        document.body.removeChild(ta);
+        return;
+    }
+    navigator.clipboard.writeText(text).catch(e => console.warn('clipboard write failed', e));
 }
