@@ -78,31 +78,6 @@ function updateSyncStatus() {
     el.className = 'small text-info';
 }
 
-
-
-// Run sync now helper triggered by debug button
-async function runSyncNow() {
-    try {
-        const btn = document.getElementById('runSyncNowBtn');
-        if (btn) {
-            btn.disabled = true;
-            btn.textContent = 'Reloading...';
-        }
-        console.log('Manual reload triggered');
-        await loadSavedChanges();
-        showTransientMessage('Reload finished', 3000);
-    } catch (e) {
-        console.warn('Manual reload failed', e);
-        showTransientMessage('Reload failed — check console', 5000);
-    } finally {
-        const btn = document.getElementById('runSyncNowBtn');
-        if (btn) {
-            btn.disabled = false;
-            btn.textContent = 'Reload from Cloudflare';
-        }
-    }
-}
-
 function showServerResponseModal(obj) {
     try {
         const pre = document.getElementById('serverResponseJson');
@@ -419,18 +394,30 @@ Promise.all([
             
             // Always show for published records if alwaysShow is true, or if there's a difference
             const hasDifference = normalizedGdos !== normalizedZesty && normalizedGdos != null && normalizedZesty != null;
-            if (fieldObj.alwaysShow && isPublished || hasDifference) {
+            
+            // For siteTitle and openHoursText, only show if there's no name field entry for this GDOS ID
+            const hasNameField = differencesData.some(row => row.gdos_id === gdos.id && row.field === 'name');
+            const shouldShowAlwaysShow = fieldObj.alwaysShow && isPublished && !hasNameField;
+            
+            if (shouldShowAlwaysShow || hasDifference) {
                 // Special handling for siteTitle alwaysShow rows
                 let correctValue = hasDifference ? 'GDOS' : 'Zesty';
                 let zestyVal = zestyValue || '';
                 let isSiteTitleRow = false;
                 
                 if (fieldObj.field === 'siteTitle' && fieldObj.alwaysShow) {
-                    // For siteTitle alwaysShow, default to "Zesty Name to Site Title" behavior
-                    correctValue = 'Zesty Name to Site Title';
-                    // Use the Zesty name as the default value
-                    zestyVal = loc['Column1.content.name'] || '';
+                    // For siteTitle alwaysShow, default to GDOS (user can manually change to "Zesty Name to Site Title")
+                    correctValue = 'GDOS';
+                    // Keep zesty value empty by default since we're defaulting to GDOS
+                    zestyVal = '';
                     isSiteTitleRow = true;
+                }
+                
+                if (fieldObj.field === 'openHoursText' && fieldObj.alwaysShow) {
+                    // For openHoursText alwaysShow, default to GDOS (user can manually change to "Zesty Custom Value to openHoursText")
+                    correctValue = 'GDOS';
+                    // Keep zesty value empty by default since we're defaulting to GDOS
+                    zestyVal = '';
                 }
                 
                 differencesData.push({
@@ -617,6 +604,19 @@ function finalValueFormatter(cell, formatterParams, onRendered) {
     const zestyValue = row.getData().zesty_value;
     
     return correctValue === 'GDOS' ? gdosValue : zestyValue;
+}
+
+function fieldFormatter(cell, formatterParams, onRendered) {
+    const row = cell.getRow();
+    const data = row.getData();
+    const field = cell.getValue();
+    
+    // Show "siteTitle" in the field column for name rows corrected to "Zesty Name to Site Title"
+    if (field === 'name' && data.correct === 'Zesty Name to Site Title') {
+        return 'siteTitle';
+    }
+    
+    return field;
 }
 
 function gdosValueFormatter(cell, formatterParams, onRendered) {
@@ -878,7 +878,7 @@ function populateCorrectValueDropdown(corrections) {
     // Clear existing options except 'All'
     // Keep a stable set of base options (so built-in choices remain available)
     select.innerHTML = '<option value="all">All</option>';
-    const baseOptions = ['GDOS', 'Zesty', 'Zesty Name to Site Title'];
+    const baseOptions = ['GDOS', 'Zesty', 'Zesty Name to Site Title', 'Zesty Custom Value to openHoursText'];
     baseOptions.forEach(optVal => {
         const o = document.createElement('option');
         o.value = optVal;
@@ -996,12 +996,13 @@ function applyChanges(changes) {
         // If this correction asks for Zesty Name -> Site Title, ensure we update both any existing siteTitle row
         // and the name row (transforming the name row if needed). This avoids missing the editable siteTitle input.
         if (savedRow.correct === 'Zesty Name to Site Title') {
-            // Update the name row to use the site title value
+            // Update the name row to use the site title value and mark as siteTitleRow for styling
             const nameRow = differencesData.find(row => candidates.includes(String(row.gdos_id)) && row.field === 'name');
             if (nameRow) {
                 nameRow.correct = savedRow.correct;
                 if (savedRow.value !== undefined) nameRow.zesty_value = savedRow.value;
                 nameRow.final_value = nameRow.zesty_value;
+                nameRow.siteTitleRow = true; // Apply blue tint styling
             }
 
             // Ensure we update an existing siteTitle row or create one from the name row
@@ -1034,8 +1035,19 @@ function applyChanges(changes) {
             }
         }
 
-        // Skip general case for 'Zesty Name to Site Title' since it's handled above
-        if (savedRow.correct === 'Zesty Name to Site Title') {
+        // If this correction asks for Zesty Custom Value -> openHoursText, ensure we update the openHoursText row
+        if (savedRow.correct === 'Zesty Custom Value to openHoursText') {
+            // Update the openHoursText row to use the custom zesty value
+            const openHoursRow = differencesData.find(row => candidates.includes(String(row.gdos_id)) && row.field === 'openHoursText');
+            if (openHoursRow) {
+                openHoursRow.correct = savedRow.correct;
+                if (savedRow.value !== undefined) openHoursRow.zesty_value = savedRow.value;
+                openHoursRow.final_value = openHoursRow.zesty_value;
+            }
+        }
+
+        // Skip general case for 'Zesty Name to Site Title' and 'Zesty Custom Value to openHoursText' since they're handled above
+        if (savedRow.correct === 'Zesty Name to Site Title' || savedRow.correct === 'Zesty Custom Value to openHoursText') {
             return;
         }
 
@@ -1300,7 +1312,7 @@ function renderDifferencesTable() {
         data: differencesData,
         layout: "fitColumns",
         columns: [
-            { title: "Field", field: "field", width: 100, cssClass: "field-highlight" },
+            { title: "Field", field: "field", width: 100, cssClass: "field-highlight", formatter: fieldFormatter },
             { title: "GDOS Value", field: "gdos_value", width: 200, formatter: gdosValueFormatter },
             { title: "Zesty Value", field: "zesty_value", width: 200, formatter: zestyValueFormatter },
             {
@@ -1693,17 +1705,3 @@ function formatTs(ts) {
 
 
 // Function to manually refresh the UI from current storage state
-async function refreshFromStorage() {
-    try {
-        const res = await fetch(SHARED_STORAGE_URL);
-        if (!res.ok) throw new Error('Failed to fetch storage');
-        const data = await res.json();
-        reconcileServerState(data);
-        console.log('Refreshed from storage');
-    } catch (e) {
-        console.warn('refreshFromStorage failed', e);
-        alert('Failed to refresh from storage: ' + e.message);
-    }
-}
-
-window.refreshFromStorage = refreshFromStorage;
