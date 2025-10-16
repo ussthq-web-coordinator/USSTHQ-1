@@ -489,8 +489,9 @@ function updateMetrics() {
         if (!Array.isArray(data)) data = table.getData();
     }
     const total = data.length;
-    const gdosCount = data.filter(r => r.correct === 'GDOS' || r.correct === 'Zesty Name to Site Title').length;
+    const gdosCount = data.filter(r => r.correct === 'GDOS').length;
     const zestyCount = data.filter(r => r.correct === 'Zesty').length;
+    const siteTitleCount = data.filter(r => r.correct === 'Zesty Name to Site Title').length;
 
     // per-field counts
     const fieldCounts = data.reduce((acc, r) => {
@@ -502,10 +503,12 @@ function updateMetrics() {
     const metricTotal = document.getElementById('metricTotal');
     const metricGdos = document.getElementById('metricGdos');
     const metricZesty = document.getElementById('metricZesty');
+    const metricSiteTitle = document.getElementById('metricSiteTitle');
     const metricFields = document.getElementById('metricFields');
     if (metricTotal) metricTotal.textContent = total;
     if (metricGdos) metricGdos.textContent = gdosCount;
     if (metricZesty) metricZesty.textContent = zestyCount;
+    if (metricSiteTitle) metricSiteTitle.textContent = siteTitleCount;
     if (metricFields) {
         metricFields.innerHTML = Object.keys(fieldCounts).sort().map(k => `${k}: ${fieldCounts[k]}`).join('  •  ');
     }
