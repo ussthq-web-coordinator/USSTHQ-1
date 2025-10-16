@@ -39,39 +39,124 @@ async function syncQueue() {
     if (!persistQueue || persistQueue.length === 0) {
         syncState.pending = 0; updateSyncStatus(); return responses;
     }
-    syncState.lastAttempt = Date.now();
+
+    const now = Date.now();
+    syncState.lastAttempt = now;
     syncState.pending = persistQueue.length; updateSyncStatus();
 
-    // try to send entries one by one so server-side merging is simpler
-    for (let i = 0; i < persistQueue.length; ) {
+    // batching parameters
+    const maxBatchItems = 10; // max queued items to merge into a single request
+    const maxBatchKeys = 200; // max number of keys in a merged payload
+
+    // backoff parameters
+    const baseDelayMs = 1000; // initial backoff
+    const maxDelayMs = 5 * 60 * 1000; // 5 minutes cap
+
+    // helper to extract delta from a queued item (support legacy plain-object entries)
+    function extractDelta(q) {
+        if (!q) return null;
+        if (q && typeof q === 'object' && q.hasOwnProperty('delta')) return q.delta;
+        return q;
+    }
+
+    // helper to mark a queued item with backoff info after a failed attempt
+    function markFailed(qitem) {
+        if (!qitem) return;
+        if (!qitem.hasOwnProperty('attempts')) qitem.attempts = 0;
+        qitem.attempts = (qitem.attempts || 0) + 1;
+        // exponential backoff with jitter (±25%)
+        const exp = Math.min(baseDelayMs * Math.pow(2, Math.min(qitem.attempts - 1, 20)), maxDelayMs);
+        const jitter = Math.round((Math.random() * 0.5 + 0.75) * exp) - Math.round(exp / 2); // biased jitter
+        const delay = Math.max(0, Math.min(maxDelayMs, exp + jitter));
+        qitem.backoffUntil = Date.now() + delay;
+    }
+
+    // Collect items that are due to be sent (skip those still in backoff)
+    const dueIndices = [];
+    for (let i = 0; i < persistQueue.length; i++) {
         const item = persistQueue[i];
+        // support both wrapper {delta, attempts, backoffUntil} and legacy plain delta
+        const backoffUntil = item && item.backoffUntil ? item.backoffUntil : null;
+        if (backoffUntil && backoffUntil > Date.now()) continue; // still backing off
+        dueIndices.push(i);
+    }
+
+    if (dueIndices.length === 0) {
+        // nothing due yet
+        return responses;
+    }
+
+    // Process batches: take up to maxBatchItems from the dueIndices and merge into one payload
+    let processed = 0;
+    while (processed < dueIndices.length) {
+        const batchIdxs = dueIndices.slice(processed, processed + maxBatchItems);
+        // Merge queued deltas into a single delta object. Later items override earlier keys.
+        const merged = {};
+        let mergedKeyCount = 0;
+        const batchItems = [];
+        for (const idx of batchIdxs) {
+            const q = persistQueue[idx];
+            const delta = extractDelta(q);
+            if (!delta || typeof delta !== 'object') continue;
+            batchItems.push({ idx, wrapper: q, delta });
+            Object.keys(delta).forEach(k => {
+                if (!merged.hasOwnProperty(k)) mergedKeyCount++;
+                merged[k] = delta[k];
+            });
+            if (mergedKeyCount >= maxBatchKeys) break;
+        }
+
+        if (batchItems.length === 0) break;
+
+        // Send merged payload
         try {
             const res = await fetch(SHARED_STORAGE_URL, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(item)
+                body: JSON.stringify(merged)
             });
             if (!res.ok) throw new Error(`Status ${res.status}`);
-            // attempt to parse response JSON to reconcile authoritative server state
             let body = null;
             try { body = await res.json(); } catch (e) { body = null; }
-            // record the server response for debug UI
-            responses.push({ request: item, response: body });
-            // remove the item from queue on success (we'll compact based on server response below)
-            persistQueue.splice(i, 1);
+            responses.push({ request: merged, response: body });
+
+            // On success, remove all batch items from persistQueue (by index). Since removing shifts indices,
+            // mark them and then filter the queue.
+            const toRemoveSet = new Set(batchItems.map(b => b.idx));
+            persistQueue = persistQueue.filter((_, i) => !toRemoveSet.has(i));
             savePersistQueue();
             syncState.lastSuccess = Date.now();
-            // If server returned a 'current' merged object, reconcile
-            try { reconcileServerState(body); } catch (e) { console.warn('reconcileServerState failed after syncQueue item', e); }
+            // Reconcile if server provided authoritative current object
+            try { reconcileServerState(body); } catch (e) { console.warn('reconcileServerState failed after batch send', e); }
             syncState.pending = persistQueue.length; updateSyncStatus();
-            // small delay between items to avoid rate limits
-            await new Promise(r => setTimeout(r, 200));
+            // short delay to avoid tight loop and rate limits
+            await new Promise(r => setTimeout(r, 150));
         } catch (e) {
-            console.warn('syncQueue item failed, will retry later', e);
-            // exponential backoff could be implemented; for now break and retry later
+            console.warn('Batch sync failed, marking batch items for backoff', e);
+            // mark failed for each batch item and leave them in the queue
+            for (const b of batchItems) {
+                const wrapper = b.wrapper;
+                // If legacy plain object, wrap it to persist attempts/backoff
+                if (!wrapper || !wrapper.hasOwnProperty('delta')) {
+                    // replace the plain object in persistQueue with a wrapper preserving original delta
+                    const original = persistQueue[b.idx];
+                    const newWrapper = { delta: original, attempts: 0 };
+                    persistQueue[b.idx] = newWrapper;
+                    markFailed(newWrapper);
+                } else {
+                    markFailed(wrapper);
+                }
+            }
+            savePersistQueue();
+            // After a failure, don't continue to process further batches in this run
             break;
         }
+
+        processed += batchItems.length;
     }
+
+    // Update pending count and status before returning
+    syncState.pending = persistQueue.length; updateSyncStatus();
     return responses;
 }
 
@@ -837,25 +922,33 @@ function populateCorrectValueDropdown(corrections) {
     if (!select) return;
 
     // Clear existing options except 'All'
+    // Keep a stable set of base options (so built-in choices remain available)
     select.innerHTML = '<option value="all">All</option>';
-
-    // Find unique correct values from corrections
-    const uniqueCorrects = new Set();
-    Object.values(corrections).forEach(correction => {
-        if (correction.correct) {
-            uniqueCorrects.add(correction.correct);
-        }
+    const baseOptions = ['GDOS', 'Zesty', 'Zesty Name to Site Title'];
+    baseOptions.forEach(optVal => {
+        const o = document.createElement('option');
+        o.value = optVal;
+        o.textContent = optVal;
+        select.appendChild(o);
     });
 
-    // Add unique options
-    Array.from(uniqueCorrects).sort().forEach(correct => {
-        const option = document.createElement('option');
-        option.value = correct;
-        option.textContent = correct;
-        select.appendChild(option);
-    });
-
-    console.log('Populated correct value dropdown with options:', Array.from(uniqueCorrects));
+    // Find unique correct values from corrections and add any that are not base options
+    try {
+        const uniqueCorrects = new Set();
+        Object.values(corrections || {}).forEach(correction => {
+            if (correction && correction.correct) uniqueCorrects.add(correction.correct);
+        });
+        Array.from(uniqueCorrects).sort().forEach(correct => {
+            if (baseOptions.includes(correct) || correct === 'all') return;
+            const option = document.createElement('option');
+            option.value = correct;
+            option.textContent = correct;
+            select.appendChild(option);
+        });
+        console.log('Populated correct value dropdown with options (merged):', Array.from(uniqueCorrects));
+    } catch (e) {
+        console.warn('populateCorrectValueDropdown failed to enumerate corrections', e);
+    }
 }
 
 // --- UI helpers: loading overlay and transient messages ---
@@ -1046,7 +1139,7 @@ function applyPendingCorrections() {
     });
     if (appliedCount > 0) {
         // update dropdown and metrics without full table reset
-        try { populateCorrectValueDropdown(Object.assign({}, pendingCorrections)); } catch (e) { console.warn('populateCorrectValueDropdown failed after applying pending corrections', e); }
+        try { populateCorrectValueDropdown(loadedCorrections); } catch (e) { console.warn('populateCorrectValueDropdown failed after applying pending corrections', e); }
         try { updateMetrics(); } catch (e) { console.warn('updateMetrics failed after applying pending corrections', e); }
     }
 }
@@ -1581,12 +1674,15 @@ function reconcileServerState(serverPayload) {
         // Compact the persistQueue: remove queued deltas whose keys are already reflected
         // in the server state (including deletions represented by null).
         if (Array.isArray(persistQueue) && persistQueue.length > 0) {
+            // Support queued items that are either plain delta objects or wrapper objects like { delta: {...}, attempts, backoffUntil }
             persistQueue = persistQueue.filter(queued => {
-                // queued is an object mapping keys -> value|null
                 try {
-                    const keys = Object.keys(queued);
+                    const delta = (queued && typeof queued === 'object' && queued.hasOwnProperty('delta')) ? queued.delta : queued;
+                    // If delta isn't an object, keep the queued item (can't reason about it)
+                    if (!delta || typeof delta !== 'object') return true;
+                    const keys = Object.keys(delta);
                     for (const k of keys) {
-                        const qv = queued[k];
+                        const qv = delta[k];
                         const sv = loadedCorrections[k];
                         if (qv === null) {
                             // queued deletion: if server still has a value, keep queued
@@ -1613,4 +1709,102 @@ function reconcileServerState(serverPayload) {
     } catch (e) {
         console.warn('reconcileServerState failed', e);
     }
+}
+
+// Queue modal helpers
+function formatTs(ts) {
+    if (!ts) return '—';
+    try {
+        const d = new Date(Number(ts));
+        return d.toLocaleString();
+    } catch (e) { return String(ts); }
+}
+
+function getQueueOverview() {
+    // Return an array of items with metadata for UI
+    return (persistQueue || []).map((item, idx) => {
+        const wrapper = (item && typeof item === 'object' && item.hasOwnProperty('delta')) ? item : { delta: item };
+        const keys = wrapper.delta ? Object.keys(wrapper.delta) : [];
+        return {
+            index: idx,
+            attempts: wrapper.attempts || 0,
+            backoffUntil: wrapper.backoffUntil || null,
+            keyCount: keys.length,
+            keys: keys.slice(0, 20), // show first 20 keys for brevity
+            raw: wrapper
+        };
+    });
+}
+
+function copyQueueToClipboard() {
+    try {
+        const overview = getQueueOverview();
+        copyToClipboard(JSON.stringify(overview, null, 2));
+        showTransientMessage('Queue copied to clipboard', 2000);
+    } catch (e) {
+        console.warn('copyQueueToClipboard failed', e);
+        showTransientMessage('Failed to copy queue', 3000);
+    }
+}
+
+function showQueueModal() {
+    // Ensure modal markup exists
+    let modalEl = document.getElementById('queueStatusModal');
+    if (!modalEl) {
+        modalEl = document.createElement('div');
+        modalEl.className = 'modal fade';
+        modalEl.id = 'queueStatusModal';
+        modalEl.tabIndex = -1;
+        modalEl.setAttribute('aria-hidden', 'true');
+        modalEl.innerHTML = `
+            <div class="modal-dialog modal-lg modal-dialog-scrollable">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Persist Queue Status</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <p class="small text-muted">Shows queued delta items, attempts, and next retry time.</p>
+                        <div id="queueStatusContent" style="font-family:monospace;white-space:pre-wrap;">Loading...</div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" id="copyQueueBtn">Copy Queue</button>
+                        <button type="button" class="btn btn-primary" id="forceSyncFromQueueBtn">Force Sync</button>
+                        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button>
+                    </div>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modalEl);
+
+        // Wire up buttons
+        modalEl.addEventListener('shown.bs.modal', () => {
+            try { document.getElementById('queueStatusContent').textContent = JSON.stringify(getQueueOverview(), null, 2); } catch (e) {}
+        });
+        // copy
+        modalEl.querySelector('#copyQueueBtn').addEventListener('click', copyQueueToClipboard);
+        // force sync
+        modalEl.querySelector('#forceSyncFromQueueBtn').addEventListener('click', async function() {
+            this.disabled = true;
+            this.textContent = 'Syncing...';
+            try {
+                const res = await syncQueue();
+                showTransientMessage('Forced sync finished', 2000);
+                // refresh the modal content
+                try { document.getElementById('queueStatusContent').textContent = JSON.stringify(getQueueOverview(), null, 2); } catch (e) {}
+                if (Array.isArray(res) && res.length > 0) showServerResponseModal(res);
+            } catch (e) {
+                console.warn('force sync failed', e);
+                showTransientMessage('Force sync failed', 4000);
+            } finally {
+                this.disabled = false;
+                this.textContent = 'Force Sync';
+            }
+        });
+    }
+
+    // Update content before showing
+    try { document.getElementById('queueStatusContent').textContent = JSON.stringify(getQueueOverview(), null, 2); } catch (e) { console.warn('Failed to set queue content before show', e); }
+    const modal = new bootstrap.Modal(modalEl, { keyboard: true });
+    modal.show();
 }
