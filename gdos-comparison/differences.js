@@ -1493,6 +1493,10 @@ function applyGlobalFilters() {
     if (hideSiteTitleOpenHoursCheckbox && hideSiteTitleOpenHoursCheckbox.checked) {
         console.log('Adding hide siteTitle/openHours filter');
         table.addFilter(function(data, filterParams) {
+            // Don't hide name rows that have been corrected to use site title values
+            if (data.field === 'name' && data.correct === 'Zesty Name to Site Title') {
+                return true;
+            }
             const result = data.field !== 'siteTitle' && data.field !== 'openHoursText';
             return result;
         });
