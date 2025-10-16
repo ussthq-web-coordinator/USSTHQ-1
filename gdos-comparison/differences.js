@@ -1350,7 +1350,9 @@ function applyPendingCorrections() {
             return;
         }
 
-        const allRows = table.getData();
+        // Use full differencesData instead of filtered table data to include all records including synthetic "do not import" rows
+        // But only include rows that represent corrections (where Zesty is chosen)
+        const allRows = differencesData.filter(r => r.correct !== 'GDOS');
 
         // Group by gdos_id and collect all corrections (including GDOS)
         const grouped = new Map();
