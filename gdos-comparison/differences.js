@@ -16,7 +16,6 @@ let syncState = { lastAttempt: null, lastSuccess: null, pending: 0 };
 // Helper: build canonical storage key for a row (territory-prefixed)
 function makeCorrectionKey(r) {
     // Always use the field name directly as the key
-    // "Zesty Name to Site Title" is handled specially in persistSingleCorrection with dual storage
     const fieldKey = r.field || '';
     return `${r.territory || ''}-${r.gdos_id}-${fieldKey}`;
 }
@@ -35,41 +34,9 @@ function buildCorrectionEntry(r) {
 // Persist a single change: add to localCorrections, then queue for sync
 function persistSingleCorrection(rowData) {
     const delta = {};
-    const territory = rowData.territory || '';
-    const gdosId = rowData.gdos_id;
-    
-    // Handle name field corrections (including "Zesty Name to Site Title")
-    if (rowData.field === 'name') {
-        const nameKey = `${territory}-${gdosId}-name`;
-        const siteTitleKey = `${territory}-${gdosId}-siteTitle`;
-        
-        if (rowData.correct === 'Zesty Name to Site Title') {
-            // Store: name as GDOS, siteTitle as Zesty value
-            delta[nameKey] = { correct: 'GDOS' };
-            const siteTitleEntry = { correct: 'Zesty' };
-            if (rowData.zesty_value !== undefined && rowData.zesty_value !== null && String(rowData.zesty_value).trim() !== '') {
-                siteTitleEntry.value = rowData.zesty_value;
-            }
-            delta[siteTitleKey] = siteTitleEntry;
-        } else if (rowData.correct === 'Zesty') {
-            // Store: name as Zesty, remove siteTitle entry
-            const entry = { correct: 'Zesty' };
-            if (rowData.zesty_value !== undefined && rowData.zesty_value !== null && String(rowData.zesty_value).trim() !== '') {
-                entry.value = rowData.zesty_value;
-            }
-            delta[nameKey] = entry;
-            delta[siteTitleKey] = null; // Delete siteTitle if it exists
-        } else if (rowData.correct === 'GDOS') {
-            // Store: name as GDOS, remove siteTitle entry
-            delta[nameKey] = { correct: 'GDOS' };
-            delta[siteTitleKey] = null; // Delete siteTitle if it exists
-        }
-    } else {
-        // Non-name fields: use standard approach
-        const key = makeCorrectionKey(rowData);
-        const entry = buildCorrectionEntry(rowData);
-        delta[key] = entry === null ? null : entry;
-    }
+    const key = makeCorrectionKey(rowData);
+    const entry = buildCorrectionEntry(rowData);
+    delta[key] = entry === null ? null : entry;
 
     // Update localCorrections
     Object.keys(delta).forEach(k => {
@@ -480,9 +447,8 @@ Promise.all([
             // Always show for published records if alwaysShow is true, or if there's a difference
             const hasDifference = normalizedGdos !== normalizedZesty && normalizedGdos != null && normalizedZesty != null;
             
-            // For siteTitle and openHoursText, only show if there's no name field entry for this GDOS ID
-            const hasNameField = differencesData.some(row => row.gdos_id === gdos.id && row.field === 'name');
-            const shouldShowAlwaysShow = fieldObj.alwaysShow && isPublished && !hasNameField;
+            // For alwaysShow fields (siteTitle, openHoursText), show for all published records by default
+            const shouldShowAlwaysShow = fieldObj.alwaysShow && isPublished;
             
             if (shouldShowAlwaysShow || hasDifference) {
                 // Special handling for siteTitle alwaysShow rows
@@ -491,15 +457,15 @@ Promise.all([
                 let isSiteTitleRow = false;
                 
                 if (fieldObj.field === 'siteTitle' && fieldObj.alwaysShow) {
-                    // For siteTitle alwaysShow, default to GDOS (user can manually change to "Zesty Name to Site Title")
+                    // For siteTitle alwaysShow, default to GDOS
                     correctValue = 'GDOS';
-                    // Keep zesty value empty by default since we're defaulting to GDOS
+                    // Keep zesty value empty - user can enter custom value if needed
                     zestyVal = '';
                     isSiteTitleRow = true;
                 }
                 
                 if (fieldObj.field === 'openHoursText' && fieldObj.alwaysShow) {
-                    // For openHoursText alwaysShow, default to GDOS (user can manually change to "Zesty Custom Value to openHoursText")
+                    // For openHoursText alwaysShow, default to GDOS
                     correctValue = 'GDOS';
                     // Keep zesty value empty by default since we're defaulting to GDOS
                     zestyVal = '';
@@ -762,48 +728,29 @@ function correctValueFormatter(cell, formatterParams, onRendered) {
         <option value="GDOS" ${value === 'GDOS' ? 'selected' : ''}>GDOS</option>
         <option value="Zesty" ${value === 'Zesty' ? 'selected' : ''}>Zesty</option>
     `;
-    if (rowData.field === 'name' || rowData.field === 'siteTitle') {
-        options += `<option value="Zesty Name to Site Title" ${value === 'Zesty Name to Site Title' ? 'selected' : ''}>Zesty Name to Site Title</option>`;
-    }
     select.innerHTML = options;
     select.value = value;
     
-    // Disable the select if there are pending changes waiting to sync
+    // Disable the select if there are pending changes waiting to sync (except for custom fields)
     const hasPending = Object.keys(localCorrections).length > 0;
-    if (hasPending) {
+    const isCustomField = rowData.field === 'siteTitle' || rowData.field === 'openHoursText';
+    if (hasPending && !isCustomField) {
         select.disabled = true;
         select.title = 'Waiting for pending changes to sync before allowing new edits';
     }
     
     select.addEventListener('change', function() {
-        // Check again if there are pending changes - don't allow change if so
-        if (Object.keys(localCorrections).length > 0) {
+        const row = cell.getRow();
+        const rowData = row.getData();
+        const isCustomField = rowData.field === 'siteTitle' || rowData.field === 'openHoursText';
+        // Check again if there are pending changes - don't allow change if so (except for custom fields)
+        if (Object.keys(localCorrections).length > 0 && !isCustomField) {
             select.disabled = true;
             return;
         }
         const newValue = this.value;
-        // Update the row data (this will cause formatters to re-run)
-        const row = cell.getRow();
-        const rowData = row.getData();
-        const oldCorrect = rowData.correct;  // Save the old correct value to detect transitions
         rowData.correct = newValue;
-        if (newValue === 'Zesty Name to Site Title') {
-            // Mark as name-to-siteTitle but keep field as 'name' so it's not hidden by the filter
-            rowData.field = 'name';
-            rowData.correct = newValue;
-            rowData.final_value = rowData.zesty_value;
-            rowData.nameToSiteTitleDisplay = true;  // Flag to show "siteTitle" in UI only
-        } else {
-            // When switching FROM "Zesty Name to Site Title" back to Zesty/GDOS
-            // we need to clear the siteTitle entry from storage (part of the dual-entry approach)
-            if (oldCorrect === 'Zesty Name to Site Title') {
-                const siteTitleKey = `${rowData.territory || ''}-${rowData.gdos_id}-siteTitle`;
-                delete localCorrections[siteTitleKey];
-            }
-            rowData.final_value = newValue === 'GDOS' ? rowData.gdos_value : rowData.zesty_value;
-            rowData.nameToSiteTitleDisplay = false;
-            rowData.field = 'name';
-        }
+        rowData.final_value = newValue === 'GDOS' ? rowData.gdos_value : rowData.zesty_value;
         row.update(rowData);
         // If this is a synthetic row and correct is changed to 'GDOS', remove it from the table
         if (rowData.synthetic && newValue === 'GDOS') {
@@ -821,7 +768,7 @@ function correctValueFormatter(cell, formatterParams, onRendered) {
             if (zestyCell) {
                 const el = zestyCell.getElement();
                 const span = el ? el.querySelector('.value-text') : null;
-                if (span) span.classList.toggle('selected-underline', newValue === 'Zesty' || newValue === 'Zesty Name to Site Title');
+                if (span) span.classList.toggle('selected-underline', newValue === 'Zesty');
             }
         } catch (e) {
             console.warn('toggle underline failed', e);
@@ -843,15 +790,7 @@ function finalValueFormatter(cell, formatterParams, onRendered) {
 }
 
 function fieldFormatter(cell, formatterParams, onRendered) {
-    const row = cell.getRow();
-    const data = row.getData();
     const field = cell.getValue();
-    
-    // Show "siteTitle" in the field column for name rows marked as nameToSiteTitleDisplay
-    if (field === 'name' && data.nameToSiteTitleDisplay) {
-        return 'siteTitle';
-    }
-    
     return field;
 }
 
@@ -885,7 +824,9 @@ function zestyValueFormatter(cell, formatterParams, onRendered) {
             input.disabled = true;
             input.title = 'Waiting for pending changes to sync before allowing new edits';
         }
-        input.addEventListener('input', function() {
+        // For custom openHoursText and siteTitle fields, persist on blur instead of input to avoid every keystroke
+        const eventType = (rowData.field === 'siteTitle' || rowData.field === 'openHoursText') ? 'blur' : 'input';
+        input.addEventListener(eventType, function() {
             // Don't allow edits if there are pending changes
             if (Object.keys(localCorrections).length > 0) {
                 input.disabled = true;
@@ -896,22 +837,6 @@ function zestyValueFormatter(cell, formatterParams, onRendered) {
             rowData.zesty_value = newValue;
             rowData.final_value = newValue; // Since editable rows use Zesty value
             
-            // Auto-switch correct value based on whether field is empty or has content
-            // This applies to siteTitle and openHoursText alwaysShow fields
-            if (rowData.field === 'siteTitle' || rowData.field === 'openHoursText') {
-                if (newValue && String(newValue).trim() !== '') {
-                    // User typed content - switch to Zesty
-                    if (rowData.correct !== 'Zesty' && rowData.correct !== 'Zesty Name to Site Title' && rowData.correct !== 'Zesty Custom Value to openHoursText') {
-                        rowData.correct = rowData.field === 'siteTitle' ? 'Zesty Name to Site Title' : 'Zesty Custom Value to openHoursText';
-                    }
-                } else {
-                    // Field is empty - switch back to GDOS
-                    if (rowData.correct !== 'GDOS') {
-                        rowData.correct = 'GDOS';
-                    }
-                }
-            }
-            
             // Persist this single change immediately so every keystroke is saved to local storage and queued for sync
             try { persistSingleCorrection(rowData); } catch (e) { console.warn('persistSingleCorrection failed in input handler', e); }
         });
@@ -920,7 +845,7 @@ function zestyValueFormatter(cell, formatterParams, onRendered) {
 
     // Default behavior for non-editable rows
     const span = document.createElement('span');
-    span.className = 'value-text' + (correctValue === 'Zesty' || correctValue === 'Zesty Name to Site Title' ? ' selected-underline' : '');
+    span.className = 'value-text' + (correctValue === 'Zesty' ? ' selected-underline' : '');
     span.textContent = value;
     return span;
 }
@@ -933,9 +858,8 @@ function saveChanges() {
         const corrections = {};
         // Use territory-prefixed keys so stored corrections can be mapped back to the correct row
         data.filter(r => r.correct !== 'GDOS').forEach(r => {
-            const fieldKey = (r.correct === 'Zesty Name to Site Title') ? 'siteTitle' : r.field;
-            const key = `${r.territory}-${r.gdos_id}-${fieldKey}`;
-            // Save the chosen correct value and include any Zesty value present so re-load can reconstruct siteTitle rows
+            const key = `${r.territory}-${r.gdos_id}-${r.field}`;
+            // Save the chosen correct value and include any Zesty value present
             const entry = { correct: r.correct };
             if (r.zesty_value !== undefined && r.zesty_value !== null && String(r.zesty_value).trim() !== '') {
                 entry.value = r.zesty_value;
@@ -1036,7 +960,6 @@ function updateMetrics() {
     const total = data.length;
     const gdosCount = data.filter(r => r.correct === 'GDOS').length;
     const zestyCount = data.filter(r => r.correct === 'Zesty').length;
-    const siteTitleCount = data.filter(r => r.correct === 'Zesty Name to Site Title').length;
 
     // per-field counts
     const fieldCounts = data.reduce((acc, r) => {
@@ -1048,12 +971,10 @@ function updateMetrics() {
     const metricTotal = document.getElementById('metricTotal');
     const metricGdos = document.getElementById('metricGdos');
     const metricZesty = document.getElementById('metricZesty');
-    const metricSiteTitle = document.getElementById('metricSiteTitle');
     const metricFields = document.getElementById('metricFields');
     if (metricTotal) metricTotal.textContent = total;
     if (metricGdos) metricGdos.textContent = gdosCount;
     if (metricZesty) metricZesty.textContent = zestyCount;
-    if (metricSiteTitle) metricSiteTitle.textContent = siteTitleCount;
     if (metricFields) {
         metricFields.innerHTML = Object.keys(fieldCounts).sort().map(k => `${k}: ${fieldCounts[k]}`).join('  •  ');
     }
@@ -1085,7 +1006,7 @@ async function loadSavedChanges() {
             // Old format: convert array to object
             corrections = {};
             payload.data.forEach(savedRow => {
-                const key = `${savedRow.gdos_id}-${savedRow.correct === 'Zesty Name to Site Title' ? 'siteTitle' : savedRow.field}`;
+                const key = `${savedRow.gdos_id}-${savedRow.field}`;
                 corrections[key] = {
                     correct: savedRow.correct,
                     value: savedRow.customZestyValue || savedRow.zesty_value
@@ -1218,7 +1139,7 @@ function populateCorrectValueDropdown(corrections) {
     // Clear existing options except 'All'
     // Keep a stable set of base options (so built-in choices remain available)
     select.innerHTML = '<option value="all">All</option>';
-    const baseOptions = ['GDOS', 'Zesty', 'Zesty Name to Site Title', 'Zesty Custom Value to openHoursText'];
+    const baseOptions = ['GDOS', 'Zesty', 'Zesty Custom Value to openHoursText'];
     baseOptions.forEach(optVal => {
         const o = document.createElement('option');
         o.value = optVal;
@@ -1336,79 +1257,11 @@ function applyChanges(changes) {
             if (currentRow) {
                 currentRow.correct = 'GDOS';
                 currentRow.final_value = currentRow.gdos_value;
-                if (field === 'name' || field === 'siteTitle') {
-                    currentRow.nameToSiteTitleDisplay = false;
-                }
             }
             return;
         }
 
-        // Special handling for name field:
-        // Check if this is part of a "Zesty Name to Site Title" dual-entry pattern
-        if (field === 'name') {
-            const gdosId = parsed.id;
-            const territory = parsed.territory;
-            const siteTitleKey = territory ? `${territory}-${gdosId}-siteTitle` : `${gdosId}-siteTitle`;
-            const siteTitleCorrection = localCorrections[siteTitleKey];
-            
-            if (savedRow.correct === 'GDOS' && siteTitleCorrection && siteTitleCorrection.correct === 'Zesty') {
-                // This is "Zesty Name to Site Title" - name is GDOS, siteTitle has Zesty value
-                const nameRow = differencesData.find(row => candidates.includes(String(row.gdos_id)) && row.field === 'name');
-                if (nameRow) {
-                    nameRow.correct = 'Zesty Name to Site Title';
-                    nameRow.zesty_value = siteTitleCorrection.value;
-                    nameRow.final_value = nameRow.zesty_value;
-                    nameRow.nameToSiteTitleDisplay = true;
-                }
-                return; // Don't process further
-            }
-            
-            // Regular name correction (Zesty or GDOS without siteTitle pairing)
-            const nameRow = differencesData.find(row => candidates.includes(String(row.gdos_id)) && row.field === 'name');
-            if (nameRow) {
-                nameRow.correct = savedRow.correct;
-                if (savedRow.value !== undefined) nameRow.zesty_value = savedRow.value;
-                nameRow.final_value = savedRow.correct === 'GDOS' ? nameRow.gdos_value : nameRow.zesty_value;
-                nameRow.nameToSiteTitleDisplay = false;
-            }
-            return; // Don't process name field through general case
-        }
-
-        // Detect dual-entry "Zesty Name to Site Title" pattern when processing siteTitle:
-        // If we have siteTitle with correct='Zesty', check if there's also a name entry with correct='GDOS'
-        if (field === 'siteTitle' && savedRow.correct === 'Zesty') {
-            const gdosId = parsed.id;
-            const territory = parsed.territory;
-            const nameKey = territory ? `${territory}-${gdosId}-name` : `${gdosId}-name`;
-            const nameCorrection = localCorrections[nameKey];
-            if (nameCorrection && nameCorrection.correct === 'GDOS') {
-                // This is the dual-entry pattern for "Zesty Name to Site Title"
-                // Update the name row to mark it as "Zesty Name to Site Title" for UI display
-                const nameRow = differencesData.find(row => candidates.includes(String(row.gdos_id)) && row.field === 'name');
-                if (nameRow) {
-                    nameRow.correct = 'Zesty Name to Site Title';
-                    if (savedRow.value !== undefined) nameRow.zesty_value = savedRow.value;
-                    nameRow.final_value = nameRow.zesty_value;
-                    nameRow.nameToSiteTitleDisplay = true;
-                }
-                return; // Don't apply the siteTitle row itself; it's just storage
-            }
-            // If siteTitle has Zesty but no GDOS name entry, skip it (shouldn't happen with proper logic)
-            return;
-        }
-
-        // If this correction asks for Zesty Custom Value -> openHoursText, ensure we update the openHoursText row
-        if (field === 'openHoursText' && savedRow.correct === 'Zesty Custom Value to openHoursText') {
-            const openHoursRow = differencesData.find(row => candidates.includes(String(row.gdos_id)) && row.field === 'openHoursText');
-            if (openHoursRow) {
-                openHoursRow.correct = savedRow.correct;
-                if (savedRow.value !== undefined) openHoursRow.zesty_value = savedRow.value;
-                openHoursRow.final_value = openHoursRow.zesty_value;
-            }
-            return;
-        }
-
-        // General case for all other corrections (address, phone, etc.)
+        // General case for all corrections (name, siteTitle, address, phone, etc.)
         let currentRow = differencesData.find(row => candidates.includes(String(row.gdos_id)) && row.field === field);
         if (currentRow) {
             console.log('Applying to row:', currentRow.gdos_id, currentRow.field, '-> correct:', savedRow.correct);
@@ -1541,17 +1394,10 @@ function applyPendingCorrections() {
             // Map the comparison field names to import sheet columns
             switch (field) {
                 case 'name':
-                    // Special handling for "Zesty Name to Site Title" corrections
-                    if (r.correct === 'Zesty Name to Site Title') {
-                        // Keep GDOS name in name column, put Zesty value in siteTitle column
-                        entry.name = r.gdos_value || entry.name;
-                        entry.siteTitle = r.zesty_value || entry.siteTitle;
-                        // This IS a meaningful correction, mark it as such
-                        entry.hasCorrections = true;
-                    } else {
-                        // Normal case: use final_value for name column
-                        entry.name = finalVal || entry.name;
-                    }
+                    entry.name = finalVal || entry.name;
+                    break;
+                case 'siteTitle':
+                    entry.siteTitle = finalVal || entry.siteTitle;
                     break;
                 case 'address':
                     entry.address1 = finalVal || entry.address1;
@@ -1861,18 +1707,48 @@ function populateGlobalFilters() {
         }
     }
 
-    // Add listener for hide siteTitle/openHours checkbox
-    if (hideSiteTitleOpenHoursCheckbox && !hideSiteTitleOpenHoursCheckbox._listenerAdded) {
-        console.log('Attaching event listener for hideSiteTitleOpenHours checkbox');
-        hideSiteTitleOpenHoursCheckbox.addEventListener('change', function() {
-            console.log('hideSiteTitleOpenHours checkbox changed to:', this.checked);
-            localStorage.setItem('hideSiteTitleOpenHours', this.checked);
+    // Add listeners for siteTitle and openHours filters
+    const showSiteTitleFilter = document.getElementById('showSiteTitleFilter');
+    if (showSiteTitleFilter && !showSiteTitleFilter._listenerAdded) {
+        showSiteTitleFilter.addEventListener('change', function() {
+            localStorage.setItem('showSiteTitleFilter', this.value);
             applyGlobalFilters();
-            // update metrics when filter changes
             try { updateMetrics(); } catch(e) { console.warn('updateMetrics failed', e); }
         });
-        hideSiteTitleOpenHoursCheckbox._listenerAdded = true;
+        showSiteTitleFilter._listenerAdded = true;
     }
+
+    const showOpenHoursFilter = document.getElementById('showOpenHoursFilter');
+    if (showOpenHoursFilter && !showOpenHoursFilter._listenerAdded) {
+        showOpenHoursFilter.addEventListener('change', function() {
+            localStorage.setItem('showOpenHoursFilter', this.value);
+            applyGlobalFilters();
+            try { updateMetrics(); } catch(e) { console.warn('updateMetrics failed', e); }
+        });
+        showOpenHoursFilter._listenerAdded = true;
+    }
+
+    const showDuplicatesFilter = document.getElementById('showDuplicatesFilter');
+    if (showDuplicatesFilter && !showDuplicatesFilter._listenerAdded) {
+        showDuplicatesFilter.addEventListener('change', function() {
+            localStorage.setItem('showDuplicatesFilter', this.value);
+            applyGlobalFilters();
+            try { updateMetrics(); } catch(e) { console.warn('updateMetrics failed', e); }
+        });
+        showDuplicatesFilter._listenerAdded = true;
+    }
+
+    const showDoNotImportFilter = document.getElementById('showDoNotImportFilter');
+    if (showDoNotImportFilter && !showDoNotImportFilter._listenerAdded) {
+        showDoNotImportFilter.addEventListener('change', function() {
+            localStorage.setItem('showDoNotImportFilter', this.value);
+            applyGlobalFilters();
+            try { updateMetrics(); } catch(e) { console.warn('updateMetrics failed', e); }
+        });
+        showDoNotImportFilter._listenerAdded = true;
+    }
+
+    // Note: hideSiteTitleOpenHours checkbox has been replaced with separate dropdown filters
 }
 
 function applyGlobalFilters() {
@@ -1884,7 +1760,10 @@ function applyGlobalFilters() {
     const territorySelect = document.getElementById('globalTerritoryFilter');
     const correctSelect = document.getElementById('globalCorrectFilter');
     const fieldSelect = document.getElementById('globalFieldFilter');
-    const hideSiteTitleOpenHoursCheckbox = document.getElementById('hideSiteTitleOpenHours');
+    const showSiteTitleFilter = document.getElementById('showSiteTitleFilter');
+    const showOpenHoursFilter = document.getElementById('showOpenHoursFilter');
+    const showDuplicatesFilter = document.getElementById('showDuplicatesFilter');
+    const showDoNotImportFilter = document.getElementById('showDoNotImportFilter');
 
     // Clear all filters first
     table.clearFilter();
@@ -1894,48 +1773,90 @@ function applyGlobalFilters() {
         table.addFilter("territory", "=", territorySelect.value);
     }
     if (correctSelect && correctSelect.value && correctSelect.value !== 'all') {
-        if (correctSelect.value === 'GDOS') {
-            table.addFilter("correct", "=", 'GDOS');
-        } else if (correctSelect.value === 'Zesty') {
-            table.addFilter("correct", "=", 'Zesty');
-        } else if (correctSelect.value === 'Zesty Name to Site Title') {
-            table.addFilter("correct", "=", 'Zesty Name to Site Title');
-        } else {
-            table.addFilter("correct", "=", correctSelect.value);
-        }
+        table.addFilter("correct", "=", correctSelect.value);
     }
     if (fieldSelect && fieldSelect.value && fieldSelect.value !== 'all') {
         table.addFilter("field", "=", fieldSelect.value);
     }
-    if (hideSiteTitleOpenHoursCheckbox && hideSiteTitleOpenHoursCheckbox.checked) {
-        console.log('Adding hide siteTitle/openHours filter');
-        table.addFilter(function(data, filterParams) {
-            // Don't hide name rows that have been corrected to use site title values
-            if (data.field === 'name') {
-                // Check if there is a 'Zesty Name to Site Title' correction for this gdos_id
-                const key = `${data.territory || ''}-${data.gdos_id}-nameToSiteTitle`;
-                const hasSiteTitleCorrection = loadedCorrections[key] !== undefined || localCorrections[key] !== undefined;
-                if (hasSiteTitleCorrection) {
-                    return true;
-                }
-            }
-            const result = data.field !== 'siteTitle' && data.field !== 'openHoursText';
-            return result;
-        });
+    
+    // Handle siteTitle filter
+    if (showSiteTitleFilter && showSiteTitleFilter.value !== 'all') {
+        if (showSiteTitleFilter.value === 'show') {
+            // Show only siteTitle rows
+            table.addFilter("field", "=", "siteTitle");
+        } else if (showSiteTitleFilter.value === 'hide') {
+            // Hide siteTitle rows
+            table.addFilter(function(data, filterParams) {
+                return data.field !== 'siteTitle';
+            });
+        }
     }
+    
+    // Handle openHours filter
+    if (showOpenHoursFilter && showOpenHoursFilter.value !== 'all') {
+        if (showOpenHoursFilter.value === 'show') {
+            // Show only openHoursText rows
+            table.addFilter("field", "=", "openHoursText");
+        } else if (showOpenHoursFilter.value === 'hide') {
+            // Hide openHoursText rows
+            table.addFilter(function(data, filterParams) {
+                return data.field !== 'openHoursText';
+            });
+        }
+    }
+
+    // Handle duplicates filter
+    if (showDuplicatesFilter && showDuplicatesFilter.value !== 'all') {
+        if (showDuplicatesFilter.value === 'show') {
+            // Show only duplicate records (duplicate = "1" or duplicate = "true")
+            table.addFilter(function(data, filterParams) {
+                const val = String(data.duplicate || '').toLowerCase();
+                return val === '1' || val === 'true';
+            });
+        } else if (showDuplicatesFilter.value === 'hide') {
+            // Hide duplicate records
+            table.addFilter(function(data, filterParams) {
+                const val = String(data.duplicate || '').toLowerCase();
+                return !(val === '1' || val === 'true');
+            });
+        }
+    }
+
+    // Handle do not import filter
+    if (showDoNotImportFilter && showDoNotImportFilter.value !== 'all') {
+        if (showDoNotImportFilter.value === 'show') {
+            // Show only do-not-import records (doNotImport = "1" or doNotImport = "true")
+            table.addFilter(function(data, filterParams) {
+                const val = String(data.doNotImport || '').toLowerCase();
+                return val === '1' || val === 'true';
+            });
+        } else if (showDoNotImportFilter.value === 'hide') {
+            // Hide do-not-import records
+            table.addFilter(function(data, filterParams) {
+                const val = String(data.doNotImport || '').toLowerCase();
+                return !(val === '1' || val === 'true');
+            });
+        }
+    }
+    // Note: siteTitle and openHoursText are always shown as separate fields - no longer hidden by checkbox
 }
 
 function applySavedGlobalFilters() {
     const territorySelect = document.getElementById('globalTerritoryFilter');
     const correctSelect = document.getElementById('globalCorrectFilter');
     const fieldSelect = document.getElementById('globalFieldFilter');
-    const hideSiteTitleOpenHoursCheckbox = document.getElementById('hideSiteTitleOpenHours');
+    const showSiteTitleFilter = document.getElementById('showSiteTitleFilter');
+    const showOpenHoursFilter = document.getElementById('showOpenHoursFilter');
+    const showDuplicatesFilter = document.getElementById('showDuplicatesFilter');
+    const showDoNotImportFilter = document.getElementById('showDoNotImportFilter');
     const savedTerr = localStorage.getItem('globalTerritoryFilter');
     const savedCorrect = localStorage.getItem('globalCorrectFilter');
     const savedField = localStorage.getItem('globalFieldFilter');
-    const savedHideSiteTitle = localStorage.getItem('hideSiteTitleOpenHours');
-    // Default to true (hide by default) if not set
-    const hideByDefault = savedHideSiteTitle === null ? true : savedHideSiteTitle === 'true';
+    const savedSiteTitle = localStorage.getItem('showSiteTitleFilter') || 'all';
+    const savedOpenHours = localStorage.getItem('showOpenHoursFilter') || 'all';
+    const savedDuplicates = localStorage.getItem('showDuplicatesFilter') || 'all';
+    const savedDoNotImport = localStorage.getItem('showDoNotImportFilter') || 'all';
+    // siteTitle and openHoursText are always shown now - no longer use hideSiteTitleOpenHours
     if (territorySelect && savedTerr) {
         // only set if option exists (safety)
         const opt = Array.from(territorySelect.options).find(o => o.value === savedTerr);
@@ -1949,28 +1870,20 @@ function applySavedGlobalFilters() {
         const opt3 = Array.from(fieldSelect.options).find(o => o.value === savedField);
         if (opt3) fieldSelect.value = savedField;
     }
-    if (hideSiteTitleOpenHoursCheckbox) {
-        hideSiteTitleOpenHoursCheckbox.checked = hideByDefault;
+    if (showSiteTitleFilter) {
+        showSiteTitleFilter.value = savedSiteTitle;
+    }
+    if (showOpenHoursFilter) {
+        showOpenHoursFilter.value = savedOpenHours;
+    }
+    if (showDuplicatesFilter) {
+        showDuplicatesFilter.value = savedDuplicates;
+    }
+    if (showDoNotImportFilter) {
+        showDoNotImportFilter.value = savedDoNotImport;
     }
     // apply after setting
     setTimeout(() => applyGlobalFilters(), 0);
-}
-
-// Filter functions for quick access
-function filterDuplicates() {
-    const table = Tabulator.findTable("#differencesTable")[0];
-    if (table) {
-        table.setFilter("duplicate", "=", "1");
-        try { updateMetrics(); } catch(e) { console.warn('updateMetrics failed', e); }
-    }
-}
-
-function filterDoNotImport() {
-    const table = Tabulator.findTable("#differencesTable")[0];
-    if (table) {
-        table.setFilter("doNotImport", "=", "True");
-        try { updateMetrics(); } catch(e) { console.warn('updateMetrics failed', e); }
-    }
 }
 
 function toggleSiteTitleOpenHoursVisibility() {

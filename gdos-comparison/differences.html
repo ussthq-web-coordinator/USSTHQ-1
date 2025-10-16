@@ -149,31 +149,52 @@
                         </select>
                     </div>
 
-                    <div class="col-12 col-sm-auto d-flex align-items-center">
-                        <div class="form-check">
-                            <input class="form-check-input" type="checkbox" id="hideSiteTitleOpenHours" checked>
-                            <label for="hideSiteTitleOpenHours" class="form-check-label small text-muted ms-2 mb-0">Hide Site Title & Open Hours</label>
-                        </div>
+                    <div class="col-12 col-sm-auto">
+                        <label for="showSiteTitleFilter" class="form-label small text-muted mb-1">Site Title</label>
+                        <select id="showSiteTitleFilter" class="form-select form-select-sm">
+                            <option value="all">Show All</option>
+                            <option value="show">Show Only</option>
+                            <option value="hide">Hide</option>
+                        </select>
                     </div>
 
-                    <div class="col-12 col-sm-auto mt-3">
-                        <div class="d-flex flex-wrap gap-2">
-                            <button type="button" class="btn btn-success btn-sm" onclick="downloadCorrectionsCsv()">
-                                Download Corrections CSV
-                            </button>
+                    <div class="col-12 col-sm-auto">
+                        <label for="showOpenHoursFilter" class="form-label small text-muted mb-1">Open Hours</label>
+                        <select id="showOpenHoursFilter" class="form-select form-select-sm">
+                            <option value="all">Show All</option>
+                            <option value="show">Show Only</option>
+                            <option value="hide">Hide</option>
+                        </select>
+                    </div>
 
-                            <!-- Filter buttons: Show Duplicates, Show Do Not Import -->
-                            <button type="button" class="btn btn-outline-primary btn-sm" onclick="filterDuplicates()">
-                                Show Duplicates
-                            </button>
-                            <button type="button" class="btn btn-outline-primary btn-sm" onclick="filterDoNotImport()">
-                                Show Do Not Import
-                            </button>
+                    <div class="col-12 col-sm-auto">
+                        <label for="showDuplicatesFilter" class="form-label small text-muted mb-1">Duplicates</label>
+                        <select id="showDuplicatesFilter" class="form-select form-select-sm">
+                            <option value="all">Show All</option>
+                            <option value="show">Show Only</option>
+                            <option value="hide">Hide</option>
+                        </select>
+                    </div>
 
-                            <button type="button" class="btn btn-outline-secondary btn-sm" onclick="clearFilters()">
-                                Clear Filters
-                            </button>
-                        </div>
+                    <div class="col-12 col-sm-auto">
+                        <label for="showDoNotImportFilter" class="form-label small text-muted mb-1">Do Not Import</label>
+                        <select id="showDoNotImportFilter" class="form-select form-select-sm">
+                            <option value="all">Show All</option>
+                            <option value="show">Show Only</option>
+                            <option value="hide">Hide</option>
+                        </select>
+                    </div>
+
+                    <div class="col-12 col-sm-auto">
+                        <button type="button" class="btn btn-success btn-sm" onclick="downloadCorrectionsCsv()">
+                            Download Corrections CSV
+                        </button>
+                    </div>
+
+                    <div class="col-12 col-sm-auto">
+                        <button type="button" class="btn btn-outline-secondary btn-sm" onclick="clearFilters()">
+                            Clear Filters
+                        </button>
                     </div>
                 </div>
             </div>
@@ -205,7 +226,7 @@
                     <div id="metricSiteTitle" class="h5 mb-0">0</div>
                 </div>
             </div>
-            <div class="col">
+            <div class="col-auto">
                 <div class="card p-2">
                     <div id="metricFields" class="small text-muted">Loading...</div>
                 </div>
