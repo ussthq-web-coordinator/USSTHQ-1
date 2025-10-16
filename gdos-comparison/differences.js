@@ -2,6 +2,8 @@ let differencesData = [];
 let gdosMap = new Map();
 let duplicateMap = new Map();
 let duplicateCheckRecords = [];
+// Corrections that couldn't be applied because rows weren't present yet
+let pendingCorrections = {};
 // latestFilteredData holds the current set of rows matching active filters (all pages)
 let latestFilteredData = null;
 
@@ -233,8 +235,8 @@ Promise.all([
                 if (fieldObj.field === 'siteTitle' && fieldObj.alwaysShow) {
                     // For siteTitle alwaysShow, default to "Zesty Name to Site Title" behavior
                     correctValue = 'Zesty Name to Site Title';
-                    // Leave Zesty Value empty for editor to enter if needed
-                    zestyVal = '';
+                    // Use the Zesty name as the default value
+                    zestyVal = loc['Column1.content.name'] || '';
                     isSiteTitleRow = true;
                 }
                 
@@ -341,10 +343,14 @@ Promise.all([
         console.log('Sample difference:', differencesData[0]);
     }
 
-    // Load any previously saved changes
-    loadSavedChanges();
-    
-    renderDifferencesTable();
+    // Load any previously saved changes and only render after corrections are applied.
+    // This prevents the table from rendering once and then switching when saved corrections arrive.
+    loadSavedChanges().then(() => {
+        try { renderDifferencesTable(); } catch (e) { console.error('renderDifferencesTable failed', e); }
+    }).catch(err => {
+        console.warn('loadSavedChanges failed, still rendering table', err);
+        try { renderDifferencesTable(); } catch (e) { console.error('renderDifferencesTable failed', e); }
+    });
 })
 .catch(error => {
     console.error('Error loading data:', error);
@@ -481,13 +487,17 @@ function saveChanges() {
     if (table) {
         const data = table.getData();
         // Save to shared storage only
-        const corrections = data.filter(r => r.correct !== 'GDOS').map(r => ({
-            gdos_id: r.gdos_id,
-            field: r.correct === 'Zesty Name to Site Title' ? 'siteTitle' : r.field,
-            correct: r.correct,
-            // For editable rows, also save the custom zesty_value
-            ...(r.editable && { customZestyValue: r.zesty_value })
-        }));
+        const corrections = {};
+        // Use territory-prefixed keys so stored corrections can be mapped back to the correct row
+        data.filter(r => r.correct !== 'GDOS').forEach(r => {
+            const fieldKey = (r.correct === 'Zesty Name to Site Title') ? 'siteTitle' : r.field;
+            const key = `${r.territory}-${r.gdos_id}-${fieldKey}`;
+            corrections[key] = {
+                correct: r.correct,
+                // For editable rows, also save the custom zesty_value
+                ...(r.editable && { value: r.zesty_value })
+            };
+        });
         console.log('Saving corrections to shared storage:', corrections);
         const updatedData = corrections; // Send corrections object directly
         const payload = JSON.stringify(updatedData);
@@ -509,9 +519,16 @@ function saveChanges() {
             }
             return response.text(); // PUT returns "OK" as text
         })
-        .then(() => console.log('Changes saved to shared storage'))
-        .catch(error => console.warn('Shared storage save failed:', error));        // update metrics live
-        updateMetrics();
+        .then(() => {
+            console.log('Changes saved to shared storage');
+            // Update the correct-value dropdown to reflect newly-saved corrections
+            try { populateCorrectValueDropdown(corrections); } catch(e) { console.warn('populateCorrectValueDropdown failed after save', e); }
+        })
+        .catch(error => console.warn('Shared storage save failed:', error))
+        .finally(() => {
+            // update metrics live regardless of save result
+            try { updateMetrics(); } catch(e) { console.warn('updateMetrics failed', e); }
+        });
     }
 }
 
@@ -568,77 +585,287 @@ function updateMetrics() {
     }
 }
 
-function loadSavedChanges() {
-    // Load from shared storage only
-    fetch(SHARED_STORAGE_URL)
-        .then(response => {
-            if (!response.ok) throw new Error('Shared storage not available');
-            return response.json();
-        })
-        .then(data => {
-            const corrections = data; // data is the corrections object directly
-            if (typeof corrections === 'object' && corrections !== null) {
-                applyChanges(corrections);
-                console.log('Shared corrections loaded');
-                // Update the table with the modified data
-                const table = window.differencesTable || Tabulator.findTable("#differencesTable")[0];
-                if (table) {
-                    table.setData(differencesData);
-                }
-                return;
+async function loadSavedChanges() {
+    showLoadingOverlay();
+    const preSnapshot = snapshotDifferences();
+    try {
+        const response = await fetch(SHARED_STORAGE_URL);
+        if (!response.ok) throw new Error('Shared storage not available');
+        const data = await response.json();
+
+        let corrections;
+        if (data && typeof data === 'object' && data.data && Array.isArray(data.data)) {
+            // Old format: convert array to object
+            corrections = {};
+            data.data.forEach(savedRow => {
+                const key = `${savedRow.gdos_id}-${savedRow.correct === 'Zesty Name to Site Title' ? 'siteTitle' : savedRow.field}`;
+                corrections[key] = {
+                    correct: savedRow.correct,
+                    value: savedRow.customZestyValue || savedRow.zesty_value
+                };
+            });
+        } else {
+            // New format: data is the corrections object directly
+            corrections = data;
+        }
+
+        if (typeof corrections === 'object' && corrections !== null) {
+            applyChanges(corrections);
+            console.log('Shared corrections loaded');
+            const table = window.differencesTable || (typeof Tabulator !== 'undefined' && typeof Tabulator.findTable === 'function' ? Tabulator.findTable("#differencesTable")[0] : null);
+            if (table && typeof table.setData === 'function') {
+                await table.setData(differencesData);
+            } else if (table && typeof table.replaceData === 'function') {
+                // some Tabulator versions expose replaceData instead
+                await table.replaceData(differencesData);
+            } else {
+                // Table isn't initialized yet or doesn't provide a setData/replaceData API
+                console.debug('Table not present or lacks setData/replaceData; table will be created later with current differencesData.');
             }
-            throw new Error('Invalid shared data');
-        })
-        .catch(error => {
-            console.warn('Failed to load shared corrections:', error);
-            // No fallback to localStorage
+            populateCorrectValueDropdown(corrections);
+
+            const postSnapshot = snapshotDifferences();
+            const changed = [];
+            postSnapshot.forEach((after, key) => {
+                const before = preSnapshot.get(key);
+                if (!before) return;
+                if (String(before.gdos_value) !== String(after.gdos_value) || String(before.zesty_value) !== String(after.zesty_value) || String(before.published) !== String(after.published)) {
+                    changed.push({ key, before, after });
+                }
+            });
+            if (changed.length > 0) {
+                console.warn('Underlying data changed since last snapshot:', changed.slice(0,10));
+                showTransientMessage(`Detected ${changed.length} rows that changed while loading saved corrections. See console for details.`, 7000);
+            }
+            return;
+        }
+        throw new Error('Invalid shared data');
+    } catch (error) {
+        console.warn('Failed to load shared corrections:', error);
+        populateCorrectValueDropdown({});
+    } finally {
+        try { applyPendingCorrections(); } catch (e) { console.warn('applyPendingCorrections failed in finally', e); }
+        hideLoadingOverlay();
+    }
+}
+
+function populateCorrectValueDropdown(corrections) {
+    const select = document.getElementById('globalCorrectFilter');
+    if (!select) return;
+
+    // Clear existing options except 'All'
+    select.innerHTML = '<option value="all">All</option>';
+
+    // Find unique correct values from corrections
+    const uniqueCorrects = new Set();
+    Object.values(corrections).forEach(correction => {
+        if (correction.correct) {
+            uniqueCorrects.add(correction.correct);
+        }
+    });
+
+    // Add unique options
+    Array.from(uniqueCorrects).sort().forEach(correct => {
+        const option = document.createElement('option');
+        option.value = correct;
+        option.textContent = correct;
+        select.appendChild(option);
+    });
+
+    console.log('Populated correct value dropdown with options:', Array.from(uniqueCorrects));
+}
+
+// --- UI helpers: loading overlay and transient messages ---
+function ensureLoadingOverlay() {
+    let overlay = document.getElementById('differencesLoadingOverlay');
+    if (!overlay) {
+        overlay = document.createElement('div');
+        overlay.id = 'differencesLoadingOverlay';
+        overlay.style.position = 'fixed';
+        overlay.style.top = '0';
+        overlay.style.left = '0';
+        overlay.style.width = '100%';
+        overlay.style.height = '100%';
+        overlay.style.background = 'rgba(0,0,0,0.4)';
+        overlay.style.display = 'none';
+        overlay.style.alignItems = 'center';
+        overlay.style.justifyContent = 'center';
+        overlay.style.zIndex = '9999';
+        overlay.innerHTML = '<div style="background:#fff;padding:20px 30px;border-radius:6px;box-shadow:0 2px 8px rgba(0,0,0,.3);font-weight:600">Loading saved changes...</div>';
+        document.body.appendChild(overlay);
+    }
+    return overlay;
+}
+
+function showLoadingOverlay() {
+    const overlay = ensureLoadingOverlay();
+    overlay.style.display = 'flex';
+}
+
+function hideLoadingOverlay() {
+    const overlay = document.getElementById('differencesLoadingOverlay');
+    if (overlay) overlay.style.display = 'none';
+}
+
+function showTransientMessage(text, ms = 5000) {
+    let msg = document.getElementById('differencesTransientMsg');
+    if (!msg) {
+        msg = document.createElement('div');
+        msg.id = 'differencesTransientMsg';
+        msg.style.position = 'fixed';
+        msg.style.right = '20px';
+        msg.style.bottom = '20px';
+        msg.style.background = '#323232';
+        msg.style.color = '#fff';
+        msg.style.padding = '10px 14px';
+        msg.style.borderRadius = '6px';
+        msg.style.zIndex = '10000';
+        msg.style.boxShadow = '0 2px 8px rgba(0,0,0,0.3)';
+        msg.style.transition = 'opacity 300ms';
+        msg.style.opacity = '0';
+        document.body.appendChild(msg);
+    }
+    msg.textContent = text;
+    msg.style.opacity = '1';
+    setTimeout(() => {
+        try { msg.style.opacity = '0'; } catch (e) {}
+    }, ms);
+}
+
+function snapshotDifferences() {
+    const map = new Map();
+    differencesData.forEach(r => {
+        if (!r) return;
+        const key = `${r.gdos_id}::${r.field}`;
+        map.set(key, {
+            gdos_value: r.gdos_value,
+            zesty_value: r.zesty_value,
+            correct: r.correct,
+            published: r.published
         });
+    });
+    return map;
 }
 
 function applyChanges(changes) {
     console.log('Applying changes from shared storage:', changes);
     Object.entries(changes).forEach(([key, savedRow]) => {
-        // key is like "USW-123-name", savedRow is { correct: 'Zesty', value: 'new value', ... }
-        const [territory, id, field] = key.split('-', 3);
-        const gdos_id = `${territory}-${id}`;
-        let currentRow = differencesData.find(row => 
-            row.gdos_id === gdos_id && row.field === field
-        );
-        if (!currentRow && field === 'siteTitle' && savedRow.correct === 'Zesty Name to Site Title') {
-            // Special case: transform the name row into a siteTitle row for "Zesty Name to Site Title"
-            // Find the corresponding name row to transform
-            const nameRow = differencesData.find(row => 
-                row.gdos_id === gdos_id && row.field === 'name'
-            );
-            if (nameRow) {
-                // Transform the name row into a siteTitle row
-                const originalGdosName = nameRow.gdos_value; // Save the original GDOS name
-                nameRow.field = 'siteTitle';
-                nameRow.gdos_value = originalGdosName; // Show the GDOS name value
-                nameRow.correct = savedRow.correct;
-                nameRow.final_value = nameRow.zesty_value; // Use the Zesty name value
-                nameRow.siteTitleRow = true; // Mark as siteTitle row for styling
-                currentRow = nameRow;
+        const parsed = parseCorrectionKey(key, savedRow);
+        const { field, candidates } = parsed;
+
+        // If this correction asks for Zesty Name -> Site Title, ensure we update both any existing siteTitle row
+        // and the name row (transforming the name row if needed). This avoids missing the editable siteTitle input.
+        if (savedRow && savedRow.correct === 'Zesty Name to Site Title') {
+            // Ensure we update an existing siteTitle row or create one from the name row
+            const existingSiteTitleRow = differencesData.find(row => candidates.includes(String(row.gdos_id)) && row.field === 'siteTitle');
+            if (existingSiteTitleRow) {
+                existingSiteTitleRow.correct = savedRow.correct;
+                if (savedRow.value !== undefined) existingSiteTitleRow.zesty_value = savedRow.value;
+                existingSiteTitleRow.final_value = existingSiteTitleRow.zesty_value;
+                existingSiteTitleRow.siteTitleRow = true;
+            } else {
+                // If there is a name row, create a separate siteTitle row derived from it
+                const nameRowCandidate = differencesData.find(row => candidates.includes(String(row.gdos_id)) && row.field === 'name');
+                if (nameRowCandidate) {
+                    const originalGdosName = nameRowCandidate.gdos_value;
+                    // Avoid creating duplicate siteTitle rows
+                    const already = differencesData.find(r => candidates.includes(String(r.gdos_id)) && r.field === 'siteTitle');
+                    if (!already) {
+                        const siteRow = Object.assign({}, nameRowCandidate);
+                        siteRow.field = 'siteTitle';
+                        siteRow.gdos_value = originalGdosName;
+                        siteRow.correct = savedRow.correct;
+                        siteRow.zesty_value = savedRow.value !== undefined ? savedRow.value : (siteRow.zesty_value || '');
+                        siteRow.final_value = siteRow.zesty_value;
+                        siteRow.siteTitleRow = true;
+                        // mark editable so the siteTitle input shows when appropriate
+                        siteRow.editable = true;
+                        differencesData.push(siteRow);
+                    }
+                }
             }
         }
+
+        let currentRow = differencesData.find(row => candidates.includes(String(row.gdos_id)) && row.field === field);
         if (currentRow) {
             console.log('Applying to row:', currentRow.gdos_id, currentRow.field, '-> correct:', savedRow.correct);
             currentRow.correct = savedRow.correct;
-            // For editable rows, restore the custom zesty_value
             if (savedRow.value !== undefined) {
                 currentRow.zesty_value = savedRow.value;
             }
-            // Compute final_value based on correct
             if (savedRow.correct === 'Zesty Name to Site Title') {
                 currentRow.final_value = currentRow.zesty_value;
             } else {
                 currentRow.final_value = savedRow.correct === 'GDOS' ? currentRow.gdos_value : currentRow.zesty_value;
             }
         } else {
-            console.warn('No matching row for:', key, savedRow);
+            // Row not present yet; save for later application when rows are available
+            pendingCorrections[key] = savedRow;
+            console.log('Stored pending correction for later application:', key);
         }
     });
     console.log('Applied changes, updated differencesData length:', differencesData.length);
+}
+
+// Parse correction key into canonical pieces and candidate gdos_id values
+function parseCorrectionKey(key, savedRow) {
+    let territory = null;
+    let id = null;
+    let field = null;
+    const parts = String(key).split('-');
+    if (parts.length >= 3) {
+        territory = parts[0];
+        field = parts.slice(parts.length - 1).join('-');
+        id = parts.slice(1, parts.length - 1).join('-');
+    } else if (parts.length === 2) {
+        id = parts[0];
+        field = parts[1];
+    } else {
+        id = key;
+        field = savedRow && savedRow.field ? savedRow.field : null;
+    }
+    const candidates = [];
+    if (territory) candidates.push(`${territory}-${id}`);
+    candidates.push(String(id));
+    return { territory, id, field, candidates };
+}
+
+function applyPendingCorrections() {
+    if (!pendingCorrections || Object.keys(pendingCorrections).length === 0) return;
+    let appliedCount = 0;
+    const table = window.differencesTable || Tabulator.findTable("#differencesTable")[0];
+    Object.entries(pendingCorrections).forEach(([key, savedRow]) => {
+        const { field, candidates } = parseCorrectionKey(key, savedRow);
+        const idx = differencesData.findIndex(r => candidates.includes(String(r.gdos_id)) && r.field === field);
+        if (idx !== -1) {
+            const row = differencesData[idx];
+            row.correct = savedRow.correct;
+            if (savedRow.value !== undefined) row.zesty_value = savedRow.value;
+            row.final_value = savedRow.correct === 'GDOS' ? row.gdos_value : row.zesty_value;
+            appliedCount++;
+            delete pendingCorrections[key];
+            console.log('Applied pending correction for key:', key);
+
+            // If table is present, update the specific row component to avoid re-rendering entire table
+            try {
+                if (table && typeof table.getRows === 'function') {
+                    const rowComp = table.getRows().find(r => {
+                        try { return String(r.getData().gdos_id) === String(row.gdos_id) && r.getData().field === row.field; } catch (e) { return false; }
+                    });
+                    if (rowComp) {
+                        rowComp.update(row);
+                    }
+                }
+            } catch (e) {
+                console.warn('Failed to incrementally update row after applying pending correction', e);
+            }
+        }
+    });
+    if (appliedCount > 0) {
+        // update dropdown and metrics without full table reset
+        try { populateCorrectValueDropdown(Object.assign({}, pendingCorrections)); } catch (e) { console.warn('populateCorrectValueDropdown failed after applying pending corrections', e); }
+        try { updateMetrics(); } catch (e) { console.warn('updateMetrics failed after applying pending corrections', e); }
+    }
 }
 
     // Build and download a CSV of corrections where GDOS is not the correct value
@@ -895,6 +1122,7 @@ function renderDifferencesTable() {
     setTimeout(() => {
         try { updateMetrics(); } catch (e) { console.warn('delayed updateMetrics failed', e); }
     }, 100);
+    // Metrics will be updated after loadSavedChanges applies any pending corrections
 }
 
 // Populate the territory select with values from differencesData
