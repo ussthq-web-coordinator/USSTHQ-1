@@ -8,6 +8,8 @@ let pendingCorrections = {};
 let latestFilteredData = null;
 // In-memory copy of corrections loaded from shared storage (used to compute deltas)
 let loadedCorrections = {};
+// Local queue for unsynced corrections (persisted to localStorage)
+let localCorrections = {};
 // Sync state for UI
 let syncState = { lastAttempt: null, lastSuccess: null, pending: 0 };
 
@@ -32,7 +34,7 @@ function buildCorrectionEntry(r) {
     return entry;
 }
 
-// Persist a single change: send to Cloudflare immediately, update UI only on success
+// Persist a single change: add to localCorrections, then attempt to sync to server
 async function persistSingleCorrection(rowData) {
     const key = makeCorrectionKey(rowData);
     const entry = buildCorrectionEntry(rowData);
@@ -45,25 +47,79 @@ async function persistSingleCorrection(rowData) {
         delta[nameToSiteTitleKey] = null; // Delete the nameToSiteTitle correction
     }
 
+    // Add to localCorrections
+    Object.keys(delta).forEach(k => {
+        if (delta[k] === null) {
+            delete localCorrections[k];
+        } else {
+            localCorrections[k] = delta[k];
+        }
+    });
+
+    // Save to localStorage
+    try {
+        localStorage.setItem('gdosLocalCorrections', JSON.stringify(localCorrections));
+    } catch (e) {
+        console.warn('Failed to save localCorrections to localStorage', e);
+    }
+
+    // Update sync state
+    syncState.pending = Object.keys(localCorrections).length;
+    updateSyncStatus();
+
+    // Disable UI if there are pending changes
+    updateUIEnabledState();
+
+    // Apply the changes to differencesData for immediate UI update
+    applyChanges(delta);
+
+    // Update the table
+    const table = window.differencesTable || (typeof Tabulator !== 'undefined' && typeof Tabulator.findTable === 'function' ? Tabulator.findTable("#differencesTable")[0] : null);
+    if (table && typeof table.setData === 'function') {
+        await table.setData(differencesData);
+    }
+
+    // Update dropdown/options immediately
+    try { populateCorrectValueDropdown(loadedCorrections); } catch (e) { console.warn('populateCorrectValueDropdown failed in persistSingleCorrection', e); }
+
+    // Try to sync immediately
+    await attemptSyncLocalCorrections();
+}
+
+// Attempt to sync all localCorrections to the server
+async function attemptSyncLocalCorrections() {
+    if (Object.keys(localCorrections).length === 0) return;
+
     try {
         const res = await fetch(SHARED_STORAGE_URL, {
             method: 'PATCH',
             headers: Object.assign({ 'Content-Type': 'application/json' }, authHeaders()),
-            body: JSON.stringify(delta)
+            body: JSON.stringify(localCorrections)
         });
         if (!res.ok) throw new Error(`Status ${res.status}`);
 
         // On success, update loadedCorrections
-        Object.keys(delta).forEach(k => {
-            if (delta[k] === null) {
+        Object.keys(localCorrections).forEach(k => {
+            if (localCorrections[k] === null) {
                 delete loadedCorrections[k];
             } else {
-                loadedCorrections[k] = delta[k];
+                loadedCorrections[k] = localCorrections[k];
             }
         });
 
+        // Clear localCorrections
+        localCorrections = {};
+        localStorage.removeItem('gdosLocalCorrections');
+
+        // Update sync state
+        syncState.pending = 0;
+        updateSyncStatus();
+
+        // Re-enable UI
+        updateUIEnabledState();
+
         // Apply the changes to differencesData for immediate UI update
-        applyChanges(delta);
+        applyChanges(localCorrections);
 
         // Update the table
         const table = window.differencesTable || (typeof Tabulator !== 'undefined' && typeof Tabulator.findTable === 'function' ? Tabulator.findTable("#differencesTable")[0] : null);
@@ -72,20 +128,49 @@ async function persistSingleCorrection(rowData) {
         }
 
         // Update dropdown/options immediately
-        try { populateCorrectValueDropdown(loadedCorrections); } catch (e) { console.warn('populateCorrectValueDropdown failed in persistSingleCorrection', e); }
+        try { populateCorrectValueDropdown(loadedCorrections); } catch (e) { console.warn('populateCorrectValueDropdown failed in attemptSyncLocalCorrections', e); }
 
+        console.log('Local corrections synced to server');
     } catch (e) {
-        console.warn('Save to Cloudflare failed', e);
-        alert('Failed to save to Cloudflare. Please check connection and try again.');
+        console.warn('Sync to Cloudflare failed', e);
+        // Keep localCorrections and UI disabled
     }
+}
+
+// Update UI enabled state based on pending changes
+function updateUIEnabledState() {
+    const hasPending = Object.keys(localCorrections).length > 0;
+    const table = window.differencesTable || (typeof Tabulator !== 'undefined' && typeof Tabulator.findTable === 'function' ? Tabulator.findTable("#differencesTable")[0] : null);
+    if (table) {
+        // Disable editing if there are pending changes
+        table.options.editable = !hasPending;
+        // You might need to refresh the table or disable specific elements
+    }
+    // Disable other UI elements like buttons
+    const buttons = document.querySelectorAll('#differencesTable button, .btn');
+    buttons.forEach(btn => {
+        if (hasPending) {
+            btn.disabled = true;
+            btn.title = 'Please wait for pending changes to sync';
+        } else {
+            btn.disabled = false;
+            btn.title = '';
+        }
+    });
 }
 
 // Update the sync status badge
 function updateSyncStatus() {
     const el = document.getElementById('syncStatus');
     if (!el) return;
-    el.textContent = 'Cloudflare only';
-    el.className = 'small text-info';
+    const pending = Object.keys(localCorrections).length;
+    if (pending > 0) {
+        el.textContent = `Syncing ${pending} changes...`;
+        el.className = 'small text-warning';
+    } else {
+        el.textContent = 'Synced';
+        el.className = 'small text-success';
+    }
 }
 
 function showServerResponseModal(obj) {
@@ -111,15 +196,6 @@ function showServerResponseModal(obj) {
         console.warn('showServerResponseModal failed', e);
     }
 }
-
-// Shared storage configuration - using Cloudflare Worker for storage
-const SHARED_STORAGE_URL = 'https://gdos-corrections-worker.uss-thq-cloudflare-account.workers.dev/';
-
-// ETag / version of last seen server snapshot (used for conditional GET)
-let serverEtag = null;
-
-// Conflict notification throttling
-let _lastConflictNotify = 0;
 
 // Fetch latest server corrections with conditional GET. Returns { changed, payload }
 async function pollServerForChanges() {
@@ -547,6 +623,131 @@ Promise.all([
     alert('Error loading data: ' + error.message);
 });
 
+// Function to show transient messages
+function showTransientMessage(message, durationMs = 3000) {
+    const alertDiv = document.createElement('div');
+    alertDiv.className = 'alert alert-info alert-dismissible fade show position-fixed';
+    alertDiv.style.top = '20px';
+    alertDiv.style.right = '20px';
+    alertDiv.style.zIndex = '9999';
+    alertDiv.innerHTML = `
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+    document.body.appendChild(alertDiv);
+    setTimeout(() => {
+        if (alertDiv.parentNode) {
+            alertDiv.remove();
+        }
+    }, durationMs);
+}
+
+// Loading overlay functions
+function showLoadingOverlay() {
+    let overlay = document.getElementById('loadingOverlay');
+    if (!overlay) {
+        overlay = document.createElement('div');
+        overlay.id = 'loadingOverlay';
+        overlay.style.position = 'fixed';
+        overlay.style.top = '0';
+        overlay.style.left = '0';
+        overlay.style.width = '100%';
+        overlay.style.height = '100%';
+        overlay.style.backgroundColor = 'rgba(0,0,0,0.5)';
+        overlay.style.zIndex = '9999';
+        overlay.style.display = 'flex';
+        overlay.style.justifyContent = 'center';
+        overlay.style.alignItems = 'center';
+        overlay.innerHTML = '<div class="spinner-border text-light" role="status"><span class="visually-hidden">Loading...</span></div>';
+        document.body.appendChild(overlay);
+    }
+    overlay.style.display = 'flex';
+}
+
+function hideLoadingOverlay() {
+    const overlay = document.getElementById('loadingOverlay');
+    if (overlay) {
+        overlay.style.display = 'none';
+    }
+}
+
+// Function to load saved changes from server
+async function loadSavedChanges() {
+    showLoadingOverlay();
+    // Load localCorrections from localStorage
+    try {
+        const stored = localStorage.getItem('gdosLocalCorrections');
+        if (stored) {
+            localCorrections = JSON.parse(stored);
+        }
+    } catch (e) {
+        console.warn('Failed to load localCorrections from localStorage', e);
+        localCorrections = {};
+    }
+
+    let corrections = {};
+    try {
+        const response = await fetch(SHARED_STORAGE_URL);
+        if (!response.ok) throw new Error('Shared storage not available');
+        const data = await response.json();
+
+        // Support worker responses that wrap the authoritative object as { current, version }
+        const payload = (data && typeof data === 'object' && data.current) ? data.current : data;
+
+        if (payload && typeof payload === 'object') {
+            corrections = payload;
+        } else {
+            corrections = {};
+        }
+
+        // Check if storage is empty (cleared)
+        if (Object.keys(corrections).length === 0) {
+            console.log('Storage is empty, performing hard reset');
+            // Clear localCorrections
+            localCorrections = {};
+            localStorage.removeItem('gdosLocalCorrections');
+            // Clear filter localStorage
+            localStorage.removeItem('globalTerritoryFilter');
+            localStorage.removeItem('globalCorrectFilter');
+            localStorage.removeItem('globalFieldFilter');
+            localStorage.removeItem('hideSiteTitleOpenHours');
+            // Reset sync state
+            syncState.pending = 0;
+            updateSyncStatus();
+            // Show message
+            showTransientMessage('Storage cleared - all corrections reset', 5000);
+        }
+
+    } catch (e) {
+        console.warn('Failed to load from Cloudflare Worker', e);
+        corrections = {};
+        alert('Failed to load corrections from Cloudflare. Please check connection.');
+    }
+
+    try {
+        // Set loadedCorrections
+        loadedCorrections = Object.assign({}, corrections);
+
+        if (typeof corrections === 'object' && corrections !== null) {
+            applyChanges(corrections);
+            console.log('Corrections loaded from Cloudflare Worker');
+            const table = window.differencesTable || (typeof Tabulator !== 'undefined' && typeof Tabulator.findTable === 'function' ? Tabulator.findTable("#differencesTable")[0] : null);
+            if (table && typeof table.setData === 'function') {
+                await table.setData(differencesData);
+            } else if (table && typeof table.replaceData === 'function') {
+                // some Tabulator versions expose replaceData instead
+                await table.replaceData(differencesData);
+            } else {
+                // Table isn't initialized yet or doesn't provide a setData/replaceData API
+                console.debug('Table not present or lacks setData/replaceData; table will be created later with current differencesData.');
+            }
+            populateCorrectValueDropdown(corrections);
+        }
+    } finally {
+        hideLoadingOverlay();
+    }
+}
+
 function correctValueFormatter(cell, formatterParams, onRendered) {
     const value = cell.getValue();
     const row = cell.getRow();
@@ -808,6 +1009,16 @@ function updateMetrics() {
 async function loadSavedChanges() {
     showLoadingOverlay();
     const preSnapshot = snapshotDifferences();
+    // Load localCorrections from localStorage
+    try {
+        const stored = localStorage.getItem('gdosLocalCorrections');
+        if (stored) {
+            localCorrections = JSON.parse(stored);
+        }
+    } catch (e) {
+        console.warn('Failed to load localCorrections from localStorage', e);
+        localCorrections = {};
+    }
     let corrections = {};
     try {
         const response = await fetch(SHARED_STORAGE_URL);
@@ -881,9 +1092,73 @@ async function loadSavedChanges() {
 
 
 
+// Shared storage configuration - using Cloudflare Worker for storage
+const SHARED_STORAGE_URL = 'https://gdos-corrections-worker.uss-thq-cloudflare-account.workers.dev/';
+
+// ETag / version of last seen server snapshot (used for conditional GET)
+let serverEtag = null;
+
+// Conflict notification throttling
+let _lastConflictNotify = 0;
+
+// Fetch latest server corrections with conditional GET. Returns { changed, payload }
+async function pollServerForChanges() {
+    try {
+        const headers = Object.assign({}, authHeaders());
+        if (serverEtag) headers['If-None-Match'] = String(serverEtag);
+        const res = await fetch(SHARED_STORAGE_URL, { method: 'GET', headers });
+        if (res.status === 304) {
+            // No changes since last version
+            return { changed: false };
+        }
+        if (!res.ok) throw new Error(`Status ${res.status}`);
+        const body = await res.json();
+        // body may be { current, version } or just object
+        const payload = body && body.current ? body : { current: body };
+        serverEtag = res.headers.get('ETag') || null;
+        return { changed: true, payload: payload.current };
+    } catch (e) {
+        console.warn('pollServerForChanges failed', e);
+        return { changed: false };
+    }
+}
+
+// Detect conflicts between queued deltas and authoritative server object
+function detectConflictsWithQueue(serverObj) {
+    // No queue, no conflicts
+    return [];
+}
+
+// Poll loop that runs periodically to keep UI in sync with remote changes and detect conflicts
+async function startServerPoll(intervalMs = 10000) {
+    try {
+        const result = await pollServerForChanges();
+        if (result.changed) {
+            // Server has new data, reconcile
+            reconcileServerState(result.payload);
+        }
+        // Attempt to sync localCorrections
+        await attemptSyncLocalCorrections();
+    } catch (e) {
+        console.warn('startServerPoll failed', e);
+    } finally {
+        // Schedule next poll
+        setTimeout(() => startServerPoll(intervalMs), intervalMs);
+    }
+}
+
+// start polling when app initializes (after a short delay to avoid clashing with initial load)
+setTimeout(() => startServerPoll(10000), 5000);
+
+function authHeaders() {
+    return {};
+}
+
 function populateCorrectValueDropdown(corrections) {
     const select = document.getElementById('globalCorrectFilter');
     if (!select) return;
+
+    const currentValue = select.value;
 
     // Clear existing options except 'All'
     // Keep a stable set of base options (so built-in choices remain available)
@@ -912,6 +1187,13 @@ function populateCorrectValueDropdown(corrections) {
         console.log('Populated correct value dropdown with options (merged):', Array.from(uniqueCorrects));
     } catch (e) {
         console.warn('populateCorrectValueDropdown failed to enumerate corrections', e);
+    }
+
+    // Restore the current value if it exists in the options
+    if (select.querySelector(`option[value="${currentValue}"]`)) {
+        select.value = currentValue;
+    } else {
+        select.value = 'all';
     }
 }
 
@@ -1467,7 +1749,7 @@ function populateGlobalFilters() {
     // attach change listeners (only once)
     if (!territorySelect._listenerAdded) {
         territorySelect.addEventListener('change', function() {
-            // localStorage.setItem('globalTerritoryFilter', this.value);
+            localStorage.setItem('globalTerritoryFilter', this.value);
             applyGlobalFilters();
             // update metrics when filters change
             try { updateMetrics(); } catch(e) { console.warn('updateMetrics failed', e); }
@@ -1559,8 +1841,13 @@ function applyGlobalFilters() {
         console.log('Adding hide siteTitle/openHours filter');
         table.addFilter(function(data, filterParams) {
             // Don't hide name rows that have been corrected to use site title values
-            if (data.field === 'name' && (data.correct === 'Zesty Name to Site Title' || data.siteTitleRow)) {
-                return true;
+            if (data.field === 'name') {
+                // Check if there is a 'Zesty Name to Site Title' correction for this gdos_id
+                const key = `${data.territory || ''}-${data.gdos_id}-nameToSiteTitle`;
+                const hasSiteTitleCorrection = loadedCorrections[key] !== undefined || localCorrections[key] !== undefined;
+                if (hasSiteTitleCorrection) {
+                    return true;
+                }
             }
             const result = data.field !== 'siteTitle' && data.field !== 'openHoursText';
             return result;
@@ -1596,7 +1883,7 @@ function applySavedGlobalFilters() {
         hideSiteTitleOpenHoursCheckbox.checked = hideByDefault;
     }
     // apply after setting
-    applyGlobalFilters();
+    setTimeout(() => applyGlobalFilters(), 0);
 }
 
 // Filter functions for quick access
