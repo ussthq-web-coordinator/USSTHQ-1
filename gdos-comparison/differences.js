@@ -14,11 +14,6 @@ let rawUss = null;
 let rawUsc = null;
 let rawUse = null;
 let rawLocations = null;
-// filenames for GDOS JSONs (used to parse refresh timestamps)
-let rawUswFilename = null;
-let rawUssFilename = null;
-let rawUscFilename = null;
-let rawUseFilename = null;
 
 // Function to get nested value from object
 function getNestedValue(obj, path) {
@@ -102,11 +97,6 @@ Promise.all([
     rawUss = ussData;
     rawUsc = uscData;
     rawUse = useData;
-        // store filenames so we can parse refresh dates from filenames
-        rawUswFilename = 'GDOS-10-14-18-53-USW.json';
-        rawUssFilename = 'GDOS-10-14-18-10-USS.json';
-        rawUscFilename = 'GDOS-10-15-04-22-USC.json';
-        rawUseFilename = 'GDOS-10-15-04-57-USE.json';
     rawLocations = locationsData;
     if (!Array.isArray(uswData)) throw new Error('USW data is not an array');
     if (!Array.isArray(ussData)) throw new Error('USS data is not an array');
@@ -363,9 +353,11 @@ function correctValueFormatter(cell, formatterParams, onRendered) {
         const rowData = row.getData();
         rowData.correct = newValue;
         if (newValue === 'Zesty Name to Site Title') {
-            // Special case: keep GDOS name, use Zesty name for siteTitle
-            rowData.correct = 'GDOS';
-            rowData.final_value = rowData.gdos_value;
+            // Special case: transform to siteTitle row, keep GDOS name, use Zesty name for siteTitle
+            rowData.field = 'siteTitle';
+            rowData.correct = newValue;
+            rowData.final_value = rowData.zesty_value;
+            rowData.siteTitleRow = true;
         } else {
             rowData.final_value = newValue === 'GDOS' ? rowData.gdos_value : rowData.zesty_value;
         }
@@ -381,12 +373,12 @@ function correctValueFormatter(cell, formatterParams, onRendered) {
             if (gdosCell) {
                 const el = gdosCell.getElement();
                 const span = el ? el.querySelector('.value-text') : null;
-                if (span) span.classList.toggle('selected-underline', newValue === 'GDOS' || newValue === 'Zesty Name to Site Title');
+                if (span) span.classList.toggle('selected-underline', newValue === 'GDOS');
             }
             if (zestyCell) {
                 const el = zestyCell.getElement();
                 const span = el ? el.querySelector('.value-text') : null;
-                if (span) span.classList.toggle('selected-underline', newValue === 'Zesty');
+                if (span) span.classList.toggle('selected-underline', newValue === 'Zesty' || newValue === 'Zesty Name to Site Title');
             }
         } catch (e) {
             console.warn('toggle underline failed', e);
@@ -413,7 +405,7 @@ function gdosValueFormatter(cell, formatterParams, onRendered) {
     const value = cell.getValue();
 
     const span = document.createElement('span');
-    span.className = 'value-text' + (correctValue === 'GDOS' || correctValue === 'Zesty Name to Site Title' ? ' selected-underline' : '');
+    span.className = 'value-text' + (correctValue === 'GDOS' ? ' selected-underline' : '');
     span.textContent = value;
     return span;
 }
@@ -424,7 +416,7 @@ function zestyValueFormatter(cell, formatterParams, onRendered) {
     const value = cell.getValue();
 
     const span = document.createElement('span');
-    span.className = 'value-text' + (correctValue === 'Zesty' ? ' selected-underline' : '');
+    span.className = 'value-text' + (correctValue === 'Zesty' || correctValue === 'Zesty Name to Site Title' ? ' selected-underline' : '');
     span.textContent = value;
     return span;
 }
@@ -553,32 +545,20 @@ function applyChanges(changes) {
             row.gdos_id === savedRow.gdos_id && row.field === savedRow.field
         );
         if (!currentRow && savedRow.field === 'siteTitle' && savedRow.correct === 'Zesty Name to Site Title') {
-            // Special case: create a synthetic siteTitle row for "Zesty Name to Site Title"
-            // Find the corresponding name row to get the data
+            // Special case: transform the name row into a siteTitle row for "Zesty Name to Site Title"
+            // Find the corresponding name row to transform
             const nameRow = differencesData.find(row => 
                 row.gdos_id === savedRow.gdos_id && row.field === 'name'
             );
             if (nameRow) {
-                currentRow = {
-                    gdos_id: savedRow.gdos_id,
-                    name: nameRow.name,
-                    property_type: nameRow.property_type,
-                    division: nameRow.division,
-                    territory: nameRow.territory,
-                    published: nameRow.published,
-                    duplicate: nameRow.duplicate,
-                    doNotImport: nameRow.doNotImport,
-                    field: 'siteTitle',
-                    gdos_value: '', // No GDOS siteTitle to compare
-                    zesty_value: nameRow.zesty_value, // Use the Zesty name value
-                    correct: savedRow.correct,
-                    final_value: nameRow.zesty_value,
-                    synthetic: true // Mark as synthetic since it's not a real difference
-                };
-                differencesData.push(currentRow);
-                // Also mark the name row as corrected to GDOS (keep GDOS name, use Zesty name for siteTitle)
-                nameRow.correct = 'GDOS';
-                nameRow.final_value = nameRow.gdos_value;
+                // Transform the name row into a siteTitle row
+                const originalGdosName = nameRow.gdos_value; // Save the original GDOS name
+                nameRow.field = 'siteTitle';
+                nameRow.gdos_value = originalGdosName; // Show the GDOS name value
+                nameRow.correct = savedRow.correct;
+                nameRow.final_value = nameRow.zesty_value; // Use the Zesty name value
+                nameRow.siteTitleRow = true; // Mark as siteTitle row for styling
+                currentRow = nameRow;
             }
         }
         if (currentRow) {
@@ -765,104 +745,6 @@ function applyChanges(changes) {
         return s;
     }
 
-    // Try common places for a refresh/timestamp in the raw JSONs
-    function extractRefreshDate(source) {
-        if (!source) return null;
-        // If source has top-level metadata or timestamp fields
-        const possibleKeys = ['updated_at','updatedAt','last_updated','lastUpdated','refreshed','refreshDate','refresh_date','timestamp','generated_at','generatedAt'];
-        // If object with meta
-        if (source.meta && typeof source.meta === 'object') {
-            for (const k of possibleKeys) if (source.meta[k]) return source.meta[k];
-        }
-        // If it's an array, try first item's meta
-        if (Array.isArray(source) && source.length > 0) {
-            const first = source[0];
-            for (const k of possibleKeys) if (first[k]) return first[k];
-        }
-        // Try top-level keys
-        for (const k of possibleKeys) if (source[k]) return source[k];
-        return null;
-    }
-
-    function showRefreshDates() {
-        const list = document.getElementById('refreshDatesList');
-        if (!list) return;
-        list.innerHTML = '';
-
-            // Prefer parsing the filename for GDOS refresh dates
-            const uswDate = parseGdosFilenameDate(rawUswFilename) || extractRefreshDate(rawUsw) || '(unknown)';
-            const ussDate = parseGdosFilenameDate(rawUssFilename) || extractRefreshDate(rawUss) || '(unknown)';
-            const uscDate = parseGdosFilenameDate(rawUscFilename) || extractRefreshDate(rawUsc) || '(unknown)';
-            const useDate = parseGdosFilenameDate(rawUseFilename) || extractRefreshDate(rawUse) || '(unknown)';
-            // Zesty (locations) may have date in different spots; fallback to 10/15 4 AM if not present
-            const zestyDate = (function(){
-                const d = extractRefreshDate(rawLocations);
-                if (d) return d;
-                return '2025-10-15 04:00';
-            })();
-
-        // Prefer showing the filename text (e.g. '10-14-18-53-USW') if available
-        const uswText = filenameDateText(rawUswFilename) || uswDate;
-        const ussText = filenameDateText(rawUssFilename) || ussDate;
-        const uscText = filenameDateText(rawUscFilename) || uscDate;
-        const useText = filenameDateText(rawUseFilename) || useDate;
-
-        const entries = [
-            ['USW (GDOS)', uswText],
-            ['USS (GDOS)', ussText],
-            ['USC (GDOS)', uscText],
-            ['USE (GDOS)', useText],
-            ['Zesty (LocationsData)', zestyDate]
-        ];
-
-        // Populate the list with entries
-        entries.forEach(([label, dateText]) => {
-            const li = document.createElement('li');
-            li.className = 'list-group-item d-flex justify-content-between align-items-center';
-            li.innerHTML = `<strong>${label}</strong> <span>${dateText}</span>`;
-            list.appendChild(li);
-        });
-
-            // Build one-line, alphabetically ordered territory: date pairs
-            const footer = document.getElementById('refreshDatesFooter');
-            if (footer) {
-                const pairs = entries.map(([label, date]) => {
-                    // convert label like 'USW (GDOS)' to just 'USW' for sorting/display
-                    const short = label.split(' ')[0];
-                    // prefer filename text (e.g., '10-14-18-53-USW') and include parsed readable date
-                    const fnameText = (typeof date === 'string' ? date : '') || '';
-                    const parsed = (function(){
-                        if (short === 'USW') return formatParsedFilenameDate(rawUswFilename);
-                        if (short === 'USS') return formatParsedFilenameDate(rawUssFilename);
-                        if (short === 'USC') return formatParsedFilenameDate(rawUscFilename);
-                        if (short === 'USE') return formatParsedFilenameDate(rawUseFilename);
-                        if (label.startsWith('Zesty')) return `(${zestyDate})`;
-                        return '';
-                    })();
-                    const display = `${fnameText} ${parsed}`.trim();
-                    return { short, display };
-                });
-
-                pairs.sort((a,b) => a.short.localeCompare(b.short));
-
-                footer.textContent = pairs.map(p => `${p.short}: ${p.display}`).join('  •  ');
-            }
-    }
-
-    // Populate the inline refresh dates list when the DOM is ready
-    document.addEventListener('DOMContentLoaded', () => {
-        // showRefreshDates will populate the #refreshDatesList so the collapse shows useful content
-        showRefreshDates();
-    });
-
-    // Also populate when the modal is shown
-    const refreshModal = document.getElementById('refreshDatesModal');
-    if (refreshModal) {
-        refreshModal.addEventListener('show.bs.modal', () => {
-            showRefreshDates();
-        });
-    }
-
 function renderDifferencesTable() {
     // Clear summary (we don't display the auto-generated summary line)
     const summaryDiv = document.getElementById('differencesSummary');
@@ -904,6 +786,9 @@ function renderDifferencesTable() {
             if (data && data.synthetic) {
                 row.getElement().classList.add('synthetic-row');
                 row.getElement().title = 'Synthetic row: This row was added to represent a workflow decision (e.g., published status) and is not a direct field comparison.';
+            } else if (data && data.siteTitleRow) {
+                row.getElement().classList.add('siteTitle-row');
+                row.getElement().title = 'Site Title row: This name difference has been resolved by using the Zesty name value for the siteTitle field.';
             }
         },
         pagination: "local",
@@ -1128,33 +1013,6 @@ function extractZestyStateValue(zestyRec) {
         }
     }
     return null;
-}
-
-// Parse GDOS filename of form GDOS-M-D-H-M-Territory.json and return a formatted date string
-function parseGdosFilenameDate(filename) {
-    if (!filename || typeof filename !== 'string') return null;
-    // Match patterns like GDOS-10-14-18-53-USW.json or GDOS-10-15-04-22-USC.json
-    const re = /GDOS-(\d{1,2})-(\d{1,2})-(\d{1,2})-(\d{1,2})-[A-Za-z]+\.json/;
-    const m = filename.match(re);
-    if (!m) return null;
-    const year = (new Date()).getFullYear();
-    const month = String(m[1]).padStart(2, '0');
-    const day = String(m[2]).padStart(2, '0');
-    const hour = String(m[3]).padStart(2, '0');
-    const minute = String(m[4]).padStart(2, '0');
-    return `${year}-${month}-${day} ${hour}:${minute}`;
-}
-
-// Extract the middle filename text after 'GDOS-' and before the extension, e.g. '10-14-18-53-USW'
-function filenameDateText(filename) {
-    if (!filename || typeof filename !== 'string') return null;
-    const m = filename.replace(/^GDOS-/, '').replace(/\.json$/i, '');
-    return m || null;
-}
-
-function formatParsedFilenameDate(filename) {
-    const parsed = parseGdosFilenameDate(filename);
-    return parsed ? `(${parsed})` : '';
 }
 
 function copyToClipboard(text) {
