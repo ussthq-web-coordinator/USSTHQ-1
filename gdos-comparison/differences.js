@@ -459,8 +459,13 @@ Promise.all([
                 if (fieldObj.field === 'siteTitle' && fieldObj.alwaysShow) {
                     // For siteTitle alwaysShow, default to GDOS
                     correctValue = 'GDOS';
-                    // Keep zesty value empty - user can enter custom value if needed
-                    zestyVal = '';
+                    // Prepopulate with Zesty name if it's different from GDOS name
+                    const zestyName = loc['Column1.content.name'];
+                    if (zestyName && zestyName !== gdos.name) {
+                        zestyVal = zestyName;
+                    } else {
+                        zestyVal = '';
+                    }
                     isSiteTitleRow = true;
                 }
                 
