@@ -57,11 +57,8 @@ async function persistSingleCorrection(rowData) {
 
         // Update the table
         const table = window.differencesTable || (typeof Tabulator !== 'undefined' && typeof Tabulator.findTable === 'function' ? Tabulator.findTable("#differencesTable")[0] : null);
-        if (table && typeof table.updateData === 'function') {
-            const updatedRows = differencesData.filter(r => makeCorrectionKey(r) === key);
-            if (updatedRows.length > 0) {
-                table.updateData(updatedRows);
-            }
+        if (table && typeof table.setData === 'function') {
+            await table.setData(differencesData);
         }
 
         // Update dropdown/options immediately
@@ -131,7 +128,7 @@ function showServerResponseModal(obj) {
 }
 
 // Shared storage configuration - using Cloudflare Worker for storage
-const SHARED_STORAGE_URL = 'http://localhost:8787';
+const SHARED_STORAGE_URL = 'https://gdos-corrections-worker.uss-thq-cloudflare-account.workers.dev/';
 
 // ETag / version of last seen server snapshot (used for conditional GET)
 let serverEtag = null;
@@ -166,21 +163,8 @@ async function pollServerForChanges() {
 
 // Detect conflicts between queued deltas and authoritative server object
 function detectConflictsWithQueue(serverObj) {
-    if (!serverObj || typeof serverObj !== 'object') return [];
-    const conflicts = [];
-    (persistQueue || []).forEach(item => {
-        const delta = (item && typeof item === 'object' && item.hasOwnProperty('delta')) ? item.delta : item;
-        if (!delta || typeof delta !== 'object') return;
-        Object.keys(delta).forEach(k => {
-            const qv = delta[k];
-            const sv = serverObj[k];
-            // Conflict if both exist and differ (and queued value is not null deletion that server already applied)
-            if (qv !== null && sv !== undefined && JSON.stringify(qv) !== JSON.stringify(sv)) {
-                conflicts.push({ key: k, queued: qv, server: sv });
-            }
-        });
-    });
-    return conflicts;
+    // No queue, no conflicts
+    return [];
 }
 
 // Poll loop that runs periodically to keep UI in sync with remote changes and detect conflicts
@@ -722,14 +706,9 @@ function saveChanges() {
             return Promise.resolve();
         }
 
-        // Enqueue delta for reliable persistence
-        persistQueue.push(delta);
-        savePersistQueue();
-        syncState.pending = persistQueue.length; updateSyncStatus();
-
-        // Attempt immediate send for responsiveness (queue guarantees persistence)
+        // Send delta directly to Cloudflare
         const payload = JSON.stringify(delta);
-        console.log('Enqueued delta and attempting immediate send:', delta);
+        console.log('Sending delta to Cloudflare:', delta);
         return fetch(SHARED_STORAGE_URL, {
             method: 'PATCH',
             headers: Object.assign({ 'Content-Type': 'application/json' }, authHeaders()),
@@ -743,7 +722,7 @@ function saveChanges() {
             try {
                 reconcileServerState(body);
             } catch (e) {
-                console.warn('reconcileServerState failed after immediate send', e);
+                console.warn('reconcileServerState failed after save', e);
                 // Fallback: merge delta into loadedCorrections
                 Object.entries(delta).forEach(([k, v]) => {
                     if (v === null) delete loadedCorrections[k]; else loadedCorrections[k] = v;
@@ -751,14 +730,11 @@ function saveChanges() {
                 try { localStorage.setItem('localCorrections', JSON.stringify(loadedCorrections)); } catch (e) { console.warn('localStorage write failed', e); }
                 try { populateCorrectValueDropdown(loadedCorrections); } catch(e) { console.warn('populateCorrectValueDropdown failed after save', e); }
             }
-            // On success, remove any matching queued deltas
-            try { removeMatchingDeltaFromQueue(delta); } catch (e) { console.warn('removeMatchingDeltaFromQueue failed after immediate send', e); }
-            // After reconciliation, ensure UI metrics and sync state are updated
-            syncState.pending = persistQueue.length; updateSyncStatus();
-            console.log('Immediate send succeeded and server reconciled');
+            console.log('Save succeeded and server reconciled');
         })
         .catch(error => {
-            console.warn('Immediate send failed, delta will remain in queue and be retried:', error);
+            console.warn('Save failed:', error);
+            alert('Failed to save to Cloudflare. Please check connection and try again.');
         })
         .finally(() => {
             try { updateMetrics(); } catch(e) { console.warn('updateMetrics failed', e); }
@@ -892,61 +868,8 @@ async function loadSavedChanges() {
     }
 }
 
-// Merge all queued deltas into one object and PATCH to server; on success clear queue and reconcile
-async function forceApplyQueue() {
-    try {
-        if (!persistQueue || persistQueue.length === 0) {
-            showTransientMessage('No queued items to apply', 2000);
-            return;
-        }
-        // Build merged delta (later items override earlier keys)
-        const merged = {};
-        persistQueue.forEach(item => {
-            const delta = (item && typeof item === 'object' && item.hasOwnProperty('delta')) ? item.delta : item;
-            if (!delta || typeof delta !== 'object') return;
-            Object.entries(delta).forEach(([k, v]) => {
-                merged[k] = v;
-            });
-        });
-        if (Object.keys(merged).length === 0) {
-            showTransientMessage('Merged delta is empty, nothing to apply', 2000);
-            return;
-        }
-        // Send merged PATCH
-        const res = await fetch(SHARED_STORAGE_URL, {
-            method: 'PATCH',
-            headers: Object.assign({ 'Content-Type': 'application/json' }, authHeaders()),
-            body: JSON.stringify(merged)
-        });
-        if (!res.ok) throw new Error('Status ' + res.status);
-        const body = await res.json();
-        // On success, clear the persistQueue entirely (we merged everything)
-        persistQueue = [];
-        savePersistQueue();
-        syncState.pending = 0; updateSyncStatus();
-        // Reconcile authoritative server state returned by worker
-        try { reconcileServerState(body); } catch (e) { console.warn('reconcileServerState failed after forceApplyQueue', e); }
-        showTransientMessage('Queue applied and cleared', 3000);
-        console.log('forceApplyQueue result', body);
-        return body;
-    } catch (e) {
-        console.warn('forceApplyQueue failed', e);
-        showTransientMessage('Apply queue failed: ' + e.message, 5000);
-        throw e;
-    }
-}
 
-// Clear the local persistQueue (data will be lost) after confirmation
-function clearPersistQueue() {
-    if (!confirm('This will permanently clear the local queued changes. Continue?')) return;
-    persistQueue = [];
-    savePersistQueue();
-    syncState.pending = 0; updateSyncStatus();
-    showTransientMessage('Local queue cleared', 2500);
-}
 
-window.forceApplyQueue = forceApplyQueue;
-window.clearPersistQueue = clearPersistQueue;
 
 function populateCorrectValueDropdown(corrections) {
     const select = document.getElementById('globalCorrectFilter');
@@ -1073,6 +996,14 @@ function applyChanges(changes) {
         // If this correction asks for Zesty Name -> Site Title, ensure we update both any existing siteTitle row
         // and the name row (transforming the name row if needed). This avoids missing the editable siteTitle input.
         if (savedRow.correct === 'Zesty Name to Site Title') {
+            // Update the name row to use the site title value
+            const nameRow = differencesData.find(row => candidates.includes(String(row.gdos_id)) && row.field === 'name');
+            if (nameRow) {
+                nameRow.correct = savedRow.correct;
+                if (savedRow.value !== undefined) nameRow.zesty_value = savedRow.value;
+                nameRow.final_value = nameRow.zesty_value;
+            }
+
             // Ensure we update an existing siteTitle row or create one from the name row
             const existingSiteTitleRow = differencesData.find(row => candidates.includes(String(row.gdos_id)) && row.field === 'siteTitle');
             if (existingSiteTitleRow) {
@@ -1101,6 +1032,11 @@ function applyChanges(changes) {
                     }
                 }
             }
+        }
+
+        // Skip general case for 'Zesty Name to Site Title' since it's handled above
+        if (savedRow.correct === 'Zesty Name to Site Title') {
+            return;
         }
 
         let currentRow = differencesData.find(row => candidates.includes(String(row.gdos_id)) && row.field === field);
@@ -1709,42 +1645,6 @@ function reconcileServerState(serverPayload) {
         // Replace loadedCorrections with authoritative server state
         loadedCorrections = Object.assign({}, serverObj);
 
-        // Persist authoritative snapshot to local storage for offline resilience
-        try { localStorage.setItem('localCorrections', JSON.stringify(loadedCorrections)); } catch (e) { console.warn('Failed to persist loadedCorrections after reconciliation', e); }
-
-        // Compact the persistQueue: remove queued deltas whose keys are already reflected
-        // in the server state (including deletions represented by null).
-        if (Array.isArray(persistQueue) && persistQueue.length > 0) {
-            // Support queued items that are either plain delta objects or wrapper objects like { delta: {...}, attempts, backoffUntil }
-            persistQueue = persistQueue.filter(queued => {
-                try {
-                    const delta = (queued && typeof queued === 'object' && queued.hasOwnProperty('delta')) ? queued.delta : queued;
-                    // If delta isn't an object, keep the queued item (can't reason about it)
-                    if (!delta || typeof delta !== 'object') return true;
-                    const keys = Object.keys(delta);
-                    for (const k of keys) {
-                        const qv = delta[k];
-                        const sv = loadedCorrections[k];
-                        if (qv === null) {
-                            // queued deletion: if server still has a value, keep queued
-                            if (sv !== undefined && sv !== null) return true;
-                            // otherwise server also deleted => drop this queued delta's key
-                        } else {
-                            // queued set/update: if server value differs, keep queued
-                            if (JSON.stringify(sv) !== JSON.stringify(qv)) return true;
-                        }
-                    }
-                    // All keys in this queued delta are reflected on server -> drop queued item
-                    return false;
-                } catch (e) {
-                    // Be conservative and keep the queued item on any error
-                    return true;
-                }
-            });
-            savePersistQueue();
-        }
-
-        syncState.pending = persistQueue.length; updateSyncStatus();
         try { populateCorrectValueDropdown(loadedCorrections); } catch (e) { console.warn('populateCorrectValueDropdown failed during reconciliation', e); }
 
         // Apply the updated corrections to the UI
@@ -1758,7 +1658,7 @@ function reconcileServerState(serverPayload) {
             console.debug('Table not present for live update; will be updated on next full load.');
         }
 
-        console.log('Reconciled with server state; queue compacted. Pending:', persistQueue.length);
+        console.log('Reconciled with server state.');
     } catch (e) {
         console.warn('reconcileServerState failed', e);
     }
@@ -1773,182 +1673,20 @@ function formatTs(ts) {
     } catch (e) { return String(ts); }
 }
 
-function getQueueOverview() {
-    // Return an array of items with metadata for UI
-    return (persistQueue || []).map((item, idx) => {
-        const wrapper = (item && typeof item === 'object' && item.hasOwnProperty('delta')) ? item : { delta: item };
-        const keys = wrapper.delta ? Object.keys(wrapper.delta) : [];
-        return {
-            index: idx,
-            attempts: wrapper.attempts || 0,
-            backoffUntil: wrapper.backoffUntil || null,
-            keyCount: keys.length,
-            keys: keys.slice(0, 20), // show first 20 keys for brevity
-            raw: wrapper
-        };
-    });
-}
 
-function copyQueueToClipboard() {
-    try {
-        const overview = getQueueOverview();
-        copyToClipboard(JSON.stringify(overview, null, 2));
-        showTransientMessage('Queue copied to clipboard', 2000);
-    } catch (e) {
-        console.warn('copyQueueToClipboard failed', e);
-        showTransientMessage('Failed to copy queue', 3000);
-    }
-}
 
-function showQueueModal() {
-    // Ensure modal markup exists
-    let modalEl = document.getElementById('queueStatusModal');
-    if (!modalEl) {
-        modalEl = document.createElement('div');
-        modalEl.className = 'modal fade';
-        modalEl.id = 'queueStatusModal';
-        modalEl.tabIndex = -1;
-        modalEl.setAttribute('aria-hidden', 'true');
-        modalEl.innerHTML = `
-            <div class="modal-dialog modal-lg modal-dialog-scrollable">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h5 class="modal-title">Persist Queue Status</h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                    </div>
-                    <div class="modal-body">
-                        <p class="small text-muted">Shows queued delta items, attempts, and next retry time.</p>
-                        <div id="queueStatusContent" style="font-family:monospace;white-space:pre-wrap;">Loading...</div>
-                    </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" id="copyQueueBtn">Copy Queue</button>
-                        <button type="button" class="btn btn-primary" id="forceSyncFromQueueBtn">Force Sync</button>
-                        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button>
-                    </div>
-                </div>
-            </div>
-        `;
-        document.body.appendChild(modalEl);
 
-        // Wire up buttons
-        modalEl.addEventListener('shown.bs.modal', () => {
-            try { document.getElementById('queueStatusContent').textContent = JSON.stringify(getQueueOverview(), null, 2); } catch (e) {}
-        });
-        // copy
-        modalEl.querySelector('#copyQueueBtn').addEventListener('click', copyQueueToClipboard);
-        // force sync
-        modalEl.querySelector('#forceSyncFromQueueBtn').addEventListener('click', async function() {
-            this.disabled = true;
-            this.textContent = 'Reloading...';
-            try {
-                await loadSavedChanges();
-                showTransientMessage('Reload finished', 2000);
-                // refresh the modal content
-                try { document.getElementById('queueStatusContent').textContent = JSON.stringify(getQueueOverview(), null, 2); } catch (e) {}
-            } catch (e) {
-                console.warn('reload failed', e);
-                showTransientMessage('Reload failed', 4000);
-            } finally {
-                this.disabled = false;
-                this.textContent = 'Reload from Cloudflare';
-            }
-        });
-    }
-
-    // Update content before showing
-    try { document.getElementById('queueStatusContent').textContent = JSON.stringify(getQueueOverview(), null, 2); } catch (e) { console.warn('Failed to set queue content before show', e); }
-    const modal = new bootstrap.Modal(modalEl, { keyboard: true });
-    modal.show();
-}
 
 // -------------------------
 // Helpers to seed the remote worker when it's empty
 // -------------------------
-// Build a merged corrections object from persistQueue (later entries override earlier keys)
-function buildCorrectionsFromQueue() {
-    const merged = {};
-    (persistQueue || []).forEach(item => {
-        const delta = (item && typeof item === 'object' && item.hasOwnProperty('delta')) ? item.delta : item;
-        if (!delta || typeof delta !== 'object') return;
-        Object.entries(delta).forEach(([k, v]) => {
-            if (v === null) delete merged[k]; else merged[k] = v;
-        });
-    });
-    return merged;
-}
 
-// Seed the worker's KV with the local loadedCorrections (full overwrite). Use with caution.
-async function seedServerFromLocal() {
-    try {
-        const toSend = Object.assign({}, loadedCorrections || {});
-        if (!toSend || Object.keys(toSend).length === 0) {
-            // if loadedCorrections is empty, try building from the queue
-            const built = buildCorrectionsFromQueue();
-            if (Object.keys(built).length === 0) {
-                alert('No local corrections found to seed the server. Ensure you have local edits or queued deltas.');
-                return;
-            }
-            if (!confirm('loadedCorrections is empty. Seed server with merged queued deltas instead?')) return;
-            return await seedServerWithObject(built);
-        }
-        if (!confirm('This will overwrite the server corrections with your local snapshot. Continue?')) return;
-        return await seedServerWithObject(toSend);
-    } catch (e) {
-        console.warn('seedServerFromLocal failed', e);
-        alert('Seeding failed: ' + e.message);
-    }
-}
 
-// Seed the worker by merging all queued deltas (non-destructive merge)
-async function seedServerFromQueue() {
-    try {
-        const merged = buildCorrectionsFromQueue();
-        if (!merged || Object.keys(merged).length === 0) {
-            alert('No queued deltas available to seed the server.');
-            return;
-        }
-        if (!confirm('This will apply merged queued deltas to the server (non-destructive). Continue?')) return;
-        // Use PATCH to merge safely
-        const res = await fetch(SHARED_STORAGE_URL, {
-            method: 'PATCH',
-            headers: Object.assign({ 'Content-Type': 'application/json' }, authHeaders()),
-            body: JSON.stringify(merged)
-        });
-        if (!res.ok) throw new Error('Status ' + res.status);
-        const body = await res.json();
-        reconcileServerState(body);
-        showTransientMessage('Server seeded from queue successfully', 3000);
-        console.log('Seeded server with merged queued deltas', body);
-    } catch (e) {
-        console.warn('seedServerFromQueue failed', e);
-        alert('Seeding from queue failed: ' + e.message);
-    }
-}
 
-// Helper that PUTs a full corrections object to the server (overwrites). Requires token if worker enforces it.
-async function seedServerWithObject(obj) {
-    try {
-        const res = await fetch(SHARED_STORAGE_URL, {
-            method: 'PUT',
-            headers: Object.assign({ 'Content-Type': 'application/json' }, authHeaders()),
-            body: JSON.stringify(obj)
-        });
-        if (!res.ok) throw new Error('Status ' + res.status);
-        const body = await res.json();
-        // Reconcile with returned server state if present
-        try { const getResp = await fetch(SHARED_STORAGE_URL); const server = await getResp.json(); reconcileServerState(server); } catch (e) { console.warn('Failed to fetch server after seeding', e); }
-        showTransientMessage('Server seeded successfully', 3000);
-        console.log('seedServerWithObject response', body);
-    } catch (e) {
-        console.warn('seedServerWithObject failed', e);
-        alert('Seeding failed: ' + e.message);
-    }
-}
 
-// Expose helpers for quick console use
-window.seedServerFromLocal = seedServerFromLocal;
-window.seedServerFromQueue = seedServerFromQueue;
-window.seedServerWithObject = seedServerWithObject;
+
+
+
 
 // Function to manually refresh the UI from current storage state
 async function refreshFromStorage() {
