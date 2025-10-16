@@ -177,10 +177,8 @@ async function syncQueue() {
         if (!qitem) return;
         if (!qitem.hasOwnProperty('attempts')) qitem.attempts = 0;
         qitem.attempts = (qitem.attempts || 0) + 1;
-        // exponential backoff with jitter (±25%)
-        const exp = Math.min(baseDelayMs * Math.pow(2, Math.min(qitem.attempts - 1, 20)), maxDelayMs);
-        const jitter = Math.round((Math.random() * 0.5 + 0.75) * exp) - Math.round(exp / 2); // biased jitter
-        const delay = Math.max(0, Math.min(maxDelayMs, exp + jitter));
+        // no backoff, retry immediately
+        const delay = 0;
         qitem.backoffUntil = Date.now() + delay;
     }
 
@@ -275,7 +273,7 @@ async function syncQueue() {
 
 // ensure queue is loaded and background sync starts
 loadPersistQueue();
-setInterval(syncQueue, 5000);
+setInterval(syncQueue, 1000);
 setTimeout(syncQueue, 1500);
 // expose for debug console
 window.syncQueue = syncQueue;
@@ -339,7 +337,7 @@ function showServerResponseModal(obj) {
 }
 
 // Shared storage configuration - using Cloudflare Worker for storage
-const SHARED_STORAGE_URL = 'https://gdos-corrections-worker.uss-thq-cloudflare-account.workers.dev';
+const SHARED_STORAGE_URL = 'http://localhost:8787';
 
 // ETag / version of last seen server snapshot (used for conditional GET)
 let serverEtag = null;
@@ -506,9 +504,14 @@ Promise.all([
         if (!response.ok) throw new Error('LocationsData file not found');
         return response.json();
     }),
-    fetch('./DuplicateLocationCheck.json?v=' + Date.now()).then(response => {
-        if (!response.ok) throw new Error('DuplicateLocationCheck file not found');
-        return response.json();
+    fetch('./DuplicateLocationCheck.json?v=' + Date.now()).then(async response => {
+        if (!response.ok) return { data: [] }; // treat as empty if not found
+        try {
+            return await response.json();
+        } catch (e) {
+            console.warn('DuplicateLocationCheck.json is empty or invalid, treating as empty');
+            return { data: [] };
+        }
     })
 ])
 .then(([uswData, ussData, uscData, useData, locationsData, duplicateCheckData]) => {
