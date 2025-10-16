@@ -13,7 +13,11 @@ let syncState = { lastAttempt: null, lastSuccess: null, pending: 0 };
 
 // Helper: build canonical storage key for a row (territory-prefixed)
 function makeCorrectionKey(r) {
-    const fieldKey = (r.correct === 'Zesty Name to Site Title') ? 'siteTitle' : (r.field || '');
+    let fieldKey = r.field || '';
+    // Use special key for name-related site title corrections to keep them separate
+    if (r.correct === 'Zesty Name to Site Title') {
+        fieldKey = 'nameToSiteTitle';
+    }
     return `${r.territory || ''}-${r.gdos_id}-${fieldKey}`;
 }
 
@@ -34,6 +38,12 @@ async function persistSingleCorrection(rowData) {
     const entry = buildCorrectionEntry(rowData);
     const delta = {};
     delta[key] = entry === null ? null : entry;
+    
+    // If saving GDOS for name field, also delete any existing "Zesty Name to Site Title" correction
+    if (rowData.correct === 'GDOS' && rowData.field === 'name') {
+        const nameToSiteTitleKey = `${rowData.territory || ''}-${rowData.gdos_id}-nameToSiteTitle`;
+        delta[nameToSiteTitleKey] = null; // Delete the nameToSiteTitle correction
+    }
 
     try {
         const res = await fetch(SHARED_STORAGE_URL, {
@@ -44,16 +54,16 @@ async function persistSingleCorrection(rowData) {
         if (!res.ok) throw new Error(`Status ${res.status}`);
 
         // On success, update loadedCorrections
-        if (entry === null) {
-            delete loadedCorrections[key];
-        } else {
-            loadedCorrections[key] = entry;
-        }
+        Object.keys(delta).forEach(k => {
+            if (delta[k] === null) {
+                delete loadedCorrections[k];
+            } else {
+                loadedCorrections[k] = delta[k];
+            }
+        });
 
-        // Apply the change to differencesData for immediate UI update
-        const singleCorrections = {};
-        singleCorrections[key] = entry;
-        applyChanges(singleCorrections);
+        // Apply the changes to differencesData for immediate UI update
+        applyChanges(delta);
 
         // Update the table
         const table = window.differencesTable || (typeof Tabulator !== 'undefined' && typeof Tabulator.findTable === 'function' ? Tabulator.findTable("#differencesTable")[0] : null);
@@ -995,7 +1005,7 @@ function applyChanges(changes) {
 
         // If this correction asks for Zesty Name -> Site Title, ensure we update both any existing siteTitle row
         // and the name row (transforming the name row if needed). This avoids missing the editable siteTitle input.
-        if (savedRow.correct === 'Zesty Name to Site Title') {
+        if (savedRow.correct === 'Zesty Name to Site Title' || field === 'nameToSiteTitle') {
             // Update the name row to use the site title value and mark as siteTitleRow for styling
             const nameRow = differencesData.find(row => candidates.includes(String(row.gdos_id)) && row.field === 'name');
             if (nameRow) {
@@ -1046,8 +1056,8 @@ function applyChanges(changes) {
             }
         }
 
-        // Skip general case for 'Zesty Name to Site Title' and 'Zesty Custom Value to openHoursText' since they're handled above
-        if (savedRow.correct === 'Zesty Name to Site Title' || savedRow.correct === 'Zesty Custom Value to openHoursText') {
+        // Skip general case for 'Zesty Name to Site Title', 'Zesty Custom Value to openHoursText', and nameToSiteTitle since they're handled above
+        if (savedRow.correct === 'Zesty Name to Site Title' || savedRow.correct === 'Zesty Custom Value to openHoursText' || field === 'nameToSiteTitle') {
             return;
         }
 
@@ -1135,8 +1145,8 @@ function applyPendingCorrections() {
 
     // Build and download a CSV of corrections where GDOS is not the correct value
     function downloadCorrectionsCsv() {
-        // We want one row per GDOS record where the chosen correct value is Zesty (i.e., not GDOS)
-        // Columns: GDOS ID, Name (with correct value), Address1, Address2, City, State, Zip, PhoneNumber, OpenHoursText, PrimaryWebsite, Division, Territory
+        // Export all corrections including GDOS selections, plus unpublished/not imported records
+        // Columns: GDOS ID, Name (with correct value), Address1, Address2, City, State, Zip, PhoneNumber, OpenHoursText, PrimaryWebsite, Published, Site Title, Division, Territory
         const table = Tabulator.findTable("#differencesTable")[0];
         if (!table) {
             alert('Table not initialized yet');
@@ -1145,12 +1155,10 @@ function applyPendingCorrections() {
 
         const allRows = table.getData();
 
-        // Group by gdos_id and collect the final values for fields
+        // Group by gdos_id and collect all corrections (including GDOS)
         const grouped = new Map();
         allRows.forEach(r => {
-            // use final_value and correct to determine whether GDOS is NOT correct
             if (!r.gdos_id) return;
-            if (r.correct === 'GDOS') return; // only collect rows where correct is not GDOS
 
             const gid = r.gdos_id;
             if (!grouped.has(gid)) {
@@ -1168,11 +1176,15 @@ function applyPendingCorrections() {
                     division: r.division || '',
                     territory: r.territory || '',
                     published: '',
-                    siteTitle: ''
+                    siteTitle: '',
+                    hasCorrections: false // Track if this record has any corrections
                 });
             }
 
             const entry = grouped.get(gid);
+            // Mark that this record has corrections
+            entry.hasCorrections = true;
+
             // The field indicates which property changed; final_value holds the chosen value
             const field = r.field;
             const finalVal = r.final_value;
@@ -1180,7 +1192,15 @@ function applyPendingCorrections() {
             // Map the comparison field names to import sheet columns
             switch (field) {
                 case 'name':
-                    entry.name = finalVal || entry.name;
+                    // Special handling for "Zesty Name to Site Title" corrections
+                    if (r.correct === 'Zesty Name to Site Title') {
+                        // Keep GDOS name in name column, put Zesty value in siteTitle column
+                        entry.name = r.gdos_value || entry.name;
+                        entry.siteTitle = r.zesty_value || entry.siteTitle;
+                    } else {
+                        // Normal case: use final_value for name column
+                        entry.name = finalVal || entry.name;
+                    }
                     break;
                 case 'address':
                     entry.address1 = finalVal || entry.address1;
@@ -1206,8 +1226,37 @@ function applyPendingCorrections() {
             }
         });
 
-        // Fill missing fields from GDOS source data (gdosMap) and convert grouped Map to CSV
+        // Fill missing fields from GDOS source data and add records that should be unpublished/not imported
         const rows = Array.from(grouped.values());
+        
+        // Also add records that should be unpublished/not imported but may not have corrections in the table
+        duplicateMap.forEach((duplicateRecord, gdosId) => {
+            const doNotImportFlag = duplicateRecord && (duplicateRecord.doNotImport === 'True' || duplicateRecord.doNotImport === true || String(duplicateRecord.doNotImport).toLowerCase() === 'true');
+            if (doNotImportFlag && !grouped.has(gdosId)) {
+                // Add this record to the export with published = 'False'
+                const gdosRecord = gdosMap.get(gdosId);
+                if (gdosRecord) {
+                    rows.push({
+                        gdos_id: gdosId,
+                        name: getNestedValue(gdosRecord, 'name') || '',
+                        address1: getNestedValue(gdosRecord, 'address1') || '',
+                        address2: getNestedValue(gdosRecord, 'address2') || '',
+                        city: getNestedValue(gdosRecord, 'city') || '',
+                        state: extractStateValue(getNestedValue(gdosRecord, 'state') || getNestedValue(gdosRecord, 'address.state')) || '',
+                        zip: getNestedValue(gdosRecord, 'zip.zipcode') || getNestedValue(gdosRecord, 'zipcode') || '',
+                        phone: getNestedValue(gdosRecord, 'phone') || getNestedValue(gdosRecord, 'phoneNumber') || '',
+                        openhours: getNestedValue(gdosRecord, 'openHoursText') || '',
+                        website: getNestedValue(gdosRecord, 'primaryWebsite') || '',
+                        division: getNestedValue(gdosRecord, 'location.division.name') || '',
+                        territory: gdosRecord.territory || '',
+                        published: 'False', // Explicitly set to False for doNotImport records
+                        siteTitle: '',
+                        hasCorrections: false
+                    });
+                }
+            }
+        });
+        
         rows.forEach(entry => {
             const gdosRecord = gdosMap.get(entry.gdos_id);
             // Look up duplicate record for this entry
@@ -1252,15 +1301,19 @@ function applyPendingCorrections() {
                 entry.published = 'False';
             }
         });
-        if (rows.length === 0) {
-            alert('No corrections where GDOS is not the correct value were found.');
+        
+        // Filter to only include records that have corrections OR should be unpublished
+        const finalRows = rows.filter(entry => entry.hasCorrections || entry.published === 'False');
+        
+        if (finalRows.length === 0) {
+            alert('No corrections or records to unpublish were found.');
             return;
         }
 
         const headers = ['GDOS ID','Name','Address1','Address2','City','State','Zip','PhoneNumber','OpenHoursText','PrimaryWebsite','Published','Site Title','Division','Territory'];
         const csvLines = [headers.join(',')];
 
-        rows.forEach(r => {
+        finalRows.forEach(r => {
             const vals = [
                 escapeCsv(r.gdos_id),
                 escapeCsv(r.name),
@@ -1506,7 +1559,7 @@ function applyGlobalFilters() {
         console.log('Adding hide siteTitle/openHours filter');
         table.addFilter(function(data, filterParams) {
             // Don't hide name rows that have been corrected to use site title values
-            if (data.field === 'name' && data.correct === 'Zesty Name to Site Title') {
+            if (data.field === 'name' && (data.correct === 'Zesty Name to Site Title' || data.siteTitleRow)) {
                 return true;
             }
             const result = data.field !== 'siteTitle' && data.field !== 'openHoursText';

@@ -114,18 +114,13 @@
                                 Download Corrections CSV
                             </button>
 
-                            <!-- Grouped filter buttons: Show Duplicates, Show Do Not Import, Clear Filters (red) -->
-                            <div class="btn-group" role="group" aria-label="filter-group">
-                                <button type="button" class="btn btn-outline-secondary btn-sm" onclick="filterDuplicates()">
-                                    Show Duplicates Only
-                                </button>
-                                <button type="button" class="btn btn-outline-warning btn-sm" onclick="filterDoNotImport()">
-                                    Show Do Not Import
-                                </button>
-                                <button type="button" class="btn btn-danger btn-sm" onclick="clearFilters()">
-                                    Clear Filters
-                                </button>
-                            </div>
+                            <!-- Filter buttons: Show Duplicates, Show Do Not Import -->
+                            <button type="button" class="btn btn-outline-secondary btn-sm" onclick="filterDuplicates()">
+                                Show Duplicates
+                            </button>
+                            <button type="button" class="btn btn-outline-warning btn-sm" onclick="filterDoNotImport()">
+                                Show Do Not Import
+                            </button>
 
                             <button type="button" class="btn btn-outline-primary btn-sm" data-bs-toggle="modal" data-bs-target="#rulesModal">
                                 View Comparison Rules
