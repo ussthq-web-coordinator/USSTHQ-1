@@ -8,7 +8,7 @@ export default {
       return {
         'Access-Control-Allow-Origin': origin,
         'Access-Control-Allow-Methods': 'GET, POST, PUT, PATCH, DELETE, OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type, X-Worker-Token, Accept, Authorization, If-None-Match',
+        'Access-Control-Allow-Headers': '*',
         'Access-Control-Allow-Credentials': 'true',
         'Access-Control-Max-Age': '600',
         'Vary': 'Origin'
