@@ -1111,7 +1111,6 @@ async function loadSavedChanges() {
         try { applyPendingCorrections(); } catch (e) { console.warn('applyPendingCorrections failed in finally', e); }
         hideLoadingOverlay();
     }
-    }
 }
 
 // Merge all queued deltas into one object and PATCH to server; on success clear queue and reconcile
