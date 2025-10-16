@@ -112,7 +112,7 @@ async function syncQueue() {
         try {
             const res = await fetch(SHARED_STORAGE_URL, {
                 method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
+                headers: Object.assign({ 'Content-Type': 'application/json' }, authHeaders()),
                 body: JSON.stringify(merged)
             });
             if (!res.ok) throw new Error(`Status ${res.status}`);
@@ -224,6 +224,16 @@ function showServerResponseModal(obj) {
 
 // Shared storage configuration - using Cloudflare Worker for storage
 const SHARED_STORAGE_URL = 'https://odd-breeze-03d9.uss-thq-cloudflare-account.workers.dev';
+
+// Helper to retrieve worker token from localStorage. This keeps the secret out of source control.
+function getWorkerToken() {
+    try { return localStorage.getItem('WORKER_TOKEN') || ''; } catch (e) { return ''; }
+}
+
+function authHeaders() {
+    const token = getWorkerToken();
+    return token ? { 'X-Worker-Token': token } : {};
+}
 
 // Raw JSONs for modal inspection
 let rawUsw = null;
@@ -752,9 +762,7 @@ function saveChanges() {
         console.log('Enqueued delta and attempting immediate send:', delta);
         return fetch(SHARED_STORAGE_URL, {
             method: 'PATCH',
-            headers: {
-                'Content-Type': 'application/json'
-            },
+            headers: Object.assign({ 'Content-Type': 'application/json' }, authHeaders()),
             body: payload
         })
         .then(async response => {
