@@ -363,7 +363,7 @@ function correctValueFormatter(cell, formatterParams, onRendered) {
         const rowData = row.getData();
         rowData.correct = newValue;
         if (newValue === 'Zesty Name to Site Title') {
-            rowData.field = 'siteTitle';
+            // Special case: use Zesty name value for siteTitle
             rowData.final_value = rowData.zesty_value;
         } else {
             rowData.final_value = newValue === 'GDOS' ? rowData.gdos_value : rowData.zesty_value;
@@ -435,7 +435,7 @@ function saveChanges() {
         // Save to shared storage only
         const corrections = data.filter(r => r.correct !== 'GDOS').map(r => ({
             gdos_id: r.gdos_id,
-            field: r.field,
+            field: r.correct === 'Zesty Name to Site Title' ? 'siteTitle' : r.field,
             correct: r.correct
         }));
         console.log('Saving corrections to shared storage:', corrections);
@@ -497,7 +497,7 @@ function updateMetrics() {
     }
     const total = data.length;
     const gdosCount = data.filter(r => r.correct === 'GDOS').length;
-    const zestyCount = data.filter(r => r.correct === 'Zesty').length;
+    const zestyCount = data.filter(r => r.correct === 'Zesty' || r.correct === 'Zesty Name to Site Title').length;
 
     // per-field counts
     const fieldCounts = data.reduce((acc, r) => {
@@ -548,15 +548,43 @@ function loadSavedChanges() {
 function applyChanges(changes) {
     console.log('Applying changes from shared storage:', changes);
     changes.forEach(savedRow => {
-        const currentRow = differencesData.find(row => 
+        let currentRow = differencesData.find(row => 
             row.gdos_id === savedRow.gdos_id && row.field === savedRow.field
         );
+        if (!currentRow && savedRow.field === 'siteTitle' && savedRow.correct === 'Zesty Name to Site Title') {
+            // Special case: create a synthetic siteTitle row for "Zesty Name to Site Title"
+            // Find the corresponding name row to get the data
+            const nameRow = differencesData.find(row => 
+                row.gdos_id === savedRow.gdos_id && row.field === 'name'
+            );
+            if (nameRow) {
+                currentRow = {
+                    gdos_id: savedRow.gdos_id,
+                    name: nameRow.name,
+                    property_type: nameRow.property_type,
+                    division: nameRow.division,
+                    territory: nameRow.territory,
+                    published: nameRow.published,
+                    duplicate: nameRow.duplicate,
+                    doNotImport: nameRow.doNotImport,
+                    field: 'siteTitle',
+                    gdos_value: '', // No GDOS siteTitle to compare
+                    zesty_value: nameRow.zesty_value, // Use the Zesty name value
+                    correct: savedRow.correct,
+                    final_value: nameRow.zesty_value,
+                    synthetic: true // Mark as synthetic since it's not a real difference
+                };
+                differencesData.push(currentRow);
+                // Also mark the name row as corrected to Zesty
+                nameRow.correct = 'Zesty';
+                nameRow.final_value = nameRow.zesty_value;
+            }
+        }
         if (currentRow) {
             console.log('Applying to row:', currentRow.gdos_id, currentRow.field, '-> correct:', savedRow.correct);
             currentRow.correct = savedRow.correct;
             // Compute final_value based on correct
             if (savedRow.correct === 'Zesty Name to Site Title') {
-                currentRow.field = 'siteTitle';
                 currentRow.final_value = currentRow.zesty_value;
             } else {
                 currentRow.final_value = savedRow.correct === 'GDOS' ? currentRow.gdos_value : currentRow.zesty_value;
@@ -997,7 +1025,14 @@ function applyGlobalFilters() {
         filters.push({ field: 'territory', type: '=', value: territorySelect.value });
     }
     if (correctSelect && correctSelect.value && correctSelect.value !== 'all') {
-        filters.push({ field: 'correct', type: '=', value: correctSelect.value });
+        if (correctSelect.value === 'Zesty') {
+            // Include both 'Zesty' and 'Zesty Name to Site Title'
+            filters.push(function(data, filterParams) {
+                return data.correct === 'Zesty' || data.correct === 'Zesty Name to Site Title';
+            });
+        } else {
+            filters.push({ field: 'correct', type: '=', value: correctSelect.value });
+        }
     }
     if (fieldSelect && fieldSelect.value && fieldSelect.value !== 'all') {
         filters.push({ field: 'field', type: '=', value: fieldSelect.value });
