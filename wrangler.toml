@@ -1,0 +1,16 @@
+name = "gdos-corrections-worker"
+main = "worker/index.mjs"
+compatibility_date = "2025-02-04"
+
+# Optional: enable observability if you have an account that supports it
+[observability]
+  enabled = true
+
+# Bind the KV namespace (replace id with your real KV namespace id)
+[[kv_namespaces]]
+binding = "KV"
+id = "0135b19c3b1e45a2a51abe5218a02e4c"
+
+# Optional: define environment variables (set secrets via `wrangler secret put` instead)
+[vars]
+#WORKER_SECRET = "replace-with-secret-if-desired"

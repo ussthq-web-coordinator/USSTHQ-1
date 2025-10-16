@@ -6,6 +6,70 @@ let duplicateCheckRecords = [];
 let pendingCorrections = {};
 // latestFilteredData holds the current set of rows matching active filters (all pages)
 let latestFilteredData = null;
+// In-memory copy of corrections loaded from shared storage (used to compute deltas)
+let loadedCorrections = {};
+// Persistence queue stored in localStorage to survive reloads
+const PERSIST_QUEUE_KEY = 'correctionsQueue';
+let persistQueue = [];
+// Sync state for UI
+let syncState = { lastAttempt: null, lastSuccess: null, pending: 0 };
+
+function loadPersistQueue() {
+    try {
+        const raw = localStorage.getItem(PERSIST_QUEUE_KEY);
+        if (raw) persistQueue = JSON.parse(raw) || [];
+    } catch (e) { console.warn('Failed to load persist queue', e); persistQueue = []; }
+}
+
+function savePersistQueue() {
+    try { localStorage.setItem(PERSIST_QUEUE_KEY, JSON.stringify(persistQueue)); } catch (e) { console.warn('Failed to save persist queue', e); }
+}
+
+// Update the sync status badge
+function updateSyncStatus() {
+    const el = document.getElementById('syncStatus');
+    if (!el) return;
+    el.textContent = syncState.pending > 0 ? `⚠ ${syncState.pending} pending` : `✓ in sync`;
+    el.className = syncState.pending > 0 ? 'small text-warning' : 'small text-success';
+}
+
+// Background sync: attempt to flush the queue, with simple retry/backoff
+async function syncQueue() {
+    if (!persistQueue || persistQueue.length === 0) {
+        syncState.pending = 0; updateSyncStatus(); return;
+    }
+    syncState.lastAttempt = Date.now();
+    syncState.pending = persistQueue.length; updateSyncStatus();
+
+    // try to send entries one by one so server-side merging is simpler
+    for (let i = 0; i < persistQueue.length; ) {
+        const item = persistQueue[i];
+        try {
+            const res = await fetch(SHARED_STORAGE_URL, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(item)
+            });
+            if (!res.ok) throw new Error(`Status ${res.status}`);
+            // remove the item from queue on success
+            persistQueue.splice(i, 1);
+            savePersistQueue();
+            syncState.lastSuccess = Date.now();
+            syncState.pending = persistQueue.length; updateSyncStatus();
+            // small delay between items to avoid rate limits
+            await new Promise(r => setTimeout(r, 200));
+        } catch (e) {
+            console.warn('syncQueue item failed, will retry later', e);
+            // exponential backoff could be implemented; for now break and retry later
+            break;
+        }
+    }
+}
+
+// ensure queue is loaded and background sync starts
+loadPersistQueue();
+setInterval(syncQueue, 5000);
+setTimeout(syncQueue, 1500);
 
 // Shared storage configuration - using Cloudflare Worker for storage
 const SHARED_STORAGE_URL = 'https://odd-breeze-03d9.uss-thq-cloudflare-account.workers.dev';
@@ -486,47 +550,88 @@ function saveChanges() {
     const table = Tabulator.findTable("#differencesTable")[0];
     if (table) {
         const data = table.getData();
-        // Save to shared storage only
+    // Save to shared storage and a local fallback (localStorage) so UI changes persist immediately
         const corrections = {};
         // Use territory-prefixed keys so stored corrections can be mapped back to the correct row
         data.filter(r => r.correct !== 'GDOS').forEach(r => {
             const fieldKey = (r.correct === 'Zesty Name to Site Title') ? 'siteTitle' : r.field;
             const key = `${r.territory}-${r.gdos_id}-${fieldKey}`;
-            corrections[key] = {
-                correct: r.correct,
-                // For editable rows, also save the custom zesty_value
-                ...(r.editable && { value: r.zesty_value })
-            };
+            // Save the chosen correct value and include any Zesty value present so re-load can reconstruct siteTitle rows
+            const entry = { correct: r.correct };
+            if (r.zesty_value !== undefined && r.zesty_value !== null && String(r.zesty_value).trim() !== '') {
+                entry.value = r.zesty_value;
+            }
+            corrections[key] = entry;
         });
+        // Persist a local copy immediately so reloads reflect the user's change even if shared storage is slow/unavailable
+        try {
+            localStorage.setItem('localCorrections', JSON.stringify(corrections));
+        } catch (e) { console.warn('localStorage write failed', e); }
         console.log('Saving corrections to shared storage:', corrections);
-        const updatedData = corrections; // Send corrections object directly
-        const payload = JSON.stringify(updatedData);
-        console.log('Payload size:', payload.length, 'bytes');
+        // Compute minimal delta against loadedCorrections
+        const delta = {};
+        Object.entries(corrections).forEach(([k, v]) => {
+            // If key is new or value changed, include in delta
+            const existing = loadedCorrections[k];
+            if (!existing || JSON.stringify(existing) !== JSON.stringify(v)) {
+                delta[k] = v;
+            }
+        });
+        // Also detect removals (keys present in loadedCorrections but now absent)
+        Object.keys(loadedCorrections).forEach(k => {
+            if (!corrections[k]) {
+                // mark as null to indicate deletion
+                delta[k] = null;
+            }
+        });
+
+        // If no changes, still update metrics and return resolved promise
+        if (Object.keys(delta).length === 0) {
+            try { updateMetrics(); } catch(e) { console.warn('updateMetrics failed', e); }
+            return Promise.resolve();
+        }
+
+        // Enqueue delta for reliable persistence
+        persistQueue.push(delta);
+        savePersistQueue();
+        syncState.pending = persistQueue.length; updateSyncStatus();
+
+        // Attempt immediate send for responsiveness (queue guarantees persistence)
+        const payload = JSON.stringify(delta);
+        console.log('Enqueued delta and attempting immediate send:', delta);
         return fetch(SHARED_STORAGE_URL, {
-            method: 'PUT',
+            method: 'PATCH',
             headers: {
                 'Content-Type': 'application/json'
             },
             body: payload
         })
         .then(response => {
-            if (!response.ok) {
-                console.error('Save failed with status:', response.status, response.statusText);
-                return response.text().then(text => {
-                    console.error('Response body:', text);
-                    throw new Error(`Save failed: ${response.status}`);
-                });
+            if (!response.ok) throw new Error(`Status ${response.status}`);
+            // On success, remove this delta from the queue (it may be the first item or merged)
+            // Simple approach: try to remove an identical item from queue
+            for (let i = 0; i < persistQueue.length; i++) {
+                try {
+                    if (JSON.stringify(persistQueue[i]) === JSON.stringify(delta)) {
+                        persistQueue.splice(i, 1);
+                        savePersistQueue();
+                        break;
+                    }
+                } catch (e) {}
             }
-            return response.text(); // PUT returns "OK" as text
+            syncState.pending = persistQueue.length; updateSyncStatus();
+            // Merge delta into loadedCorrections
+            Object.entries(delta).forEach(([k, v]) => {
+                if (v === null) delete loadedCorrections[k]; else loadedCorrections[k] = v;
+            });
+            try { localStorage.setItem('localCorrections', JSON.stringify(loadedCorrections)); } catch (e) { console.warn('localStorage write failed', e); }
+            try { populateCorrectValueDropdown(loadedCorrections); } catch(e) { console.warn('populateCorrectValueDropdown failed after save', e); }
+            console.log('Immediate send succeeded and delta merged');
         })
-        .then(() => {
-            console.log('Changes saved to shared storage');
-            // Update the correct-value dropdown to reflect newly-saved corrections
-            try { populateCorrectValueDropdown(corrections); } catch(e) { console.warn('populateCorrectValueDropdown failed after save', e); }
+        .catch(error => {
+            console.warn('Immediate send failed, delta will remain in queue and be retried:', error);
         })
-        .catch(error => console.warn('Shared storage save failed:', error))
         .finally(() => {
-            // update metrics live regardless of save result
             try { updateMetrics(); } catch(e) { console.warn('updateMetrics failed', e); }
         });
     }
@@ -609,9 +714,23 @@ async function loadSavedChanges() {
             corrections = data;
         }
 
+        // Merge local fallback corrections (if any) so user changes persist across reloads
+        try {
+            const local = localStorage.getItem('localCorrections');
+            if (local) {
+                const parsedLocal = JSON.parse(local);
+                if (parsedLocal && typeof parsedLocal === 'object') {
+                    corrections = Object.assign({}, corrections || {}, parsedLocal);
+                    console.log('Merged localCorrections into fetched corrections');
+                }
+            }
+        } catch (e) { console.warn('Failed to merge localCorrections', e); }
+
         if (typeof corrections === 'object' && corrections !== null) {
+            // store loaded corrections for delta computation on save
+            loadedCorrections = Object.assign({}, corrections);
             applyChanges(corrections);
-            console.log('Shared corrections loaded');
+            console.log('Shared corrections loaded (merged with local if present)');
             const table = window.differencesTable || (typeof Tabulator !== 'undefined' && typeof Tabulator.findTable === 'function' ? Tabulator.findTable("#differencesTable")[0] : null);
             if (table && typeof table.setData === 'function') {
                 await table.setData(differencesData);
