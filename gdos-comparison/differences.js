@@ -996,15 +996,12 @@ function applyChanges(changes) {
         // If this correction asks for Zesty Name -> Site Title, ensure we update both any existing siteTitle row
         // and the name row (transforming the name row if needed). This avoids missing the editable siteTitle input.
         if (savedRow.correct === 'Zesty Name to Site Title') {
-            // Update the name row to use the site title value and change its field to siteTitle
+            // Update the name row to use the site title value
             const nameRow = differencesData.find(row => candidates.includes(String(row.gdos_id)) && row.field === 'name');
             if (nameRow) {
-                nameRow.field = 'siteTitle';
                 nameRow.correct = savedRow.correct;
                 if (savedRow.value !== undefined) nameRow.zesty_value = savedRow.value;
                 nameRow.final_value = nameRow.zesty_value;
-                nameRow.siteTitleRow = true;
-                nameRow.editable = true;
             }
 
             // Ensure we update an existing siteTitle row or create one from the name row
