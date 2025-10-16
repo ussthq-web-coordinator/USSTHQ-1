@@ -783,21 +783,6 @@ function correctValueFormatter(cell, formatterParams, onRendered) {
     const row = cell.getRow();
     const rowData = row.getData();
 
-    // For editable rows, show a fixed "Custom Zesty" label since they provide custom values
-    // But for siteTitle alwaysShow rows, show "Zesty Name to Site Title"
-    if (rowData.editable) {
-        const span = document.createElement('span');
-        span.className = 'text-muted small';
-        if (rowData.field === 'siteTitle' && rowData.siteTitleRow) {
-            span.textContent = 'Zesty Name to Site Title';
-            span.title = 'Using Zesty name as siteTitle (editable)';
-        } else {
-            span.textContent = 'Custom Zesty';
-            span.title = 'This field allows custom Zesty values to be entered';
-        }
-        return span;
-    }
-
     const select = document.createElement('select');
     select.className = 'form-select form-select-sm';
     let options = `
@@ -1048,47 +1033,53 @@ function updateMetrics() {
 async function loadSavedChanges() {
     showLoadingOverlay();
     const preSnapshot = snapshotDifferences();
+    let corrections = {};
     try {
-        const response = await fetch(SHARED_STORAGE_URL);
-        if (!response.ok) throw new Error('Shared storage not available');
-        const data = await response.json();
+        try {
+            const response = await fetch(SHARED_STORAGE_URL);
+            if (!response.ok) throw new Error('Shared storage not available');
+            const data = await response.json();
 
-        // Support worker responses that wrap the authoritative object as { current, version }
-        const payload = (data && typeof data === 'object' && data.current) ? data.current : data;
+            // Support worker responses that wrap the authoritative object as { current, version }
+            const payload = (data && typeof data === 'object' && data.current) ? data.current : data;
 
-        let corrections;
-        if (payload && typeof payload === 'object' && payload.data && Array.isArray(payload.data)) {
-            // Old format: convert array to object
-            corrections = {};
-            payload.data.forEach(savedRow => {
-                const key = `${savedRow.gdos_id}-${savedRow.correct === 'Zesty Name to Site Title' ? 'siteTitle' : savedRow.field}`;
-                corrections[key] = {
-                    correct: savedRow.correct,
-                    value: savedRow.customZestyValue || savedRow.zesty_value
-                };
-            });
-        } else {
-            // New format: payload is the corrections object directly
-            corrections = payload;
+            if (payload && typeof payload === 'object' && payload.data && Array.isArray(payload.data)) {
+                // Old format: convert array to object
+                corrections = {};
+                payload.data.forEach(savedRow => {
+                    const key = `${savedRow.gdos_id}-${savedRow.correct === 'Zesty Name to Site Title' ? 'siteTitle' : savedRow.field}`;
+                    corrections[key] = {
+                        correct: savedRow.correct,
+                        value: savedRow.customZestyValue || savedRow.zesty_value
+                    };
+                });
+            } else {
+                // New format: payload is the corrections object directly
+                corrections = payload || {};
+            }
+
+            // Save to localStorage as cache
+            try { localStorage.setItem('localCorrections', JSON.stringify(corrections)); } catch (e) { console.warn('Failed to cache corrections locally', e); }
+
+        } catch (e) {
+            console.warn('Failed to load from shared storage, falling back to local cache', e);
+            try {
+                const local = localStorage.getItem('localCorrections');
+                if (local) {
+                    corrections = JSON.parse(local);
+                }
+            } catch (e2) {
+                console.warn('Failed to load localCorrections', e2);
+                corrections = {};
+            }
         }
 
-        // Merge local fallback corrections (if any) so user changes persist across reloads
-        try {
-            const local = localStorage.getItem('localCorrections');
-            if (local) {
-                const parsedLocal = JSON.parse(local);
-                if (parsedLocal && typeof parsedLocal === 'object') {
-                    corrections = Object.assign({}, corrections || {}, parsedLocal);
-                    console.log('Merged localCorrections into fetched corrections');
-                }
-            }
-        } catch (e) { console.warn('Failed to merge localCorrections', e); }
+        // Set loadedCorrections
+        loadedCorrections = Object.assign({}, corrections);
 
         if (typeof corrections === 'object' && corrections !== null) {
-            // store loaded corrections for delta computation on save
-            loadedCorrections = Object.assign({}, corrections);
             applyChanges(corrections);
-            console.log('Shared corrections loaded (merged with local if present)');
+            console.log('Corrections loaded from primary storage (worker), with local cache fallback');
             const table = window.differencesTable || (typeof Tabulator !== 'undefined' && typeof Tabulator.findTable === 'function' ? Tabulator.findTable("#differencesTable")[0] : null);
             if (table && typeof table.setData === 'function') {
                 await table.setData(differencesData);
@@ -1116,13 +1107,10 @@ async function loadSavedChanges() {
             }
             return;
         }
-        throw new Error('Invalid shared data');
-    } catch (error) {
-        console.warn('Failed to load shared corrections:', error);
-        populateCorrectValueDropdown({});
     } finally {
         try { applyPendingCorrections(); } catch (e) { console.warn('applyPendingCorrections failed in finally', e); }
         hideLoadingOverlay();
+    }
     }
 }
 
@@ -1970,6 +1958,18 @@ function reconcileServerState(serverPayload) {
 
         syncState.pending = persistQueue.length; updateSyncStatus();
         try { populateCorrectValueDropdown(loadedCorrections); } catch (e) { console.warn('populateCorrectValueDropdown failed during reconciliation', e); }
+
+        // Apply the updated corrections to the UI
+        applyChanges(loadedCorrections);
+        const table = window.differencesTable || (typeof Tabulator !== 'undefined' && typeof Tabulator.findTable === 'function' ? Tabulator.findTable("#differencesTable")[0] : null);
+        if (table && typeof table.setData === 'function') {
+            table.setData(differencesData);
+        } else if (table && typeof table.replaceData === 'function') {
+            table.replaceData(differencesData);
+        } else {
+            console.debug('Table not present for live update; will be updated on next full load.');
+        }
+
         console.log('Reconciled with server state; queue compacted. Pending:', persistQueue.length);
     } catch (e) {
         console.warn('reconcileServerState failed', e);
@@ -2162,3 +2162,19 @@ async function seedServerWithObject(obj) {
 window.seedServerFromLocal = seedServerFromLocal;
 window.seedServerFromQueue = seedServerFromQueue;
 window.seedServerWithObject = seedServerWithObject;
+
+// Function to manually refresh the UI from current storage state
+async function refreshFromStorage() {
+    try {
+        const res = await fetch(SHARED_STORAGE_URL);
+        if (!res.ok) throw new Error('Failed to fetch storage');
+        const data = await res.json();
+        reconcileServerState(data);
+        console.log('Refreshed from storage');
+    } catch (e) {
+        console.warn('refreshFromStorage failed', e);
+        alert('Failed to refresh from storage: ' + e.message);
+    }
+}
+
+window.refreshFromStorage = refreshFromStorage;
