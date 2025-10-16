@@ -1317,7 +1317,16 @@ function clearFilters() {
     if (territorySelect) territorySelect.value = 'all';
     if (correctSelect) correctSelect.value = 'all';
     if (fieldSelect) fieldSelect.value = 'all';
-    if (hideSiteTitleOpenHoursCheckbox) hideSiteTitleOpenHoursCheckbox.checked = true; // Reset to default (checked)
+    if (hideSiteTitleOpenHoursCheckbox) {
+        hideSiteTitleOpenHoursCheckbox.checked = true; // Reset to default (checked)
+        try {
+            // Trigger the change event to ensure filters re-apply and localStorage is updated
+            hideSiteTitleOpenHoursCheckbox.dispatchEvent(new Event('change', { bubbles: true }));
+        } catch (e) {
+            // fallback for older browsers
+            hideSiteTitleOpenHoursCheckbox.dispatchEvent(new Event('change'));
+        }
+    }
     // Clear localStorage
     localStorage.removeItem('globalTerritoryFilter');
     localStorage.removeItem('globalCorrectFilter');
