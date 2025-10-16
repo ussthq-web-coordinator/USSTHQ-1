@@ -75,6 +75,32 @@ async function syncQueue() {
 loadPersistQueue();
 setInterval(syncQueue, 5000);
 setTimeout(syncQueue, 1500);
+// expose for debug console
+window.syncQueue = syncQueue;
+
+// Run sync now helper triggered by debug button
+async function runSyncNow() {
+    try {
+        const btn = document.getElementById('runSyncNowBtn');
+        if (btn) {
+            btn.disabled = true;
+            btn.textContent = 'Syncing...';
+        }
+        console.log('Manual sync triggered');
+        await syncQueue();
+        showTransientMessage('Sync attempt finished', 3000);
+        console.log('Manual sync finished. persistQueue length:', persistQueue.length, 'localCorrections:', localStorage.getItem('localCorrections'));
+    } catch (e) {
+        console.warn('Manual sync failed', e);
+        showTransientMessage('Sync failed — check console', 5000);
+    } finally {
+        const btn = document.getElementById('runSyncNowBtn');
+        if (btn) {
+            btn.disabled = false;
+            btn.textContent = 'Run sync now';
+        }
+    }
+}
 
 // Shared storage configuration - using Cloudflare Worker for storage
 const SHARED_STORAGE_URL = 'https://odd-breeze-03d9.uss-thq-cloudflare-account.workers.dev';
