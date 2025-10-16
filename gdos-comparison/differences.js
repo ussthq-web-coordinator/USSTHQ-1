@@ -21,8 +21,121 @@ function loadPersistQueue() {
     } catch (e) { console.warn('Failed to load persist queue', e); persistQueue = []; }
 }
 
+// Normalize persistQueue so every item is a wrapper { delta, attempts?, backoffUntil? }
+function normalizePersistQueue() {
+    if (!Array.isArray(persistQueue)) return;
+    let changed = false;
+    persistQueue = persistQueue.map(item => {
+        if (!item) return item;
+        if (typeof item === 'object' && item.hasOwnProperty('delta')) return item;
+        // Plain delta -> wrap it
+        if (typeof item === 'object') {
+            changed = true;
+            return { delta: item, attempts: 0 };
+        }
+        return item;
+    });
+    if (changed) savePersistQueue();
+}
+
 function savePersistQueue() {
     try { localStorage.setItem(PERSIST_QUEUE_KEY, JSON.stringify(persistQueue)); } catch (e) { console.warn('Failed to save persist queue', e); }
+}
+
+// Helper: build canonical storage key for a row (territory-prefixed)
+function makeCorrectionKey(r) {
+    const fieldKey = (r.correct === 'Zesty Name to Site Title') ? 'siteTitle' : (r.field || '');
+    return `${r.territory || ''}-${r.gdos_id}-${fieldKey}`;
+}
+
+// Helper: build correction entry object from a rowData
+function buildCorrectionEntry(r) {
+    if (!r || !r.correct) return null;
+    if (r.correct === 'GDOS') return null; // indicates deletion
+    const entry = { correct: r.correct };
+    try {
+        if (r.zesty_value !== undefined && r.zesty_value !== null && String(r.zesty_value).trim() !== '') entry.value = r.zesty_value;
+    } catch (e) { /* ignore */ }
+    return entry;
+}
+
+// Remove matching delta object(s) from persistQueue (used after successful immediate send)
+function removeMatchingDeltaFromQueue(targetDelta) {
+    if (!targetDelta || typeof targetDelta !== 'object') return;
+    const strTarget = JSON.stringify(targetDelta);
+    let changed = false;
+    persistQueue = persistQueue.filter(item => {
+        const d = (item && typeof item === 'object' && item.hasOwnProperty('delta')) ? item.delta : item;
+        if (!d) return true; // keep non-deltas
+        if (JSON.stringify(d) === strTarget) {
+            changed = true;
+            return false; // remove this one
+        }
+        return true;
+    });
+    if (changed) savePersistQueue();
+}
+
+// Debounced immediate send map so rapid edits of the same key don't spin the network
+const _sendTimers = {};
+function scheduleImmediateSend(delta, key, delay = 250) {
+    // merge by key so subsequent calls consolidate
+    if (!key) key = JSON.stringify(delta);
+    if (_sendTimers[key]) clearTimeout(_sendTimers[key]);
+    _sendTimers[key] = setTimeout(async () => {
+        delete _sendTimers[key];
+        try {
+            const res = await fetch(SHARED_STORAGE_URL, {
+                method: 'PATCH',
+                headers: Object.assign({ 'Content-Type': 'application/json' }, authHeaders()),
+                body: JSON.stringify(delta)
+            });
+            if (!res.ok) throw new Error(`Status ${res.status}`);
+            let body = null;
+            try { body = await res.json(); } catch (e) { body = null; }
+            try { reconcileServerState(body); } catch (e) { console.warn('reconcileServerState failed after debounced send', e); }
+            // On success remove matching delta(s) from queue
+            try { removeMatchingDeltaFromQueue(delta); } catch (e) { console.warn('removeMatchingDeltaFromQueue failed', e); }
+        } catch (e) {
+            // leave the delta in the queue; syncQueue will retry with backoff
+            console.warn('Debounced immediate send failed', e);
+        }
+    }, delay);
+}
+
+// Persist a single change immediately: update loadedCorrections/localCorrections, enqueue a minimal delta,
+// and attempt a debounced immediate send. This guarantees every single change is persisted.
+function persistSingleCorrection(rowData) {
+    try {
+        const key = makeCorrectionKey(rowData);
+        const entry = buildCorrectionEntry(rowData);
+
+        // Update in-memory loadedCorrections for delta computation and UI
+        if (entry === null) {
+            delete loadedCorrections[key];
+        } else {
+            loadedCorrections[key] = entry;
+        }
+
+        // Persist local copy for immediate reload recovery
+        try { localStorage.setItem('localCorrections', JSON.stringify(loadedCorrections)); } catch (e) { console.warn('localStorage write failed in persistSingleCorrection', e); }
+
+        // Update dropdown/options immediately
+        try { populateCorrectValueDropdown(loadedCorrections); } catch (e) { console.warn('populateCorrectValueDropdown failed in persistSingleCorrection', e); }
+
+        // Enqueue minimal delta (single-key)
+        const delta = {};
+        delta[key] = entry === null ? null : entry;
+        // push wrapper for consistent queue entries
+        persistQueue.push({ delta, attempts: 0 });
+        savePersistQueue();
+        syncState.pending = persistQueue.length; updateSyncStatus();
+
+        // Attempt an immediate (debounced) send for responsiveness
+        scheduleImmediateSend(delta, key);
+    } catch (e) {
+        console.warn('persistSingleCorrection failed', e);
+    }
 }
 
 // Update the sync status badge
@@ -167,6 +280,9 @@ setTimeout(syncQueue, 1500);
 // expose for debug console
 window.syncQueue = syncQueue;
 
+// normalize queue right after loading
+try { normalizePersistQueue(); } catch (e) { console.warn('normalizePersistQueue failed', e); }
+
 // Run sync now helper triggered by debug button
 async function runSyncNow() {
     try {
@@ -223,7 +339,84 @@ function showServerResponseModal(obj) {
 }
 
 // Shared storage configuration - using Cloudflare Worker for storage
-const SHARED_STORAGE_URL = 'https://odd-breeze-03d9.uss-thq-cloudflare-account.workers.dev';
+const SHARED_STORAGE_URL = 'https://gdos-corrections-worker.uss-thq-cloudflare-account.workers.dev';
+
+// ETag / version of last seen server snapshot (used for conditional GET)
+let serverEtag = null;
+
+// Conflict notification throttling
+let _lastConflictNotify = 0;
+
+// Fetch latest server corrections with conditional GET. Returns { changed, payload }
+async function pollServerForChanges() {
+    try {
+        const headers = Object.assign({}, authHeaders());
+        if (serverEtag) headers['If-None-Match'] = String(serverEtag);
+        const res = await fetch(SHARED_STORAGE_URL, { method: 'GET', headers });
+        if (res.status === 304) {
+            // No changes since last version
+            return { changed: false };
+        }
+        if (!res.ok) throw new Error(`Status ${res.status}`);
+        const body = await res.json();
+        // body may be { current, version } or just object
+        const payload = body && body.current ? body : { current: body };
+        const version = payload.version || payload.current && payload.current._version || null;
+        // Prefer ETag header if present
+        const etag = res.headers.get('ETag') || version || null;
+        if (etag) serverEtag = String(etag);
+        return { changed: true, payload };
+    } catch (e) {
+        console.warn('pollServerForChanges failed', e);
+        return { changed: false, error: e };
+    }
+}
+
+// Detect conflicts between queued deltas and authoritative server object
+function detectConflictsWithQueue(serverObj) {
+    if (!serverObj || typeof serverObj !== 'object') return [];
+    const conflicts = [];
+    (persistQueue || []).forEach(item => {
+        const delta = (item && typeof item === 'object' && item.hasOwnProperty('delta')) ? item.delta : item;
+        if (!delta || typeof delta !== 'object') return;
+        Object.keys(delta).forEach(k => {
+            const qv = delta[k];
+            const sv = serverObj[k];
+            // Conflict if both exist and differ (and queued value is not null deletion that server already applied)
+            if (qv !== null && sv !== undefined && JSON.stringify(qv) !== JSON.stringify(sv)) {
+                conflicts.push({ key: k, queued: qv, server: sv });
+            }
+        });
+    });
+    return conflicts;
+}
+
+// Poll loop that runs periodically to keep UI in sync with remote changes and detect conflicts
+async function startServerPoll(intervalMs = 10000) {
+    try {
+        const { changed, payload, error } = await pollServerForChanges();
+        if (error) return; // transient
+        if (!changed) return; // nothing new
+        // payload.current contains authoritative corrections
+        const serverObj = payload.current || payload;
+        // detect conflicts and notify user (throttle notifications)
+        const conflicts = detectConflictsWithQueue(serverObj);
+        if (conflicts.length > 0 && Date.now() - _lastConflictNotify > 60000) {
+            _lastConflictNotify = Date.now();
+            showTransientMessage(`Detected ${conflicts.length} remote change(s) that conflict with your local queued edits. Run sync or review the queue.`, 8000);
+            console.warn('Conflict examples:', conflicts.slice(0,5));
+        }
+        // Reconcile and apply server authoritative state
+        try { reconcileServerState(payload); } catch (e) { console.warn('reconcileServerState failed in poll', e); }
+    } catch (e) {
+        console.warn('startServerPoll error', e);
+    } finally {
+        setTimeout(() => startServerPoll(intervalMs), intervalMs);
+    }
+}
+
+// start polling when app initializes (after a short delay to avoid clashing with initial load)
+setTimeout(() => startServerPoll(10000), 5000);
 
 // Helper to retrieve worker token from localStorage. This keeps the secret out of source control.
 function getWorkerToken() {
@@ -612,7 +805,7 @@ function correctValueFormatter(cell, formatterParams, onRendered) {
         options += `<option value="Zesty Name to Site Title" ${value === 'Zesty Name to Site Title' ? 'selected' : ''}>Zesty Name to Site Title</option>`;
     }
     select.innerHTML = options;
-    select.addEventListener('change', function() {
+        select.addEventListener('change', function() {
         const newValue = this.value;
         // Update the row data (this will cause formatters to re-run)
         const row = cell.getRow();
@@ -649,9 +842,9 @@ function correctValueFormatter(cell, formatterParams, onRendered) {
         } catch (e) {
             console.warn('toggle underline failed', e);
         }
-
-        // Save changes
-        saveChanges();
+        
+        // Persist this single change immediately (updates localCorrections, queue, and schedules send)
+        try { persistSingleCorrection(rowData); } catch (e) { console.warn('persistSingleCorrection failed in select change handler', e); }
     });
     return select;
 }
@@ -694,8 +887,8 @@ function zestyValueFormatter(cell, formatterParams, onRendered) {
             // Update the row data directly
             rowData.zesty_value = newValue;
             rowData.final_value = newValue; // Since editable rows use Zesty value
-            // Save changes without updating the row to avoid re-rendering the input
-            saveChanges();
+            // Persist this single change immediately so every keystroke is saved to local storage and queued for sync
+            try { persistSingleCorrection(rowData); } catch (e) { console.warn('persistSingleCorrection failed in input handler', e); }
         });
         return input;
     }
@@ -781,6 +974,8 @@ function saveChanges() {
                 try { localStorage.setItem('localCorrections', JSON.stringify(loadedCorrections)); } catch (e) { console.warn('localStorage write failed', e); }
                 try { populateCorrectValueDropdown(loadedCorrections); } catch(e) { console.warn('populateCorrectValueDropdown failed after save', e); }
             }
+            // On success, remove any matching queued deltas
+            try { removeMatchingDeltaFromQueue(delta); } catch (e) { console.warn('removeMatchingDeltaFromQueue failed after immediate send', e); }
             // After reconciliation, ensure UI metrics and sync state are updated
             syncState.pending = persistQueue.length; updateSyncStatus();
             console.log('Immediate send succeeded and server reconciled');
@@ -855,11 +1050,14 @@ async function loadSavedChanges() {
         if (!response.ok) throw new Error('Shared storage not available');
         const data = await response.json();
 
+        // Support worker responses that wrap the authoritative object as { current, version }
+        const payload = (data && typeof data === 'object' && data.current) ? data.current : data;
+
         let corrections;
-        if (data && typeof data === 'object' && data.data && Array.isArray(data.data)) {
+        if (payload && typeof payload === 'object' && payload.data && Array.isArray(payload.data)) {
             // Old format: convert array to object
             corrections = {};
-            data.data.forEach(savedRow => {
+            payload.data.forEach(savedRow => {
                 const key = `${savedRow.gdos_id}-${savedRow.correct === 'Zesty Name to Site Title' ? 'siteTitle' : savedRow.field}`;
                 corrections[key] = {
                     correct: savedRow.correct,
@@ -867,8 +1065,8 @@ async function loadSavedChanges() {
                 };
             });
         } else {
-            // New format: data is the corrections object directly
-            corrections = data;
+            // New format: payload is the corrections object directly
+            corrections = payload;
         }
 
         // Merge local fallback corrections (if any) so user changes persist across reloads
@@ -924,6 +1122,62 @@ async function loadSavedChanges() {
         hideLoadingOverlay();
     }
 }
+
+// Merge all queued deltas into one object and PATCH to server; on success clear queue and reconcile
+async function forceApplyQueue() {
+    try {
+        if (!persistQueue || persistQueue.length === 0) {
+            showTransientMessage('No queued items to apply', 2000);
+            return;
+        }
+        // Build merged delta (later items override earlier keys)
+        const merged = {};
+        persistQueue.forEach(item => {
+            const delta = (item && typeof item === 'object' && item.hasOwnProperty('delta')) ? item.delta : item;
+            if (!delta || typeof delta !== 'object') return;
+            Object.entries(delta).forEach(([k, v]) => {
+                merged[k] = v;
+            });
+        });
+        if (Object.keys(merged).length === 0) {
+            showTransientMessage('Merged delta is empty, nothing to apply', 2000);
+            return;
+        }
+        // Send merged PATCH
+        const res = await fetch(SHARED_STORAGE_URL, {
+            method: 'PATCH',
+            headers: Object.assign({ 'Content-Type': 'application/json' }, authHeaders()),
+            body: JSON.stringify(merged)
+        });
+        if (!res.ok) throw new Error('Status ' + res.status);
+        const body = await res.json();
+        // On success, clear the persistQueue entirely (we merged everything)
+        persistQueue = [];
+        savePersistQueue();
+        syncState.pending = 0; updateSyncStatus();
+        // Reconcile authoritative server state returned by worker
+        try { reconcileServerState(body); } catch (e) { console.warn('reconcileServerState failed after forceApplyQueue', e); }
+        showTransientMessage('Queue applied and cleared', 3000);
+        console.log('forceApplyQueue result', body);
+        return body;
+    } catch (e) {
+        console.warn('forceApplyQueue failed', e);
+        showTransientMessage('Apply queue failed: ' + e.message, 5000);
+        throw e;
+    }
+}
+
+// Clear the local persistQueue (data will be lost) after confirmation
+function clearPersistQueue() {
+    if (!confirm('This will permanently clear the local queued changes. Continue?')) return;
+    persistQueue = [];
+    savePersistQueue();
+    syncState.pending = 0; updateSyncStatus();
+    showTransientMessage('Local queue cleared', 2500);
+}
+
+window.forceApplyQueue = forceApplyQueue;
+window.clearPersistQueue = clearPersistQueue;
 
 function populateCorrectValueDropdown(corrections) {
     const select = document.getElementById('globalCorrectFilter');
@@ -1125,7 +1379,7 @@ function applyPendingCorrections() {
             const row = differencesData[idx];
             row.correct = savedRow.correct;
             if (savedRow.value !== undefined) row.zesty_value = savedRow.value;
-            row.final_value = savedRow.correct === 'GDOS' ? row.gdos_value : row.zesty_value;
+            row.final_value = row.correct === 'GDOS' ? row.gdos_value : row.zesty_value;
             appliedCount++;
             delete pendingCorrections[key];
             console.log('Applied pending correction for key:', key);
@@ -1816,3 +2070,92 @@ function showQueueModal() {
     const modal = new bootstrap.Modal(modalEl, { keyboard: true });
     modal.show();
 }
+
+// -------------------------
+// Helpers to seed the remote worker when it's empty
+// -------------------------
+// Build a merged corrections object from persistQueue (later entries override earlier keys)
+function buildCorrectionsFromQueue() {
+    const merged = {};
+    (persistQueue || []).forEach(item => {
+        const delta = (item && typeof item === 'object' && item.hasOwnProperty('delta')) ? item.delta : item;
+        if (!delta || typeof delta !== 'object') return;
+        Object.entries(delta).forEach(([k, v]) => {
+            if (v === null) delete merged[k]; else merged[k] = v;
+        });
+    });
+    return merged;
+}
+
+// Seed the worker's KV with the local loadedCorrections (full overwrite). Use with caution.
+async function seedServerFromLocal() {
+    try {
+        const toSend = Object.assign({}, loadedCorrections || {});
+        if (!toSend || Object.keys(toSend).length === 0) {
+            // if loadedCorrections is empty, try building from the queue
+            const built = buildCorrectionsFromQueue();
+            if (Object.keys(built).length === 0) {
+                alert('No local corrections found to seed the server. Ensure you have local edits or queued deltas.');
+                return;
+            }
+            if (!confirm('loadedCorrections is empty. Seed server with merged queued deltas instead?')) return;
+            return await seedServerWithObject(built);
+        }
+        if (!confirm('This will overwrite the server corrections with your local snapshot. Continue?')) return;
+        return await seedServerWithObject(toSend);
+    } catch (e) {
+        console.warn('seedServerFromLocal failed', e);
+        alert('Seeding failed: ' + e.message);
+    }
+}
+
+// Seed the worker by merging all queued deltas (non-destructive merge)
+async function seedServerFromQueue() {
+    try {
+        const merged = buildCorrectionsFromQueue();
+        if (!merged || Object.keys(merged).length === 0) {
+            alert('No queued deltas available to seed the server.');
+            return;
+        }
+        if (!confirm('This will apply merged queued deltas to the server (non-destructive). Continue?')) return;
+        // Use PATCH to merge safely
+        const res = await fetch(SHARED_STORAGE_URL, {
+            method: 'PATCH',
+            headers: Object.assign({ 'Content-Type': 'application/json' }, authHeaders()),
+            body: JSON.stringify(merged)
+        });
+        if (!res.ok) throw new Error('Status ' + res.status);
+        const body = await res.json();
+        reconcileServerState(body);
+        showTransientMessage('Server seeded from queue successfully', 3000);
+        console.log('Seeded server with merged queued deltas', body);
+    } catch (e) {
+        console.warn('seedServerFromQueue failed', e);
+        alert('Seeding from queue failed: ' + e.message);
+    }
+}
+
+// Helper that PUTs a full corrections object to the server (overwrites). Requires token if worker enforces it.
+async function seedServerWithObject(obj) {
+    try {
+        const res = await fetch(SHARED_STORAGE_URL, {
+            method: 'PUT',
+            headers: Object.assign({ 'Content-Type': 'application/json' }, authHeaders()),
+            body: JSON.stringify(obj)
+        });
+        if (!res.ok) throw new Error('Status ' + res.status);
+        const body = await res.json();
+        // Reconcile with returned server state if present
+        try { const getResp = await fetch(SHARED_STORAGE_URL); const server = await getResp.json(); reconcileServerState(server); } catch (e) { console.warn('Failed to fetch server after seeding', e); }
+        showTransientMessage('Server seeded successfully', 3000);
+        console.log('seedServerWithObject response', body);
+    } catch (e) {
+        console.warn('seedServerWithObject failed', e);
+        alert('Seeding failed: ' + e.message);
+    }
+}
+
+// Expose helpers for quick console use
+window.seedServerFromLocal = seedServerFromLocal;
+window.seedServerFromQueue = seedServerFromQueue;
+window.seedServerWithObject = seedServerWithObject;

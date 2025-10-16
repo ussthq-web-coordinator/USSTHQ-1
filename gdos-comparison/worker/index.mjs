@@ -42,8 +42,26 @@ export default {
       try { return JSON.parse(raw); } catch { return {}; }
     }
 
+    async function getVersion() {
+      if (!KV) return null;
+      const v = await KV.get('corrections_version');
+      if (!v) return null;
+      const n = Number(v);
+      return isNaN(n) ? null : n;
+    }
+
+    async function putVersion(ts) {
+      if (!KV) return;
+      await KV.put('corrections_version', String(ts));
+    }
+
     async function putCorrections(obj) {
-      if (KV) await KV.put('corrections', JSON.stringify(obj));
+      if (KV) {
+        await KV.put('corrections', JSON.stringify(obj));
+        // update version timestamp to help clients detect changes
+        const ts = Date.now();
+        await putVersion(ts);
+      }
     }
 
     function convertLegacyArray(arr) {
@@ -62,7 +80,14 @@ export default {
       // --- GET: public read ---
       if (request.method === 'GET') {
         const current = await getCorrections();
-        return new Response(JSON.stringify(current), { status: 200, headers: { 'Content-Type': 'application/json', ...corsHeaders } });
+        const version = await getVersion() || Date.now();
+        // Support conditional GET using If-None-Match header (ETag)
+        const ifNone = request.headers.get('If-None-Match');
+        if (ifNone && String(ifNone) === String(version)) {
+          return new Response(null, { status: 304, headers: { ...corsHeaders, 'ETag': String(version), 'X-Last-Modified': new Date(Number(version)).toUTCString() } });
+        }
+        const payload = { current, version };
+        return new Response(JSON.stringify(payload), { status: 200, headers: { 'Content-Type': 'application/json', 'ETag': String(version), 'X-Last-Modified': new Date(Number(version)).toUTCString(), ...corsHeaders } });
       }
 
       // --- Require secret for writes ---
@@ -106,10 +131,10 @@ export default {
         const current = await getCorrections();
         Object.entries(delta).forEach(([k, v]) => { if (v === null) delete current[k]; else current[k] = v; });
         await putCorrections(current);
-
-        return new Response(JSON.stringify({ ok: true, merged: Object.keys(delta).length, current }), {
+        const version = await getVersion() || Date.now();
+        return new Response(JSON.stringify({ ok: true, merged: Object.keys(delta).length, current, version }), {
           status: 200,
-          headers: { 'Content-Type': 'application/json', ...corsHeaders }
+          headers: { 'Content-Type': 'application/json', 'ETag': String(version), 'X-Last-Modified': new Date(Number(version)).toUTCString(), ...corsHeaders }
         });
       }
 
