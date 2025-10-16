@@ -20,7 +20,7 @@ function makeCorrectionKey(r) {
 // Helper: build correction entry object from a rowData
 function buildCorrectionEntry(r) {
     if (!r || !r.correct) return null;
-    if (r.correct === 'GDOS') return null; // indicates deletion
+    // Save all corrections including GDOS
     const entry = { correct: r.correct };
     try {
         if (r.zesty_value !== undefined && r.zesty_value !== null && String(r.zesty_value).trim() !== '') entry.value = r.zesty_value;
