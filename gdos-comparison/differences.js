@@ -51,10 +51,15 @@ async function syncQueue() {
                 body: JSON.stringify(item)
             });
             if (!res.ok) throw new Error(`Status ${res.status}`);
-            // remove the item from queue on success
+            // attempt to parse response JSON to reconcile authoritative server state
+            let body = null;
+            try { body = await res.json(); } catch (e) { body = null; }
+            // remove the item from queue on success (we'll compact based on server response below)
             persistQueue.splice(i, 1);
             savePersistQueue();
             syncState.lastSuccess = Date.now();
+            // If server returned a 'current' merged object, reconcile
+            try { reconcileServerState(body); } catch (e) { console.warn('reconcileServerState failed after syncQueue item', e); }
             syncState.pending = persistQueue.length; updateSyncStatus();
             // small delay between items to avoid rate limits
             await new Promise(r => setTimeout(r, 200));
@@ -606,27 +611,25 @@ function saveChanges() {
             },
             body: payload
         })
-        .then(response => {
+        .then(async response => {
             if (!response.ok) throw new Error(`Status ${response.status}`);
-            // On success, remove this delta from the queue (it may be the first item or merged)
-            // Simple approach: try to remove an identical item from queue
-            for (let i = 0; i < persistQueue.length; i++) {
-                try {
-                    if (JSON.stringify(persistQueue[i]) === JSON.stringify(delta)) {
-                        persistQueue.splice(i, 1);
-                        savePersistQueue();
-                        break;
-                    }
-                } catch (e) {}
+            // Parse server response and reconcile authoritative state if provided
+            let body = null;
+            try { body = await response.json(); } catch (e) { body = null; }
+            try {
+                reconcileServerState(body);
+            } catch (e) {
+                console.warn('reconcileServerState failed after immediate send', e);
+                // Fallback: merge delta into loadedCorrections
+                Object.entries(delta).forEach(([k, v]) => {
+                    if (v === null) delete loadedCorrections[k]; else loadedCorrections[k] = v;
+                });
+                try { localStorage.setItem('localCorrections', JSON.stringify(loadedCorrections)); } catch (e) { console.warn('localStorage write failed', e); }
+                try { populateCorrectValueDropdown(loadedCorrections); } catch(e) { console.warn('populateCorrectValueDropdown failed after save', e); }
             }
+            // After reconciliation, ensure UI metrics and sync state are updated
             syncState.pending = persistQueue.length; updateSyncStatus();
-            // Merge delta into loadedCorrections
-            Object.entries(delta).forEach(([k, v]) => {
-                if (v === null) delete loadedCorrections[k]; else loadedCorrections[k] = v;
-            });
-            try { localStorage.setItem('localCorrections', JSON.stringify(loadedCorrections)); } catch (e) { console.warn('localStorage write failed', e); }
-            try { populateCorrectValueDropdown(loadedCorrections); } catch(e) { console.warn('populateCorrectValueDropdown failed after save', e); }
-            console.log('Immediate send succeeded and delta merged');
+            console.log('Immediate send succeeded and server reconciled');
         })
         .catch(error => {
             console.warn('Immediate send failed, delta will remain in queue and be retried:', error);
@@ -1496,4 +1499,57 @@ function copyToClipboard(text) {
         return;
     }
     navigator.clipboard.writeText(text).catch(e => console.warn('clipboard write failed', e));
+}
+
+// When the server returns an authoritative 'current' corrections object,
+// replace the local loadedCorrections with it, persist locally, and
+// compact the persistQueue by removing any queued deltas that are now
+// reflected in the server state.
+function reconcileServerState(serverPayload) {
+    try {
+        if (!serverPayload) return;
+        const serverObj = serverPayload.current || serverPayload;
+        if (!serverObj || typeof serverObj !== 'object') return;
+
+        // Replace loadedCorrections with authoritative server state
+        loadedCorrections = Object.assign({}, serverObj);
+
+        // Persist authoritative snapshot to local storage for offline resilience
+        try { localStorage.setItem('localCorrections', JSON.stringify(loadedCorrections)); } catch (e) { console.warn('Failed to persist loadedCorrections after reconciliation', e); }
+
+        // Compact the persistQueue: remove queued deltas whose keys are already reflected
+        // in the server state (including deletions represented by null).
+        if (Array.isArray(persistQueue) && persistQueue.length > 0) {
+            persistQueue = persistQueue.filter(queued => {
+                // queued is an object mapping keys -> value|null
+                try {
+                    const keys = Object.keys(queued);
+                    for (const k of keys) {
+                        const qv = queued[k];
+                        const sv = loadedCorrections[k];
+                        if (qv === null) {
+                            // queued deletion: if server still has a value, keep queued
+                            if (sv !== undefined && sv !== null) return true;
+                            // otherwise server also deleted => drop this queued delta's key
+                        } else {
+                            // queued set/update: if server value differs, keep queued
+                            if (JSON.stringify(sv) !== JSON.stringify(qv)) return true;
+                        }
+                    }
+                    // All keys in this queued delta are reflected on server -> drop queued item
+                    return false;
+                } catch (e) {
+                    // Be conservative and keep the queued item on any error
+                    return true;
+                }
+            });
+            savePersistQueue();
+        }
+
+        syncState.pending = persistQueue.length; updateSyncStatus();
+        try { populateCorrectValueDropdown(loadedCorrections); } catch (e) { console.warn('populateCorrectValueDropdown failed during reconciliation', e); }
+        console.log('Reconciled with server state; queue compacted. Pending:', persistQueue.length);
+    } catch (e) {
+        console.warn('reconcileServerState failed', e);
+    }
 }
