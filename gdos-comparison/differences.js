@@ -8,39 +8,8 @@ let pendingCorrections = {};
 let latestFilteredData = null;
 // In-memory copy of corrections loaded from shared storage (used to compute deltas)
 let loadedCorrections = {};
-// Persistence queue stored in localStorage to survive reloads
-const PERSIST_QUEUE_KEY = 'correctionsQueue';
-let persistQueue = [];
 // Sync state for UI
 let syncState = { lastAttempt: null, lastSuccess: null, pending: 0 };
-
-function loadPersistQueue() {
-    try {
-        const raw = localStorage.getItem(PERSIST_QUEUE_KEY);
-        if (raw) persistQueue = JSON.parse(raw) || [];
-    } catch (e) { console.warn('Failed to load persist queue', e); persistQueue = []; }
-}
-
-// Normalize persistQueue so every item is a wrapper { delta, attempts?, backoffUntil? }
-function normalizePersistQueue() {
-    if (!Array.isArray(persistQueue)) return;
-    let changed = false;
-    persistQueue = persistQueue.map(item => {
-        if (!item) return item;
-        if (typeof item === 'object' && item.hasOwnProperty('delta')) return item;
-        // Plain delta -> wrap it
-        if (typeof item === 'object') {
-            changed = true;
-            return { delta: item, attempts: 0 };
-        }
-        return item;
-    });
-    if (changed) savePersistQueue();
-}
-
-function savePersistQueue() {
-    try { localStorage.setItem(PERSIST_QUEUE_KEY, JSON.stringify(persistQueue)); } catch (e) { console.warn('Failed to save persist queue', e); }
-}
 
 // Helper: build canonical storage key for a row (territory-prefixed)
 function makeCorrectionKey(r) {
@@ -59,82 +28,48 @@ function buildCorrectionEntry(r) {
     return entry;
 }
 
-// Remove matching delta object(s) from persistQueue (used after successful immediate send)
-function removeMatchingDeltaFromQueue(targetDelta) {
-    if (!targetDelta || typeof targetDelta !== 'object') return;
-    const strTarget = JSON.stringify(targetDelta);
-    let changed = false;
-    persistQueue = persistQueue.filter(item => {
-        const d = (item && typeof item === 'object' && item.hasOwnProperty('delta')) ? item.delta : item;
-        if (!d) return true; // keep non-deltas
-        if (JSON.stringify(d) === strTarget) {
-            changed = true;
-            return false; // remove this one
-        }
-        return true;
-    });
-    if (changed) savePersistQueue();
-}
+// Persist a single change: send to Cloudflare immediately, update UI only on success
+async function persistSingleCorrection(rowData) {
+    const key = makeCorrectionKey(rowData);
+    const entry = buildCorrectionEntry(rowData);
+    const delta = {};
+    delta[key] = entry === null ? null : entry;
 
-// Debounced immediate send map so rapid edits of the same key don't spin the network
-const _sendTimers = {};
-function scheduleImmediateSend(delta, key, delay = 250) {
-    // merge by key so subsequent calls consolidate
-    if (!key) key = JSON.stringify(delta);
-    if (_sendTimers[key]) clearTimeout(_sendTimers[key]);
-    _sendTimers[key] = setTimeout(async () => {
-        delete _sendTimers[key];
-        try {
-            const res = await fetch(SHARED_STORAGE_URL, {
-                method: 'PATCH',
-                headers: Object.assign({ 'Content-Type': 'application/json' }, authHeaders()),
-                body: JSON.stringify(delta)
-            });
-            if (!res.ok) throw new Error(`Status ${res.status}`);
-            let body = null;
-            try { body = await res.json(); } catch (e) { body = null; }
-            try { reconcileServerState(body); } catch (e) { console.warn('reconcileServerState failed after debounced send', e); }
-            // On success remove matching delta(s) from queue
-            try { removeMatchingDeltaFromQueue(delta); } catch (e) { console.warn('removeMatchingDeltaFromQueue failed', e); }
-        } catch (e) {
-            // leave the delta in the queue; syncQueue will retry with backoff
-            console.warn('Debounced immediate send failed', e);
-        }
-    }, delay);
-}
-
-// Persist a single change immediately: update loadedCorrections/localCorrections, enqueue a minimal delta,
-// and attempt a debounced immediate send. This guarantees every single change is persisted.
-function persistSingleCorrection(rowData) {
     try {
-        const key = makeCorrectionKey(rowData);
-        const entry = buildCorrectionEntry(rowData);
+        const res = await fetch(SHARED_STORAGE_URL, {
+            method: 'PATCH',
+            headers: Object.assign({ 'Content-Type': 'application/json' }, authHeaders()),
+            body: JSON.stringify(delta)
+        });
+        if (!res.ok) throw new Error(`Status ${res.status}`);
 
-        // Update in-memory loadedCorrections for delta computation and UI
+        // On success, update loadedCorrections
         if (entry === null) {
             delete loadedCorrections[key];
         } else {
             loadedCorrections[key] = entry;
         }
 
-        // Persist local copy for immediate reload recovery
-        try { localStorage.setItem('localCorrections', JSON.stringify(loadedCorrections)); } catch (e) { console.warn('localStorage write failed in persistSingleCorrection', e); }
+        // Apply the change to differencesData for immediate UI update
+        const singleCorrections = {};
+        singleCorrections[key] = entry;
+        applyChanges(singleCorrections);
+
+        // Update the table
+        const table = window.differencesTable || (typeof Tabulator !== 'undefined' && typeof Tabulator.findTable === 'function' ? Tabulator.findTable("#differencesTable")[0] : null);
+        if (table && typeof table.updateData === 'function') {
+            const updatedRows = differencesData.filter(r => makeCorrectionKey(r) === key);
+            if (updatedRows.length > 0) {
+                table.updateData(updatedRows);
+            }
+        }
 
         // Update dropdown/options immediately
         try { populateCorrectValueDropdown(loadedCorrections); } catch (e) { console.warn('populateCorrectValueDropdown failed in persistSingleCorrection', e); }
 
-        // Enqueue minimal delta (single-key)
-        const delta = {};
-        delta[key] = entry === null ? null : entry;
-        // push wrapper for consistent queue entries
-        persistQueue.push({ delta, attempts: 0 });
-        savePersistQueue();
-        syncState.pending = persistQueue.length; updateSyncStatus();
-
-        // Attempt an immediate (debounced) send for responsiveness
-        scheduleImmediateSend(delta, key);
     } catch (e) {
-        console.warn('persistSingleCorrection failed', e);
+        console.warn('Save to Cloudflare failed', e);
+        alert('Failed to save to Cloudflare. Please check connection and try again.');
     }
 }
 
@@ -142,144 +77,11 @@ function persistSingleCorrection(rowData) {
 function updateSyncStatus() {
     const el = document.getElementById('syncStatus');
     if (!el) return;
-    el.textContent = syncState.pending > 0 ? `⚠ ${syncState.pending} pending` : `✓ in sync`;
-    el.className = syncState.pending > 0 ? 'small text-warning' : 'small text-success';
+    el.textContent = 'Cloudflare only';
+    el.className = 'small text-info';
 }
 
-// Background sync: attempt to flush the queue, with simple retry/backoff
-async function syncQueue() {
-    const responses = [];
-    if (!persistQueue || persistQueue.length === 0) {
-        syncState.pending = 0; updateSyncStatus(); return responses;
-    }
 
-    const now = Date.now();
-    syncState.lastAttempt = now;
-    syncState.pending = persistQueue.length; updateSyncStatus();
-
-    // batching parameters
-    const maxBatchItems = 10; // max queued items to merge into a single request
-    const maxBatchKeys = 200; // max number of keys in a merged payload
-
-    // backoff parameters
-    const baseDelayMs = 1000; // initial backoff
-    const maxDelayMs = 5 * 60 * 1000; // 5 minutes cap
-
-    // helper to extract delta from a queued item (support legacy plain-object entries)
-    function extractDelta(q) {
-        if (!q) return null;
-        if (q && typeof q === 'object' && q.hasOwnProperty('delta')) return q.delta;
-        return q;
-    }
-
-    // helper to mark a queued item with backoff info after a failed attempt
-    function markFailed(qitem) {
-        if (!qitem) return;
-        if (!qitem.hasOwnProperty('attempts')) qitem.attempts = 0;
-        qitem.attempts = (qitem.attempts || 0) + 1;
-        // no backoff, retry immediately
-        const delay = 0;
-        qitem.backoffUntil = Date.now() + delay;
-    }
-
-    // Collect items that are due to be sent (skip those still in backoff)
-    const dueIndices = [];
-    for (let i = 0; i < persistQueue.length; i++) {
-        const item = persistQueue[i];
-        // support both wrapper {delta, attempts, backoffUntil} and legacy plain delta
-        const backoffUntil = item && item.backoffUntil ? item.backoffUntil : null;
-        if (backoffUntil && backoffUntil > Date.now()) continue; // still backing off
-        dueIndices.push(i);
-    }
-
-    if (dueIndices.length === 0) {
-        // nothing due yet
-        return responses;
-    }
-
-    // Process batches: take up to maxBatchItems from the dueIndices and merge into one payload
-    let processed = 0;
-    while (processed < dueIndices.length) {
-        const batchIdxs = dueIndices.slice(processed, processed + maxBatchItems);
-        // Merge queued deltas into a single delta object. Later items override earlier keys.
-        const merged = {};
-        let mergedKeyCount = 0;
-        const batchItems = [];
-        for (const idx of batchIdxs) {
-            const q = persistQueue[idx];
-            const delta = extractDelta(q);
-            if (!delta || typeof delta !== 'object') continue;
-            batchItems.push({ idx, wrapper: q, delta });
-            Object.keys(delta).forEach(k => {
-                if (!merged.hasOwnProperty(k)) mergedKeyCount++;
-                merged[k] = delta[k];
-            });
-            if (mergedKeyCount >= maxBatchKeys) break;
-        }
-
-        if (batchItems.length === 0) break;
-
-        // Send merged payload
-        try {
-            const res = await fetch(SHARED_STORAGE_URL, {
-                method: 'PATCH',
-                headers: Object.assign({ 'Content-Type': 'application/json' }, authHeaders()),
-                body: JSON.stringify(merged)
-            });
-            if (!res.ok) throw new Error(`Status ${res.status}`);
-            let body = null;
-            try { body = await res.json(); } catch (e) { body = null; }
-            responses.push({ request: merged, response: body });
-
-            // On success, remove all batch items from persistQueue (by index). Since removing shifts indices,
-            // mark them and then filter the queue.
-            const toRemoveSet = new Set(batchItems.map(b => b.idx));
-            persistQueue = persistQueue.filter((_, i) => !toRemoveSet.has(i));
-            savePersistQueue();
-            syncState.lastSuccess = Date.now();
-            // Reconcile if server provided authoritative current object
-            try { reconcileServerState(body); } catch (e) { console.warn('reconcileServerState failed after batch send', e); }
-            syncState.pending = persistQueue.length; updateSyncStatus();
-            // short delay to avoid tight loop and rate limits
-            await new Promise(r => setTimeout(r, 150));
-        } catch (e) {
-            console.warn('Batch sync failed, marking batch items for backoff', e);
-            // mark failed for each batch item and leave them in the queue
-            for (const b of batchItems) {
-                const wrapper = b.wrapper;
-                // If legacy plain object, wrap it to persist attempts/backoff
-                if (!wrapper || !wrapper.hasOwnProperty('delta')) {
-                    // replace the plain object in persistQueue with a wrapper preserving original delta
-                    const original = persistQueue[b.idx];
-                    const newWrapper = { delta: original, attempts: 0 };
-                    persistQueue[b.idx] = newWrapper;
-                    markFailed(newWrapper);
-                } else {
-                    markFailed(wrapper);
-                }
-            }
-            savePersistQueue();
-            // After a failure, don't continue to process further batches in this run
-            break;
-        }
-
-        processed += batchItems.length;
-    }
-
-    // Update pending count and status before returning
-    syncState.pending = persistQueue.length; updateSyncStatus();
-    return responses;
-}
-
-// ensure queue is loaded and background sync starts
-loadPersistQueue();
-setInterval(syncQueue, 1000);
-setTimeout(syncQueue, 1500);
-// expose for debug console
-window.syncQueue = syncQueue;
-
-// normalize queue right after loading
-try { normalizePersistQueue(); } catch (e) { console.warn('normalizePersistQueue failed', e); }
 
 // Run sync now helper triggered by debug button
 async function runSyncNow() {
@@ -287,27 +89,19 @@ async function runSyncNow() {
         const btn = document.getElementById('runSyncNowBtn');
         if (btn) {
             btn.disabled = true;
-            btn.textContent = 'Syncing...';
+            btn.textContent = 'Reloading...';
         }
-        console.log('Manual sync triggered');
-        const responses = await syncQueue();
-        showTransientMessage('Sync attempt finished', 3000);
-        console.log('Manual sync finished. persistQueue length:', persistQueue.length, 'localCorrections:', localStorage.getItem('localCorrections'));
-        // If the sync produced server responses, show them in the modal for inspection
-        if (Array.isArray(responses) && responses.length > 0) {
-            try {
-                const pretty = responses.map(r => ({ request: r.request, response: r.response }));
-                showServerResponseModal(pretty);
-            } catch (e) { console.warn('Failed to show server response modal', e); }
-        }
+        console.log('Manual reload triggered');
+        await loadSavedChanges();
+        showTransientMessage('Reload finished', 3000);
     } catch (e) {
-        console.warn('Manual sync failed', e);
-        showTransientMessage('Sync failed — check console', 5000);
+        console.warn('Manual reload failed', e);
+        showTransientMessage('Reload failed — check console', 5000);
     } finally {
         const btn = document.getElementById('runSyncNowBtn');
         if (btn) {
             btn.disabled = false;
-            btn.textContent = 'Run sync now';
+            btn.textContent = 'Reload from Cloudflare';
         }
     }
 }
@@ -416,14 +210,8 @@ async function startServerPoll(intervalMs = 10000) {
 // start polling when app initializes (after a short delay to avoid clashing with initial load)
 setTimeout(() => startServerPoll(10000), 5000);
 
-// Helper to retrieve worker token from localStorage. This keeps the secret out of source control.
-function getWorkerToken() {
-    try { return localStorage.getItem('WORKER_TOKEN') || ''; } catch (e) { return ''; }
-}
-
 function authHeaders() {
-    const token = getWorkerToken();
-    return token ? { 'X-Worker-Token': token } : {};
+    return {};
 }
 
 // Raw JSONs for modal inspection
@@ -793,6 +581,7 @@ function correctValueFormatter(cell, formatterParams, onRendered) {
         options += `<option value="Zesty Name to Site Title" ${value === 'Zesty Name to Site Title' ? 'selected' : ''}>Zesty Name to Site Title</option>`;
     }
     select.innerHTML = options;
+    select.value = value;
         select.addEventListener('change', function() {
         const newValue = this.value;
         // Update the row data (this will cause formatters to re-run)
@@ -1035,51 +824,41 @@ async function loadSavedChanges() {
     const preSnapshot = snapshotDifferences();
     let corrections = {};
     try {
-        try {
-            const response = await fetch(SHARED_STORAGE_URL);
-            if (!response.ok) throw new Error('Shared storage not available');
-            const data = await response.json();
+        const response = await fetch(SHARED_STORAGE_URL);
+        if (!response.ok) throw new Error('Shared storage not available');
+        const data = await response.json();
 
-            // Support worker responses that wrap the authoritative object as { current, version }
-            const payload = (data && typeof data === 'object' && data.current) ? data.current : data;
+        // Support worker responses that wrap the authoritative object as { current, version }
+        const payload = (data && typeof data === 'object' && data.current) ? data.current : data;
 
-            if (payload && typeof payload === 'object' && payload.data && Array.isArray(payload.data)) {
-                // Old format: convert array to object
-                corrections = {};
-                payload.data.forEach(savedRow => {
-                    const key = `${savedRow.gdos_id}-${savedRow.correct === 'Zesty Name to Site Title' ? 'siteTitle' : savedRow.field}`;
-                    corrections[key] = {
-                        correct: savedRow.correct,
-                        value: savedRow.customZestyValue || savedRow.zesty_value
-                    };
-                });
-            } else {
-                // New format: payload is the corrections object directly
-                corrections = payload || {};
-            }
-
-            // Save to localStorage as cache
-            try { localStorage.setItem('localCorrections', JSON.stringify(corrections)); } catch (e) { console.warn('Failed to cache corrections locally', e); }
-
-        } catch (e) {
-            console.warn('Failed to load from shared storage, falling back to local cache', e);
-            try {
-                const local = localStorage.getItem('localCorrections');
-                if (local) {
-                    corrections = JSON.parse(local);
-                }
-            } catch (e2) {
-                console.warn('Failed to load localCorrections', e2);
-                corrections = {};
-            }
+        if (payload && typeof payload === 'object' && payload.data && Array.isArray(payload.data)) {
+            // Old format: convert array to object
+            corrections = {};
+            payload.data.forEach(savedRow => {
+                const key = `${savedRow.gdos_id}-${savedRow.correct === 'Zesty Name to Site Title' ? 'siteTitle' : savedRow.field}`;
+                corrections[key] = {
+                    correct: savedRow.correct,
+                    value: savedRow.customZestyValue || savedRow.zesty_value
+                };
+            });
+        } else {
+            // New format: payload is the corrections object directly
+            corrections = payload || {};
         }
 
+    } catch (e) {
+        console.warn('Failed to load from Cloudflare Worker', e);
+        corrections = {};
+        alert('Failed to load corrections from Cloudflare. Please check connection.');
+    }
+
+    try {
         // Set loadedCorrections
         loadedCorrections = Object.assign({}, corrections);
 
         if (typeof corrections === 'object' && corrections !== null) {
             applyChanges(corrections);
-            console.log('Corrections loaded from primary storage (worker), with local cache fallback');
+            console.log('Corrections loaded from Cloudflare Worker');
             const table = window.differencesTable || (typeof Tabulator !== 'undefined' && typeof Tabulator.findTable === 'function' ? Tabulator.findTable("#differencesTable")[0] : null);
             if (table && typeof table.setData === 'function') {
                 await table.setData(differencesData);
@@ -1281,9 +1060,19 @@ function applyChanges(changes) {
         const parsed = parseCorrectionKey(key, savedRow);
         const { field, candidates } = parsed;
 
+        if (savedRow === null) {
+            // Deletion: set to GDOS
+            let currentRow = differencesData.find(row => candidates.includes(String(row.gdos_id)) && row.field === field);
+            if (currentRow) {
+                currentRow.correct = 'GDOS';
+                currentRow.final_value = currentRow.gdos_value;
+            }
+            return;
+        }
+
         // If this correction asks for Zesty Name -> Site Title, ensure we update both any existing siteTitle row
         // and the name row (transforming the name row if needed). This avoids missing the editable siteTitle input.
-        if (savedRow && savedRow.correct === 'Zesty Name to Site Title') {
+        if (savedRow.correct === 'Zesty Name to Site Title') {
             // Ensure we update an existing siteTitle row or create one from the name row
             const existingSiteTitleRow = differencesData.find(row => candidates.includes(String(row.gdos_id)) && row.field === 'siteTitle');
             if (existingSiteTitleRow) {
@@ -1677,7 +1466,7 @@ function populateGlobalFilters() {
     // attach change listeners (only once)
     if (!territorySelect._listenerAdded) {
         territorySelect.addEventListener('change', function() {
-            localStorage.setItem('globalTerritoryFilter', this.value);
+            // localStorage.setItem('globalTerritoryFilter', this.value);
             applyGlobalFilters();
             // update metrics when filters change
             try { updateMetrics(); } catch(e) { console.warn('updateMetrics failed', e); }
@@ -2050,19 +1839,18 @@ function showQueueModal() {
         // force sync
         modalEl.querySelector('#forceSyncFromQueueBtn').addEventListener('click', async function() {
             this.disabled = true;
-            this.textContent = 'Syncing...';
+            this.textContent = 'Reloading...';
             try {
-                const res = await syncQueue();
-                showTransientMessage('Forced sync finished', 2000);
+                await loadSavedChanges();
+                showTransientMessage('Reload finished', 2000);
                 // refresh the modal content
                 try { document.getElementById('queueStatusContent').textContent = JSON.stringify(getQueueOverview(), null, 2); } catch (e) {}
-                if (Array.isArray(res) && res.length > 0) showServerResponseModal(res);
             } catch (e) {
-                console.warn('force sync failed', e);
-                showTransientMessage('Force sync failed', 4000);
+                console.warn('reload failed', e);
+                showTransientMessage('Reload failed', 4000);
             } finally {
                 this.disabled = false;
-                this.textContent = 'Force Sync';
+                this.textContent = 'Reload from Cloudflare';
             }
         });
     }
