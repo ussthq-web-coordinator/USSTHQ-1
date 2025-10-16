@@ -23,14 +23,39 @@ export default {
           headers: { 'Content-Type': 'application/json' },
         });
       } else {
-        response = new Response(JSON.stringify({ data: [], lastUpdated: null }), {
+        response = new Response(JSON.stringify({}), {
           headers: { 'Content-Type': 'application/json' },
         });
       }
     } else if (request.method === 'PUT') {
-      // Store the new data
+      // Store the new data, merging with existing
       const body = await request.text();
-      await env.KV.put(key, body);
+      let incomingCorrections;
+      try {
+        incomingCorrections = JSON.parse(body);
+      } catch (e) {
+        return new Response('Invalid JSON', { status: 400 });
+      }
+
+      // Get current data
+      const currentDataStr = await env.KV.get(key);
+      let currentCorrections = {};
+      if (currentDataStr) {
+        try {
+          currentCorrections = JSON.parse(currentDataStr);
+        } catch (e) {
+          // If current data is corrupted, start fresh
+          console.error('Corrupted current data, starting fresh');
+        }
+      }
+
+      // Merge incoming corrections into current (incoming takes precedence)
+      const mergedCorrections = { ...currentCorrections, ...incomingCorrections };
+
+      // Add timestamp
+      mergedCorrections.lastUpdated = new Date().toISOString();
+
+      await env.KV.put(key, JSON.stringify(mergedCorrections));
       response = new Response('OK', { status: 200 });
     } else {
       response = new Response('Method not allowed', { status: 405 });

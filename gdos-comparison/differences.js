@@ -167,7 +167,9 @@ Promise.all([
         { field: 'address', gdosPath: 'address1', zestyPath: 'Column1.content.address' },
         { field: 'latitude', gdosPath: 'location.latitude', zestyPath: 'Column1.content.latitude' },
         { field: 'longitude', gdosPath: 'location.longitude', zestyPath: 'Column1.content.longitude' },
-        { field: 'zipcode', gdosPath: 'zip.zipcode', zestyPath: 'Column1.content.zipcode' }
+        { field: 'zipcode', gdosPath: 'zip.zipcode', zestyPath: 'Column1.content.zipcode' },
+        { field: 'siteTitle', gdosPath: 'name', zestyPath: 'Column1.content.siteTitle', alwaysShow: true }, // Always show for published records
+        { field: 'openHoursText', gdosPath: 'openHoursText', zestyPath: 'Column1.content.openHoursText', alwaysShow: true } // Always show for published records
     ];
 
     // Find differences
@@ -220,7 +222,22 @@ Promise.all([
             const normalizedGdos = normalizeValue(gdosValue, fieldObj.field);
             const normalizedZesty = normalizeValue(zestyValue, fieldObj.field);
             
-            if (normalizedGdos !== normalizedZesty && normalizedGdos != null && normalizedZesty != null) {
+            // Always show for published records if alwaysShow is true, or if there's a difference
+            const hasDifference = normalizedGdos !== normalizedZesty && normalizedGdos != null && normalizedZesty != null;
+            if (fieldObj.alwaysShow && isPublished || hasDifference) {
+                // Special handling for siteTitle alwaysShow rows
+                let correctValue = hasDifference ? 'GDOS' : 'Zesty';
+                let zestyVal = zestyValue || '';
+                let isSiteTitleRow = false;
+                
+                if (fieldObj.field === 'siteTitle' && fieldObj.alwaysShow) {
+                    // For siteTitle alwaysShow, default to "Zesty Name to Site Title" behavior
+                    correctValue = 'Zesty Name to Site Title';
+                    // Leave Zesty Value empty for editor to enter if needed
+                    zestyVal = '';
+                    isSiteTitleRow = true;
+                }
+                
                 differencesData.push({
                     gdos_id: gdos.id,
                     name: gdos.name,
@@ -233,8 +250,10 @@ Promise.all([
                     doNotImport: duplicateRecord && duplicateRecord.doNotImport != null ? String(duplicateRecord.doNotImport) : 'False',
                     field: fieldObj.field,
                     gdos_value: gdosValue,
-                    zesty_value: zestyValue,
-                    correct: 'GDOS' // default
+                    zesty_value: zestyVal, // Allow empty zesty value for editing
+                    correct: correctValue,
+                    editable: fieldObj.alwaysShow, // Mark as editable for alwaysShow fields
+                    siteTitleRow: isSiteTitleRow
                 });
             }
         });
@@ -336,6 +355,22 @@ function correctValueFormatter(cell, formatterParams, onRendered) {
     const value = cell.getValue();
     const row = cell.getRow();
     const rowData = row.getData();
+
+    // For editable rows, show a fixed "Custom Zesty" label since they provide custom values
+    // But for siteTitle alwaysShow rows, show "Zesty Name to Site Title"
+    if (rowData.editable) {
+        const span = document.createElement('span');
+        span.className = 'text-muted small';
+        if (rowData.field === 'siteTitle' && rowData.siteTitleRow) {
+            span.textContent = 'Zesty Name to Site Title';
+            span.title = 'Using Zesty name as siteTitle (editable)';
+        } else {
+            span.textContent = 'Custom Zesty';
+            span.title = 'This field allows custom Zesty values to be entered';
+        }
+        return span;
+    }
+
     const select = document.createElement('select');
     select.className = 'form-select form-select-sm';
     let options = `
@@ -414,7 +449,27 @@ function zestyValueFormatter(cell, formatterParams, onRendered) {
     const row = cell.getRow();
     const correctValue = row.getData().correct;
     const value = cell.getValue();
+    const rowData = row.getData();
 
+    // For editable rows (alwaysShow fields), create an input field
+    if (rowData.editable) {
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.className = 'form-control form-control-sm';
+        input.value = value || '';
+        input.placeholder = 'Enter custom value...';
+        input.addEventListener('input', function() {
+            const newValue = this.value;
+            // Update the row data directly
+            rowData.zesty_value = newValue;
+            rowData.final_value = newValue; // Since editable rows use Zesty value
+            // Save changes without updating the row to avoid re-rendering the input
+            saveChanges();
+        });
+        return input;
+    }
+
+    // Default behavior for non-editable rows
     const span = document.createElement('span');
     span.className = 'value-text' + (correctValue === 'Zesty' || correctValue === 'Zesty Name to Site Title' ? ' selected-underline' : '');
     span.textContent = value;
@@ -429,13 +484,12 @@ function saveChanges() {
         const corrections = data.filter(r => r.correct !== 'GDOS').map(r => ({
             gdos_id: r.gdos_id,
             field: r.correct === 'Zesty Name to Site Title' ? 'siteTitle' : r.field,
-            correct: r.correct
+            correct: r.correct,
+            // For editable rows, also save the custom zesty_value
+            ...(r.editable && { customZestyValue: r.zesty_value })
         }));
         console.log('Saving corrections to shared storage:', corrections);
-        const updatedData = {
-            data: corrections,
-            lastUpdated: new Date().toISOString()
-        };
+        const updatedData = corrections; // Send corrections object directly
         const payload = JSON.stringify(updatedData);
         console.log('Payload size:', payload.length, 'bytes');
         return fetch(SHARED_STORAGE_URL, {
@@ -522,8 +576,8 @@ function loadSavedChanges() {
             return response.json();
         })
         .then(data => {
-            const corrections = data.data;
-            if (Array.isArray(corrections)) {
+            const corrections = data; // data is the corrections object directly
+            if (typeof corrections === 'object' && corrections !== null) {
                 applyChanges(corrections);
                 console.log('Shared corrections loaded');
                 // Update the table with the modified data
@@ -543,15 +597,18 @@ function loadSavedChanges() {
 
 function applyChanges(changes) {
     console.log('Applying changes from shared storage:', changes);
-    changes.forEach(savedRow => {
+    Object.entries(changes).forEach(([key, savedRow]) => {
+        // key is like "USW-123-name", savedRow is { correct: 'Zesty', value: 'new value', ... }
+        const [territory, id, field] = key.split('-', 3);
+        const gdos_id = `${territory}-${id}`;
         let currentRow = differencesData.find(row => 
-            row.gdos_id === savedRow.gdos_id && row.field === savedRow.field
+            row.gdos_id === gdos_id && row.field === field
         );
-        if (!currentRow && savedRow.field === 'siteTitle' && savedRow.correct === 'Zesty Name to Site Title') {
+        if (!currentRow && field === 'siteTitle' && savedRow.correct === 'Zesty Name to Site Title') {
             // Special case: transform the name row into a siteTitle row for "Zesty Name to Site Title"
             // Find the corresponding name row to transform
             const nameRow = differencesData.find(row => 
-                row.gdos_id === savedRow.gdos_id && row.field === 'name'
+                row.gdos_id === gdos_id && row.field === 'name'
             );
             if (nameRow) {
                 // Transform the name row into a siteTitle row
@@ -567,6 +624,10 @@ function applyChanges(changes) {
         if (currentRow) {
             console.log('Applying to row:', currentRow.gdos_id, currentRow.field, '-> correct:', savedRow.correct);
             currentRow.correct = savedRow.correct;
+            // For editable rows, restore the custom zesty_value
+            if (savedRow.value !== undefined) {
+                currentRow.zesty_value = savedRow.value;
+            }
             // Compute final_value based on correct
             if (savedRow.correct === 'Zesty Name to Site Title') {
                 currentRow.final_value = currentRow.zesty_value;
@@ -574,7 +635,7 @@ function applyChanges(changes) {
                 currentRow.final_value = savedRow.correct === 'GDOS' ? currentRow.gdos_value : currentRow.zesty_value;
             }
         } else {
-            console.warn('No matching row for:', savedRow);
+            console.warn('No matching row for:', key, savedRow);
         }
     });
     console.log('Applied changes, updated differencesData length:', differencesData.length);
@@ -841,6 +902,7 @@ function populateGlobalFilters() {
     const territorySelect = document.getElementById('globalTerritoryFilter');
     const correctSelect = document.getElementById('globalCorrectFilter');
     const fieldSelect = document.getElementById('globalFieldFilter');
+    const hideSiteTitleOpenHoursCheckbox = document.getElementById('hideSiteTitleOpenHours');
     if (!territorySelect || !correctSelect) return;
 
     // gather unique territories from differencesData
@@ -900,41 +962,59 @@ function populateGlobalFilters() {
             fieldSelect._listenerAdded = true;
         }
     }
+
+    // Add listener for hide siteTitle/openHours checkbox
+    if (hideSiteTitleOpenHoursCheckbox && !hideSiteTitleOpenHoursCheckbox._listenerAdded) {
+        console.log('Attaching event listener for hideSiteTitleOpenHours checkbox');
+        hideSiteTitleOpenHoursCheckbox.addEventListener('change', function() {
+            console.log('hideSiteTitleOpenHours checkbox changed to:', this.checked);
+            localStorage.setItem('hideSiteTitleOpenHours', this.checked);
+            applyGlobalFilters();
+            // update metrics when filter changes
+            try { updateMetrics(); } catch(e) { console.warn('updateMetrics failed', e); }
+        });
+        hideSiteTitleOpenHoursCheckbox._listenerAdded = true;
+    }
 }
 
 function applyGlobalFilters() {
     const table = window.differencesTable;
-    if (!table) return;
+    if (!table || !table.initialized) {
+        console.warn('Table not ready, skipping filter application');
+        return;
+    }
     const territorySelect = document.getElementById('globalTerritoryFilter');
     const correctSelect = document.getElementById('globalCorrectFilter');
     const fieldSelect = document.getElementById('globalFieldFilter');
+    const hideSiteTitleOpenHoursCheckbox = document.getElementById('hideSiteTitleOpenHours');
 
-    const filters = [];
+    // Clear all filters first
+    table.clearFilter();
+
+    // Add filters back
     if (territorySelect && territorySelect.value && territorySelect.value !== 'all') {
-        filters.push({ field: 'territory', type: '=', value: territorySelect.value });
+        table.addFilter("territory", "=", territorySelect.value);
     }
     if (correctSelect && correctSelect.value && correctSelect.value !== 'all') {
         if (correctSelect.value === 'GDOS') {
-            // Include both 'GDOS' and 'Zesty Name to Site Title' (since it keeps GDOS name)
-            filters.push(function(data, filterParams) {
-                return data.correct === 'GDOS' || data.correct === 'Zesty Name to Site Title';
-            });
+            table.addFilter("correct", "=", 'GDOS');
         } else if (correctSelect.value === 'Zesty') {
-            filters.push({ field: 'correct', type: '=', value: 'Zesty' });
+            table.addFilter("correct", "=", 'Zesty');
+        } else if (correctSelect.value === 'Zesty Name to Site Title') {
+            table.addFilter("correct", "=", 'Zesty Name to Site Title');
         } else {
-            filters.push({ field: 'correct', type: '=', value: correctSelect.value });
+            table.addFilter("correct", "=", correctSelect.value);
         }
     }
     if (fieldSelect && fieldSelect.value && fieldSelect.value !== 'all') {
-        filters.push({ field: 'field', type: '=', value: fieldSelect.value });
+        table.addFilter("field", "=", fieldSelect.value);
     }
-
-    if (filters.length === 0) {
-        table.clearFilter();
-    } else if (filters.length === 1) {
-        table.setFilter(filters[0].field, filters[0].type, filters[0].value);
-    } else {
-        table.setFilter(filters);
+    if (hideSiteTitleOpenHoursCheckbox && hideSiteTitleOpenHoursCheckbox.checked) {
+        console.log('Adding hide siteTitle/openHours filter');
+        table.addFilter(function(data, filterParams) {
+            const result = data.field !== 'siteTitle' && data.field !== 'openHoursText';
+            return result;
+        });
     }
 }
 
@@ -942,9 +1022,13 @@ function applySavedGlobalFilters() {
     const territorySelect = document.getElementById('globalTerritoryFilter');
     const correctSelect = document.getElementById('globalCorrectFilter');
     const fieldSelect = document.getElementById('globalFieldFilter');
+    const hideSiteTitleOpenHoursCheckbox = document.getElementById('hideSiteTitleOpenHours');
     const savedTerr = localStorage.getItem('globalTerritoryFilter');
     const savedCorrect = localStorage.getItem('globalCorrectFilter');
     const savedField = localStorage.getItem('globalFieldFilter');
+    const savedHideSiteTitle = localStorage.getItem('hideSiteTitleOpenHours');
+    // Default to true (hide by default) if not set
+    const hideByDefault = savedHideSiteTitle === null ? true : savedHideSiteTitle === 'true';
     if (territorySelect && savedTerr) {
         // only set if option exists (safety)
         const opt = Array.from(territorySelect.options).find(o => o.value === savedTerr);
@@ -957,6 +1041,9 @@ function applySavedGlobalFilters() {
     if (fieldSelect && savedField) {
         const opt3 = Array.from(fieldSelect.options).find(o => o.value === savedField);
         if (opt3) fieldSelect.value = savedField;
+    }
+    if (hideSiteTitleOpenHoursCheckbox) {
+        hideSiteTitleOpenHoursCheckbox.checked = hideByDefault;
     }
     // apply after setting
     applyGlobalFilters();
@@ -979,12 +1066,35 @@ function filterDoNotImport() {
     }
 }
 
+function toggleSiteTitleOpenHoursVisibility() {
+    const checkbox = document.getElementById('hideSiteTitleOpenHours');
+    if (checkbox) {
+        checkbox.checked = !checkbox.checked;
+        // Trigger the change event to apply the filter
+        checkbox.dispatchEvent(new Event('change'));
+    }
+}
+
 function clearFilters() {
     const table = Tabulator.findTable("#differencesTable")[0];
     if (table) {
         table.clearFilter();
         try { updateMetrics(); } catch(e) { console.warn('updateMetrics failed', e); }
     }
+    // Also reset global filters
+    const territorySelect = document.getElementById('globalTerritoryFilter');
+    const correctSelect = document.getElementById('globalCorrectFilter');
+    const fieldSelect = document.getElementById('globalFieldFilter');
+    const hideSiteTitleOpenHoursCheckbox = document.getElementById('hideSiteTitleOpenHours');
+    if (territorySelect) territorySelect.value = 'all';
+    if (correctSelect) correctSelect.value = 'all';
+    if (fieldSelect) fieldSelect.value = 'all';
+    if (hideSiteTitleOpenHoursCheckbox) hideSiteTitleOpenHoursCheckbox.checked = true; // Reset to default (checked)
+    // Clear localStorage
+    localStorage.removeItem('globalTerritoryFilter');
+    localStorage.removeItem('globalCorrectFilter');
+    localStorage.removeItem('globalFieldFilter');
+    localStorage.removeItem('hideSiteTitleOpenHours');
 }
 
 // Try to pull a usable state string from a Zesty flattened record
