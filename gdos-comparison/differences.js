@@ -363,8 +363,9 @@ function correctValueFormatter(cell, formatterParams, onRendered) {
         const rowData = row.getData();
         rowData.correct = newValue;
         if (newValue === 'Zesty Name to Site Title') {
-            // Special case: use Zesty name value for siteTitle
-            rowData.final_value = rowData.zesty_value;
+            // Special case: keep GDOS name, use Zesty name for siteTitle
+            rowData.correct = 'GDOS';
+            rowData.final_value = rowData.gdos_value;
         } else {
             rowData.final_value = newValue === 'GDOS' ? rowData.gdos_value : rowData.zesty_value;
         }
@@ -380,12 +381,12 @@ function correctValueFormatter(cell, formatterParams, onRendered) {
             if (gdosCell) {
                 const el = gdosCell.getElement();
                 const span = el ? el.querySelector('.value-text') : null;
-                if (span) span.classList.toggle('selected-underline', newValue === 'GDOS');
+                if (span) span.classList.toggle('selected-underline', newValue === 'GDOS' || newValue === 'Zesty Name to Site Title');
             }
             if (zestyCell) {
                 const el = zestyCell.getElement();
                 const span = el ? el.querySelector('.value-text') : null;
-                if (span) span.classList.toggle('selected-underline', newValue === 'Zesty' || newValue === 'Zesty Name to Site Title');
+                if (span) span.classList.toggle('selected-underline', newValue === 'Zesty');
             }
         } catch (e) {
             console.warn('toggle underline failed', e);
@@ -412,7 +413,7 @@ function gdosValueFormatter(cell, formatterParams, onRendered) {
     const value = cell.getValue();
 
     const span = document.createElement('span');
-    span.className = 'value-text' + (correctValue === 'GDOS' ? ' selected-underline' : '');
+    span.className = 'value-text' + (correctValue === 'GDOS' || correctValue === 'Zesty Name to Site Title' ? ' selected-underline' : '');
     span.textContent = value;
     return span;
 }
@@ -496,8 +497,8 @@ function updateMetrics() {
         if (!Array.isArray(data)) data = table.getData();
     }
     const total = data.length;
-    const gdosCount = data.filter(r => r.correct === 'GDOS').length;
-    const zestyCount = data.filter(r => r.correct === 'Zesty' || r.correct === 'Zesty Name to Site Title').length;
+    const gdosCount = data.filter(r => r.correct === 'GDOS' || r.correct === 'Zesty Name to Site Title').length;
+    const zestyCount = data.filter(r => r.correct === 'Zesty').length;
 
     // per-field counts
     const fieldCounts = data.reduce((acc, r) => {
@@ -575,9 +576,9 @@ function applyChanges(changes) {
                     synthetic: true // Mark as synthetic since it's not a real difference
                 };
                 differencesData.push(currentRow);
-                // Also mark the name row as corrected to Zesty
-                nameRow.correct = 'Zesty';
-                nameRow.final_value = nameRow.zesty_value;
+                // Also mark the name row as corrected to GDOS (keep GDOS name, use Zesty name for siteTitle)
+                nameRow.correct = 'GDOS';
+                nameRow.final_value = nameRow.gdos_value;
             }
         }
         if (currentRow) {
@@ -1025,11 +1026,13 @@ function applyGlobalFilters() {
         filters.push({ field: 'territory', type: '=', value: territorySelect.value });
     }
     if (correctSelect && correctSelect.value && correctSelect.value !== 'all') {
-        if (correctSelect.value === 'Zesty') {
-            // Include both 'Zesty' and 'Zesty Name to Site Title'
+        if (correctSelect.value === 'GDOS') {
+            // Include both 'GDOS' and 'Zesty Name to Site Title' (since it keeps GDOS name)
             filters.push(function(data, filterParams) {
-                return data.correct === 'Zesty' || data.correct === 'Zesty Name to Site Title';
+                return data.correct === 'GDOS' || data.correct === 'Zesty Name to Site Title';
             });
+        } else if (correctSelect.value === 'Zesty') {
+            filters.push({ field: 'correct', type: '=', value: 'Zesty' });
         } else {
             filters.push({ field: 'correct', type: '=', value: correctSelect.value });
         }
