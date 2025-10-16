@@ -1,15 +1,23 @@
 export default {
   async fetch(request, env, ctx) {
     const KV = env.CORRECTIONS_KV || env.KV;
-    const CORS_HEADERS = {
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'GET, PUT, PATCH, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type, X-Worker-Token',
-    };
 
-    // Preflight
+    // Build CORS headers per-request (reflect Origin when present).
+    function buildCorsHeaders(req) {
+      const origin = req.headers.get('Origin') || '*';
+      return {
+        'Access-Control-Allow-Origin': origin,
+        'Access-Control-Allow-Methods': 'GET, PUT, PATCH, OPTIONS',
+        // Allow common headers that the client may send in preflight
+        'Access-Control-Allow-Headers': 'Content-Type, X-Worker-Token, Accept, Authorization',
+        // Allow credentials if any client uses them (set to true for compatibility)
+        'Access-Control-Allow-Credentials': 'true',
+      };
+    }
+
+    // Preflight handling
     if (request.method === 'OPTIONS') {
-      return new Response(null, { status: 204, headers: CORS_HEADERS });
+      return new Response(null, { status: 204, headers: buildCorsHeaders(request) });
     }
 
     // optional auth for mutating requests
@@ -52,33 +60,33 @@ export default {
     try {
       if (request.method === 'GET') {
         const current = await getCorrections();
-        return new Response(JSON.stringify(current), { status: 200, headers: { 'Content-Type': 'application/json', ...CORS_HEADERS } });
+        return new Response(JSON.stringify(current), { status: 200, headers: { 'Content-Type': 'application/json', ...buildCorsHeaders(request) } });
       }
 
       // auth guard for writes
       if (!(await requireAuth(request))) {
-        return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { 'Content-Type': 'application/json', ...CORS_HEADERS } });
+        return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { 'Content-Type': 'application/json', ...buildCorsHeaders(request) } });
       }
 
       if (request.method === 'PUT') {
         const text = await request.text();
-        if (text.length > MAX_PAYLOAD_BYTES) return new Response(JSON.stringify({ error: 'Payload too large' }), { status: 413, headers: { 'Content-Type': 'application/json', ...CORS_HEADERS } });
+        if (text.length > MAX_PAYLOAD_BYTES) return new Response(JSON.stringify({ error: 'Payload too large' }), { status: 413, headers: { 'Content-Type': 'application/json', ...buildCorsHeaders(request) } });
         let obj;
-        try { obj = JSON.parse(text); } catch (e) { return new Response(JSON.stringify({ error: 'Invalid JSON' }), { status: 400, headers: { 'Content-Type': 'application/json', ...CORS_HEADERS } }); }
+        try { obj = JSON.parse(text); } catch (e) { return new Response(JSON.stringify({ error: 'Invalid JSON' }), { status: 400, headers: { 'Content-Type': 'application/json', ...buildCorsHeaders(request) } }); }
         if (obj && obj.data && Array.isArray(obj.data)) obj = convertLegacyArray(obj.data);
         if (Array.isArray(obj)) obj = convertLegacyArray(obj);
         if (!obj || typeof obj !== 'object') obj = {};
         await putCorrections(obj);
-        return new Response(JSON.stringify({ ok: true }), { status: 200, headers: { 'Content-Type': 'application/json', ...CORS_HEADERS } });
+        return new Response(JSON.stringify({ ok: true }), { status: 200, headers: { 'Content-Type': 'application/json', ...buildCorsHeaders(request) } });
       }
 
       if (request.method === 'PATCH') {
         const text = await request.text();
-        if (text.length > MAX_PAYLOAD_BYTES) return new Response(JSON.stringify({ error: 'Payload too large' }), { status: 413, headers: { 'Content-Type': 'application/json', ...CORS_HEADERS } });
+        if (text.length > MAX_PAYLOAD_BYTES) return new Response(JSON.stringify({ error: 'Payload too large' }), { status: 413, headers: { 'Content-Type': 'application/json', ...buildCorsHeaders(request) } });
         let delta;
-        try { delta = JSON.parse(text); } catch (e) { return new Response(JSON.stringify({ error: 'Invalid JSON' }), { status: 400, headers: { 'Content-Type': 'application/json', ...CORS_HEADERS } }); }
+        try { delta = JSON.parse(text); } catch (e) { return new Response(JSON.stringify({ error: 'Invalid JSON' }), { status: 400, headers: { 'Content-Type': 'application/json', ...buildCorsHeaders(request) } }); }
         if (Array.isArray(delta)) delta = convertLegacyArray(delta);
-        if (!delta || typeof delta !== 'object') return new Response(JSON.stringify({ error: 'Invalid delta' }), { status: 400, headers: { 'Content-Type': 'application/json', ...CORS_HEADERS } });
+        if (!delta || typeof delta !== 'object') return new Response(JSON.stringify({ error: 'Invalid delta' }), { status: 400, headers: { 'Content-Type': 'application/json', ...buildCorsHeaders(request) } });
 
         const current = await getCorrections();
         // apply delta: null => delete
@@ -86,12 +94,12 @@ export default {
           if (v === null) delete current[k]; else current[k] = v;
         });
         await putCorrections(current);
-        return new Response(JSON.stringify({ ok: true, merged: Object.keys(delta).length, current }), { status: 200, headers: { 'Content-Type': 'application/json', ...CORS_HEADERS } });
+        return new Response(JSON.stringify({ ok: true, merged: Object.keys(delta).length, current }), { status: 200, headers: { 'Content-Type': 'application/json', ...buildCorsHeaders(request) } });
       }
 
-      return new Response(JSON.stringify({ error: 'Method not allowed' }), { status: 405, headers: { 'Content-Type': 'application/json', ...CORS_HEADERS } });
+      return new Response(JSON.stringify({ error: 'Method not allowed' }), { status: 405, headers: { 'Content-Type': 'application/json', ...buildCorsHeaders(request) } });
     } catch (err) {
-      return new Response(JSON.stringify({ error: err.message }), { status: 500, headers: { 'Content-Type': 'application/json', ...CORS_HEADERS } });
+      return new Response(JSON.stringify({ error: err.message }), { status: 500, headers: { 'Content-Type': 'application/json', ...buildCorsHeaders(request) } });
     }
   }
 };
