@@ -230,5 +230,24 @@
         </div>
     
     </div>
+        <!-- Server Response Modal (populated dynamically after sync attempts) -->
+        <div class="modal fade" id="serverResponseModal" tabindex="-1" aria-labelledby="serverResponseModalLabel" aria-hidden="true">
+            <div class="modal-dialog modal-lg modal-dialog-scrollable">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="serverResponseModalLabel">Server Response</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <p class="small text-muted">This shows the JSON returned by the shared storage worker after a sync attempt. Useful for debugging reconciliation and queued deltas.</p>
+                        <pre id="serverResponseJson" style="background:#f8f9fa;border:1px solid #e9ecef;padding:12px;border-radius:6px;max-height:60vh;overflow:auto;white-space:pre-wrap;word-break:break-word"></pre>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" id="copyServerResponseBtn">Copy JSON</button>
+                        <button type="button" class="btn btn-primary" data-bs-dismiss="modal">Close</button>
+                    </div>
+                </div>
+            </div>
+        </div>
 </body>
 </html>

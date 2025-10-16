@@ -35,8 +35,9 @@ function updateSyncStatus() {
 
 // Background sync: attempt to flush the queue, with simple retry/backoff
 async function syncQueue() {
+    const responses = [];
     if (!persistQueue || persistQueue.length === 0) {
-        syncState.pending = 0; updateSyncStatus(); return;
+        syncState.pending = 0; updateSyncStatus(); return responses;
     }
     syncState.lastAttempt = Date.now();
     syncState.pending = persistQueue.length; updateSyncStatus();
@@ -54,6 +55,8 @@ async function syncQueue() {
             // attempt to parse response JSON to reconcile authoritative server state
             let body = null;
             try { body = await res.json(); } catch (e) { body = null; }
+            // record the server response for debug UI
+            responses.push({ request: item, response: body });
             // remove the item from queue on success (we'll compact based on server response below)
             persistQueue.splice(i, 1);
             savePersistQueue();
@@ -69,6 +72,7 @@ async function syncQueue() {
             break;
         }
     }
+    return responses;
 }
 
 // ensure queue is loaded and background sync starts
@@ -87,9 +91,16 @@ async function runSyncNow() {
             btn.textContent = 'Syncing...';
         }
         console.log('Manual sync triggered');
-        await syncQueue();
+        const responses = await syncQueue();
         showTransientMessage('Sync attempt finished', 3000);
         console.log('Manual sync finished. persistQueue length:', persistQueue.length, 'localCorrections:', localStorage.getItem('localCorrections'));
+        // If the sync produced server responses, show them in the modal for inspection
+        if (Array.isArray(responses) && responses.length > 0) {
+            try {
+                const pretty = responses.map(r => ({ request: r.request, response: r.response }));
+                showServerResponseModal(pretty);
+            } catch (e) { console.warn('Failed to show server response modal', e); }
+        }
     } catch (e) {
         console.warn('Manual sync failed', e);
         showTransientMessage('Sync failed — check console', 5000);
@@ -99,6 +110,30 @@ async function runSyncNow() {
             btn.disabled = false;
             btn.textContent = 'Run sync now';
         }
+    }
+}
+
+function showServerResponseModal(obj) {
+    try {
+        const pre = document.getElementById('serverResponseJson');
+        if (!pre) return;
+        pre.textContent = JSON.stringify(obj, null, 2);
+        // show the modal using Bootstrap's modal API
+        const modalEl = document.getElementById('serverResponseModal');
+        if (!modalEl) return;
+        const modal = new bootstrap.Modal(modalEl, { keyboard: true });
+        modal.show();
+
+        // wire copy button
+        const copyBtn = document.getElementById('copyServerResponseBtn');
+        if (copyBtn) {
+            copyBtn.onclick = () => {
+                copyToClipboard(pre.textContent || '');
+                showTransientMessage('Server response copied to clipboard', 2000);
+            };
+        }
+    } catch (e) {
+        console.warn('showServerResponseModal failed', e);
     }
 }
 
