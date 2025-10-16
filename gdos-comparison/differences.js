@@ -103,7 +103,9 @@ async function attemptSyncLocalCorrections() {
 
         // Update the table
         const table = window.differencesTable || (typeof Tabulator !== 'undefined' && typeof Tabulator.findTable === 'function' ? Tabulator.findTable("#differencesTable")[0] : null);
-        if (table && typeof table.setData === 'function') {
+        if (table && typeof table.replaceData === 'function') {
+            await table.replaceData(differencesData);
+        } else if (table && typeof table.setData === 'function') {
             await table.setData(differencesData);
         }
 
@@ -1997,10 +1999,10 @@ function reconcileServerState(serverPayload) {
         applyChanges(loadedCorrections);
         
         const table = window.differencesTable || (typeof Tabulator !== 'undefined' && typeof Tabulator.findTable === 'function' ? Tabulator.findTable("#differencesTable")[0] : null);
-        if (table && typeof table.setData === 'function') {
-            table.setData(differencesData);
-        } else if (table && typeof table.replaceData === 'function') {
+        if (table && typeof table.replaceData === 'function') {
             table.replaceData(differencesData);
+        } else if (table && typeof table.setData === 'function') {
+            table.setData(differencesData);
         } else {
             console.debug('Table not present for live update; will be updated on next full load.');
         }
