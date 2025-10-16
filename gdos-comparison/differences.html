@@ -11,6 +11,52 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Bona+Nova:ital,wght@0,400;0,700;1,400&family=East+Sea+Dokdo&family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&family=Montserrat&family=Rock+Salt&display=swap" rel="stylesheet">
     <style>
+        /* Ensure the table container sits below the filters/metrics row on all viewports */
+        #differencesTable {
+            clear: both;
+            margin-top: 0.75rem;
+        }
+        /* Make the top controls span the full width so table can't float beside it */
+        .filters-container {
+            display: block;
+            width: 100%;
+        }
+        /* Sections for explicit layout separation */
+        #controlsSection {
+            display: block;
+            width: 100%;
+            margin-bottom: 0.5rem;
+        }
+        #tableSection {
+            display: block;
+            width: 100%;
+            clear: both;
+        }
+        /* Ensure the responsive table wrapper itself uses full width */
+        #differencesTable.table-responsive {
+            width: 100% !important;
+        }
+        /* Strong rules to override Tabulator inline sizing/positioning so the table cannot sit beside controls */
+        #differencesTable {
+            display: block !important;
+            clear: both !important;
+            margin-top: 0.75rem !important;
+            width: 100% !important;
+            box-sizing: border-box !important;
+        }
+        /* Tabulator injects a .tabulator element; ensure it fills the container and does not float or position itself off the flow */
+        #differencesTable .tabulator {
+            clear: both !important;
+            width: 100% !important;
+            max-width: 100% !important;
+            float: none !important;
+            position: relative !important;
+            left: auto !important;
+            right: auto !important;
+            margin: 0 !important;
+            box-sizing: border-box !important;
+        }
+
         .field-highlight {
             background-color: #fff3cd !important;
             font-weight: bold;
@@ -57,6 +103,9 @@
         <nav class="navbar navbar-expand-lg navbar-light bg-light shadow-sm">
             <div class="container-fluid">
                 <span class="navbar-brand mb-0 h1">GDOS Data Differences</span>
+                <div class="me-3">
+                    <span id="syncStatus" class="small text-muted">&#9679; Synced</span>
+                </div>
                 <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
                     <span class="navbar-toggler-icon"></span>
                 </button>
@@ -70,13 +119,12 @@
             </div>
         </nav>
 
-        <div class="d-flex justify-content-between align-items-center mb-3">
-            <div class="d-flex align-items-center">
-                <div id="differencesSummary" class="text-muted me-3">Loading differences...</div>
-                <div id="syncStatus" class="small text-muted">&#9679; Checking sync...</div>
-            </div>
+    <section id="controlsSection" class="mb-3">
+        <div class="d-flex justify-content-between align-items-center mb-3 filters-container">
+            <div id="differencesSummary" class="text-muted me-3">Loading differences...</div>
             <div class="d-flex align-items-center gap-3 w-100">
-                <div class="row gx-2 gy-1 align-items-end w-100">
+                <div class="w-100">
+                    <div class="row gx-2 gy-1 align-items-end w-100">
                     <div class="col-12 col-sm-auto">
                         <label for="globalTerritoryFilter" class="form-label small text-muted mb-1">Territory</label>
                         <select id="globalTerritoryFilter" class="form-select form-select-sm">
@@ -115,15 +163,15 @@
                             </button>
 
                             <!-- Filter buttons: Show Duplicates, Show Do Not Import -->
-                            <button type="button" class="btn btn-outline-secondary btn-sm" onclick="filterDuplicates()">
+                            <button type="button" class="btn btn-outline-primary btn-sm" onclick="filterDuplicates()">
                                 Show Duplicates
                             </button>
-                            <button type="button" class="btn btn-outline-warning btn-sm" onclick="filterDoNotImport()">
+                            <button type="button" class="btn btn-outline-primary btn-sm" onclick="filterDoNotImport()">
                                 Show Do Not Import
                             </button>
 
-                            <button type="button" class="btn btn-outline-primary btn-sm" data-bs-toggle="modal" data-bs-target="#rulesModal">
-                                View Comparison Rules
+                            <button type="button" class="btn btn-outline-secondary btn-sm" onclick="clearFilters()">
+                                Clear Filters
                             </button>
                         </div>
                     </div>
@@ -132,7 +180,7 @@
         </div>
 
         <!-- Metrics Row -->
-        <div id="differencesMetrics" class="row g-2 mb-3">
+    <div id="differencesMetrics" class="row g-2 mt-3 mb-3">
             <div class="col-auto">
                 <div class="card p-2">
                     <div class="small text-muted">Total Differences</div>
@@ -153,19 +201,27 @@
             </div>
             <div class="col-auto">
                 <div class="card p-2">
-                    <div class="small text-muted">Correct = Zesty Name to Site Title</div>
+                    <div class="small text-muted">Zesty Name to Site Title</div>
                     <div id="metricSiteTitle" class="h5 mb-0">0</div>
                 </div>
             </div>
             <div class="col">
                 <div class="card p-2">
-                    <div class="small text-muted">Field Counts</div>
                     <div id="metricFields" class="small text-muted">Loading...</div>
                 </div>
             </div>
         </div>
 
-        <div id="differencesTable"></div>
+        <!-- Ensure table always renders in its own full-width row beneath filters and metrics -->
+        </section>
+        <section id="tableSection">
+        <div class="row mt-3">
+            <div class="col-12">
+                <!-- Table container: intentionally placed beneath filters and metrics -->
+                <div id="differencesTable" class="table-responsive"></div>
+            </div>
+        </div>
+        </section>
     </div>
 
     <script src="https://unpkg.com/tabulator-tables@6.2.1/dist/js/tabulator.min.js"></script>
@@ -242,5 +298,15 @@
                 </div>
             </div>
         </div>
+    </div>
+
+    <!-- Footer with muted View Comparison Rules button -->
+    <div class="container-fluid mt-5 pt-3 border-top">
+        <div class="text-center pb-3">
+            <button type="button" class="btn btn-link btn-sm text-muted" data-bs-toggle="modal" data-bs-target="#rulesModal">
+                View Comparison Rules
+            </button>
+        </div>
+    </div>
 </body>
 </html>
