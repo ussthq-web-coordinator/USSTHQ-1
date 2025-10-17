@@ -392,6 +392,7 @@ Promise.all([
         { field: 'latitude', gdosPath: 'location.latitude', zestyPath: 'Column1.content.latitude' },
         { field: 'longitude', gdosPath: 'location.longitude', zestyPath: 'Column1.content.longitude' },
         { field: 'zipcode', gdosPath: 'zip.zipcode', zestyPath: 'Column1.content.zipcode' },
+        { field: 'phone', gdosPath: 'phone.phoneNumber', zestyPath: 'Column1.content.phoneNumber' },
         { field: 'siteTitle', gdosPath: 'name', zestyPath: 'Column1.content.siteTitle', alwaysShow: true }, // Always show for published records
         { field: 'openHoursText', gdosPath: 'openHoursText', zestyPath: 'Column1.content.openHoursText', alwaysShow: true } // Always show for published records
     ];
@@ -474,8 +475,13 @@ Promise.all([
                 if (fieldObj.field === 'openHoursText' && fieldObj.alwaysShow) {
                     // For openHoursText alwaysShow, default to GDOS
                     correctValue = 'GDOS';
-                    // Keep zesty value empty by default since we're defaulting to GDOS
-                    zestyVal = '';
+                    // Prepopulate with Zesty generalHours if it's different from GDOS openHoursText
+                    const zestyGeneralHours = loc['Column1.content.generalHours'];
+                    if (zestyGeneralHours && zestyGeneralHours !== gdos.openHoursText) {
+                        zestyVal = zestyGeneralHours;
+                    } else {
+                        zestyVal = '';
+                    }
                 }
                 
                 differencesData.push({
