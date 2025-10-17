@@ -16,6 +16,40 @@
     <link rel="icon" href="favicon.png" type="image/png">
     <!-- Apple touch icon for iOS devices -->
     <link rel="apple-touch-icon" href="favicon.png">
+    <style>
+        .filter-container {
+            transition: all 0.2s ease;
+        }
+        .filter-container.active {
+            border: 2px solid #007bff;
+            border-radius: 0.375rem;
+            background-color: #f8f9ff;
+            box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+        }
+        .filter-container.active label {
+            color: #007bff;
+            font-weight: 600;
+        }
+        .filter-container.inactive {
+            border: 1px solid #dee2e6;
+            border-radius: 0.375rem;
+            opacity: 0.7;
+        }
+        .filter-container.inactive label {
+            color: #6c757d;
+        }
+        .selected-indicator {
+            display: block;
+            font-size: 0.875rem;
+            color: #495057;
+            margin-top: 0.25rem;
+            font-weight: 500;
+            background-color: #e9ecef;
+            padding: 0.25rem 0.5rem;
+            border-radius: 0.25rem;
+            border: 1px solid #dee2e6;
+        }
+    </style>
     <script src="https://unpkg.com/tabulator-tables@6.2.1/dist/js/tabulator.min.js"></script>
 </head>
 <body>
@@ -40,31 +74,31 @@
         <!-- Filters -->
         <div class="filters-row overflow-x-auto mb-3">
             <div class="d-flex flex-nowrap gap-2 pb-2">
-                <div class="flex-shrink-0">
+                <div class="flex-shrink-0 filter-container" data-filter-type="territory">
                     <label for="territorySelect">Territories</label>
                     <select id="territorySelect" class="form-select" multiple></select>
                 </div>
-                <div class="flex-shrink-0">
+                <div class="flex-shrink-0 filter-container" data-filter-type="state">
                     <label for="stateSelect">State</label>
                     <select id="stateSelect" class="form-select" multiple></select>
                 </div>
-                <div class="flex-shrink-0">
+                <div class="flex-shrink-0 filter-container" data-filter-type="published">
                     <label for="publishedSelect">Published Status</label>
                     <select id="publishedSelect" class="form-select" multiple></select>
                 </div>
-                <div class="flex-shrink-0">
+                <div class="flex-shrink-0 filter-container" data-filter-type="division">
                     <label for="divisionSelect">Division</label>
                     <select id="divisionSelect" class="form-select" multiple></select>
                 </div>
-                <div class="flex-shrink-0">
+                <div class="flex-shrink-0 filter-container" data-filter-type="siteType">
                     <label for="siteTypeSelect">Site Type</label>
                     <select id="siteTypeSelect" class="form-select" multiple></select>
                 </div>
-                <div class="flex-shrink-0">
+                <div class="flex-shrink-0 filter-container" data-filter-type="duplicate">
                     <label for="duplicateSelect">Duplicate Status</label>
                     <select id="duplicateSelect" class="form-select" multiple></select>
                 </div>
-                <div class="flex-shrink-0">
+                <div class="flex-shrink-0 filter-container" data-filter-type="doNotImport">
                     <label for="doNotImportSelect">Import Status</label>
                     <select id="doNotImportSelect" class="form-select" multiple></select>
                 </div>
@@ -75,7 +109,7 @@
                     <label for="columnSelect">Show Columns</label>
                     <select id="columnSelect" class="form-select" multiple></select>
                 </div>
-                <div class="flex-shrink-0">
+                <div class="flex-shrink-0 filter-container" data-filter-type="openHours">
                     <label for="openHoursSelect">OpenHoursText</label>
                     <select id="openHoursSelect" class="form-select">
                         <option value="all">All</option>
@@ -83,7 +117,7 @@
                         <option value="not-empty">Not Empty</option>
                     </select>
                 </div>
-                <div class="flex-shrink-0">
+                <div class="flex-shrink-0 filter-container" data-filter-type="website">
                     <label for="websiteSelect">PrimaryWebsite</label>
                     <select id="websiteSelect" class="form-select">
                         <option value="all">All</option>
@@ -91,7 +125,7 @@
                         <option value="not-empty">Not Empty</option>
                     </select>
                 </div>
-                <div class="flex-shrink-0">
+                <div class="flex-shrink-0 filter-container" data-filter-type="phone">
                     <label for="phoneSelect">PhoneNumber</label>
                     <select id="phoneSelect" class="form-select">
                         <option value="all">All</option>

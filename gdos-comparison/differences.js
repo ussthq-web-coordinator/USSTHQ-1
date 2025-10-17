@@ -1625,6 +1625,7 @@ function renderDifferencesTable() {
 
     // Populate global filters after table created
     populateGlobalFilters();
+    updateFilterVisualState();
 
     // Apply any saved global filters after table is built
     table.on("tableBuilt", function(){
@@ -1854,6 +1855,11 @@ function applyGlobalFilters() {
         }
     }
     // Note: siteTitle and openHoursText are always shown as separate fields - no longer hidden by checkbox
+    updateFilterVisualState();
+}
+
+function updateFilterVisualState() {
+    // No visual styling applied to differences page filters
 }
 
 function applySavedGlobalFilters() {
@@ -1939,6 +1945,7 @@ function clearFilters() {
     localStorage.removeItem('globalCorrectFilter');
     localStorage.removeItem('globalFieldFilter');
     localStorage.removeItem('hideSiteTitleOpenHours');
+    updateFilterVisualState();
 }
 
 // Try to pull a usable state string from a Zesty flattened record

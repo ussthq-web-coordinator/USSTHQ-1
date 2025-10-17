@@ -115,6 +115,7 @@ Promise.all([
     data = [...uswDataWithTerritory, ...ussDataWithTerritory, ...uscDataWithTerritory, ...useDataWithTerritory];
     
     populateFilterOptions(data, true);
+    updateFilterVisualState();
     renderTable();
 })
 .catch(error => {
@@ -126,99 +127,148 @@ function populateFilterOptions(filteredData, addListeners = false, hasEmptyFilte
     const territorySelect = document.getElementById('territorySelect');
     const currentTerritories = Array.from(territorySelect.selectedOptions).map(o => o.value);
     territorySelect.innerHTML = '';
+    // Add All option
+    const allTerrOption = document.createElement('option');
+    allTerrOption.value = 'all';
+    allTerrOption.textContent = 'All';
+    territorySelect.appendChild(allTerrOption);
     const allTerritories = [...new Set(data.map(d => d.territory).filter(t => t))];
     const availableTerritories = [...new Set(filteredData.map(d => d.territory).filter(t => t))];
     allTerritories.forEach(terr => {
         const option = document.createElement('option');
         option.value = terr;
         option.textContent = terr;
-        option.selected = hasEmptyFilter || currentTerritories.length === 0 || (currentTerritories.includes(terr) && availableTerritories.includes(terr));
+        option.selected = hasEmptyFilter || currentTerritories.length === 0 || currentTerritories.includes('all') || (currentTerritories.includes(terr) && availableTerritories.includes(terr));
         territorySelect.appendChild(option);
     });
+    // Select All if all is selected or no selection
+    allTerrOption.selected = currentTerritories.includes('all') || currentTerritories.length === 0 || hasEmptyFilter;
 
     // Published filter
     const publishedSelect = document.getElementById('publishedSelect');
     const currentPublished = Array.from(publishedSelect.selectedOptions).map(o => o.value);
     publishedSelect.innerHTML = '';
+    // Add All option
+    const allPubOption = document.createElement('option');
+    allPubOption.value = 'all';
+    allPubOption.textContent = 'All';
+    publishedSelect.appendChild(allPubOption);
     const allPublished = [...new Set(data.map(d => d.published).filter(pub => pub !== undefined && pub !== null))];
     const availablePublished = [...new Set(filteredData.map(d => d.published).filter(pub => pub !== undefined && pub !== null))];
     allPublished.forEach(pub => {
         const option = document.createElement('option');
         option.value = pub.toString();
         option.textContent = pub ? 'Published' : 'Not Published';
-        option.selected = hasEmptyFilter || currentPublished.length === 0 || (currentPublished.includes(pub.toString()) && availablePublished.includes(pub));
+        option.selected = hasEmptyFilter || currentPublished.length === 0 || currentPublished.includes('all') || (currentPublished.includes(pub.toString()) && availablePublished.includes(pub));
         publishedSelect.appendChild(option);
     });
+    // Select All if all is selected or no selection
+    allPubOption.selected = currentPublished.includes('all') || currentPublished.length === 0 || hasEmptyFilter;
 
     // State filter
     const stateSelect = document.getElementById('stateSelect');
     const currentStates = Array.from(stateSelect.selectedOptions).map(o => o.value);
     stateSelect.innerHTML = '';
+    // Add All option
+    const allStateOption = document.createElement('option');
+    allStateOption.value = 'all';
+    allStateOption.textContent = 'All';
+    stateSelect.appendChild(allStateOption);
     const allStates = [...new Set(data.map(d => d.state?.name).filter(s => s))];
     const availableStates = [...new Set(filteredData.map(d => d.state?.name).filter(s => s))];
     allStates.forEach(state => {
         const option = document.createElement('option');
         option.value = state;
         option.textContent = state;
-        option.selected = hasEmptyFilter || currentStates.length === 0 || (currentStates.includes(state) && availableStates.includes(state));
+        option.selected = hasEmptyFilter || currentStates.length === 0 || currentStates.includes('all') || (currentStates.includes(state) && availableStates.includes(state));
         stateSelect.appendChild(option);
     });
+    // Select All if all is selected or no selection
+    allStateOption.selected = currentStates.includes('all') || currentStates.length === 0 || hasEmptyFilter;
 
     // Division filter
     const divisionSelect = document.getElementById('divisionSelect');
     const currentDivisions = Array.from(divisionSelect.selectedOptions).map(o => o.value);
     divisionSelect.innerHTML = '';
+    // Add All option
+    const allDivOption = document.createElement('option');
+    allDivOption.value = 'all';
+    allDivOption.textContent = 'All';
+    divisionSelect.appendChild(allDivOption);
     const allDivisions = [...new Set(data.map(d => d.location?.division?.name).filter(d => d))];
     const availableDivisions = [...new Set(filteredData.map(d => d.location?.division?.name).filter(d => d))];
     allDivisions.forEach(div => {
         const option = document.createElement('option');
         option.value = div;
         option.textContent = div.length > 30 ? div.substring(0, 27) + '...' : div;
-        option.selected = hasEmptyFilter || currentDivisions.length === 0 || (currentDivisions.includes(div) && availableDivisions.includes(div));
+        option.selected = hasEmptyFilter || currentDivisions.length === 0 || currentDivisions.includes('all') || (currentDivisions.includes(div) && availableDivisions.includes(div));
         divisionSelect.appendChild(option);
     });
+    // Select All if all is selected or no selection
+    allDivOption.selected = currentDivisions.includes('all') || currentDivisions.length === 0 || hasEmptyFilter;
 
     // Site Type filter
     const siteTypeSelect = document.getElementById('siteTypeSelect');
     const currentSiteTypes = Array.from(siteTypeSelect.selectedOptions).map(o => o.value);
     siteTypeSelect.innerHTML = '';
+    // Add All option
+    const allSiteOption = document.createElement('option');
+    allSiteOption.value = 'all';
+    allSiteOption.textContent = 'All';
+    siteTypeSelect.appendChild(allSiteOption);
     const allSiteTypes = [...new Set(data.map(d => d.wm4SiteType?.name).filter(s => s))];
     const availableSiteTypes = [...new Set(filteredData.map(d => d.wm4SiteType?.name).filter(s => s))];
     allSiteTypes.forEach(siteType => {
         const option = document.createElement('option');
         option.value = siteType;
         option.textContent = siteType;
-        option.selected = hasEmptyFilter || currentSiteTypes.length === 0 || (currentSiteTypes.includes(siteType) && availableSiteTypes.includes(siteType));
+        option.selected = hasEmptyFilter || currentSiteTypes.length === 0 || currentSiteTypes.includes('all') || (currentSiteTypes.includes(siteType) && availableSiteTypes.includes(siteType));
         siteTypeSelect.appendChild(option);
     });
+    // Select All if all is selected or no selection
+    allSiteOption.selected = currentSiteTypes.includes('all') || currentSiteTypes.length === 0 || hasEmptyFilter;
 
     // Duplicate filter
     const duplicateSelect = document.getElementById('duplicateSelect');
     const currentDuplicates = Array.from(duplicateSelect.selectedOptions).map(o => o.value);
     duplicateSelect.innerHTML = '';
+    // Add All option
+    const allDupOption = document.createElement('option');
+    allDupOption.value = 'all';
+    allDupOption.textContent = 'All';
+    duplicateSelect.appendChild(allDupOption);
     const allDuplicates = [...new Set(data.map(d => d.duplicate).filter(dup => dup !== undefined && dup !== null))];
     const availableDuplicates = [...new Set(filteredData.map(d => d.duplicate).filter(dup => dup !== undefined && dup !== null))];
     allDuplicates.forEach(dup => {
         const option = document.createElement('option');
         option.value = dup;
         option.textContent = dup === '1' ? 'Duplicate' : 'Not Duplicate';
-        option.selected = hasEmptyFilter || currentDuplicates.length === 0 || (currentDuplicates.includes(dup) && availableDuplicates.includes(dup));
+        option.selected = hasEmptyFilter || currentDuplicates.length === 0 || currentDuplicates.includes('all') || (currentDuplicates.includes(dup) && availableDuplicates.includes(dup));
         duplicateSelect.appendChild(option);
     });
+    // Select All if all is selected or no selection
+    allDupOption.selected = currentDuplicates.includes('all') || currentDuplicates.length === 0 || hasEmptyFilter;
 
     // Do Not Import filter
     const doNotImportSelect = document.getElementById('doNotImportSelect');
     const currentDoNotImport = Array.from(doNotImportSelect.selectedOptions).map(o => o.value);
     doNotImportSelect.innerHTML = '';
+    // Add All option
+    const allDniOption = document.createElement('option');
+    allDniOption.value = 'all';
+    allDniOption.textContent = 'All';
+    doNotImportSelect.appendChild(allDniOption);
     const allDoNotImport = [...new Set(data.map(d => d.doNotImport).filter(dni => dni !== undefined && dni !== null))];
     const availableDoNotImport = [...new Set(filteredData.map(d => d.doNotImport).filter(dni => dni !== undefined && dni !== null))];
     allDoNotImport.forEach(dni => {
         const option = document.createElement('option');
         option.value = dni;
         option.textContent = dni === 'True' ? 'Do Not Import' : 'Import';
-        option.selected = hasEmptyFilter || currentDoNotImport.length === 0 || (currentDoNotImport.includes(dni) && availableDoNotImport.includes(dni));
+        option.selected = hasEmptyFilter || currentDoNotImport.length === 0 || currentDoNotImport.includes('all') || (currentDoNotImport.includes(dni) && availableDoNotImport.includes(dni));
         doNotImportSelect.appendChild(option);
     });
+    // Select All if all is selected or no selection
+    allDniOption.selected = currentDoNotImport.includes('all') || currentDoNotImport.length === 0 || hasEmptyFilter;
 
     // Column visibility select
     const columnSelect = document.getElementById('columnSelect');
@@ -264,9 +314,63 @@ function populateFilterOptions(filteredData, addListeners = false, hasEmptyFilte
     }
 }
 
+function updateFilterVisualState() {
+    // Get all filter containers
+    const filterContainers = document.querySelectorAll('[data-filter-type]');
+
+    filterContainers.forEach(container => {
+        const select = container.querySelector('select');
+        if (!select) return;
+
+        const selectedOptions = Array.from(select.selectedOptions);
+        const isMultiple = select.multiple;
+        let isActive = false;
+
+        if (isMultiple) {
+            isActive = selectedOptions.length > 0 && !selectedOptions.some(o => o.value === 'all');
+        } else {
+            isActive = selectedOptions.length > 0 && selectedOptions[0].value !== 'all';
+        }
+
+        container.classList.toggle('active', isActive);
+        container.classList.toggle('inactive', !isActive);
+
+        // Style selected options in dropdown
+        Array.from(select.options).forEach(option => {
+            option.style.backgroundColor = '';
+            option.style.color = '';
+            option.style.fontWeight = '';
+        });
+        if (isActive) {
+            selectedOptions.forEach(option => {
+                option.style.backgroundColor = '#007bff';
+                option.style.color = 'white';
+                option.style.fontWeight = '600';
+            });
+        }
+
+        // Add or update selected indicator
+        let indicator = container.querySelector('.selected-indicator');
+        if (!indicator) {
+            indicator = document.createElement('span');
+            indicator.className = 'selected-indicator';
+            container.appendChild(indicator);
+        }
+
+        if (isActive) {
+            const values = selectedOptions.map(o => o.textContent).join(', ');
+            indicator.textContent = `Selected: ${values}`;
+            indicator.style.display = 'block';
+        } else {
+            indicator.textContent = '';
+            indicator.style.display = 'none';
+        }
+    });
+}
+
 function applyFilters() {
     const selectedTerritories = Array.from(document.getElementById('territorySelect').selectedOptions).map(o => o.value);
-    const selectedPublished = Array.from(document.getElementById('publishedSelect').selectedOptions).map(o => o.value === 'true');  // Convert string to boolean
+    const selectedPublished = Array.from(document.getElementById('publishedSelect').selectedOptions).map(o => o.value);
     const selectedStates = Array.from(document.getElementById('stateSelect').selectedOptions).map(o => o.value);
     const selectedDivisions = Array.from(document.getElementById('divisionSelect').selectedOptions).map(o => o.value);
     const selectedSiteTypes = Array.from(document.getElementById('siteTypeSelect').selectedOptions).map(o => o.value);
@@ -278,25 +382,25 @@ function applyFilters() {
 
     const filtered = data.filter(d => {
         // New territory filter
-        if (selectedTerritories.length > 0 && !selectedTerritories.includes(d.territory)) return false;
+        if (!selectedTerritories.includes('all') && selectedTerritories.length > 0 && !selectedTerritories.includes(d.territory)) return false;
         
         // New published filter
-        if (selectedPublished.length > 0 && !selectedPublished.includes(d.published)) return false;
+        if (!selectedPublished.includes('all') && selectedPublished.length > 0 && !selectedPublished.includes(d.published.toString())) return false;
 
         // State filter
-        if (selectedStates.length > 0 && !selectedStates.includes(d.state?.name)) return false;
+        if (!selectedStates.includes('all') && selectedStates.length > 0 && !selectedStates.includes(d.state?.name)) return false;
 
         // Division filter
-        if (selectedDivisions.length > 0 && !selectedDivisions.includes(d.location?.division?.name)) return false;
+        if (!selectedDivisions.includes('all') && selectedDivisions.length > 0 && !selectedDivisions.includes(d.location?.division?.name)) return false;
 
         // Site Type filter
-        if (selectedSiteTypes.length > 0 && !selectedSiteTypes.includes(d.wm4SiteType?.name)) return false;
+        if (!selectedSiteTypes.includes('all') && selectedSiteTypes.length > 0 && !selectedSiteTypes.includes(d.wm4SiteType?.name)) return false;
 
         // Duplicate filter
-        if (selectedDuplicates.length > 0 && !selectedDuplicates.includes(d.duplicate)) return false;
+        if (!selectedDuplicates.includes('all') && selectedDuplicates.length > 0 && !selectedDuplicates.includes(d.duplicate)) return false;
 
         // Do Not Import filter
-        if (selectedDoNotImport.length > 0 && !selectedDoNotImport.includes(d.doNotImport)) return false;
+        if (!selectedDoNotImport.includes('all') && selectedDoNotImport.length > 0 && !selectedDoNotImport.includes(d.doNotImport)) return false;
 
         // OpenHoursText filter
         if (openHoursFilter === 'empty' && (d.openHoursText !== null && d.openHoursText !== '')) return false;
@@ -314,9 +418,10 @@ function applyFilters() {
     });
 
     table.setData(filtered);
-    const hasEmptyFilter = selectedTerritories.length === 0 || selectedPublished.length === 0 || selectedStates.length === 0 || selectedDivisions.length === 0 || selectedSiteTypes.length === 0 || selectedDuplicates.length === 0 || selectedDoNotImport.length === 0;
+    const hasEmptyFilter = selectedTerritories.includes('all') || selectedPublished.includes('all') || selectedStates.includes('all') || selectedDivisions.includes('all') || selectedSiteTypes.includes('all') || selectedDuplicates.includes('all') || selectedDoNotImport.includes('all');
     populateFilterOptions(hasEmptyFilter ? data : filtered, false, hasEmptyFilter);
     renderCards(filtered);
+    updateFilterVisualState();
 }
 
 function renderTable() {
