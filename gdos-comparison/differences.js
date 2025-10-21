@@ -2,6 +2,27 @@ let differencesData = [];
 let gdosMap = new Map();
 let duplicateMap = new Map();
 let duplicateCheckRecords = [];
+// Polling/adaptive sync configuration
+let pollIntervalMsDefault = 10000; // normal short poll
+let pollIntervalMs = pollIntervalMsDefault;
+let pollBackoffCount = 0;
+const pollMaxInterval = 60000; // don't back off beyond 60s
+let _serverPollTimeoutId = null;
+// Background sync scheduler (debounced) so UI edits don't force immediate sync/refresh
+let _backgroundSyncTimeoutId = null;
+const BACKGROUND_SYNC_DELAY_MS = 5000; // wait 5s of idle before syncing
+let _pendingServerReconcile = null;
+
+function scheduleBackgroundSync(delayMs = BACKGROUND_SYNC_DELAY_MS) {
+    try { if (_backgroundSyncTimeoutId) clearTimeout(_backgroundSyncTimeoutId); } catch (e) {}
+    _backgroundSyncTimeoutId = setTimeout(() => {
+        // Fire-and-forget sync; attemptSyncLocalCorrections is serialized internally
+        attemptSyncLocalCorrections().catch(e => console.warn('background attemptSyncLocalCorrections failed', e));
+    }, delayMs);
+}
+// Optional cross-tab notification channel to avoid redundant polling between tabs
+let _bc = null;
+try { if (typeof BroadcastChannel !== 'undefined') _bc = new BroadcastChannel('gdos-corrections'); } catch (e) { _bc = null; }
 // Corrections that couldn't be applied because rows weren't present yet
 let pendingCorrections = {};
 // latestFilteredData holds the current set of rows matching active filters (all pages)
@@ -12,6 +33,61 @@ let loadedCorrections = {};
 let localCorrections = {};
 // Sync state for UI
 let syncState = { lastAttempt: null, lastSuccess: null, pending: 0 };
+
+// Whether a full table refresh was skipped while the user was editing
+let deferredTableRefresh = false;
+let _deferredRefreshListenerAdded = false;
+
+// Return true when the user is actively editing an input/select/textarea inside the table
+function isUserEditingInTable() {
+    try {
+        const ae = document.activeElement;
+        if (!ae) return false;
+        const tableContainer = document.getElementById('differencesTable');
+        if (!tableContainer) return false;
+        if (!tableContainer.contains(ae)) return false;
+        const tag = (ae.tagName || '').toLowerCase();
+        return tag === 'input' || tag === 'select' || tag === 'textarea' || ae.isContentEditable;
+    } catch (e) {
+        return false;
+    }
+}
+
+async function smartRefreshTable(table) {
+    if (!table) return;
+    // If the user is typing inside the table, defer the full refresh and let incremental updates happen instead
+    if (isUserEditingInTable()) {
+        deferredTableRefresh = true;
+        // ensure we listen for the end of editing via blur on inputs created by formatters
+        if (!_deferredRefreshListenerAdded) {
+            _deferredRefreshListenerAdded = true;
+            // fallback listener to attempt refresh when focus leaves the table
+            document.addEventListener('focusout', function() {
+                setTimeout(async () => {
+                    if (!isUserEditingInTable() && deferredTableRefresh) {
+                        try {
+                            if (typeof table.replaceData === 'function') await table.replaceData(differencesData);
+                            else if (typeof table.setData === 'function') await table.setData(differencesData);
+                        } catch (e) { console.warn('deferred replaceData/setData failed', e); }
+                        deferredTableRefresh = false;
+                    }
+                }, 50);
+            }, true);
+        }
+        console.log('Deferring full table refresh until user stops editing');
+        return;
+    }
+
+    try {
+        if (typeof table.replaceData === 'function') {
+            await table.replaceData(differencesData);
+        } else if (typeof table.setData === 'function') {
+            await table.setData(differencesData);
+        }
+    } catch (e) {
+        console.warn('smartRefreshTable failed', e);
+    }
+}
 
 // Helper: build canonical storage key for a row (territory-prefixed)
 function makeCorrectionKey(r) {
@@ -54,67 +130,133 @@ function persistSingleCorrection(rowData) {
         console.warn('Failed to save localCorrections to localStorage', e);
     }
 
+    // Notify other tabs that a local correction was made so they can kick off sync sooner
+    try {
+        if (_bc) _bc.postMessage({ type: 'localCorrection', ts: Date.now() });
+    } catch (e) { /* ignore */ }
+
     // Update sync state and UI status
     syncState.pending = Object.keys(localCorrections).length;
     updateSyncStatus();
     updateUIEnabledState();
 
-    // Queue sync to happen soon, but don't block on it
-    attemptSyncLocalCorrections().catch(e => console.warn('Async sync failed:', e));
+    // Schedule a background sync to run after a short idle period so typing/selection
+    // actions do not trigger immediate network activity or table refreshes.
+    scheduleBackgroundSync();
 }
 
 // Attempt to sync all localCorrections to the server
+let _syncInProgress = false;
+let _syncRetryPending = false;
+
 async function attemptSyncLocalCorrections() {
+    // If nothing to do, return
     if (Object.keys(localCorrections).length === 0) return;
 
-    // Save scroll position
-    const scrollY = window.scrollY;
+    // If a sync is already running, mark that we should retry after current run completes
+    if (_syncInProgress) {
+        _syncRetryPending = true;
+        return;
+    }
+
+    _syncInProgress = true;
+    _syncRetryPending = false;
 
     try {
+        // Snapshot the corrections we're about to send so concurrent edits during the fetch
+        // get persisted to localCorrections and retried after this run.
+        const payload = JSON.stringify(localCorrections);
         const res = await fetch(SHARED_STORAGE_URL, {
             method: 'PATCH',
             headers: Object.assign({ 'Content-Type': 'application/json' }, authHeaders()),
-            body: JSON.stringify(localCorrections)
+            body: payload
         });
         if (!res.ok) throw new Error(`Status ${res.status}`);
 
-        // On success, update loadedCorrections
-        Object.keys(localCorrections).forEach(k => {
-            if (localCorrections[k] === null) {
-                delete loadedCorrections[k];
-            } else {
-                loadedCorrections[k] = localCorrections[k];
-            }
-        });
+        // On success, merge the snapshot into loadedCorrections
+        // The server authoritatively reflects what we just sent
+        try {
+            Object.keys(JSON.parse(payload)).forEach(k => {
+                const val = JSON.parse(payload)[k];
+                if (val === null) {
+                    delete loadedCorrections[k];
+                } else {
+                    loadedCorrections[k] = val;
+                }
+            });
+        } catch (e) {
+            // If parsing snapshot fails for some reason, fall back to using localCorrections
+            Object.keys(localCorrections).forEach(k => {
+                if (localCorrections[k] === null) delete loadedCorrections[k]; else loadedCorrections[k] = localCorrections[k];
+            });
+        }
 
-        // Clear localCorrections
-        localCorrections = {};
-        localStorage.removeItem('gdosLocalCorrections');
+        // Clear the keys that we successfully sent from localCorrections
+        try {
+            const sentKeys = Object.keys(JSON.parse(payload));
+            sentKeys.forEach(k => delete localCorrections[k]);
+        } catch (e) {
+            localCorrections = {};
+        }
+        // Persist remaining localCorrections (if any edits happened during the sync)
+        try { localStorage.setItem('gdosLocalCorrections', JSON.stringify(localCorrections)); } catch (e) { console.warn('localStorage write failed after sync', e); }
 
         // Update sync state
-        syncState.pending = 0;
+        syncState.pending = Object.keys(localCorrections).length;
         updateSyncStatus();
 
         // Re-enable UI
         updateUIEnabledState();
 
-        // Apply the changes to differencesData for immediate UI update
-        applyChanges(localCorrections);
+        // Apply the authoritative changes to differencesData for immediate UI update
+        // However, if the user is currently editing inside the table, avoid applying
+        // UI updates that can steal focus or change the editing state. In that case,
+        // persist loadedCorrections and schedule a background reconcile to update UI
+        // after a short idle period.
+        // Compute changed keys from the payload we sent (if available). This helps us
+        // update only the affected rows in the table rather than replacing whole data.
+        let changedKeys = [];
+        try {
+            const parsedPayload = JSON.parse(payload || '{}');
+            changedKeys = Object.keys(parsedPayload || {});
+        } catch (e) { /* ignore */ }
 
-        // Update the table
-        const table = window.differencesTable || (typeof Tabulator !== 'undefined' && typeof Tabulator.findTable === 'function' ? Tabulator.findTable("#differencesTable")[0] : null);
-        if (table && typeof table.replaceData === 'function') {
-            await table.replaceData(differencesData);
-        } else if (table && typeof table.setData === 'function') {
-            await table.setData(differencesData);
+        if (isUserEditingInTable()) {
+            // Merge into loadedCorrections now (authoritative state updated above)
+            try { applyChanges(loadedCorrections); } catch (e) { console.warn('applyChanges (deferred) failed', e); }
+            // Schedule a background UI update (smaller delay so it occurs once editing finishes)
+            if (_backgroundSyncTimeoutId) try { clearTimeout(_backgroundSyncTimeoutId); } catch (e) {}
+            _backgroundSyncTimeoutId = setTimeout(async () => {
+                try {
+                    const table = window.differencesTable || (typeof Tabulator !== 'undefined' && typeof Tabulator.findTable === 'function' ? Tabulator.findTable("#differencesTable")[0] : null);
+                    if (table) {
+                        // Try incremental updates first
+                        applyIncrementalChangesToTable(table, changedKeys);
+                        // If incremental didn't cover everything, fall back to smartRefreshTable
+                        try { await smartRefreshTable(table); } catch (e) { /* ignore */ }
+                    }
+                    try { populateCorrectValueDropdown(loadedCorrections); } catch (e) {}
+                    try { applyGlobalFilters(); } catch (e) {}
+                    try { updateMetrics(); } catch (e) {}
+                } catch (e) { console.warn('deferred UI reconcile failed', e); }
+            }, 1000);
+        } else {
+            try { applyChanges(loadedCorrections); } catch (e) { console.warn('applyChanges failed', e); }
+            // Update the table incrementally where possible to preserve scroll/focus
+            const table = window.differencesTable || (typeof Tabulator !== 'undefined' && typeof Tabulator.findTable === 'function' ? Tabulator.findTable("#differencesTable")[0] : null);
+            if (table) {
+                try {
+                    applyIncrementalChangesToTable(table, changedKeys);
+                    // If we couldn't apply all changes incrementally, smartRefreshTable will be a no-op or perform minimal update
+                    try { await smartRefreshTable(table); } catch (e) { console.warn('smartRefreshTable failed after sync', e); }
+                } catch (e) { console.warn('incremental update after sync failed', e); }
+            }
+            // Update dropdown/options immediately
+            try { populateCorrectValueDropdown(loadedCorrections); } catch (e) { console.warn('populateCorrectValueDropdown failed in attemptSyncLocalCorrections', e); }
+            // Re-apply filters and update metrics
+            try { applyGlobalFilters(); } catch (e) { console.warn('applyGlobalFilters failed in attemptSyncLocalCorrections', e); }
+            try { updateMetrics(); } catch (e) { console.warn('updateMetrics failed in attemptSyncLocalCorrections', e); }
         }
-
-        // Update dropdown/options immediately
-        try { populateCorrectValueDropdown(loadedCorrections); } catch (e) { console.warn('populateCorrectValueDropdown failed in attemptSyncLocalCorrections', e); }
-
-        // Re-apply filters and update metrics
-        try { applyGlobalFilters(); } catch (e) { console.warn('applyGlobalFilters failed in attemptSyncLocalCorrections', e); }
-        try { updateMetrics(); } catch (e) { console.warn('updateMetrics failed in attemptSyncLocalCorrections', e); }
 
         console.log('Local corrections synced to server');
     } catch (e) {
@@ -125,27 +267,28 @@ async function attemptSyncLocalCorrections() {
             el.textContent = '⚠ Out of Sync';
             el.className = 'small text-danger';
         }
-        // Don't show a transient message - it's confusing. The sync status badge shows we're out of sync.
-        // Changes are safely queued in localStorage and will retry automatically on next sync attempt
-        // Keep localCorrections and UI disabled
+        // Keep any unsent localCorrections persisted; we'll retry later
+        try { localStorage.setItem('gdosLocalCorrections', JSON.stringify(localCorrections)); } catch (e) { console.warn('localStorage write failed on sync error', e); }
     } finally {
-        // Restore scroll position
-        window.scrollTo(0, scrollY);
+        _syncInProgress = false;
+        // If edits arrived during sync, schedule a retry shortly
+        if (_syncRetryPending && Object.keys(localCorrections).length > 0) {
+            console.log('Retrying sync because changes arrived during in-flight sync');
+            setTimeout(() => attemptSyncLocalCorrections().catch(e => console.warn('retry sync failed', e)), 250);
+        }
     }
 }
 
 // Update UI enabled state based on pending changes
 function updateUIEnabledState() {
     const hasPending = Object.keys(localCorrections).length > 0;
-    const table = window.differencesTable || (typeof Tabulator !== 'undefined' && typeof Tabulator.findTable === 'function' ? Tabulator.findTable("#differencesTable")[0] : null);
-    if (table) {
-        // Disable editing if there are pending changes
-        table.options.editable = !hasPending;
-        // You might need to refresh the table or disable specific elements
-    }
-    // Disable other UI elements like buttons
-    const buttons = document.querySelectorAll('#differencesTable button, .btn');
-    buttons.forEach(btn => {
+    // Don't change Tabulator.editable dynamically; that can trigger re-renders which steal focus.
+    // Instead, only disable global controls outside the table when pending.
+    const tableEl = document.getElementById('differencesTable');
+    const allButtons = Array.from(document.querySelectorAll('.btn'));
+    allButtons.forEach(btn => {
+        // Skip buttons that are inside the table to avoid interrupting row edits
+        if (tableEl && tableEl.contains(btn)) return;
         if (hasPending) {
             btn.disabled = true;
             btn.title = 'Please wait for pending changes to sync';
@@ -639,6 +782,10 @@ function showLoadingOverlay() {
         overlay.innerHTML = '<div class="spinner-border text-light" role="status"><span class="visually-hidden">Loading...</span></div>';
         document.body.appendChild(overlay);
     }
+    // Allow pointer events to pass through the overlay so inputs inside the table remain interactive
+    overlay.style.pointerEvents = 'none';
+    // Allow the spinner itself to be the only element that can receive pointer events (optional)
+    try { if (overlay.firstElementChild) overlay.firstElementChild.style.pointerEvents = 'auto'; } catch (e) {}
     overlay.style.display = 'flex';
 }
 
@@ -712,20 +859,20 @@ async function loadSavedChanges() {
             applyChanges(corrections);
             console.log('Corrections loaded from Cloudflare Worker');
             const table = window.differencesTable || (typeof Tabulator !== 'undefined' && typeof Tabulator.findTable === 'function' ? Tabulator.findTable("#differencesTable")[0] : null);
-            if (table && typeof table.setData === 'function') {
-                await table.setData(differencesData);
-            } else if (table && typeof table.replaceData === 'function') {
-                // some Tabulator versions expose replaceData instead
-                await table.replaceData(differencesData);
-            } else {
-                // Table isn't initialized yet or doesn't provide a setData/replaceData API
-                console.debug('Table not present or lacks setData/replaceData; table will be created later with current differencesData.');
+            if (table) {
+                try {
+                    // Try to apply incremental changes using the keys present in corrections
+                    const changedKeys = Object.keys(corrections || {});
+                    applyIncrementalChangesToTable(table, changedKeys);
+                    try { await smartRefreshTable(table); } catch (e) { /* ignore */ }
+                } catch (e) { console.warn('incremental update during loadSavedChanges failed', e); }
             }
             populateCorrectValueDropdown(corrections);
         }
     } finally {
-        // Restore scroll position
-        window.scrollTo(0, scrollY);
+        // Do not programmatically change scroll position here. Restoring scroll can
+        // cause unwanted jumps while the UI is updating (especially during frequent
+        // polls). We still hide the loading overlay.
         hideLoadingOverlay();
     }
 }
@@ -744,21 +891,15 @@ function correctValueFormatter(cell, formatterParams, onRendered) {
     select.innerHTML = options;
     select.value = value;
     
-    // Disable the select if there are pending changes waiting to sync (except for custom fields)
-    const hasPending = Object.keys(localCorrections).length > 0;
-    const isCustomField = rowData.field === 'siteTitle' || rowData.field === 'openHoursText';
-    if (hasPending && !isCustomField) {
-        select.disabled = true;
-        select.title = 'Waiting for pending changes to sync before allowing new edits';
-    }
+    // Do not programmatically disable selects here - that can steal focus. We'll ignore changes while pending instead.
     
     select.addEventListener('change', function() {
         const row = cell.getRow();
         const rowData = row.getData();
         const isCustomField = rowData.field === 'siteTitle' || rowData.field === 'openHoursText';
-        // Check again if there are pending changes - don't allow change if so (except for custom fields)
+        // If there are pending changes, ignore this change (unless custom field) and inform the user.
         if (Object.keys(localCorrections).length > 0 && !isCustomField) {
-            select.disabled = true;
+            showTransientMessage('Please wait for pending changes to finish syncing before making another change', 2000);
             return;
         }
         const newValue = this.value;
@@ -831,26 +972,17 @@ function zestyValueFormatter(cell, formatterParams, onRendered) {
         input.className = 'form-control form-control-sm';
         input.value = value || '';
         input.placeholder = 'Enter custom value...';
-        // Disable input if there are pending changes to prevent editing until synced
-        const hasPending = Object.keys(localCorrections).length > 0;
-        if (hasPending) {
-            input.disabled = true;
-            input.title = 'Waiting for pending changes to sync before allowing new edits';
-        }
+        // Do not disable the input element programmatically (it causes layout changes). We'll ignore attempts to change while pending.
         // For custom openHoursText and siteTitle fields, persist on blur instead of input to avoid every keystroke
         const eventType = (rowData.field === 'siteTitle' || rowData.field === 'openHoursText') ? 'blur' : 'input';
         input.addEventListener(eventType, function() {
-            // Don't allow edits if there are pending changes
-            if (Object.keys(localCorrections).length > 0) {
-                input.disabled = true;
-                return;
-            }
             const newValue = this.value;
             // Update the row data directly
             rowData.zesty_value = newValue;
             rowData.final_value = newValue; // Since editable rows use Zesty value
-            
-            // Persist this single change immediately so every keystroke is saved to local storage and queued for sync
+
+            // Persist this single change immediately so every keystroke is saved to local storage and queued for sync.
+            // If a sync is already in-flight, the attemptSyncLocalCorrections() serializer will retry after the current run.
             try { persistSingleCorrection(rowData); } catch (e) { console.warn('persistSingleCorrection failed in input handler', e); }
         });
         return input;
@@ -1044,11 +1176,10 @@ async function loadSavedChanges() {
             applyChanges(corrections);
             console.log('Corrections loaded from Cloudflare Worker');
             const table = window.differencesTable || (typeof Tabulator !== 'undefined' && typeof Tabulator.findTable === 'function' ? Tabulator.findTable("#differencesTable")[0] : null);
-            if (table && typeof table.setData === 'function') {
-                await table.setData(differencesData);
-            } else if (table && typeof table.replaceData === 'function') {
-                // some Tabulator versions expose replaceData instead
-                await table.replaceData(differencesData);
+            if (table) {
+                try {
+                    await smartRefreshTable(table);
+                } catch (e) { console.warn('smartRefreshTable failed during loadSavedChanges', e); }
             } else {
                 // Table isn't initialized yet or doesn't provide a setData/replaceData API
                 console.debug('Table not present or lacks setData/replaceData; table will be created later with current differencesData.');
@@ -1120,24 +1251,80 @@ function detectConflictsWithQueue(serverObj) {
 // Poll loop that runs periodically to keep UI in sync with remote changes and detect conflicts
 async function startServerPoll(intervalMs = 10000) {
     try {
+        // If the user is actively editing inside the table, avoid running the poll work
+        // that may re-render or modify the table. Defer until editing stops to avoid
+        // stealing focus or making fields appear readonly during sync.
+        if (isUserEditingInTable()) {
+            console.log('Polling deferred because user is editing; retrying shortly');
+            // Retry sooner so UI stays in sync shortly after editing finishes
+            scheduleNextPoll(1000);
+            return;
+        }
+
         const result = await pollServerForChanges();
         if (result.changed) {
             // Server has new data, reconcile
             console.log('Poll detected server changes, reconciling...');
             reconcileServerState(result.payload);
+            // reset backoff after a real change
+            pollBackoffCount = 0;
+            pollIntervalMs = pollIntervalMsDefault;
+        } else {
+            // No change: increase backoff slowly up to max interval
+            pollBackoffCount = Math.min(pollBackoffCount + 1, 10);
+            pollIntervalMs = Math.min(pollIntervalMsDefault * Math.pow(1.5, pollBackoffCount), pollMaxInterval);
         }
-        // Attempt to sync localCorrections
+
+        // Attempt to sync localCorrections (this is serialized internally)
         await attemptSyncLocalCorrections();
     } catch (e) {
         console.warn('startServerPoll failed', e);
+        // On error, backoff a bit
+        pollBackoffCount = Math.min(pollBackoffCount + 2, 10);
+        pollIntervalMs = Math.min(pollIntervalMsDefault * Math.pow(1.5, pollBackoffCount), pollMaxInterval);
     } finally {
-        // Schedule next poll
-        setTimeout(() => startServerPoll(intervalMs), intervalMs);
+        // Schedule next poll using adaptive interval
+        scheduleNextPoll(pollIntervalMs);
     }
 }
 
 // start polling when app initializes (after a short delay to avoid clashing with initial load)
-setTimeout(() => startServerPoll(10000), 5000);
+function scheduleNextPoll(ms) {
+    try { if (_serverPollTimeoutId) clearTimeout(_serverPollTimeoutId); } catch (e) {}
+    _serverPollTimeoutId = setTimeout(() => startServerPoll(pollIntervalMs), ms);
+}
+
+setTimeout(() => startServerPoll(pollIntervalMsDefault), 5000);
+
+// Listen for cross-tab notifications and trigger immediate reconcile/sync when another tab posts changes
+if (_bc) {
+    _bc.onmessage = (ev) => {
+        try {
+            const data = ev.data || {};
+            if (data && data.type === 'localCorrection') {
+                console.log('Received localCorrection broadcast from another tab; scheduling background sync');
+                // Schedule a background sync so we don't interrupt editing in this tab
+                scheduleBackgroundSync(1000);
+                // Also trigger a near-term poll to pick up authoritative state later
+                scheduleNextPoll(500);
+            }
+            if (data && data.type === 'serverReconcile') {
+                console.log('Received serverReconcile broadcast; reconciling now (deferred if editing)');
+                // If the user is editing, stash the reconcile payload and apply after idle
+                if (isUserEditingInTable()) {
+                    _pendingServerReconcile = data.payload;
+                    // apply after short idle
+                    if (_backgroundSyncTimeoutId) clearTimeout(_backgroundSyncTimeoutId);
+                    _backgroundSyncTimeoutId = setTimeout(() => {
+                        try { reconcileServerState(_pendingServerReconcile); _pendingServerReconcile = null; } catch (e) { console.warn('deferred reconcile failed', e); }
+                    }, 1500);
+                } else {
+                    try { reconcileServerState(data.payload); } catch (e) { console.warn('reconcileServerState failed on broadcast', e); }
+                }
+            }
+        } catch (e) { console.warn('BroadcastChannel onmessage failed', e); }
+    };
+}
 
 function authHeaders() {
     return {};
@@ -1205,6 +1392,9 @@ function ensureLoadingOverlay() {
         overlay.innerHTML = '<div style="background:#fff;padding:20px 30px;border-radius:6px;box-shadow:0 2px 8px rgba(0,0,0,.3);font-weight:600">Loading saved changes...</div>';
         document.body.appendChild(overlay);
     }
+    // Make this overlay non-blocking so sync UI doesn't prevent typing in the table inputs
+    overlay.style.pointerEvents = 'none';
+    try { if (overlay.firstElementChild) overlay.firstElementChild.style.pointerEvents = 'auto'; } catch (e) {}
     return overlay;
 }
 
@@ -1350,6 +1540,34 @@ function applyPendingCorrections() {
         // update dropdown and metrics without full table reset
         try { populateCorrectValueDropdown(loadedCorrections); } catch (e) { console.warn('populateCorrectValueDropdown failed after applying pending corrections', e); }
         try { updateMetrics(); } catch (e) { console.warn('updateMetrics failed after applying pending corrections', e); }
+    }
+}
+
+// Apply only the changed keys to the existing Tabulator table to avoid full rebuilds
+function applyIncrementalChangesToTable(table, changedKeys) {
+    if (!table || !Array.isArray(changedKeys) || changedKeys.length === 0) return;
+    try {
+        const rows = table.getRows ? table.getRows() : [];
+        changedKeys.forEach(key => {
+            try {
+                // Determine target rows for this key
+                const parsed = parseCorrectionKey(key, loadedCorrections && loadedCorrections[key] ? loadedCorrections[key] : null);
+                const { field, candidates } = parsed;
+                // find index in differencesData
+                const idx = differencesData.findIndex(r => candidates.includes(String(r.gdos_id)) && r.field === field);
+                if (idx === -1) return; // row not present - applyChanges will stash in pendingCorrections
+                const rowData = differencesData[idx];
+                // find Tabulator row component
+                const rowComp = rows.find(r => {
+                    try { const d = r.getData(); return d && String(d.gdos_id) === String(rowData.gdos_id) && d.field === rowData.field; } catch (e) { return false; }
+                });
+                if (rowComp && typeof rowComp.update === 'function') {
+                    rowComp.update(rowData);
+                }
+            } catch (e) { console.warn('applyIncrementalChangesToTable key update failed', key, e); }
+        });
+    } catch (e) {
+        console.warn('applyIncrementalChangesToTable failed', e);
     }
 }
 
@@ -2012,17 +2230,37 @@ function reconcileServerState(serverPayload) {
         applyChanges(loadedCorrections);
         
         const table = window.differencesTable || (typeof Tabulator !== 'undefined' && typeof Tabulator.findTable === 'function' ? Tabulator.findTable("#differencesTable")[0] : null);
-        if (table && typeof table.replaceData === 'function') {
-            table.replaceData(differencesData);
-        } else if (table && typeof table.setData === 'function') {
-            table.setData(differencesData);
+        if (table) {
+            // If the user is editing, defer the refresh and other UI updates until editing stops
+            if (isUserEditingInTable()) {
+                deferredTableRefresh = true;
+                console.log('Deferring reconciliation UI refresh until user stops editing');
+                if (!_deferredRefreshListenerAdded) {
+                    _deferredRefreshListenerAdded = true;
+                    document.addEventListener('focusout', function() {
+                        setTimeout(async () => {
+                            if (!isUserEditingInTable() && deferredTableRefresh) {
+                                try { await smartRefreshTable(table); } catch (e) { console.warn('deferred smartRefreshTable failed', e); }
+                                try { applyGlobalFilters(); } catch (e) { console.warn('applyGlobalFilters failed after deferred reconciliation', e); }
+                                try { updateMetrics(); } catch (e) { console.warn('updateMetrics failed after deferred reconciliation', e); }
+                            }
+                            deferredTableRefresh = false;
+                        }, 50);
+                    }, true);
+                }
+            } else {
+                // call smartRefreshTable but this function is not async, so handle the promise directly
+                smartRefreshTable(table).catch(e => console.warn('smartRefreshTable failed during reconciliation', e));
+            }
         } else {
             console.debug('Table not present for live update; will be updated on next full load.');
         }
         
-        // Re-apply filters and update metrics to reflect the new state
-        try { applyGlobalFilters(); } catch (e) { console.warn('applyGlobalFilters failed during reconciliation', e); }
-        try { updateMetrics(); } catch (e) { console.warn('updateMetrics failed during reconciliation', e); }
+        // Re-apply filters and update metrics to reflect the new state. If editing, these were deferred above.
+        if (!isUserEditingInTable()) {
+            try { applyGlobalFilters(); } catch (e) { console.warn('applyGlobalFilters failed during reconciliation', e); }
+            try { updateMetrics(); } catch (e) { console.warn('updateMetrics failed during reconciliation', e); }
+        }
 
         console.log('Reconciled with server state.');
     } catch (e) {
@@ -2088,10 +2326,6 @@ window.addEventListener('beforeunload', () => {
     localStorage.setItem('scrollPosition', window.scrollY);
 });
 
-window.addEventListener('load', () => {
-    const scrollY = localStorage.getItem('scrollPosition');
-    if (scrollY) {
-        window.scrollTo(0, parseInt(scrollY));
-        localStorage.removeItem('scrollPosition');
-    }
-});
+// Note: we intentionally do not restore scrollPosition on load to avoid
+// forcing the user's viewport while the page finishes initializing. The
+// saved value remains available in localStorage if needed for manual restore.

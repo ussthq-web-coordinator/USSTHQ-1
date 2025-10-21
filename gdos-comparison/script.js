@@ -417,7 +417,36 @@ function applyFilters() {
         return true;
     });
 
-    table.setData(filtered);
+    if (typeof smartRefreshTable === 'function') {
+        Promise.resolve(smartRefreshTable(table)).catch(e => {
+            console.warn('smartRefreshTable failed in filters; falling back to setData', e);
+            try { if (table && typeof table.setData === 'function') table.setData(filtered); } catch (e2) { console.warn('fallback setData failed', e2); }
+        });
+    } else if (table && typeof table.setData === 'function') {
+        // If the user is editing in the differences table, defer applying the filtered set
+        // to avoid stealing focus. Retry shortly after editing stops.
+        try {
+            if (typeof isUserEditingInTable === 'function' && isUserEditingInTable()) {
+                console.log('Deferring filter setData because user is editing; will retry shortly');
+                setTimeout(() => {
+                    try { table.setData(filtered); } catch (e) { console.warn('deferred table.setData failed in filters', e); }
+                }, 1000);
+            } else {
+                table.setData(filtered);
+            }
+        } catch (e) { console.warn('table.setData failed in filters', e); }
+    } else if (table && typeof table.replaceData === 'function') {
+        try {
+            if (typeof isUserEditingInTable === 'function' && isUserEditingInTable()) {
+                console.log('Deferring filter replaceData because user is editing; will retry shortly');
+                setTimeout(() => {
+                    try { table.replaceData(filtered); } catch (e) { console.warn('deferred table.replaceData failed in filters', e); }
+                }, 1000);
+            } else {
+                table.replaceData(filtered);
+            }
+        } catch (e) { console.warn('table.replaceData failed in filters', e); }
+    }
     const hasEmptyFilter = selectedTerritories.includes('all') || selectedPublished.includes('all') || selectedStates.includes('all') || selectedDivisions.includes('all') || selectedSiteTypes.includes('all') || selectedDuplicates.includes('all') || selectedDoNotImport.includes('all');
     populateFilterOptions(hasEmptyFilter ? data : filtered, false, hasEmptyFilter);
     renderCards(filtered);
