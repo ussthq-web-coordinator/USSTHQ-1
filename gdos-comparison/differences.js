@@ -1582,8 +1582,35 @@ function applyIncrementalChangesToTable(table, changedKeys) {
         }
 
         // Use full differencesData instead of filtered table data to include all records including synthetic "do not import" rows
-        // But only include rows that represent corrections (where Zesty is chosen)
-        const allRows = differencesData.filter(r => r.correct !== 'GDOS');
+        // Include rows that represent corrections (where Correct != 'GDOS')
+        // Also include siteTitle and openHoursText rows that have a non-empty final_value (user-entered Zesty value)
+        const includedExamples = [];
+        const excludedExamples = [];
+        const allRows = differencesData.filter(r => {
+            try {
+                if (!r) return false;
+                // Include anything explicitly marked as non-GDOS
+                if (r.correct && r.correct !== 'GDOS') {
+                    if (includedExamples.length < 5) includedExamples.push({ gdos_id: r.gdos_id, field: r.field, reason: 'correct!=GDOS' });
+                    return true;
+                }
+                // For staging fields, include when either final_value or zesty_value contains a non-empty user value
+                if (r.field && (r.field === 'siteTitle' || /openhours/i.test(r.field))) {
+                    const fv = r.final_value !== undefined && r.final_value !== null ? String(r.final_value).trim() : '';
+                    const zv = r.zesty_value !== undefined && r.zesty_value !== null ? String(r.zesty_value).trim() : '';
+                    if (fv !== '' || zv !== '') {
+                        if (includedExamples.length < 5) includedExamples.push({ gdos_id: r.gdos_id, field: r.field, reason: fv !== '' ? 'final_value' : 'zesty_value', value: fv !== '' ? fv : zv });
+                        return true;
+                    }
+                }
+                if (excludedExamples.length < 5) excludedExamples.push({ gdos_id: r.gdos_id, field: r.field, correct: r.correct, final_value: r.final_value, zesty_value: r.zesty_value });
+                return false;
+            } catch (e) {
+                return false;
+            }
+        });
+        console.debug('downloadCorrectionsCsv: included rows:', allRows.length, 'examples:', includedExamples);
+        console.debug('downloadCorrectionsCsv: excluded sample rows (up to 5):', excludedExamples);
 
         // Group by gdos_id and collect all corrections (including GDOS)
         const grouped = new Map();
@@ -1613,16 +1640,30 @@ function applyIncrementalChangesToTable(table, changedKeys) {
 
             const entry = grouped.get(gid);
 
-            // The field indicates which property changed; final_value holds the chosen value
+            // The field indicates which property changed; final_value holds the chosen value.
+            // If final_value was not populated for staging fields, fall back to zesty_value so
+            // user-entered Zesty custom values are exported.
             const field = r.field;
-            const finalVal = r.final_value;
-
-            // Only mark as hasCorrections if this is a meaningful correction (not just a staging row for siteTitle/openHours)
-            // Exclude siteTitle and openHoursText from auto-marking; they are staging rows unless they represent actual corrections
-            const isNonStaging = field !== 'siteTitle' && !(/openhours/i.test(field));
-            if (isNonStaging) {
-                entry.hasCorrections = true;
+            let finalVal = r.final_value;
+            if ((finalVal === undefined || finalVal === null || String(finalVal).trim() === '') && r.zesty_value !== undefined && r.zesty_value !== null) {
+                finalVal = r.zesty_value;
             }
+
+            // Only mark as hasCorrections if this is a meaningful correction.
+            // siteTitle and openHoursText are treated as "staging" rows by default, but
+            // if the user selected Zesty (finalVal present/non-empty) we should include them
+            // as real corrections in the export.
+            let markAsCorrection = false;
+            if (field === 'siteTitle' || /openhours/i.test(field)) {
+                // For these staging fields, only mark as a correction when a non-empty final value exists
+                if (finalVal !== undefined && finalVal !== null && String(finalVal).trim() !== '') {
+                    markAsCorrection = true;
+                }
+            } else {
+                // All other fields are considered meaningful corrections
+                markAsCorrection = true;
+            }
+            if (markAsCorrection) entry.hasCorrections = true;
 
             // Map the comparison field names to import sheet columns
             switch (field) {
