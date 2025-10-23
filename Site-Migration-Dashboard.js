@@ -7,8 +7,8 @@ const _migrationSampleData = [
   { "Site Title": "Potomac", "Migration Date": "2025-09-05", "View Website URL": "https://www.salvationarmyusa.org/usa-southern-territory/potomac/", "Division": "Potomac" },
   { "Site Title": "Kentucky and Tennessee", "Migration Date": "2025-10-01", "View Website URL": "https://www.salvationarmyusa.org/usa-southern-territory/kentucky-and-tennessee/", "Division": "Kentucky and Tennessee" },
   { "Site Title": "Arkansas and Oklahoma", "Migration Date": "2025-10-02", "View Website URL": "https://www.salvationarmyusa.org/usa-southern-territory/arkansas-and-oklahoma/", "Division": "Arkansas and Oklahoma" },
-  { "Site Title": "Alabama, Louisiana, and Mississippi", "Migration Date": "", "View Website URL": "", "Division": "Alabama, Louisiana, and Mississippi" },
-  { "Site Title": "Texas", "Migration Date": "", "View Website URL": "", "Division": "Texas" },
+  { "Site Title": "Alabama, Louisiana, and Mississippi", "Migration Date": "2025-10-23", "View Website URL": "https://www.salvationarmyusa.org/usa-southern-territory/alabama-louisiana-and-mississippi/", "Division": "Alabama, Louisiana, and Mississippi" },
+  { "Site Title": "Texas", "Migration Date": "2025-10-23", "View Website URL": "https://www.salvationarmyusa.org/usa-southern-territory/texas/", "Division": "Texas" },
   { "Site Title": "Florida", "Migration Date": "", "View Website URL": "", "Division": "Florida" },
   { "Site Title": "Georgia", "Migration Date": "", "View Website URL": "", "Division": "Georgia" },
   { "Site Title": "Area Command Site Pages", "Migration Date": "", "View Website URL": "", "Division": "There is no expectation that sites migrate during the giving season, but we would still like site admins to review the migration report to determine pages planned to migrate and understand the level of effort needed." },
@@ -1043,13 +1043,19 @@ function renderCards(){
     "Migration Progress": (() => {
       const total = filtered.length;
       const completed = filtered.filter(d => (d.Status || '').toString().trim().startsWith('4') || (d.Status || '').toString().trim().startsWith('5')).length;
+      // New THQ Redirect status should be treated as completed for progress totals
+      const thqRedirect = filtered.filter(d => (d.Status || '').toString().trim() === 'THQ Redirect').length;
       const doNotMigrate = filtered.filter(d => (d.Status || '').toString().trim() === "Do Not Migrate").length;
-      const progressCount = completed + doNotMigrate;
+      const progressCount = completed + thqRedirect + doNotMigrate;
       const progressPct = total > 0 ? Math.round((progressCount / total) * 100) : 0;
       return `${progressPct}% (${progressCount} of ${total} Total Pages)`;
     })(),
-
-    "Completed": filtered.filter(d => ((d.Status || '').toString().trim().startsWith('4') || (d.Status || '').toString().trim().startsWith('5'))).length,
+    // Merge Completed and THQ Redirect into a single card while keeping progress calculation unchanged
+    "Completed (incl. THQ Redirect)": (() => {
+      const completed = filtered.filter(d => ((d.Status || '').toString().trim().startsWith('4') || (d.Status || '').toString().trim().startsWith('5'))).length;
+      const thqRedirect = filtered.filter(d => (d.Status || '').toString().trim() === 'THQ Redirect').length;
+      return completed + thqRedirect;
+    })(),
     "Do Not Migrate": filtered.filter(d => (d.Status || '').toString().trim() === "Do Not Migrate").length,
 
     "Weekly Modified": (() => {
