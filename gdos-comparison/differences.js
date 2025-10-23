@@ -619,11 +619,39 @@ Promise.all([
                     // For openHoursText alwaysShow, default to GDOS
                     correctValue = 'GDOS';
                     // Prepopulate with Zesty generalHours if it's different from GDOS openHoursText
-                    const zestyGeneralHours = loc['Column1.content.generalHours'];
+                    // Use a helper to try multiple potential keys to be resilient to data shape changes
+                    const zestyGeneralHours = (function getZestyGeneralHours(l) {
+                        if (!l || typeof l !== 'object') return null;
+                        // Common flattened keys we've seen
+                        const candidates = [
+                            'Column1.content.generalHours',
+                            'Column1.content.general_hours',
+                            'Column1.content.general-hours',
+                            'generalHours',
+                            'general_hours',
+                            'general-hours'
+                        ];
+                        for (let k of candidates) {
+                            if (k in l && l[k]) return l[k];
+                        }
+                        // Some exports embed content differently under Column1 or content; try nested access
+                        try {
+                            if (l.Column1 && l.Column1.content) {
+                                const c = l.Column1.content;
+                                if (c.generalHours) return c.generalHours;
+                                if (c.general_hours) return c.general_hours;
+                                if (c['general-hours']) return c['general-hours'];
+                            }
+                        } catch (e) { /* ignore */ }
+                        return null;
+                    })(loc);
                     if (zestyGeneralHours && zestyGeneralHours !== gdos.openHoursText) {
                         zestyVal = zestyGeneralHours;
+                        console.debug('Prepopulating openHoursText from Zesty generalHours for GDOS id', gdos.id);
                     } else {
                         zestyVal = '';
+                        if (zestyGeneralHours) console.debug('Zesty generalHours equals GDOS openHoursText; skipping prepopulate for', gdos.id);
+                        else console.debug('No Zesty generalHours found for GDOS id', gdos.id);
                     }
                 }
                 
@@ -1078,12 +1106,11 @@ function saveChanges() {
 function updateMetrics() {
     const table = window.differencesTable || Tabulator.findTable("#differencesTable")[0];
     if (!table) return;
-    // If Tabulator provided the full filtered set (latestFilteredData), prefer that
+    // Determine visible (filtered) data that the table is currently showing
     let data = null;
     if (Array.isArray(latestFilteredData)) {
-        data = latestFilteredData;
+        data = latestFilteredData.slice();
     } else {
-        // Otherwise, attempt to compute from visible rows (covers header filters) or fall back
         try {
             if (typeof table.getRows === 'function') {
                 const rows = table.getRows();
@@ -1102,13 +1129,33 @@ function updateMetrics() {
         }
         if (!Array.isArray(data)) data = table.getData();
     }
-    const total = data.length;
-    const gdosCount = data.filter(r => r.correct === 'GDOS').length;
-    const zestyCount = data.filter(r => r.correct === 'Zesty').length;
 
-    // per-field counts
-    const fieldCounts = data.reduce((acc, r) => {
+    // visible (filtered) counts
+    const visible = Array.isArray(data) ? data.slice() : [];
+    const visibleTotal = visible.length;
+    const visibleGdos = visible.filter(r => r && r.correct === 'GDOS').length;
+    const visibleZesty = visible.filter(r => r && r.correct === 'Zesty').length;
+
+    // totals across the entire dataset (unfiltered)
+    // Determine pull-level data: differencesData filtered only by territory selection (ignore other filters)
+    const territorySelect = document.getElementById('globalTerritoryFilter');
+    const territoryVal = territorySelect && territorySelect.value && territorySelect.value !== 'all' ? territorySelect.value : null;
+    const pullData = Array.isArray(differencesData) ? (territoryVal ? differencesData.filter(r => r && r.territory === territoryVal) : differencesData.slice()) : [];
+    const total = pullData.length;
+    const gdosCount = pullData.filter(r => r && r.correct === 'GDOS').length;
+    const zestyCount = pullData.filter(r => r && r.correct === 'Zesty').length;
+
+    // Compute pull-level per-field totals (counts of rows per field within the pull)
+    const pullFieldCounts = pullData.reduce((acc, r) => {
+        if (!r) return acc;
         const f = r.field || 'unknown';
+        acc[f] = (acc[f] || 0) + 1;
+        return acc;
+    }, {});
+
+    // per-field counts for visible data
+    const fieldCounts = visible.reduce((acc, r) => {
+        const f = r && r.field ? r.field : 'unknown';
         acc[f] = (acc[f] || 0) + 1;
         return acc;
     }, {});
@@ -1117,12 +1164,70 @@ function updateMetrics() {
     const metricGdos = document.getElementById('metricGdos');
     const metricZesty = document.getElementById('metricZesty');
     const metricFields = document.getElementById('metricFields');
-    if (metricTotal) metricTotal.textContent = total;
-    if (metricGdos) metricGdos.textContent = gdosCount;
-    if (metricZesty) metricZesty.textContent = zestyCount;
+    if (metricTotal) metricTotal.textContent = visibleTotal;
+    if (metricGdos) metricGdos.textContent = visibleGdos;
+    if (metricZesty) metricZesty.textContent = visibleZesty;
     if (metricFields) {
-        metricFields.innerHTML = Object.keys(fieldCounts).sort().map(k => `${k}: ${fieldCounts[k]}`).join('  •  ');
+        // Keep the field breakdown as a compact text line (no pills)
+        const excluded = new Set(['address', 'name', 'zipcode', 'siteTitle', 'openHoursText']);
+        metricFields.innerHTML = Object.keys(fieldCounts).filter(k => !excluded.has(k)).sort().map(k => `${k}: ${fieldCounts[k]}`).join('  •  ');
     }
+    // Update the new Field Totals (pull-level) card
+    try {
+        const metricFieldTotals = document.getElementById('metricFieldTotals');
+        if (metricFieldTotals) {
+            const items = Object.keys(pullFieldCounts).sort();
+            if (items.length === 0) {
+                metricFieldTotals.innerHTML = '-';
+            } else {
+                // Build HTML of spans so CSS can control wrapping (break after third)
+                metricFieldTotals.innerHTML = items.map(k => {
+                    const v = pullFieldCounts[k] || 0;
+                    return `<span class="metric-field-item">${escapeHtml(k)}: ${v}</span>`;
+                }).join('');
+            }
+        }
+    } catch (e) { console.warn('Failed to update metricFieldTotals', e); }
+    // Published-field differences: rows where the compared field is 'published' and GDOS and Zesty values differ
+    try {
+        const metricPublishedZesty = document.getElementById('metricPublishedZesty');
+        if (metricPublishedZesty) {
+            // Rows in pullData whose field is 'published' and values differ (normalized)
+            const publishedDiffRows = pullData.filter(r => {
+                try {
+                    if (!r || String(r.field).toLowerCase() !== 'published') return false;
+                    // Treat missing values as empty strings so rows with only one side present are counted
+                    const gval = normalizeValue(r.gdos_value, 'published') || '';
+                    const zval = normalizeValue(r.zesty_value, 'published') || '';
+                    return gval !== zval;
+                } catch (e) { return false; }
+            });
+            const publishedDiffRowCount = publishedDiffRows.length;
+            const publishedDiffUnique = new Set(publishedDiffRows.map(r => String(r.gdos_id))).size;
+
+            // Show the row-level published-field difference count (this matches 'published differences' rows in the table)
+            metricPublishedZesty.textContent = String(publishedDiffRowCount);
+            metricPublishedZesty.title = `Published-field differences in pull: ${publishedDiffRowCount} (unique records: ${publishedDiffUnique})`;
+        }
+    } catch (e) { console.warn('Failed to compute published-field differences metric', e); }
+
+    // Also update published badges for Total Differences and Correct = GDOS cards
+    try {
+        const metricPublishedTotal = document.getElementById('metricPublishedTotal');
+        const metricPublishedGdos = document.getElementById('metricPublishedGdos');
+        if (metricPublishedTotal) {
+            // total published-field difference rows in pullData
+            const totalPublishedDiffs = pullData.filter(r => r && String(r.field).toLowerCase() === 'published' && normalizeValue(r.gdos_value, 'published') != null && normalizeValue(r.zesty_value, 'published') != null && normalizeValue(r.gdos_value, 'published') !== normalizeValue(r.zesty_value, 'published')).length;
+            metricPublishedTotal.textContent = String(totalPublishedDiffs);
+            metricPublishedTotal.title = `Published-field differences in pull: ${totalPublishedDiffs}`;
+        }
+        if (metricPublishedGdos) {
+            // published-field difference rows where correct === 'GDOS' (in pullData)
+            const gdosPublishedDiffs = pullData.filter(r => r && String(r.field).toLowerCase() === 'published' && r.correct === 'GDOS' && normalizeValue(r.gdos_value, 'published') != null && normalizeValue(r.zesty_value, 'published') != null && normalizeValue(r.gdos_value, 'published') !== normalizeValue(r.zesty_value, 'published')).length;
+            metricPublishedGdos.textContent = String(gdosPublishedDiffs);
+            metricPublishedGdos.title = `Published-field differences (Correct = GDOS) in pull: ${gdosPublishedDiffs}`;
+        }
+    } catch (e) { console.warn('Failed to update additional published metrics', e); }
 }
 
 async function loadSavedChanges() {
@@ -1825,6 +1930,17 @@ function applyIncrementalChangesToTable(table, changedKeys) {
         return s;
     }
 
+// Simple HTML escaper for small snippets
+function escapeHtml(str) {
+    if (str == null) return '';
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
 function renderDifferencesTable() {
     // Clear summary (we don't display the auto-generated summary line)
     const summaryDiv = document.getElementById('differencesSummary');
@@ -2003,16 +2119,6 @@ function populateGlobalFilters() {
         showOpenHoursFilter._listenerAdded = true;
     }
 
-    const showDuplicatesFilter = document.getElementById('showDuplicatesFilter');
-    if (showDuplicatesFilter && !showDuplicatesFilter._listenerAdded) {
-        showDuplicatesFilter.addEventListener('change', function() {
-            localStorage.setItem('showDuplicatesFilter', this.value);
-            applyGlobalFilters();
-            try { updateMetrics(); } catch(e) { console.warn('updateMetrics failed', e); }
-        });
-        showDuplicatesFilter._listenerAdded = true;
-    }
-
     const showDoNotImportFilter = document.getElementById('showDoNotImportFilter');
     if (showDoNotImportFilter && !showDoNotImportFilter._listenerAdded) {
         showDoNotImportFilter.addEventListener('change', function() {
@@ -2081,35 +2187,21 @@ function applyGlobalFilters() {
     }
 
     // Handle duplicates filter
-    if (showDuplicatesFilter && showDuplicatesFilter.value !== 'all') {
-        if (showDuplicatesFilter.value === 'show') {
-            // Show only duplicate records (duplicate = "1" or duplicate = "true")
-            table.addFilter(function(data, filterParams) {
-                const val = String(data.duplicate || '').toLowerCase();
-                return val === '1' || val === 'true';
-            });
-        } else if (showDuplicatesFilter.value === 'hide') {
-            // Hide duplicate records
-            table.addFilter(function(data, filterParams) {
-                const val = String(data.duplicate || '').toLowerCase();
-                return !(val === '1' || val === 'true');
-            });
-        }
-    }
-
-    // Handle do not import filter
+    // Combine duplicates into Do Not Import filter. Treat duplicate=true as equivalent to doNotImport for filtering
     if (showDoNotImportFilter && showDoNotImportFilter.value !== 'all') {
         if (showDoNotImportFilter.value === 'show') {
-            // Show only do-not-import records (doNotImport = "1" or doNotImport = "true")
+            // Show only records marked doNotImport OR duplicate
             table.addFilter(function(data, filterParams) {
-                const val = String(data.doNotImport || '').toLowerCase();
-                return val === '1' || val === 'true';
+                const doVal = String(data.doNotImport || '').toLowerCase();
+                const dupVal = String(data.duplicate || '').toLowerCase();
+                return (doVal === '1' || doVal === 'true') || (dupVal === '1' || dupVal === 'true');
             });
         } else if (showDoNotImportFilter.value === 'hide') {
-            // Hide do-not-import records
+            // Hide records that are doNotImport OR duplicate
             table.addFilter(function(data, filterParams) {
-                const val = String(data.doNotImport || '').toLowerCase();
-                return !(val === '1' || val === 'true');
+                const doVal = String(data.doNotImport || '').toLowerCase();
+                const dupVal = String(data.duplicate || '').toLowerCase();
+                return !((doVal === '1' || doVal === 'true') || (dupVal === '1' || dupVal === 'true'));
             });
         }
     }
@@ -2135,7 +2227,8 @@ function applySavedGlobalFilters() {
     const savedSiteTitle = localStorage.getItem('showSiteTitleFilter') || 'all';
     const savedOpenHours = localStorage.getItem('showOpenHoursFilter') || 'all';
     const savedDuplicates = localStorage.getItem('showDuplicatesFilter') || 'all';
-    const savedDoNotImport = localStorage.getItem('showDoNotImportFilter') || 'all';
+    // Default to 'hide' so Clear Filters hides Do Not Import / Duplicates by default
+    const savedDoNotImport = localStorage.getItem('showDoNotImportFilter') || 'hide';
     // siteTitle and openHoursText are always shown now - no longer use hideSiteTitleOpenHours
     if (territorySelect && savedTerr) {
         // only set if option exists (safety)
@@ -2155,9 +2248,6 @@ function applySavedGlobalFilters() {
     }
     if (showOpenHoursFilter) {
         showOpenHoursFilter.value = savedOpenHours;
-    }
-    if (showDuplicatesFilter) {
-        showDuplicatesFilter.value = savedDuplicates;
     }
     if (showDoNotImportFilter) {
         showDoNotImportFilter.value = savedDoNotImport;
@@ -2185,25 +2275,38 @@ function clearFilters() {
     const territorySelect = document.getElementById('globalTerritoryFilter');
     const correctSelect = document.getElementById('globalCorrectFilter');
     const fieldSelect = document.getElementById('globalFieldFilter');
-    const hideSiteTitleOpenHoursCheckbox = document.getElementById('hideSiteTitleOpenHours');
-    if (territorySelect) territorySelect.value = 'all';
-    if (correctSelect) correctSelect.value = 'all';
-    if (fieldSelect) fieldSelect.value = 'all';
-    if (hideSiteTitleOpenHoursCheckbox) {
-        hideSiteTitleOpenHoursCheckbox.checked = true; // Reset to default (checked)
-        try {
-            // Trigger the change event to ensure filters re-apply and localStorage is updated
-            hideSiteTitleOpenHoursCheckbox.dispatchEvent(new Event('change', { bubbles: true }));
-        } catch (e) {
-            // fallback for older browsers
-            hideSiteTitleOpenHoursCheckbox.dispatchEvent(new Event('change'));
-        }
+    if (territorySelect) {
+        territorySelect.value = 'all';
+        localStorage.setItem('globalTerritoryFilter', 'all');
     }
-    // Clear localStorage
-    localStorage.removeItem('globalTerritoryFilter');
-    localStorage.removeItem('globalCorrectFilter');
-    localStorage.removeItem('globalFieldFilter');
-    localStorage.removeItem('hideSiteTitleOpenHours');
+    if (correctSelect) {
+        correctSelect.value = 'all';
+        localStorage.setItem('globalCorrectFilter', 'all');
+    }
+    if (fieldSelect) {
+        fieldSelect.value = 'all';
+        localStorage.setItem('globalFieldFilter', 'all');
+    }
+    // Reset siteTitle/openHours filters to 'hide' by default per new UX
+    const showSiteTitleFilter = document.getElementById('showSiteTitleFilter');
+    const showOpenHoursFilter = document.getElementById('showOpenHoursFilter');
+    if (showSiteTitleFilter) {
+        showSiteTitleFilter.value = 'hide';
+        localStorage.setItem('showSiteTitleFilter', 'hide');
+    }
+    if (showOpenHoursFilter) {
+        showOpenHoursFilter.value = 'hide';
+        localStorage.setItem('showOpenHoursFilter', 'hide');
+    }
+    // Reset do-not-import filter to 'hide' per UX decision so Clear Filters hides these rows
+    const showDoNotImportFilter = document.getElementById('showDoNotImportFilter');
+    if (showDoNotImportFilter) {
+        showDoNotImportFilter.value = 'hide';
+        localStorage.setItem('showDoNotImportFilter', 'hide');
+    }
+    // Re-apply filters and update metrics after reset
+    try { applyGlobalFilters(); } catch (e) { console.warn('applyGlobalFilters failed after clearFilters', e); }
+    try { updateMetrics(); } catch (e) { console.warn('updateMetrics failed after clearFilters', e); }
     updateFilterVisualState();
 }
 

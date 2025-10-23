@@ -96,6 +96,22 @@
         .siteTitle-row {
             background-color: #e3f2fd !important;
         }
+        /* Field totals card: allow wrapping and force a break after the third item */
+        #metricFieldTotals {
+            white-space: normal;
+            word-break: break-word;
+        }
+        #metricFieldTotals .metric-field-item {
+            display: inline-block;
+            margin-right: 0.6rem;
+        }
+        /* Insert a break after the third metric item so the fourth and following wrap to a new line */
+        #metricFieldTotals .metric-field-item:nth-child(3)::after {
+            content: "";
+            display: block;
+            width: 100%;
+            height: 0;
+        }
     </style>
 </head>
 <body>
@@ -168,16 +184,7 @@
                     </div>
 
                     <div class="col-12 col-sm-auto">
-                        <label for="showDuplicatesFilter" class="form-label small text-muted mb-1">Duplicates</label>
-                        <select id="showDuplicatesFilter" class="form-select form-select-sm">
-                            <option value="all">Show All</option>
-                            <option value="show">Show Only</option>
-                            <option value="hide">Hide</option>
-                        </select>
-                    </div>
-
-                    <div class="col-12 col-sm-auto">
-                        <label for="showDoNotImportFilter" class="form-label small text-muted mb-1">Do Not Import</label>
+                        <label for="showDoNotImportFilter" class="form-label small text-muted mb-1">Do Not Import (includes Duplicates)</label>
                         <select id="showDoNotImportFilter" class="form-select form-select-sm">
                             <option value="all">Show All</option>
                             <option value="show">Show Only</option>
@@ -203,34 +210,30 @@
         <!-- Metrics Row -->
     <div id="differencesMetrics" class="row g-2 mt-3 mb-3">
             <div class="col-auto">
-                <div class="card p-2">
+                <div class="card p-1" style="min-width:120px;">
                     <div class="small text-muted">Total Differences</div>
-                    <div id="metricTotal" class="h5 mb-0">0</div>
+                    <div id="metricTotal" class="h6 mb-0">0</div>
                 </div>
             </div>
             <div class="col-auto">
-                <div class="card p-2">
+                <div class="card p-1" style="min-width:120px;">
                     <div class="small text-muted">Correct = GDOS</div>
-                    <div id="metricGdos" class="h5 mb-0">0</div>
+                    <div id="metricGdos" class="h6 mb-0">0</div>
                 </div>
             </div>
             <div class="col-auto">
-                <div class="card p-2">
+                <div class="card p-1" style="min-width:160px;">
                     <div class="small text-muted">Correct = Zesty</div>
-                    <div id="metricZesty" class="h5 mb-0">0</div>
+                    <div id="metricZesty" class="h6 mb-0">0</div>
                 </div>
             </div>
             <div class="col-auto">
-                <div class="card p-2">
-                    <div class="small text-muted">Zesty Name to Site Title</div>
-                    <div id="metricSiteTitle" class="h5 mb-0">0</div>
+                <div class="card p-1" style="min-width:120px;">
+                    <div class="small text-muted">Field Totals</div>
+                    <div id="metricFieldTotals" class="small mb-0 text-muted">-</div>
                 </div>
             </div>
-            <div class="col-auto">
-                <div class="card p-2">
-                    <div id="metricFields" class="small text-muted">Loading...</div>
-                </div>
-            </div>
+            <!-- Zesty Name to Site Title card removed (counts integrated into Zesty card) -->
         </div>
 
         <!-- Ensure table always renders in its own full-width row beneath filters and metrics -->
