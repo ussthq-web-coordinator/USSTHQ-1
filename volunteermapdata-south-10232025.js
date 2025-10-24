@@ -193,19 +193,19 @@ var simplemaps_usmap_mapdata={
     AL: {
       name: "Alabama",
       color: "#999999",
-      url: "https://forms.office.com/r/kshVE51gzN",
+      url: "https://www.salvationarmyusa.org/usa-southern-territory/alabama-louisiana-and-mississippi/contact-us/#contact",
       popup: "on_click" 
     },
     LA: {
       name: "Louisiana",
       color: "#999999",
-      url: "https://forms.office.com/r/kshVE51gzN",
+      url: "https://www.salvationarmyusa.org/usa-southern-territory/alabama-louisiana-and-mississippi/contact-us/#contact",
       popup: "on_click" 
     },
     MS: {
       name: "Mississippi",
       color: "#999999",
-      url: "https://forms.office.com/r/kshVE51gzN",
+      url: "https://www.salvationarmyusa.org/usa-southern-territory/alabama-louisiana-and-mississippi/contact-us/#contact",
       popup: "on_click"
     },
     IA: {
