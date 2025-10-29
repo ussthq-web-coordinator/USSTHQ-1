@@ -1,19 +1,128 @@
 
 /* Migration Dates module: FullCalendar (grid) + Agenda (list) + Table (Tabulator) */
 const _migrationSampleData = [
-  { "Site Title": "USA National Homepage", "Migration Date": "2025-04-03", "View Website URL": "https://www.salvationarmyusa.org/", "Division": "USA National" },
-  { "Site Title": "USA Southern Territory", "Migration Date": "2025-05-08", "View Website URL": "https://www.salvationarmyusa.org/usa-southern-territory/", "Division": "USA Southern Territory" },
-  { "Site Title": "North and South Carolina", "Migration Date": "2025-08-21", "View Website URL": "https://www.salvationarmyusa.org/usa-southern-territory/north-and-south-carolina/", "Division": "North and South Carolina" },
-  { "Site Title": "Potomac", "Migration Date": "2025-09-05", "View Website URL": "https://www.salvationarmyusa.org/usa-southern-territory/potomac/", "Division": "Potomac" },
-  { "Site Title": "Kentucky and Tennessee", "Migration Date": "2025-10-01", "View Website URL": "https://www.salvationarmyusa.org/usa-southern-territory/kentucky-and-tennessee/", "Division": "Kentucky and Tennessee" },
-  { "Site Title": "Arkansas and Oklahoma", "Migration Date": "2025-10-02", "View Website URL": "https://www.salvationarmyusa.org/usa-southern-territory/arkansas-and-oklahoma/", "Division": "Arkansas and Oklahoma" },
-  { "Site Title": "Alabama, Louisiana, and Mississippi", "Migration Date": "2025-10-23", "View Website URL": "https://www.salvationarmyusa.org/usa-southern-territory/alabama-louisiana-and-mississippi/", "Division": "Alabama, Louisiana, and Mississippi" },
-  { "Site Title": "Texas", "Migration Date": "2025-10-23", "View Website URL": "https://www.salvationarmyusa.org/usa-southern-territory/texas/", "Division": "Texas" },
-  { "Site Title": "Florida", "Migration Date": "", "View Website URL": "", "Division": "Florida" },
-  { "Site Title": "Georgia", "Migration Date": "", "View Website URL": "", "Division": "Georgia" },
-  { "Site Title": "Area Command Site Pages", "Migration Date": "", "View Website URL": "", "Division": "There is no expectation that sites migrate during the giving season, but we would still like site admins to review the migration report to determine pages planned to migrate and understand the level of effort needed." },
-  { "Site Title": "Location Site Pages", "Migration Date": "", "View Website URL": "", "Division": "There is no expectation that sites migrate during the giving season, but we would still like site admins to review the migration report to determine pages planned to migrate and understand the level of effort needed." }
+  {
+    "Site Title": "USA National Homepage",
+    "Migration Date": "2025-04-03",
+    "View Website URL": "https://www.salvationarmyusa.org/",
+    "Division": "USA National",
+    "meta.zuid": "",
+    "meta.title": "USA National Homepage",
+    "Path Part": "/",
+    "meta.description": ""
+  },
+  {
+    "Site Title": "USA Southern Territory",
+    "Migration Date": "2025-05-08",
+    "View Website URL": "https://www.salvationarmyusa.org/usa-southern-territory/",
+    "Division": "USA Southern Territory",
+    "meta.zuid": "",
+    "meta.title": "USA Southern Territory",
+    "Path Part": "/usa-southern-territory/",
+    "meta.description": ""
+  },
+  {
+    "Site Title": "North and South Carolina",
+    "Migration Date": "2025-08-21",
+    "View Website URL": "https://www.salvationarmyusa.org/usa-southern-territory/north-and-south-carolina/",
+    "Division": "North and South Carolina",
+    "meta.zuid": "7-fcbb8f98c9-r7nxlf",
+    "meta.title": "North and South Carolina Division",
+    "Path Part": "/usa-southern-territory/north-and-south-carolina/",
+    "meta.description": "The Salvation Army USA | North and South Carolina Division Headquarters"
+  },
+  {
+    "Site Title": "Potomac",
+    "Migration Date": "2025-09-05",
+    "View Website URL": "https://www.salvationarmyusa.org/usa-southern-territory/potomac/",
+    "Division": "Potomac",
+    "meta.zuid": "7-f0f9b5c4ec-xb359v",
+    "meta.title": "Potomac Division",
+    "Path Part": "/usa-southern-territory/potomac/",
+    "meta.description": "The Salvation Army USA | Potomac Division Headquarters"
+  },
+  {
+    "Site Title": "Kentucky and Tennessee",
+    "Migration Date": "2025-10-01",
+    "View Website URL": "https://www.salvationarmyusa.org/usa-southern-territory/kentucky-and-tennessee/",
+    "Division": "Kentucky and Tennessee",
+    "meta.zuid": "7-dac2a589bf-2klwh6",
+    "meta.title": "Kentucky and Tennessee Division",
+    "Path Part": "/usa-southern-territory/kentucky-and-tennessee/",
+    "meta.description": "The Salvation Army USA | Kentucky and Tennessee Division Headquarters"
+  },
+  {
+    "Site Title": "Arkansas and Oklahoma",
+    "Migration Date": "2025-10-02",
+    "View Website URL": "https://www.salvationarmyusa.org/usa-southern-territory/arkansas-and-oklahoma/",
+    "Division": "Arkansas and Oklahoma",
+    "meta.zuid": "7-f4cfbc98a0-bhnrr5",
+    "meta.title": "Arkansas and Oklahoma Division",
+    "Path Part": "/usa-southern-territory/arkansas-and-oklahoma/",
+    "meta.description": "The Salvation Army USA | Arkansas and Oklahoma Division Headquarters"
+  },
+  {
+    "Site Title": "Alabama, Louisiana, and Mississippi",
+    "Migration Date": "2025-10-23",
+    "View Website URL": "https://www.salvationarmyusa.org/usa-southern-territory/alabama-louisiana-and-mississippi/",
+    "Division": "Alabama, Louisiana, and Mississippi",
+    "meta.zuid": "7-f68ddd8c96-x07gqx",
+    "meta.title": "Alabama, Louisiana and Mississippi Division",
+    "Path Part": "/usa-southern-territory/alabama-louisiana-and-mississippi/",
+    "meta.description": "The Salvation Army USA | Alabama, Louisiana and Mississippi Division Headquarters"
+  },
+  {
+    "Site Title": "Texas",
+    "Migration Date": "2025-10-23",
+    "View Website URL": "https://www.salvationarmyusa.org/usa-southern-territory/texas/",
+    "Division": "Texas",
+    "meta.zuid": "7-8cb2cdb7d3-v7g7zn",
+    "meta.title": "Texas Division",
+    "Path Part": "/usa-southern-territory/texas/",
+    "meta.description": "The Salvation Army USA | Texas Division Headquarters"
+  },
+  {
+    "Site Title": "Florida",
+    "Migration Date": "",
+    "View Website URL": "",
+    "Division": "Florida",
+    "meta.zuid": "7-d4ecfdb8aa-ggn7w9",
+    "meta.title": "Florida Division",
+    "Path Part": "/usa-southern-territory/florida/",
+    "meta.description": "The Salvation Army USA | Florida Division Headquarters"
+  },
+  {
+    "Site Title": "Georgia",
+    "Migration Date": "",
+    "View Website URL": "",
+    "Division": "Georgia",
+    "meta.zuid": "7-d4ebbcf3b4-lwqwp2",
+    "meta.title": "Georgia Division",
+    "Path Part": "/usa-southern-territory/georgia/",
+    "meta.description": "The Salvation Army USA | Georgia Division Headquarters"
+  },
+  {
+    "Site Title": "Area Command Site Pages",
+    "Migration Date": "",
+    "View Website URL": "",
+    "Division": "There is no expectation that sites migrate during the giving season, but we would still like site admins to review the migration report to determine pages planned to migrate and understand the level of effort needed.",
+    "meta.zuid": "",
+    "meta.title": "Area Command Site Pages",
+    "Path Part": "",
+    "meta.description": ""
+  },
+  {
+    "Site Title": "Location Site Pages",
+    "Migration Date": "",
+    "View Website URL": "",
+    "Division": "There is no expectation that sites migrate during the giving season, but we would still like site admins to review the migration report to determine pages planned to migrate and understand the level of effort needed.",
+    "meta.zuid": "",
+    "meta.title": "Location Site Pages",
+    "Path Part": "",
+    "meta.description": ""
+  }
 ];
+
 
 
 
