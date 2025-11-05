@@ -444,7 +444,7 @@ Promise.all([
         if (!response.ok) throw new Error('USE file not found');
         return response.json();
     }),
-    fetch('./LocationsData.json?v=' + Date.now()).then(response => {
+    fetch('../LocationsData.json?v=' + Date.now()).then(response => {
         if (!response.ok) throw new Error('LocationsData file not found');
         return response.json();
     }),
@@ -528,6 +528,22 @@ Promise.all([
         console.log('Sample normalized GDOS name:', normalizeValue(gdosData[0].name, 'name'));
     }
 
+    // DEBUG: mapping diagnostics to help trace why only a subset of Zesty hours are appearing.
+    try {
+        const zestyWithHours = Array.from(locationMap.entries()).filter(([k, loc]) => {
+            const h = getNestedValue(loc, 'Column1.content.hours_of_operation');
+            return h !== undefined && h !== null && String(h).trim() !== '';
+        });
+        console.log('DEBUG: locationMap entries total:', locationMap.size);
+        console.log('DEBUG: locationMap entries with non-empty hours_of_operation:', zestyWithHours.length);
+        const matchedGdosCount = Array.from(locationMap.keys()).filter(k => gdosMap.has(String(k))).length;
+        console.log('DEBUG: locationMap keys that match a GDOS id from the pull:', matchedGdosCount);
+        const publishedGdosCount = gdosData.filter(g => g && g.published).length;
+        const publishedWithLoc = gdosData.filter(g => g && g.published && locationMap.has(String(g.id))).length;
+        console.log('DEBUG: published GDOS records in pull:', publishedGdosCount);
+        console.log('DEBUG: published GDOS records that have a Zesty locationMap entry:', publishedWithLoc);
+    } catch (e) { console.warn('DEBUG: mapping diagnostics failed', e); }
+
     // Fields to compare - with mapping for GDOS nested fields and Zesty flattened fields
     const fieldsToCompare = [
         { field: 'name', gdosPath: 'name', zestyPath: 'Column1.content.name' },
@@ -598,9 +614,12 @@ Promise.all([
             
             // Always show for published records if alwaysShow is true, or if there's a difference
             const hasDifference = normalizedGdos !== normalizedZesty && normalizedGdos != null && normalizedZesty != null;
-            
-            // For alwaysShow fields (siteTitle, openHoursText), show for all published records by default
-            const shouldShowAlwaysShow = fieldObj.alwaysShow && isPublished;
+
+            // For alwaysShow fields (siteTitle, openHoursText), show for all published records by default.
+            // Additionally: if this is the openHoursText field and Zesty provides a non-empty
+            // hours_of_operation value, show the row even when GDOS is not published. This surfaces
+            // Zesty hours that otherwise get hidden by the published-only filter.
+            const shouldShowAlwaysShow = fieldObj.alwaysShow && (isPublished || (fieldObj.field === 'openHoursText' && zestyValue !== undefined && zestyValue !== null && String(zestyValue).trim() !== ''));
             
             if (shouldShowAlwaysShow || hasDifference) {
                 // Special handling for siteTitle alwaysShow rows
@@ -624,40 +643,14 @@ Promise.all([
                 if (fieldObj.field === 'openHoursText' && fieldObj.alwaysShow) {
                     // For openHoursText alwaysShow, default to GDOS
                     correctValue = 'GDOS';
-                    // Prepopulate with Zesty generalHours if it's different from GDOS openHoursText
-                    // Use a helper to try multiple potential keys to be resilient to data shape changes
-                    const zestyGeneralHours = (function getZestyGeneralHours(l) {
-                        if (!l || typeof l !== 'object') return null;
-                        // Common flattened keys we've seen
-                        const candidates = [
-                            'Column1.content.generalHours',
-                            'Column1.content.general_hours',
-                            'Column1.content.general-hours',
-                            'generalHours',
-                            'general_hours',
-                            'general-hours'
-                        ];
-                        for (let k of candidates) {
-                            if (k in l && l[k]) return l[k];
-                        }
-                        // Some exports embed content differently under Column1 or content; try nested access
-                        try {
-                            if (l.Column1 && l.Column1.content) {
-                                const c = l.Column1.content;
-                                if (c.generalHours) return c.generalHours;
-                                if (c.general_hours) return c.general_hours;
-                                if (c['general-hours']) return c['general-hours'];
-                            }
-                        } catch (e) { /* ignore */ }
-                        return null;
-                    })(loc);
-                    if (zestyGeneralHours && zestyGeneralHours !== gdos.openHoursText) {
-                        zestyVal = zestyGeneralHours;
-                        console.debug('Prepopulating openHoursText from Zesty generalHours for GDOS id', gdos.id);
+                    // Use the hours_of_operation value (assigned earlier to zestyValue)
+                    // so the Zesty column is always populated when that field exists.
+                    if (zestyValue) {
+                        zestyVal = zestyValue;
+                        console.debug('Populating openHoursText zestyVal from hours_of_operation for GDOS id', gdos.id);
                     } else {
                         zestyVal = '';
-                        if (zestyGeneralHours) console.debug('Zesty generalHours equals GDOS openHoursText; skipping prepopulate for', gdos.id);
-                        else console.debug('No Zesty generalHours found for GDOS id', gdos.id);
+                        console.debug('No Zesty hours_of_operation found for GDOS id', gdos.id);
                     }
                 }
                 
@@ -758,7 +751,74 @@ Promise.all([
     console.log('Skipped no match:', skippedNoMatch);
     console.log('Matched GDOS records:', matchCount);
     console.log('Total field comparisons:', totalComparisons);
-    console.log('Differences found:', differencesData.length);
+    console.log('Differences found (before adding Zesty-only openHoursText rows):', differencesData.length);
+    
+    // ADDITIONAL PASS: Add openHoursText rows for Zesty locations that have hours_of_operation
+    // but were not processed in the main GDOS loop (either because they have no GDOS match,
+    // or the GDOS record is not published). This ensures all Zesty hours are editable.
+    let zestyOnlyOpenHoursCount = 0;
+    locationsData.forEach(loc => {
+        if (!loc) return;
+        const gdosId = loc['Column1.content.gdos_id'];
+        if (!gdosId && gdosId !== 0) return; // Skip if no gdos_id
+        
+        const hoursOfOperation = getNestedValue(loc, 'Column1.content.hours_of_operation');
+        if (!hoursOfOperation || String(hoursOfOperation).trim() === '') return; // Skip if no hours
+        
+        // Check if we already created an openHoursText row for this gdos_id
+        const alreadyExists = differencesData.some(r => String(r.gdos_id) === String(gdosId) && r.field === 'openHoursText');
+        if (alreadyExists) return; // Already have a row for this
+        
+        // This Zesty location has hours but no openHoursText row yet - create one
+        // Look up GDOS record if it exists (may be unpublished or not in pull)
+        const gdosRecord = gdosMap.get(String(gdosId));
+        const gdosName = gdosRecord ? gdosRecord.name : loc['Column1.content.name'] || 'Unknown';
+        const gdosValue = gdosRecord ? gdosRecord.openHoursText : null;
+        const isPublished = gdosRecord ? gdosRecord.published : false;
+        const division = gdosRecord ? getNestedValue(gdosRecord, 'location.division.name') || 'Unknown' : 'Unknown';
+        const territory = gdosRecord ? gdosRecord.territory : 'Unknown';
+        const propertyType = gdosRecord ? getNestedValue(gdosRecord, 'wm4SiteType.name') || 'Unknown' : 'Unknown';
+        
+        // Look up duplicate record
+        let duplicateRecord = duplicateMap.get(String(gdosId));
+        if (!duplicateRecord && Array.isArray(duplicateCheckRecords)) {
+            duplicateRecord = duplicateCheckRecords.find(r => {
+                if (!r) return false;
+                const candidate = r.gdosid ?? r.gdos_id ?? r.gdosId ?? r['gdos id'] ?? (r.gdos && r.gdos.id);
+                return String(candidate) === String(gdosId);
+            }) || null;
+        }
+        
+        differencesData.push({
+            gdos_id: gdosId,
+            name: gdosName,
+            property_type: propertyType,
+            division: division,
+            territory: territory,
+            published: isPublished ? 'True' : 'False',
+            duplicate: duplicateRecord && duplicateRecord.duplicate != null ? String(duplicateRecord.duplicate) : '0',
+            doNotImport: duplicateRecord && duplicateRecord.doNotImport != null ? String(duplicateRecord.doNotImport) : 'False',
+            field: 'openHoursText',
+            gdos_value: gdosValue,
+            zesty_value: hoursOfOperation,
+            correct: 'GDOS',
+            editable: true,
+            siteTitleRow: false
+        });
+        zestyOnlyOpenHoursCount++;
+    });
+    
+    console.log('Added Zesty-only openHoursText rows:', zestyOnlyOpenHoursCount);
+    console.log('Total differences found:', differencesData.length);
+    
+    // Count openHoursText rows with populated vs empty Zesty values
+    const openHoursTextRows = differencesData.filter(r => r.field === 'openHoursText');
+    const openHoursTextWithZesty = openHoursTextRows.filter(r => r.zesty_value && String(r.zesty_value).trim() !== '');
+    console.log('=== OPEN HOURS TEXT DIAGNOSTIC ===');
+    console.log('Total openHoursText rows:', openHoursTextRows.length);
+    console.log('openHoursText rows WITH Zesty value:', openHoursTextWithZesty.length);
+    console.log('openHoursText rows WITHOUT Zesty value:', openHoursTextRows.length - openHoursTextWithZesty.length);
+    console.log('==================================');
     
     if (differencesData.length > 0) {
         console.log('Sample difference:', differencesData[0]);
@@ -1593,7 +1653,8 @@ function applyChanges(changes) {
         if (currentRow) {
             console.log('Applying to row:', currentRow.gdos_id, currentRow.field, '-> correct:', savedRow.correct);
             currentRow.correct = savedRow.correct;
-            if (savedRow.value !== undefined) {
+            // Only apply saved correction value when it's non-empty to avoid clearing existing zesty values
+            if (savedRow.value !== undefined && String(savedRow.value).trim() !== '') {
                 currentRow.zesty_value = savedRow.value;
             }
             currentRow.final_value = savedRow.correct === 'GDOS' ? currentRow.gdos_value : currentRow.zesty_value;
@@ -1639,7 +1700,8 @@ function applyPendingCorrections() {
         if (idx !== -1) {
             const row = differencesData[idx];
             row.correct = savedRow.correct;
-            if (savedRow.value !== undefined) row.zesty_value = savedRow.value;
+            // Only apply saved correction value when non-empty so we preserve populated hours_of_operation
+            if (savedRow.value !== undefined && String(savedRow.value).trim() !== '') row.zesty_value = savedRow.value;
             row.final_value = row.correct === 'GDOS' ? row.gdos_value : row.zesty_value;
             appliedCount++;
             delete pendingCorrections[key];
