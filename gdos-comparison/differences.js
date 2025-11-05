@@ -581,7 +581,13 @@ Promise.all([
         fieldsToCompare.forEach(fieldObj => {
             totalComparisons++;
             const gdosValue = getNestedValue(gdos, fieldObj.gdosPath);
-            const zestyValue = loc[fieldObj.zestyPath]; // Flattened key
+            
+            let zestyValue;
+            if (fieldObj.field === 'openHoursText') {
+                zestyValue = getNestedValue(loc, 'Column1.content.hours_of_operation');
+            } else {
+                zestyValue = loc[fieldObj.zestyPath]; // Flattened key
+            }
             
             // Skip if should ignore this field
             if (shouldIgnoreField(fieldObj.field, zestyValue)) return;
@@ -999,7 +1005,20 @@ function zestyValueFormatter(cell, formatterParams, onRendered) {
         input.type = 'text';
         input.className = 'form-control form-control-sm';
         input.value = value || '';
-        input.placeholder = 'Enter custom value...';
+        
+        // For openHoursText, show the current Zesty hours_of_operation value as the input's value
+        if (rowData.field === 'openHoursText') {
+            const gdosId = rowData.gdos_id;
+            const zestyRecord = rawLocations && Array.isArray(rawLocations.data) ? rawLocations.data.find(loc => getNestedValue(loc, 'Column1.content.gdos_id') == gdosId) : null;
+            const hoursOfOperation = zestyRecord ? getNestedValue(zestyRecord, 'Column1.content.hours_of_operation') : '';
+            // Prioritize the existing value (from saved corrections), but fall back to hoursOfOperation.
+            input.value = value || hoursOfOperation || '';
+            input.placeholder = 'Enter custom value...';
+        } else {
+            input.value = value || '';
+            input.placeholder = 'Enter custom value...';
+        }
+
         // Do not disable the input element programmatically (it causes layout changes). We'll ignore attempts to change while pending.
         // For custom openHoursText and siteTitle fields, persist on blur instead of input to avoid every keystroke
         const eventType = (rowData.field === 'siteTitle' || rowData.field === 'openHoursText') ? 'blur' : 'input';
@@ -2420,56 +2439,3 @@ function formatTs(ts) {
         return d.toLocaleString();
     } catch (e) { return String(ts); }
 }
-
-
-
-
-
-// -------------------------
-// Helpers to seed the remote worker when it's empty
-// -------------------------
-
-
-
-
-
-
-
-
-// Function to manually refresh the UI from current storage state
-
-// Listen for storage changes from other tabs/windows
-window.addEventListener('storage', (event) => {
-    if (event.key === 'gdosLocalCorrections') {
-        if (event.newValue === null) {
-            // Corrections were cleared
-            console.log('Detected storage cleared from another tab');
-            showTransientMessage('⚠ Corrections were cleared from another session', 6000);
-            const el = document.getElementById('syncStatus');
-            if (el) {
-                el.textContent = '⚠ Storage Cleared';
-                el.className = 'small text-warning';
-                setTimeout(() => updateSyncStatus(), 500);
-            }
-        } else if (event.oldValue !== event.newValue) {
-            // Corrections changed from another tab
-            try {
-                const newCorrections = JSON.parse(event.newValue);
-                localCorrections = newCorrections;
-                updateSyncStatus();
-                console.log('Updated localCorrections from another tab');
-            } catch (e) {
-                console.warn('Failed to parse storage changes', e);
-            }
-        }
-    }
-});
-
-// Preserve scroll position on page reload
-window.addEventListener('beforeunload', () => {
-    localStorage.setItem('scrollPosition', window.scrollY);
-});
-
-// Note: we intentionally do not restore scrollPosition on load to avoid
-// forcing the user's viewport while the page finishes initializing. The
-// saved value remains available in localStorage if needed for manual restore.
