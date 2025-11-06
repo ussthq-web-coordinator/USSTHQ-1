@@ -193,6 +193,24 @@
                     </div>
 
                     <div class="col-12 col-sm-auto">
+                        <label for="gdosValueBlankFilter" class="form-label small text-muted mb-1">GDOS Value</label>
+                        <select id="gdosValueBlankFilter" class="form-select form-select-sm">
+                            <option value="all">All</option>
+                            <option value="blank">Blank Only</option>
+                            <option value="notblank">Not Blank Only</option>
+                        </select>
+                    </div>
+
+                    <div class="col-12 col-sm-auto">
+                        <label for="zestyValueBlankFilter" class="form-label small text-muted mb-1">Zesty Value</label>
+                        <select id="zestyValueBlankFilter" class="form-select form-select-sm">
+                            <option value="all">All</option>
+                            <option value="blank">Blank Only</option>
+                            <option value="notblank">Not Blank Only</option>
+                        </select>
+                    </div>
+
+                    <div class="col-12 col-sm-auto">
                         <button type="button" class="btn btn-success btn-sm" onclick="downloadCorrectionsCsv()">
                             Download Corrections CSV
                         </button>

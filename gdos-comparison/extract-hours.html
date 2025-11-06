@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Extract Hours Data</title>
+</head>
+<body>
+    <h1>Extracting Hours Data...</h1>
+    <p id="status">Loading...</p>
+    <button id="downloadBtn" style="display:none;">Download hours.json</button>
+
+    <script>
+        async function extractHours() {
+            const statusEl = document.getElementById('status');
+            const downloadBtn = document.getElementById('downloadBtn');
+            
+            try {
+                statusEl.textContent = 'Fetching LocationsData.json...';
+                
+                const response = await fetch('../LocationsData.json?v=' + Date.now());
+                if (!response.ok) throw new Error('LocationsData file not found');
+                
+                const locationsData = await response.json();
+                
+                if (!locationsData.data || !Array.isArray(locationsData.data)) {
+                    throw new Error('LocationsData.data is not an array');
+                }
+                
+                statusEl.textContent = 'Extracting hours data...';
+                
+                const hoursData = [];
+                let processedCount = 0;
+                let withHoursCount = 0;
+                
+                locationsData.data.forEach((loc, index) => {
+                    if (!loc) return;
+                    processedCount++;
+                    
+                    const gdosId = loc['Column1.content.gdos_id'];
+                    const name = loc['Column1.content.name'];
+                    const hours = loc['Column1.content.hours_of_operation'];
+                    
+                    // Only include records with both GDOS ID and hours
+                    if ((gdosId || gdosId === 0) && hours && String(hours).trim() !== '') {
+                        hoursData.push({
+                            gdos_id: gdosId,
+                            name: name || 'Unknown',
+                            hours_of_operation: hours
+                        });
+                        withHoursCount++;
+                    }
+                });
+                
+                statusEl.textContent = `Processed ${processedCount} records, found ${withHoursCount} with hours_of_operation`;
+                
+                // Create downloadable JSON file
+                const jsonStr = JSON.stringify(hoursData, null, 2);
+                const blob = new Blob([jsonStr], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                
+                downloadBtn.style.display = 'block';
+                downloadBtn.onclick = () => {
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = 'hours.json';
+                    a.click();
+                };
+                
+                console.log('Hours data extracted:', hoursData.length, 'records');
+                console.log('First 5 records:', hoursData.slice(0, 5));
+                
+            } catch (error) {
+                statusEl.textContent = 'Error: ' + error.message;
+                console.error('Error extracting hours:', error);
+            }
+        }
+        
+        extractHours();
+    </script>
+</body>
+</html>

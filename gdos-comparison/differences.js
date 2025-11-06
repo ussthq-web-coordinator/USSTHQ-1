@@ -1,3 +1,37 @@
+/**
+ * GDOS vs Zesty Comparison Dashboard
+ * 
+ * SPECIAL CHARACTER HANDLING STRATEGY:
+ * ====================================
+ * This application handles special characters (newlines, quotes, tabs, Unicode, etc.) 
+ * correctly throughout the data flow:
+ * 
+ * 1. DATA STORAGE (localStorage & Cloudflare):
+ *    - Uses JSON.stringify() / JSON.parse() which automatically handles all special 
+ *      characters including newlines, quotes, Unicode, etc.
+ *    - No manual escaping needed - JavaScript's native JSON handling is robust
+ * 
+ * 2. UI DISPLAY (Tabulator table):
+ *    - Uses textContent property (not innerHTML) to safely display values
+ *    - Prevents HTML injection and preserves all special characters as-is
+ *    - Formatters use createElement + textContent for safe rendering
+ * 
+ * 3. USER INPUT (editable fields):
+ *    - openHoursText uses <textarea> to support multi-line content
+ *    - Other fields use <input type="text">
+ *    - Input values are captured directly with .value (no sanitization)
+ *    - All special characters including newlines are preserved
+ * 
+ * 4. CSV EXPORT:
+ *    - Follows RFC 4180 CSV standard
+ *    - escapeCsv() function quotes fields containing: , " \n \r \t
+ *    - Double quotes are escaped by doubling ("")
+ *    - Uses CRLF (\r\n) line endings for Windows compatibility
+ *    - UTF-8 BOM prepended for proper encoding in Excel
+ * 
+ * This ensures data integrity: what you type is what gets saved and exported.
+ */
+
 let differencesData = [];
 let gdosMap = new Map();
 let duplicateMap = new Map();
@@ -102,7 +136,18 @@ function buildCorrectionEntry(r) {
     // Save all corrections including GDOS
     const entry = { correct: r.correct };
     try {
-        if (r.zesty_value !== undefined && r.zesty_value !== null && String(r.zesty_value).trim() !== '') entry.value = r.zesty_value;
+        // Save the value from the selected source (GDOS or Zesty)
+        let selectedValue = r.correct === 'GDOS' ? r.gdos_value : r.zesty_value;
+        
+        // Apply encoding fix before saving (replace � with hyphens)
+        if (selectedValue !== undefined && selectedValue !== null) {
+            selectedValue = fixEncodingIssues(selectedValue);
+        }
+        
+        // Only save the value if it's not blank/empty
+        if (selectedValue !== undefined && selectedValue !== null && String(selectedValue).trim() !== '') {
+            entry.value = selectedValue;
+        }
     } catch (e) { /* ignore */ }
     return entry;
 }
@@ -236,7 +281,7 @@ async function attemptSyncLocalCorrections() {
                         try { await smartRefreshTable(table); } catch (e) { /* ignore */ }
                     }
                     try { populateCorrectValueDropdown(loadedCorrections); } catch (e) {}
-                    try { applyGlobalFilters(); } catch (e) {}
+                    // Don't re-apply filters during sync - causes rows to change
                     try { updateMetrics(); } catch (e) {}
                 } catch (e) { console.warn('deferred UI reconcile failed', e); }
             }, 1000);
@@ -253,8 +298,7 @@ async function attemptSyncLocalCorrections() {
             }
             // Update dropdown/options immediately
             try { populateCorrectValueDropdown(loadedCorrections); } catch (e) { console.warn('populateCorrectValueDropdown failed in attemptSyncLocalCorrections', e); }
-            // Re-apply filters and update metrics
-            try { applyGlobalFilters(); } catch (e) { console.warn('applyGlobalFilters failed in attemptSyncLocalCorrections', e); }
+            // Don't re-apply filters during sync - causes rows to change and disrupts user workflow
             try { updateMetrics(); } catch (e) { console.warn('updateMetrics failed in attemptSyncLocalCorrections', e); }
         }
 
@@ -382,6 +426,34 @@ function getNestedValue(obj, path) {
     return path.split('.').reduce((current, key) => current && current[key], obj);
 }
 
+/**
+ * Fix common encoding issues in text data
+ * Replaces the Unicode replacement character (�) with proper equivalents
+ * This helps when source data has encoding corruption
+ */
+function fixEncodingIssues(str) {
+    if (str == null) return str;
+    let fixed = String(str);
+    
+    // Common Windows-1252 characters that get corrupted to � when read as UTF-8
+    // These replacements handle the most common cases seen in hours of operation data
+    
+    // Check if string contains the replacement character �
+    if (fixed.includes('�')) {
+        // If we see �, try to infer what it should be based on context
+        // For now, replace with a regular hyphen as a safe default
+        // You can customize this based on your actual data patterns
+        fixed = fixed.replace(/�/g, '-');
+        
+        console.log('Fixed encoding issue in text:', {
+            original_preview: str.substring(0, 50),
+            fixed_preview: fixed.substring(0, 50)
+        });
+    }
+    
+    return fixed;
+}
+
 // Normalize a state value which may be a string or an object (e.g. { id, name })
 function extractStateValue(stateVal) {
     if (stateVal == null) return null;
@@ -456,9 +528,21 @@ Promise.all([
             console.warn('DuplicateLocationCheck.json is empty or invalid, treating as empty');
             return { data: [] };
         }
+    }),
+    fetch('./hours.json?v=' + Date.now()).then(async response => {
+        if (!response.ok) {
+            console.warn('hours.json not found, no hours data will be loaded');
+            return [];
+        }
+        try {
+            return await response.json();
+        } catch (e) {
+            console.warn('hours.json is empty or invalid, treating as empty');
+            return [];
+        }
     })
 ])
-.then(([uswData, ussData, uscData, useData, locationsData, duplicateCheckData]) => {
+.then(([uswData, ussData, uscData, useData, locationsData, duplicateCheckData, hoursData]) => {
     // store raw JSONs for modal use
     rawUsw = uswData;
     rawUss = ussData;
@@ -475,9 +559,32 @@ Promise.all([
     // Extract the data arrays
     locationsData = locationsData.data.filter(loc => loc && typeof loc === 'object');
     duplicateCheckRecords = duplicateCheckData.data;
-    console.log('First filtered loc:', locationsData[0]);
-    console.log('LocationsData length after filter:', locationsData.length);
-
+    
+    // Create a map of hours from hours.json by GDOS ID (official source for openHoursText)
+    const hoursMapByGdosId = new Map();
+    if (Array.isArray(hoursData) && hoursData.length > 0) {
+        hoursData.forEach(hourRecord => {
+            if (!hourRecord) return;
+            const gdosId = hourRecord.gdos_id;
+            const hoursOfOperation = hourRecord.hours_of_operation;
+            
+            if ((gdosId || gdosId === 0) && hoursOfOperation !== undefined && hoursOfOperation !== null && String(hoursOfOperation).trim() !== '') {
+                hoursMapByGdosId.set(String(gdosId), hoursOfOperation);
+            }
+        });
+    }
+    
+    console.log('=== HOURS.JSON DATA LOADED ===');
+    console.log('Total hours.json records:', Array.isArray(hoursData) ? hoursData.length : 0);
+    console.log('Hours map size (valid entries):', hoursMapByGdosId.size);
+    console.log('First 5 GDOS IDs with hours:', Array.from(hoursMapByGdosId.keys()).slice(0, 5));
+    if (hoursMapByGdosId.size > 0) {
+        const firstId = hoursMapByGdosId.keys().next().value;
+        const firstHours = hoursMapByGdosId.get(firstId);
+        console.log('Sample hours entry:', { gdosId: firstId, hours_preview: firstHours ? firstHours.substring(0, 50) + '...' : 'EMPTY' });
+    }
+    console.log('================================');
+    
     console.log('GDOS USW data length:', uswData.length);
     console.log('GDOS USS data length:', ussData.length);
     console.log('GDOS USC data length:', uscData.length);
@@ -523,26 +630,6 @@ Promise.all([
         if (g && g.id) gdosMap.set(g.id, g);
     });
     console.log('Total GDOS data length:', gdosData.length);
-    if (gdosData.length > 0) {
-        console.log('Sample GDOS name:', gdosData[0].name);
-        console.log('Sample normalized GDOS name:', normalizeValue(gdosData[0].name, 'name'));
-    }
-
-    // DEBUG: mapping diagnostics to help trace why only a subset of Zesty hours are appearing.
-    try {
-        const zestyWithHours = Array.from(locationMap.entries()).filter(([k, loc]) => {
-            const h = getNestedValue(loc, 'Column1.content.hours_of_operation');
-            return h !== undefined && h !== null && String(h).trim() !== '';
-        });
-        console.log('DEBUG: locationMap entries total:', locationMap.size);
-        console.log('DEBUG: locationMap entries with non-empty hours_of_operation:', zestyWithHours.length);
-        const matchedGdosCount = Array.from(locationMap.keys()).filter(k => gdosMap.has(String(k))).length;
-        console.log('DEBUG: locationMap keys that match a GDOS id from the pull:', matchedGdosCount);
-        const publishedGdosCount = gdosData.filter(g => g && g.published).length;
-        const publishedWithLoc = gdosData.filter(g => g && g.published && locationMap.has(String(g.id))).length;
-        console.log('DEBUG: published GDOS records in pull:', publishedGdosCount);
-        console.log('DEBUG: published GDOS records that have a Zesty locationMap entry:', publishedWithLoc);
-    } catch (e) { console.warn('DEBUG: mapping diagnostics failed', e); }
 
     // Fields to compare - with mapping for GDOS nested fields and Zesty flattened fields
     const fieldsToCompare = [
@@ -553,7 +640,7 @@ Promise.all([
         { field: 'zipcode', gdosPath: 'zip.zipcode', zestyPath: 'Column1.content.zipcode' },
         { field: 'phone', gdosPath: 'phone.phoneNumber', zestyPath: 'Column1.content.phoneNumber' },
         { field: 'siteTitle', gdosPath: 'name', zestyPath: 'Column1.content.siteTitle', alwaysShow: true }, // Always show for published records
-        { field: 'openHoursText', gdosPath: 'openHoursText', zestyPath: 'Column1.content.openHoursText', alwaysShow: true } // Always show for published records
+        { field: 'openHoursText', gdosPath: 'openHoursText', zestyPath: 'Column1.content.hours_of_operation', alwaysShow: true } // Always show for published records
     ];
 
     // Find differences
@@ -577,10 +664,6 @@ Promise.all([
         }
         
         matchCount++;
-        if (matchCount === 1) { // Log first match
-            console.log('First match - GDOS ID:', gdos.id, 'Name:', gdos.name);
-            console.log('Zesty GDOS ID:', loc['Column1.content.gdos_id'], 'Name:', loc['Column1.content.name']);
-        }
         const division = getNestedValue(gdos, 'location.division.name') || 'Unknown';
         const territory = gdos.territory;
         let duplicateRecord = duplicateMap.get(String(gdos.id));
@@ -596,11 +679,14 @@ Promise.all([
         
         fieldsToCompare.forEach(fieldObj => {
             totalComparisons++;
+            
             const gdosValue = getNestedValue(gdos, fieldObj.gdosPath);
             
+            // Special handling for openHoursText - get from hours.json (official source)
             let zestyValue;
             if (fieldObj.field === 'openHoursText') {
-                zestyValue = getNestedValue(loc, 'Column1.content.hours_of_operation');
+                // Use hours.json as the single source of truth for openHoursText
+                zestyValue = hoursMapByGdosId.get(String(gdos.id)) || '';
             } else {
                 zestyValue = loc[fieldObj.zestyPath]; // Flattened key
             }
@@ -616,13 +702,10 @@ Promise.all([
             const hasDifference = normalizedGdos !== normalizedZesty && normalizedGdos != null && normalizedZesty != null;
 
             // For alwaysShow fields (siteTitle, openHoursText), show for all published records by default.
-            // Additionally: if this is the openHoursText field and Zesty provides a non-empty
-            // hours_of_operation value, show the row even when GDOS is not published. This surfaces
-            // Zesty hours that otherwise get hidden by the published-only filter.
-            const shouldShowAlwaysShow = fieldObj.alwaysShow && (isPublished || (fieldObj.field === 'openHoursText' && zestyValue !== undefined && zestyValue !== null && String(zestyValue).trim() !== ''));
+            const shouldShowAlwaysShow = fieldObj.alwaysShow && isPublished;
             
             if (shouldShowAlwaysShow || hasDifference) {
-                // Special handling for siteTitle alwaysShow rows
+                // Special handling for alwaysShow rows
                 let correctValue = hasDifference ? 'GDOS' : 'Zesty';
                 let zestyVal = zestyValue || '';
                 let isSiteTitleRow = false;
@@ -641,17 +724,9 @@ Promise.all([
                 }
                 
                 if (fieldObj.field === 'openHoursText' && fieldObj.alwaysShow) {
-                    // For openHoursText alwaysShow, default to GDOS
+                    // For openHoursText, default to GDOS and use Zesty hours_of_operation
                     correctValue = 'GDOS';
-                    // Use the hours_of_operation value (assigned earlier to zestyValue)
-                    // so the Zesty column is always populated when that field exists.
-                    if (zestyValue) {
-                        zestyVal = zestyValue;
-                        console.debug('Populating openHoursText zestyVal from hours_of_operation for GDOS id', gdos.id);
-                    } else {
-                        zestyVal = '';
-                        console.debug('No Zesty hours_of_operation found for GDOS id', gdos.id);
-                    }
+                    zestyVal = zestyValue || '';
                 }
                 
                 differencesData.push({
@@ -750,80 +825,127 @@ Promise.all([
     console.log('Skipped not published:', skippedNotPublished);
     console.log('Skipped no match:', skippedNoMatch);
     console.log('Matched GDOS records:', matchCount);
-    console.log('Total field comparisons:', totalComparisons);
-    console.log('Differences found (before adding Zesty-only openHoursText rows):', differencesData.length);
-    
-    // ADDITIONAL PASS: Add openHoursText rows for Zesty locations that have hours_of_operation
-    // but were not processed in the main GDOS loop (either because they have no GDOS match,
-    // or the GDOS record is not published). This ensures all Zesty hours are editable.
-    let zestyOnlyOpenHoursCount = 0;
-    locationsData.forEach(loc => {
-        if (!loc) return;
-        const gdosId = loc['Column1.content.gdos_id'];
-        if (!gdosId && gdosId !== 0) return; // Skip if no gdos_id
-        
-        const hoursOfOperation = getNestedValue(loc, 'Column1.content.hours_of_operation');
-        if (!hoursOfOperation || String(hoursOfOperation).trim() === '') return; // Skip if no hours
-        
-        // Check if we already created an openHoursText row for this gdos_id
-        const alreadyExists = differencesData.some(r => String(r.gdos_id) === String(gdosId) && r.field === 'openHoursText');
-        if (alreadyExists) return; // Already have a row for this
-        
-        // This Zesty location has hours but no openHoursText row yet - create one
-        // Look up GDOS record if it exists (may be unpublished or not in pull)
-        const gdosRecord = gdosMap.get(String(gdosId));
-        const gdosName = gdosRecord ? gdosRecord.name : loc['Column1.content.name'] || 'Unknown';
-        const gdosValue = gdosRecord ? gdosRecord.openHoursText : null;
-        const isPublished = gdosRecord ? gdosRecord.published : false;
-        const division = gdosRecord ? getNestedValue(gdosRecord, 'location.division.name') || 'Unknown' : 'Unknown';
-        const territory = gdosRecord ? gdosRecord.territory : 'Unknown';
-        const propertyType = gdosRecord ? getNestedValue(gdosRecord, 'wm4SiteType.name') || 'Unknown' : 'Unknown';
-        
-        // Look up duplicate record
-        let duplicateRecord = duplicateMap.get(String(gdosId));
-        if (!duplicateRecord && Array.isArray(duplicateCheckRecords)) {
-            duplicateRecord = duplicateCheckRecords.find(r => {
-                if (!r) return false;
-                const candidate = r.gdosid ?? r.gdos_id ?? r.gdosId ?? r['gdos id'] ?? (r.gdos && r.gdos.id);
-                return String(candidate) === String(gdosId);
-            }) || null;
-        }
-        
-        differencesData.push({
-            gdos_id: gdosId,
-            name: gdosName,
-            property_type: propertyType,
-            division: division,
-            territory: territory,
-            published: isPublished ? 'True' : 'False',
-            duplicate: duplicateRecord && duplicateRecord.duplicate != null ? String(duplicateRecord.duplicate) : '0',
-            doNotImport: duplicateRecord && duplicateRecord.doNotImport != null ? String(duplicateRecord.doNotImport) : 'False',
-            field: 'openHoursText',
-            gdos_value: gdosValue,
-            zesty_value: hoursOfOperation,
-            correct: 'GDOS',
-            editable: true,
-            siteTitleRow: false
-        });
-        zestyOnlyOpenHoursCount++;
-    });
-    
-    console.log('Added Zesty-only openHoursText rows:', zestyOnlyOpenHoursCount);
     console.log('Total differences found:', differencesData.length);
     
-    // Count openHoursText rows with populated vs empty Zesty values
-    const openHoursTextRows = differencesData.filter(r => r.field === 'openHoursText');
-    const openHoursTextWithZesty = openHoursTextRows.filter(r => r.zesty_value && String(r.zesty_value).trim() !== '');
-    console.log('=== OPEN HOURS TEXT DIAGNOSTIC ===');
-    console.log('Total openHoursText rows:', openHoursTextRows.length);
-    console.log('openHoursText rows WITH Zesty value:', openHoursTextWithZesty.length);
-    console.log('openHoursText rows WITHOUT Zesty value:', openHoursTextRows.length - openHoursTextWithZesty.length);
-    console.log('==================================');
+    // CREATE OPENHOURS ROWS FROM hours.json
+    console.log('=== CREATING OPENHOURS ROWS FROM hours.json ===');
+    console.log('Hours data loaded:', Array.isArray(hoursData) ? hoursData.length : 0, 'records');
     
-    if (differencesData.length > 0) {
-        console.log('Sample difference:', differencesData[0]);
+    // Create a Set of GDOS IDs that already have openHoursText rows from the main comparison loop
+    // This prevents duplicates when the same location exists in both sources
+    const existingOpenHoursIds = new Set(
+        differencesData
+            .filter(d => d.field === 'openHoursText')
+            .map(d => String(d.gdos_id))
+    );
+    console.log('Existing openHoursText rows from main comparison:', existingOpenHoursIds.size);
+    
+    let hoursRowsCreated = 0;
+    let hoursRowsSkipped = 0;
+    if (Array.isArray(hoursData) && hoursData.length > 0) {
+        hoursData.forEach((hourRecord, index) => {
+            if (!hourRecord) return;
+            
+            const gdosId = hourRecord.gdos_id;
+            const hoursOfOperation = hourRecord.hours_of_operation;
+            
+            if (!gdosId && gdosId !== 0) return;
+            if (!hoursOfOperation || String(hoursOfOperation).trim() === '') return;
+            
+            // Skip if this GDOS ID already has an openHoursText row from the main comparison
+            if (existingOpenHoursIds.has(String(gdosId))) {
+                hoursRowsSkipped++;
+                return;
+            }
+            
+            // Fix encoding issues in the hours data (� → proper characters)
+            const cleanedHours = fixEncodingIssues(hoursOfOperation);
+            
+            // Log first 3 for debugging
+            if (hoursRowsCreated < 3) {
+                console.log(`Creating openHours row ${hoursRowsCreated + 1}:`, {
+                    gdos_id: gdosId,
+                    name: hourRecord.name,
+                    hours_preview: cleanedHours.substring(0, 50) + '...',
+                    had_encoding_issues: cleanedHours !== hoursOfOperation
+                });
+            }
+            
+            // Look up GDOS record if it exists
+            const gdosRecord = gdosMap.get(String(gdosId));
+            const gdosName = gdosRecord ? gdosRecord.name : hourRecord.name || 'Unknown';
+            const gdosValue = gdosRecord ? gdosRecord.openHoursText : null;
+            const isPublished = gdosRecord ? gdosRecord.published : false;
+            const division = gdosRecord ? getNestedValue(gdosRecord, 'location.division.name') || 'Unknown' : 'Unknown';
+            const territory = gdosRecord ? gdosRecord.territory : 'Unknown';
+            const propertyType = gdosRecord ? getNestedValue(gdosRecord, 'wm4SiteType.name') || 'Unknown' : 'Unknown';
+            
+            // Look up duplicate record
+            let duplicateRecord = duplicateMap.get(String(gdosId));
+            if (!duplicateRecord && Array.isArray(duplicateCheckRecords)) {
+                duplicateRecord = duplicateCheckRecords.find(r => {
+                    if (!r) return false;
+                    const candidate = r.gdosid ?? r.gdos_id ?? r.gdosId ?? r['gdos id'] ?? (r.gdos && r.gdos.id);
+                    return String(candidate) === String(gdosId);
+                }) || null;
+            }
+            
+            differencesData.push({
+                gdos_id: gdosId,
+                name: gdosName,
+                property_type: propertyType,
+                division: division,
+                territory: territory,
+                published: isPublished ? 'True' : 'False',
+                duplicate: duplicateRecord && duplicateRecord.duplicate != null ? String(duplicateRecord.duplicate) : '0',
+                doNotImport: duplicateRecord && duplicateRecord.doNotImport != null ? String(duplicateRecord.doNotImport) : 'False',
+                field: 'openHoursText',
+                gdos_value: gdosValue,
+                zesty_value: cleanedHours, // Use cleaned hours with fixed encoding
+                correct: 'GDOS',
+                editable: true,
+                siteTitleRow: false
+            });
+            hoursRowsCreated++;
+        });
+        
+        console.log('Created openHoursText rows from hours.json:', hoursRowsCreated);
+        console.log('Skipped duplicate openHoursText rows:', hoursRowsSkipped);
+        console.log('Total openHoursText rows:', existingOpenHoursIds.size + hoursRowsCreated);
+    } else {
+        console.warn('No hours data available from hours.json');
     }
-
+    
+    console.log('Total differences after adding hours:', differencesData.length);
+    
+    // DEBUG: Verify no duplicate openHoursText rows exist
+    const openHoursRows = differencesData.filter(d => d.field === 'openHoursText');
+    const uniqueOpenHoursIds = new Set(openHoursRows.map(r => String(r.gdos_id)));
+    console.log('Total openHoursText rows:', openHoursRows.length);
+    console.log('Unique GDOS IDs with openHoursText:', uniqueOpenHoursIds.size);
+    if (openHoursRows.length !== uniqueOpenHoursIds.size) {
+        console.warn('⚠️ DUPLICATE ALERT: Found duplicate openHoursText rows!');
+        // Find and log duplicates
+        const idCounts = {};
+        openHoursRows.forEach(r => {
+            const id = String(r.gdos_id);
+            idCounts[id] = (idCounts[id] || 0) + 1;
+        });
+        const duplicates = Object.entries(idCounts).filter(([id, count]) => count > 1);
+        console.warn('Duplicate GDOS IDs:', duplicates);
+    } else {
+        console.log('✓ No duplicate openHoursText rows found');
+    }
+    
+    // DEBUG: Show a few sample openHoursText rows
+    const sampleOpenHoursRows = differencesData.filter(d => d.field === 'openHoursText').slice(0, 3);
+    console.log('Sample openHoursText rows:', sampleOpenHoursRows.map(r => ({
+        gdos_id: r.gdos_id,
+        name: r.name,
+        zesty_value_length: r.zesty_value ? r.zesty_value.length : 0,
+        zesty_value_preview: r.zesty_value ? r.zesty_value.substring(0, 50) + '...' : 'EMPTY'
+    })));
+    
     // Load any previously saved changes and only render after corrections are applied.
     // This prevents the table from rendering once and then switching when saved corrections arrive.
     loadSavedChanges().then(() => {
@@ -998,7 +1120,9 @@ function correctValueFormatter(cell, formatterParams, onRendered) {
         }
         const newValue = this.value;
         rowData.correct = newValue;
-        rowData.final_value = newValue === 'GDOS' ? rowData.gdos_value : rowData.zesty_value;
+        // Set final_value to the selected source value (including blank/empty values)
+        const selectedValue = newValue === 'GDOS' ? rowData.gdos_value : rowData.zesty_value;
+        rowData.final_value = (selectedValue !== undefined && selectedValue !== null) ? selectedValue : '';
         row.update(rowData);
         // If this is a synthetic row and correct is changed to 'GDOS', remove it from the table
         if (rowData.synthetic && newValue === 'GDOS') {
@@ -1030,11 +1154,33 @@ function correctValueFormatter(cell, formatterParams, onRendered) {
 
 function finalValueFormatter(cell, formatterParams, onRendered) {
     const row = cell.getRow();
-    const correctValue = row.getData().correct;
-    const gdosValue = row.getData().gdos_value;
-    const zestyValue = row.getData().zesty_value;
+    const rowData = row.getData();
+    const correctValue = rowData.correct;
+    const gdosValue = rowData.gdos_value;
+    const zestyValue = rowData.zesty_value;
     
-    return correctValue === 'GDOS' ? gdosValue : zestyValue;
+    const finalValue = correctValue === 'GDOS' ? gdosValue : zestyValue;
+    
+    // For openHoursText, use textarea to display multi-line content properly
+    if (rowData.field === 'openHoursText') {
+        const textarea = document.createElement('textarea');
+        textarea.className = 'form-control form-control-sm';
+        textarea.rows = 3;
+        textarea.style.resize = 'vertical';
+        textarea.style.minHeight = '60px';
+        textarea.readOnly = true;
+        textarea.style.backgroundColor = '#f8f9fa';
+        textarea.style.cursor = 'default';
+        // Apply encoding fix to make � characters visible as hyphens
+        const cleanValue = fixEncodingIssues(finalValue || '');
+        textarea.value = cleanValue;
+        return textarea;
+    }
+    
+    // Use a span with textContent to safely display all special characters
+    const span = document.createElement('span');
+    span.textContent = finalValue;
+    return span;
 }
 
 function fieldFormatter(cell, formatterParams, onRendered) {
@@ -1061,19 +1207,29 @@ function zestyValueFormatter(cell, formatterParams, onRendered) {
 
     // For editable rows (alwaysShow fields), create an input field
     if (rowData.editable) {
-        const input = document.createElement('input');
-        input.type = 'text';
+        // Use textarea for openHoursText to properly handle multi-line content
+        const isMultiLine = rowData.field === 'openHoursText';
+        const input = document.createElement(isMultiLine ? 'textarea' : 'input');
+        
+        if (!isMultiLine) {
+            input.type = 'text';
+        } else {
+            // Configure textarea for better UX with multi-line content
+            input.rows = 3;
+            input.style.resize = 'vertical';
+            input.style.minHeight = '60px';
+        }
+        
         input.className = 'form-control form-control-sm';
         input.value = value || '';
         
-        // For openHoursText, show the current Zesty hours_of_operation value as the input's value
+        // For openHoursText, use the value that was already loaded from hours.json
         if (rowData.field === 'openHoursText') {
-            const gdosId = rowData.gdos_id;
-            const zestyRecord = rawLocations && Array.isArray(rawLocations.data) ? rawLocations.data.find(loc => getNestedValue(loc, 'Column1.content.gdos_id') == gdosId) : null;
-            const hoursOfOperation = zestyRecord ? getNestedValue(zestyRecord, 'Column1.content.hours_of_operation') : '';
-            // Prioritize the existing value (from saved corrections), but fall back to hoursOfOperation.
-            input.value = value || hoursOfOperation || '';
-            input.placeholder = 'Enter custom value...';
+            // The zesty_value was already set from hours.json during data loading
+            // Apply encoding fix to make special characters visible and editable
+            const cleanValue = fixEncodingIssues(value || '');
+            input.value = cleanValue;
+            input.placeholder = 'Enter hours of operation (multi-line supported)...';
         } else {
             input.value = value || '';
             input.placeholder = 'Enter custom value...';
@@ -1084,7 +1240,7 @@ function zestyValueFormatter(cell, formatterParams, onRendered) {
         const eventType = (rowData.field === 'siteTitle' || rowData.field === 'openHoursText') ? 'blur' : 'input';
         input.addEventListener(eventType, function() {
             const newValue = this.value;
-            // Update the row data directly
+            // Update the row data directly - no sanitization, preserve all special characters
             rowData.zesty_value = newValue;
             rowData.final_value = newValue; // Since editable rows use Zesty value
 
@@ -1098,6 +1254,7 @@ function zestyValueFormatter(cell, formatterParams, onRendered) {
     // Default behavior for non-editable rows
     const span = document.createElement('span');
     span.className = 'value-text' + (correctValue === 'Zesty' ? ' selected-underline' : '');
+    // Use textContent to safely display all special characters without HTML encoding issues
     span.textContent = value;
     return span;
 }
@@ -1820,7 +1977,8 @@ function applyIncrementalChangesToTable(table, changedKeys) {
                     territory: r.territory || '',
                     published: '',
                     siteTitle: '',
-                    hasCorrections: false // Track if this record has any corrections
+                    hasCorrections: false, // Track if this record has any corrections
+                    changedFields: [] // Track which fields were changed and their values
                 });
             }
 
@@ -1849,7 +2007,18 @@ function applyIncrementalChangesToTable(table, changedKeys) {
                 // All other fields are considered meaningful corrections
                 markAsCorrection = true;
             }
-            if (markAsCorrection) entry.hasCorrections = true;
+            if (markAsCorrection) {
+                entry.hasCorrections = true;
+                // Track the change details for the explanation column
+                const gdosVal = r.gdos_value;
+                const changeInfo = {
+                    field: field,
+                    from: gdosVal,
+                    to: finalVal,
+                    source: r.correct // Which source was selected (GDOS or Zesty)
+                };
+                entry.changedFields.push(changeInfo);
+            }
 
             // Map the comparison field names to import sheet columns
             switch (field) {
@@ -1893,6 +2062,7 @@ function applyIncrementalChangesToTable(table, changedKeys) {
                 // Add this record to the export with published = 'False'
                 const gdosRecord = gdosMap.get(gdosId);
                 if (gdosRecord) {
+                    const isDuplicate = duplicateRecord && duplicateRecord.duplicate === '1';
                     rows.push({
                         gdos_id: gdosId,
                         name: getNestedValue(gdosRecord, 'name') || '',
@@ -1908,7 +2078,14 @@ function applyIncrementalChangesToTable(table, changedKeys) {
                         territory: gdosRecord.territory || '',
                         published: 'False', // Explicitly set to False for doNotImport records
                         siteTitle: '',
-                        hasCorrections: false
+                        hasCorrections: false,
+                        changedFields: [{
+                            field: 'published',
+                            from: 'True',
+                            to: 'False',
+                            source: 'Zesty',
+                            reason: isDuplicate ? 'Marked as duplicate location' : 'Marked do not import'
+                        }]
                     });
                 }
             }
@@ -1955,19 +2132,120 @@ function applyIncrementalChangesToTable(table, changedKeys) {
                 }
             // Override published to 'False' if doNotImport is 'True', to ensure these records are unpublished in the import
             if (doNotImportFlag) {
+                const wasPublished = entry.published === 'True';
                 entry.published = 'False';
+                // Track this change if it wasn't already tracked
+                if (!entry.changedFields) entry.changedFields = [];
+                const alreadyTracked = entry.changedFields.some(c => c.field === 'published');
+                if (!alreadyTracked && wasPublished) {
+                    const isDuplicate = duplicateRecord && duplicateRecord.duplicate === '1';
+                    entry.changedFields.push({
+                        field: 'published',
+                        from: 'True',
+                        to: 'False',
+                        source: 'Zesty',
+                        reason: isDuplicate ? 'Marked as duplicate location' : 'Marked do not import'
+                    });
+                }
             }
         });
         
+        // Build change reason explanations for each row BEFORE filtering
+        rows.forEach(entry => {
+            if (!entry.changedFields) entry.changedFields = [];
+            
+            const reasons = [];
+            
+            // Group changes by type for clearer explanations
+            const fieldChanges = entry.changedFields.filter(c => c.field !== 'published');
+            const publishedChanges = entry.changedFields.filter(c => c.field === 'published');
+            
+            // Handle published field changes with detailed explanations
+            if (publishedChanges.length > 0) {
+                const change = publishedChanges[0];
+                if (change.reason) {
+                    // Use the detailed reason already provided (e.g., "Marked as duplicate location")
+                    reasons.push(change.reason);
+                } else if (change.from === 'True' && change.to === 'False') {
+                    reasons.push('Unpublishing location');
+                } else if (change.from === 'False' && change.to === 'True') {
+                    reasons.push('Publishing location');
+                } else {
+                    reasons.push('Changed published status');
+                }
+            }
+            
+            // Handle field changes with source information
+            if (fieldChanges.length > 0) {
+                const fieldDetails = fieldChanges.map(c => {
+                    // Format field names nicely
+                    let fieldName = c.field;
+                    if (c.field === 'openHoursText' || /openhours/i.test(c.field)) fieldName = 'Hours';
+                    else if (c.field === 'siteTitle') fieldName = 'Site Title';
+                    else if (c.field === 'name') fieldName = 'Name';
+                    else if (c.field === 'address') fieldName = 'Address';
+                    else if (c.field === 'zipcode') fieldName = 'Zip';
+                    else if (c.field === 'phone') fieldName = 'Phone';
+                    else if (/website/i.test(c.field)) fieldName = 'Website';
+                    
+                    return { fieldName, source: c.source, field: c.field };
+                });
+                
+                // Group by source for cleaner reasons
+                const gdosFields = fieldDetails.filter(f => f.source === 'GDOS').map(f => f.fieldName);
+                const zestyFields = fieldDetails.filter(f => f.source === 'Zesty').map(f => f.fieldName);
+                
+                if (gdosFields.length > 0 && zestyFields.length > 0) {
+                    // Mixed sources
+                    reasons.push(`Updated ${gdosFields.join(', ')} from GDOS; ${zestyFields.join(', ')} from Zesty`);
+                } else if (gdosFields.length > 0) {
+                    // All from GDOS
+                    if (gdosFields.length === 1) {
+                        reasons.push(`Updated ${gdosFields[0]} from GDOS`);
+                    } else if (gdosFields.length === 2) {
+                        reasons.push(`Updated ${gdosFields[0]} and ${gdosFields[1]} from GDOS`);
+                    } else {
+                        reasons.push(`Updated ${gdosFields.length} fields from GDOS: ${gdosFields.join(', ')}`);
+                    }
+                } else if (zestyFields.length > 0) {
+                    // All from Zesty
+                    if (zestyFields.length === 1) {
+                        reasons.push(`Updated ${zestyFields[0]} from Zesty`);
+                    } else if (zestyFields.length === 2) {
+                        reasons.push(`Updated ${zestyFields[0]} and ${zestyFields[1]} from Zesty`);
+                    } else {
+                        reasons.push(`Updated ${zestyFields.length} fields from Zesty: ${zestyFields.join(', ')}`);
+                    }
+                }
+            }
+            
+            entry.changeReason = reasons.length > 0 ? reasons.join('; ') : 'Correction applied';
+            
+            // Flag for exclusion: Site Title from GDOS with no other changes
+            entry.isSiteTitleOnlyFromGDOS = 
+                fieldChanges.length === 1 && 
+                fieldChanges[0].field === 'siteTitle' && 
+                fieldChanges[0].source === 'GDOS' &&
+                publishedChanges.length === 0;
+        });
+        
         // Filter to only include records that have corrections OR should be unpublished
-        const finalRows = rows.filter(entry => entry.hasCorrections || entry.published === 'False');
+        // EXCLUDE rows that only have Site Title from GDOS with no other changes
+        const finalRows = rows.filter(entry => {
+            // Exclude Site Title-only from GDOS changes
+            if (entry.isSiteTitleOnlyFromGDOS) {
+                return false;
+            }
+            // Include if has corrections or should be unpublished
+            return entry.hasCorrections || entry.published === 'False';
+        });
         
         if (finalRows.length === 0) {
             alert('No corrections or records to unpublish were found.');
             return;
         }
 
-        const headers = ['GDOS ID','Name','Address1','Address2','City','State','Zip','PhoneNumber','OpenHoursText','PrimaryWebsite','Published','Site Title','Division','Territory'];
+        const headers = ['GDOS ID','Name','Address1','Address2','City','State','Zip','PhoneNumber','OpenHoursText','PrimaryWebsite','Published','Site Title','Division','Territory','Change Reason'];
         const csvLines = [headers.join(',')];
 
         finalRows.forEach(r => {
@@ -1985,13 +2263,30 @@ function applyIncrementalChangesToTable(table, changedKeys) {
                 escapeCsv(r.published),
                 escapeCsv(r.siteTitle),
                 escapeCsv(r.division),
-                escapeCsv(r.territory)
+                escapeCsv(r.territory),
+                escapeCsv(r.changeReason || '')
             ];
             csvLines.push(vals.join(','));
         });
 
-        const csvContent = csvLines.join('\n');
-        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        // Use CRLF (\r\n) line endings for proper CSV format (RFC 4180 standard)
+        const csvContent = csvLines.join('\r\n');
+        
+        // Create UTF-8 encoded content with BOM for Excel compatibility
+        // Using TextEncoder ensures proper UTF-8 byte encoding for all Unicode characters
+        const BOM = new Uint8Array([0xEF, 0xBB, 0xBF]); // UTF-8 BOM bytes
+        const encoder = new TextEncoder(); // Always encodes to UTF-8
+        const contentBytes = encoder.encode(csvContent);
+        
+        // Combine BOM + content
+        const csvBytes = new Uint8Array(BOM.length + contentBytes.length);
+        csvBytes.set(BOM, 0);
+        csvBytes.set(contentBytes, BOM.length);
+        
+        // Create Blob from the properly encoded bytes
+        const blob = new Blob([csvBytes], { type: 'text/csv;charset=utf-8;' });
+        
+        // Create download link and trigger download
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
@@ -2002,10 +2297,28 @@ function applyIncrementalChangesToTable(table, changedKeys) {
         URL.revokeObjectURL(url);
     }
 
+    /**
+     * Escapes a value for CSV export according to RFC 4180 standard.
+     * Handles all special characters including newlines, quotes, commas, tabs, etc.
+     * 
+     * Special character handling:
+     * - Newlines (\n, \r): Preserved within quoted fields
+     * - Double quotes ("): Escaped by doubling ("")
+     * - Commas (,): Field is quoted to prevent column splitting
+     * - Tabs (\t): Field is quoted to preserve formatting
+     * - Unicode characters: Preserved as-is (file uses UTF-8 with BOM)
+     * 
+     * @param {*} str - The value to escape (will be converted to string)
+     * @returns {string} - Properly escaped CSV field value
+     */
     function escapeCsv(str) {
         if (str == null) return '';
         const s = String(str);
-        if (s.includes(',') || s.includes('\n') || s.includes('"')) {
+        // Always quote if contains: comma, newline, carriage return, double quote, or tab
+        // This ensures proper CSV formatting for all special characters
+        if (s.includes(',') || s.includes('\n') || s.includes('\r') || s.includes('"') || s.includes('\t')) {
+            // Escape double quotes by doubling them (CSV standard)
+            // Preserve all newlines and other special characters within the quoted field
             return '"' + s.replace(/"/g, '""') + '"';
         }
         return s;
@@ -2040,7 +2353,44 @@ function renderDifferencesTable() {
                 title: "Correct Value",
                 field: "correct",
                 width: 150,
-                formatter: correctValueFormatter
+                formatter: correctValueFormatter,
+                titleFormatter: function() {
+                    // Create a container for the title and dropdown
+                    const container = document.createElement('div');
+                    container.style.display = 'flex';
+                    container.style.flexDirection = 'column';
+                    container.style.gap = '4px';
+                    
+                    // Add the column title
+                    const title = document.createElement('div');
+                    title.textContent = 'Correct Value';
+                    title.style.fontWeight = 'bold';
+                    container.appendChild(title);
+                    
+                    // Add the bulk set dropdown
+                    const select = document.createElement('select');
+                    select.className = 'form-select form-select-sm';
+                    select.style.fontSize = '0.75rem';
+                    select.innerHTML = `
+                        <option value="">Set All on Page...</option>
+                        <option value="GDOS">→ GDOS</option>
+                        <option value="Zesty">→ Zesty</option>
+                    `;
+                    
+                    select.addEventListener('change', function() {
+                        const value = this.value;
+                        if (value) {
+                            bulkSetPageCorrectValue(value);
+                            // Reset dropdown after action
+                            setTimeout(() => {
+                                this.value = '';
+                            }, 100);
+                        }
+                    });
+                    
+                    container.appendChild(select);
+                    return container;
+                }
             },
             {
                 title: "Final Value",
@@ -2210,6 +2560,26 @@ function populateGlobalFilters() {
         showDoNotImportFilter._listenerAdded = true;
     }
 
+    const gdosValueBlankFilter = document.getElementById('gdosValueBlankFilter');
+    if (gdosValueBlankFilter && !gdosValueBlankFilter._listenerAdded) {
+        gdosValueBlankFilter.addEventListener('change', function() {
+            localStorage.setItem('gdosValueBlankFilter', this.value);
+            applyGlobalFilters();
+            try { updateMetrics(); } catch(e) { console.warn('updateMetrics failed', e); }
+        });
+        gdosValueBlankFilter._listenerAdded = true;
+    }
+
+    const zestyValueBlankFilter = document.getElementById('zestyValueBlankFilter');
+    if (zestyValueBlankFilter && !zestyValueBlankFilter._listenerAdded) {
+        zestyValueBlankFilter.addEventListener('change', function() {
+            localStorage.setItem('zestyValueBlankFilter', this.value);
+            applyGlobalFilters();
+            try { updateMetrics(); } catch(e) { console.warn('updateMetrics failed', e); }
+        });
+        zestyValueBlankFilter._listenerAdded = true;
+    }
+
     // Note: hideSiteTitleOpenHours checkbox has been replaced with separate dropdown filters
 }
 
@@ -2226,6 +2596,8 @@ function applyGlobalFilters() {
     const showOpenHoursFilter = document.getElementById('showOpenHoursFilter');
     const showDuplicatesFilter = document.getElementById('showDuplicatesFilter');
     const showDoNotImportFilter = document.getElementById('showDoNotImportFilter');
+    const gdosValueBlankFilter = document.getElementById('gdosValueBlankFilter');
+    const zestyValueBlankFilter = document.getElementById('zestyValueBlankFilter');
 
     // Clear all filters first
     table.clearFilter();
@@ -2286,6 +2658,41 @@ function applyGlobalFilters() {
             });
         }
     }
+
+    // Handle GDOS value blank/not blank filter
+    if (gdosValueBlankFilter && gdosValueBlankFilter.value !== 'all') {
+        if (gdosValueBlankFilter.value === 'blank') {
+            // Show only rows where GDOS value is blank/empty
+            table.addFilter(function(data, filterParams) {
+                const val = data.gdos_value;
+                return val === null || val === undefined || String(val).trim() === '';
+            });
+        } else if (gdosValueBlankFilter.value === 'notblank') {
+            // Show only rows where GDOS value is not blank
+            table.addFilter(function(data, filterParams) {
+                const val = data.gdos_value;
+                return val !== null && val !== undefined && String(val).trim() !== '';
+            });
+        }
+    }
+
+    // Handle Zesty value blank/not blank filter
+    if (zestyValueBlankFilter && zestyValueBlankFilter.value !== 'all') {
+        if (zestyValueBlankFilter.value === 'blank') {
+            // Show only rows where Zesty value is blank/empty
+            table.addFilter(function(data, filterParams) {
+                const val = data.zesty_value;
+                return val === null || val === undefined || String(val).trim() === '';
+            });
+        } else if (zestyValueBlankFilter.value === 'notblank') {
+            // Show only rows where Zesty value is not blank
+            table.addFilter(function(data, filterParams) {
+                const val = data.zesty_value;
+                return val !== null && val !== undefined && String(val).trim() !== '';
+            });
+        }
+    }
+
     // Note: siteTitle and openHoursText are always shown as separate fields - no longer hidden by checkbox
     updateFilterVisualState();
 }
@@ -2302,6 +2709,8 @@ function applySavedGlobalFilters() {
     const showOpenHoursFilter = document.getElementById('showOpenHoursFilter');
     const showDuplicatesFilter = document.getElementById('showDuplicatesFilter');
     const showDoNotImportFilter = document.getElementById('showDoNotImportFilter');
+    const gdosValueBlankFilter = document.getElementById('gdosValueBlankFilter');
+    const zestyValueBlankFilter = document.getElementById('zestyValueBlankFilter');
     const savedTerr = localStorage.getItem('globalTerritoryFilter');
     const savedCorrect = localStorage.getItem('globalCorrectFilter');
     const savedField = localStorage.getItem('globalFieldFilter');
@@ -2310,6 +2719,8 @@ function applySavedGlobalFilters() {
     const savedDuplicates = localStorage.getItem('showDuplicatesFilter') || 'all';
     // Default to 'hide' so Clear Filters hides Do Not Import / Duplicates by default
     const savedDoNotImport = localStorage.getItem('showDoNotImportFilter') || 'hide';
+    const savedGdosBlank = localStorage.getItem('gdosValueBlankFilter') || 'all';
+    const savedZestyBlank = localStorage.getItem('zestyValueBlankFilter') || 'all';
     // siteTitle and openHoursText are always shown now - no longer use hideSiteTitleOpenHours
     if (territorySelect && savedTerr) {
         // only set if option exists (safety)
@@ -2332,6 +2743,12 @@ function applySavedGlobalFilters() {
     }
     if (showDoNotImportFilter) {
         showDoNotImportFilter.value = savedDoNotImport;
+    }
+    if (gdosValueBlankFilter) {
+        gdosValueBlankFilter.value = savedGdosBlank;
+    }
+    if (zestyValueBlankFilter) {
+        zestyValueBlankFilter.value = savedZestyBlank;
     }
     // apply after setting
     setTimeout(() => applyGlobalFilters(), 0);
@@ -2356,6 +2773,8 @@ function clearFilters() {
     const territorySelect = document.getElementById('globalTerritoryFilter');
     const correctSelect = document.getElementById('globalCorrectFilter');
     const fieldSelect = document.getElementById('globalFieldFilter');
+    const gdosValueBlankFilter = document.getElementById('gdosValueBlankFilter');
+    const zestyValueBlankFilter = document.getElementById('zestyValueBlankFilter');
     if (territorySelect) {
         territorySelect.value = 'all';
         localStorage.setItem('globalTerritoryFilter', 'all');
@@ -2385,11 +2804,117 @@ function clearFilters() {
         showDoNotImportFilter.value = 'hide';
         localStorage.setItem('showDoNotImportFilter', 'hide');
     }
+    // Reset blank/not blank filters to 'all'
+    if (gdosValueBlankFilter) {
+        gdosValueBlankFilter.value = 'all';
+        localStorage.setItem('gdosValueBlankFilter', 'all');
+    }
+    if (zestyValueBlankFilter) {
+        zestyValueBlankFilter.value = 'all';
+        localStorage.setItem('zestyValueBlankFilter', 'all');
+    }
     // Re-apply filters and update metrics after reset
     try { applyGlobalFilters(); } catch (e) { console.warn('applyGlobalFilters failed after clearFilters', e); }
     try { updateMetrics(); } catch (e) { console.warn('updateMetrics failed after clearFilters', e); }
     updateFilterVisualState();
 }
+
+// Bulk set all rows on current page from column header dropdown
+function bulkSetPageCorrectValue(value) {
+    const table = window.differencesTable || (typeof Tabulator !== 'undefined' && typeof Tabulator.findTable === 'function' ? Tabulator.findTable("#differencesTable")[0] : null);
+    if (!table) {
+        console.warn('Table not initialized');
+        return;
+    }
+
+    if (!value || (value !== 'GDOS' && value !== 'Zesty')) {
+        console.warn('Invalid value for bulk set:', value);
+        return;
+    }
+
+    // Get rows currently visible on the current page (respects pagination)
+    const pageRows = table.getRows('visible');
+    if (pageRows.length === 0) {
+        showTransientMessage('No rows visible on current page', 2000);
+        return;
+    }
+
+    console.log(`Bulk setting ${pageRows.length} rows to: ${value}`);
+
+    // Track how many rows were actually changed
+    let changedCount = 0;
+    const batchChanges = {};
+
+    // Update each row - batch the changes to avoid triggering multiple syncs
+    pageRows.forEach(row => {
+        try {
+            const rowData = row.getData();
+            
+            // Skip if already set to the target value
+            if (rowData.correct === value) {
+                return;
+            }
+
+            // Update the row data
+            rowData.correct = value;
+            
+            // Set final_value to the selected source value
+            const selectedValue = value === 'GDOS' ? rowData.gdos_value : rowData.zesty_value;
+            rowData.final_value = (selectedValue !== undefined && selectedValue !== null) ? selectedValue : '';
+            
+            // Update the row in the table
+            row.update(rowData);
+            
+            // Build the correction entry for batching
+            const key = makeCorrectionKey(rowData);
+            const entry = buildCorrectionEntry(rowData);
+            batchChanges[key] = entry === null ? null : entry;
+            
+            changedCount++;
+        } catch (e) {
+            console.warn('Failed to update row:', e, row);
+        }
+    });
+
+    // Persist all changes as a single batch
+    if (changedCount > 0) {
+        // Update localCorrections with all the batch changes
+        Object.keys(batchChanges).forEach(k => {
+            if (batchChanges[k] === null) {
+                delete localCorrections[k];
+            } else {
+                localCorrections[k] = batchChanges[k];
+            }
+        });
+
+        // Save to localStorage immediately
+        try {
+            localStorage.setItem('gdosLocalCorrections', JSON.stringify(localCorrections));
+        } catch (e) {
+            console.warn('Failed to save localCorrections to localStorage', e);
+        }
+
+        // Notify other tabs
+        try {
+            if (_bc) _bc.postMessage({ type: 'localCorrection', ts: Date.now() });
+        } catch (e) { /* ignore */ }
+
+        // Update sync state
+        syncState.pending = Object.keys(localCorrections).length;
+        updateSyncStatus();
+        updateUIEnabledState();
+
+        // Schedule a single background sync for all changes
+        scheduleBackgroundSync();
+
+        // Show success message
+        showTransientMessage(`Updated ${changedCount} row${changedCount === 1 ? '' : 's'} to ${value}`, 3000);
+    }
+
+    // Update metrics
+    try { updateMetrics(); } catch (e) { console.warn('updateMetrics failed after bulk set', e); }
+}
+
 
 // Try to pull a usable state string from a Zesty flattened record
 function extractZestyStateValue(zestyRec) {
