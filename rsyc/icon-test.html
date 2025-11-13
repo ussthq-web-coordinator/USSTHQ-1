@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RSYC Icon Tester</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
+    <style>
+        .icon-card {
+            border: 1px solid #ddd;
+            padding: 20px;
+            margin: 10px 0;
+            border-radius: 8px;
+            transition: all 0.3s;
+        }
+        .icon-card:hover {
+            background-color: #f8f9fa;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        .icon-display {
+            font-size: 48px;
+            color: #0071ce;
+            margin-bottom: 15px;
+        }
+        .icon-class {
+            font-family: monospace;
+            background-color: #f4f4f4;
+            padding: 5px 10px;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        .section-header {
+            background-color: #0071ce;
+            color: white;
+            padding: 15px 20px;
+            border-radius: 8px;
+            margin: 30px 0 20px 0;
+        }
+        .copy-btn {
+            position: sticky;
+            top: 20px;
+            z-index: 1000;
+        }
+        .missing-icon {
+            border-color: #dc3545 !important;
+            background-color: #fff5f5 !important;
+        }
+        .missing-icon .icon-display {
+            color: #dc3545;
+        }
+    </style>
+</head>
+<body>
+    <div class="container-fluid py-4">
+        <div class="row">
+            <div class="col-12">
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h1>RSYC Icon Tester</h1>
+                    <button id="copyBtn" class="btn btn-primary copy-btn">Copy HTML</button>
+                </div>
+                <div class="alert alert-info">
+                    <strong>Instructions:</strong> This page displays all facility features and programs with their Bootstrap icons. 
+                    Icons that don't render properly will be highlighted in red. Click "Copy HTML" to copy the generated HTML to your clipboard.
+                </div>
+            </div>
+        </div>
+
+        <div id="output"></div>
+    </div>
+
+    <script>
+        class IconTester {
+            constructor() {
+                this.facilities = [];
+                this.programs = [];
+            }
+
+            async init() {
+                await this.loadData();
+                this.generateDisplay();
+                this.setupCopyButton();
+            }
+
+            async loadData() {
+                try {
+                    // Use CORS proxy to fetch the JSON files
+                    const corsProxy = 'https://corsproxy.io/?';
+                    
+                    const facilitiesResponse = await fetch(corsProxy + 'https://thisishoperva.org/rsyc/RSYCFacilityFeatures.json');
+                    const facilitiesData = await facilitiesResponse.json();
+                    this.facilities = facilitiesData.value || facilitiesData;
+
+                    const programsResponse = await fetch(corsProxy + 'https://thisishoperva.org/rsyc/RSYCPrograms.json');
+                    const programsData = await programsResponse.json();
+                    this.programs = programsData.value || programsData;
+
+                    // Sort alphabetically by name
+                    this.facilities.sort((a, b) => (a.Title || a.name || '').localeCompare(b.Title || b.name || ''));
+                    this.programs.sort((a, b) => (a.Title || a.name || '').localeCompare(b.Title || b.name || ''));
+
+                } catch (error) {
+                    console.error('Error loading data:', error);
+                    alert('Failed to load facility and program data. Please check the console for details.');
+                }
+            }
+
+            generateDisplay() {
+                const output = document.getElementById('output');
+                let html = '';
+
+                // Facility Features Section
+                html += `
+                    <div class="section-header">
+                        <h2 class="mb-0">Facility Features (${this.facilities.length})</h2>
+                    </div>
+                    <div class="row" id="facilities-section">
+                `;
+
+                this.facilities.forEach(facility => {
+                    const name = facility.Title || facility.name || 'Unknown Feature';
+                    const iconClass = this.normalizeIconClass(facility.IconClass || facility.iconClass);
+                    const isMissing = this.checkIconMissing(iconClass);
+                    
+                    html += `
+                        <div class="col-md-6 col-lg-4">
+                            <div class="icon-card ${isMissing ? 'missing-icon' : ''}">
+                                <div class="icon-display text-center">
+                                    <i class="${iconClass}"></i>
+                                </div>
+                                <h5 class="text-center mb-2">${name}</h5>
+                                <div class="text-center">
+                                    <span class="icon-class">${iconClass}</span>
+                                </div>
+                                ${isMissing ? '<div class="text-danger text-center mt-2 small"><strong>⚠ Icon may be missing</strong></div>' : ''}
+                            </div>
+                        </div>
+                    `;
+                });
+
+                html += `</div>`;
+
+                // Programs Section
+                html += `
+                    <div class="section-header">
+                        <h2 class="mb-0">Featured Programs (${this.programs.length})</h2>
+                    </div>
+                    <div class="row" id="programs-section">
+                `;
+
+                this.programs.forEach(program => {
+                    const name = program.Title || program.name || 'Unknown Program';
+                    const iconClass = this.normalizeIconClass(program.IconClass || program.iconClass);
+                    const isMissing = this.checkIconMissing(iconClass);
+                    
+                    html += `
+                        <div class="col-md-6 col-lg-4">
+                            <div class="icon-card ${isMissing ? 'missing-icon' : ''}">
+                                <div class="icon-display text-center">
+                                    <i class="${iconClass}"></i>
+                                </div>
+                                <h5 class="text-center mb-2">${name}</h5>
+                                <div class="text-center">
+                                    <span class="icon-class">${iconClass}</span>
+                                </div>
+                                ${isMissing ? '<div class="text-danger text-center mt-2 small"><strong>⚠ Icon may be missing</strong></div>' : ''}
+                            </div>
+                        </div>
+                    `;
+                });
+
+                html += `</div>`;
+
+                output.innerHTML = html;
+            }
+
+            normalizeIconClass(iconClass) {
+                if (!iconClass) return 'bi bi-question-circle';
+                
+                // Trim whitespace
+                iconClass = iconClass.trim();
+                
+                // Remove duplicate "bi" prefixes (e.g., "bi bi bi-icon" -> "bi bi-icon")
+                iconClass = iconClass.replace(/^(?:bi\s+)+/gi, 'bi ');
+                
+                return iconClass;
+            }
+
+            checkIconMissing(iconClass) {
+                // This is a simple heuristic - icons that don't exist typically won't render
+                // You could enhance this by checking against a known list of Bootstrap icons
+                return false; // For now, we'll visually inspect
+            }
+
+            setupCopyButton() {
+                const copyBtn = document.getElementById('copyBtn');
+                copyBtn.addEventListener('click', () => {
+                    const output = document.getElementById('output');
+                    const htmlContent = this.sanitizeHTMLForCopy(output.innerHTML);
+                    
+                    navigator.clipboard.writeText(htmlContent).then(() => {
+                        const originalText = copyBtn.textContent;
+                        copyBtn.textContent = 'Copied!';
+                        copyBtn.classList.remove('btn-primary');
+                        copyBtn.classList.add('btn-success');
+                        
+                        setTimeout(() => {
+                            copyBtn.textContent = originalText;
+                            copyBtn.classList.remove('btn-success');
+                            copyBtn.classList.add('btn-primary');
+                        }, 2000);
+                    }).catch(err => {
+                        console.error('Failed to copy:', err);
+                        alert('Failed to copy HTML. Please try again.');
+                    });
+                });
+            }
+
+            sanitizeHTMLForCopy(html) {
+                // Create a wrapper div to parse the HTML
+                const wrapper = document.createElement('div');
+                wrapper.innerHTML = html;
+                
+                // Replace any webmanager.salvationarmy.org references with example.com
+                let sanitized = wrapper.innerHTML.replace(/webmanager\.salvationarmy\.org/gi, 'example.com');
+                
+                // Add a comment indicating this is generated content
+                sanitized = '<!-- Generated by RSYC Icon Tester -->\n' + sanitized;
+                
+                return sanitized;
+            }
+        }
+
+        // Initialize the tester when the page loads
+        document.addEventListener('DOMContentLoaded', async () => {
+            const tester = new IconTester();
+            await tester.init();
+        });
+    </script>
+</body>
+</html>

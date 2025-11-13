@@ -1,0 +1,622 @@
+<!-- RSYC Custom Styles and Scripts -->
+<!-- This file contains all custom CSS and JavaScript for RSYC profiles -->
+<!-- Update this file to apply changes to all generated profiles -->
+
+<!-- Symphony Main CSS -->
+<link href="//static.salvationarmy.org/us-east-1/templates/symphony/static_resources/styles/main.css?v=1,763,021,194.703" rel="stylesheet">
+
+<!-- Fonts -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=East+Sea+Dokdo&family=M+PLUS+2:wght@100..900&family=Rock+Salt&family=Montserrat:wght@400;500;700&display=swap" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css" rel="stylesheet">
+<!-- Bootstrap 5 CSS -->
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+
+<!-- Bootstrap Icons -->
+<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css" rel="stylesheet">
+
+
+<style>
+
+p, ul, ol, .localSites-item, .btn {
+    font-family: proxima-nova, sans-serif;
+}
+
+.east-sea-dokdo-regular {
+    font-family: "East Sea Dokdo", serif;
+    font-style: normal;
+}
+
+.m-plus-2-rsyc {
+    font-family: "M PLUS 2", serif;
+    font-optical-sizing: auto;
+    font-style: normal;
+}
+
+.montserrat-rsyc {
+    font-family: "Montserrat", sans-serif;
+    font-optical-sizing: auto;
+    font-weight: 400;
+}
+
+.heroText-headline {
+    font-family: proxima-nova, sans-serif;
+    font-weight: 700;
+    font-style: normal;
+    margin-bottom: 15px;
+}
+
+/* Turn Privacy Policy White from Gray */
+.globalFooter-copyrightLink {
+    color: #ffffff !important;
+}
+
+
+/* Hero headline and site-wide <em> using Rock Salt */
+.heroText-headline em,
+em {
+    font-family: "Rock Salt", cursive;
+    font-weight: 700;
+    font-style: normal;
+}
+
+/* Hero headline <em> with Rock Salt and marker-style underline */
+.heroText-headline em {
+    font-family: "Rock Salt", cursive;
+    font-weight: 700;
+    font-style: normal;
+    position: relative;
+    display: inline-block;
+}
+
+/* Marker-style curved underline */
+.heroText-headline em::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: -4px;
+    bottom: -8.3px; /* distance from text */
+    width: 100%;
+    height: 6px; /* thickness of the line */
+    background: white;
+    border-radius: 25% / 100%; /* creates a smooth curve */
+    transform: skewX(-15deg) rotate(-6deg) skewY(3deg); /* slight tilt if needed */
+    z-index: -1;
+}
+
+
+
+
+/* Buttons */
+.btn-red.submit, .btn.btn-red, .rowDonate-btn, .rowDonate-submit, input.btn-red[type=submit], input[type=submit].rowDonate-btn, input[type=submit].rowDonate-submit {
+    background-color: transparent;
+    border-color: #EF3D42;
+    color: #EF3D42;
+}
+
+.btn-red.submit:hover, .btn.btn-red:hover, .rowDonate-btn:hover, .rowDonate-submit:hover, input.btn-red[type=submit]:hover {
+    background-color: #EF3D42;
+    color: #fff;
+    border-color: #EF3D42;
+}
+
+.btn-red.btn-solid.submit, .btn-solid.rowDonate-btn, .btn.btn-red.btn-solid, .rowDonate-submit, input.btn-red.btn-solid[type=submit], input[type=submit].rowDonate-submit {
+    background-color: #EF3D42;
+    color: #fff;
+}
+
+.btn-red.btn-solid.submit:hover, .btn-solid.rowDonate-btn:hover, .btn.btn-red.btn-solid:hover, .rowDonate-submit:hover, input.btn-red.btn-solid[type=submit]:hover {
+    color: #EF3D42;
+    background-color: #fff;
+}
+
+.btn-grey.rowDonate-btn, .btn-grey.rowDonate-submit, .btn-grey.submit, .btn.btn-grey, input.btn-grey[type=submit] {
+    border-color: #767676;
+    color: #767676;
+}
+
+.btn-grey.rowDonate-btn:hover, .btn-grey.rowDonate-submit:hover, .btn-grey.submit:hover, .btn.btn-grey:hover, input.btn-grey[type=submit]:hover {
+    background-color: #767676;
+    color: #fff;
+    border-color: #767676;
+}
+
+.btn-grey.btn-solid.rowDonate-btn, .btn-grey.btn-solid.submit, .btn-grey.rowDonate-submit, .btn.btn-grey.btn-solid, input.btn-grey.btn-solid[type=submit] {
+    background-color: #767676;
+    color: #fff;
+}
+
+.btn-grey.btn-solid.rowDonate-btn:hover, .btn-grey.btn-solid.submit:hover, .btn-grey.rowDonate-submit:hover, .btn.btn-grey.btn-solid:hover, input.btn-grey.btn-solid[type=submit]:hover {
+    color: #767676;
+    background-color: #fff;
+}
+
+/* Nav colors */
+.globalHeader-nav .nav .navItem:first-child { display: none !important; }
+.globalHeader .navItem-btn {
+    border-color: #EF3D42;
+    background-color: #EF3D42;
+    color: white;
+}
+.globalHeader .navItem-btn:hover {
+    background-color: white;
+    color: #EF3D42!important;
+}
+
+/* Footer colors */
+.globalFooter {
+    background: #EF3D42;
+}
+.globalFooter-input {
+    background-color: #333333;
+}
+.globalFooter-copyright {
+    color: rgb(240, 240, 240);
+    font-size: 13px !important;
+}
+.globalFooter-copyrightLink {
+    font-size: 13px !important;
+}
+
+/* Giving toolbar / flyout colors */
+.givingToolbar-toolbar { background: #EF3D42; }
+.flyoutNav { background: #EF3D42; }
+.flyoutContainer.mobile-only { background: #72757E; display: none; }
+.flyoutContainer.mobile-only.isVisible { display: block; }
+.flyoutContainer.mobile-only.isVisible .flyoutNavItem:focus-within > ul { max-height: 800px; }
+
+/* Text colors */
+/* a { color: #EF3D42; } */
+.u-textRed { color: #EF3D42; }
+.storyContent-meta { color: #007fab; }
+.sidebarBlock-heading { color: #EF3D42; }
+.sidebarBlock-heading:before { background-color: #EF3D42; }
+
+/* Strong highlight Red: transparent 35%, rgba(239, 61, 66, 0.3) 45%; Gold below */
+strong {
+    background: linear-gradient(to bottom, transparent 35%, rgba(247, 162, 0, 0.4) 45%);
+    padding: 0 5px;
+    box-decoration-break: clone;
+    -webkit-box-decoration-break: clone;
+}
+
+
+
+/* Base card (no hover) */
+.hover-card {
+  transition: all 0.3s ease;
+  border-radius: 1rem;
+  overflow: hidden;
+  border: 1px solid #dee2e6;
+  background: #ffffff;
+  padding: 2rem;
+}
+
+@media (max-width: 991.98px) {
+  .hover-card {
+    margin: 15px 0;
+  }
+}
+
+/* Disable hover/focus effects on the card itself */
+.hover-card:hover,
+.hover-card:focus-within {
+  transform: none;
+  box-shadow: none;
+}
+
+/* --- Buttons inside the card --- */
+.hover-card .btn {
+  transition: all 0.3s ease;
+}
+
+/* Add hover and focus effects for accessibility */
+.hover-card .btn:hover,
+.hover-card .btn:focus {
+  transform: translateY(-5px);
+  box-shadow: 0 1rem 2rem rgba(0,0,0,0.1);
+  background-color: #EF3D42 !important; /* Red Shield red */
+  color: #fff !important;
+  border-color: #EF3D42 !important;
+  outline: none; /* Optional: removes default browser outline */
+}
+
+/* Optional: keep a focus-visible outline for keyboard users */
+.hover-card .btn:focus-visible {
+  outline: 2px solid #EF3D42;
+  outline-offset: 3px;
+}
+
+.icon-lg {
+  font-size: 2.5rem;
+  margin-bottom: 1.5rem;
+  color: #0d6efd;
+}
+.feature-icon {
+  font-size: 1.5rem;
+  margin-right: 0.5rem;
+  color: #20c997;
+}
+
+
+/* Icons row: flex wrap evenly */
+.features-icons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+.features-icons > div {
+  flex: 1 1 45%;
+  min-width: 140px;
+}
+
+/* Photo card */
+.photo-card {
+  border-radius: 1rem;
+  overflow: hidden;
+  border: 1px solid #dee2e6;
+  display: flex;
+  flex: 1 1 auto;
+  height: 100%;
+}
+.photo-card img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 1rem;
+}
+
+.row.align-items-stretch > .col-md-5,
+.row.align-items-stretch > .col-md-7 {
+  display: flex;
+  flex-direction: column;
+  margin: 0; /* ensure no extra space */
+}
+
+.photo-card.flex-fill,
+.hover-card.flex-fill {
+  height: 100%;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.photo-card img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 0.5rem; /* match hover-card rounding */
+}
+
+
+
+
+/* Icons row: flex wrap evenly */
+.features-icons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+.features-icons > div {
+  flex: 1 1 45%; /* Two per row, adjustable */
+  min-width: 140px;
+}
+
+/* Section titles / icons */
+.section-title { margin-top: 3rem; margin-bottom: 2rem; font-weight: bold; }
+.icon-feature { font-size: 2.5rem; color: #EF3D42; margin-bottom: 0.5rem; }
+.program-card { border: 1px solid #eee; border-radius: 12px; padding: 1rem; transition: all 0.3s ease; }
+.program-card:hover { transform: translateY(-5px); box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+.gamified-badge { border: 2px dashed #EF3D42; padding: 1rem; border-radius: 15px; text-align: center; transition: all 0.3s ease; }
+.gamified-badge:hover { background: #f8f9fa; }
+
+/* Headings, responsive sizes */
+h1 { font-family: proxima-nova, sans-serif; font-weight: 700; font-size: 2em !important; line-height: 1.3; }  
+h2 { font-family: proxima-nova, sans-serif; font-weight: 700; font-size: 1.6em; line-height: 1.35; }
+h3 { font-family: proxima-nova, sans-serif; font-weight: 700; font-size: 1.35em; line-height: 1.4; }
+h4 { font-family: proxima-nova, sans-serif; font-weight: 700; font-size: 1.15em; line-height: 1.45; }
+h5 { font-family: proxima-nova, sans-serif; font-weight: 700; font-size: 0.95em; line-height: 1.5; }
+h6 { font-family: proxima-nova, sans-serif; font-weight: 700; font-size: 0.8em; line-height: 1.5; }
+
+@media (max-width:992px) {
+    h1 { font-weight: 700; font-size: 1.8em !important; line-height: 1.35; }
+    h2 { font-weight: 700; font-size: 1.45em; line-height: 1.4; }
+    h3 { font-weight: 700; font-size: 1.25em; line-height: 1.45; }
+    h4 { font-weight: 700; font-size: 1.05em; line-height: 1.5; }
+    h5 { font-weight: 700; font-size: 0.9em; line-height: 1.55; }
+    h6 { font-weight: 700; font-size: 0.75em; line-height: 1.55; }
+}
+
+@media (max-width:576px) {
+    h1 { font-weight: 700; font-size: 1.6em !important; line-height: 1.4; }
+    h2 { font-weight: 700; font-size: 1.3em; line-height: 1.45; }
+    h3 { font-weight: 700; font-size: 1.1em; line-height: 1.5; }
+    h4 { font-weight: 700; font-size: 1em; line-height: 1.55; }
+    h5 { font-weight: 700; font-size: 0.85em; line-height: 1.6; }
+    h6 { font-weight: 700; font-size: 0.7em; line-height: 1.6; }
+}
+
+/* Margins on local sites module */
+div.section.margin-bottom-xl.padding-right-md.padding-left-md {
+    /* Mobile default (small or no margins) */
+    margin-left: 0;
+    margin-right: 0;
+}
+
+/* Tablets (≥968px) and up */
+@media (min-width: 768px) {
+    div.section.margin-bottom-xl.padding-right-md.padding-left-md {
+        margin-left: 80px;  /* adjust as needed */
+        margin-right: 80px; /* adjust as needed */
+    }
+}
+
+/* Desktops (≥1200px) and up */
+@media (min-width: 1200px) {
+    div.section.margin-bottom-xl.padding-right-md.padding-left-md {
+        margin-left: 260px;  /* adjust as needed */
+        margin-right: 260px; /* adjust as needed */
+    }
+}
+
+/* Scrollable Cards */
+
+.card-scroll-container {
+  display: flex;
+  gap: 1rem;
+  overflow-x: auto;
+  padding-bottom: 1rem;
+  scroll-snap-type: x mandatory;
+}
+
+.card-scroll-container::-webkit-scrollbar {
+  height: 8px;
+}
+.card-scroll-container::-webkit-scrollbar-thumb {
+  background-color: #ccc;
+  border-radius: 4px;
+}
+
+.feature-card {
+  flex: 0 0 auto;
+  width: 300px;
+  scroll-snap-align: start;
+  background: #f8f9fa; /* light gray background for contrast */
+  color: #111; /* dark text for readability */
+  border-radius: 15px;
+  padding: 25px 20px;
+  box-shadow: 0 3px 10px rgba(0,0,0,0.05);
+  display: flex;
+  flex-direction: column;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.feature-card h5 {
+  color: #111; /* headings dark */
+}
+
+.feature-card p {
+  color: #111; /* text dark */
+}
+
+.icon-wrap {
+  font-size: 3rem;
+  display: inline-block;
+  color: inherit; /* uses card text color */
+  animation: wobble 6s infinite ease-in-out;
+  transition: transform 0.3s ease, filter 0.3s ease, color 0.3s ease;
+}
+
+.feature-card:hover .icon-wrap,
+.feature-card:active .icon-wrap {
+  transform: scale(1.8) rotate(-5deg) transformX(15px);
+  color: #EF3D42; /* hover color */
+  filter: drop-shadow(0 0 6px rgba(255,255,255,0.6));
+  animation: none;
+}
+
+
+/* Idle wobble animation */
+@keyframes wobble {
+  0% { transform: rotate(0deg); }
+  25% { transform: rotate(2deg); }
+  50% { transform: rotate(0deg); }
+  75% { transform: rotate(-2deg); }
+  100% { transform: rotate(0deg); }
+}
+
+@media (hover: none) {
+  .feature-card:active {
+      transform: scale(0.97);
+  }
+  .feature-card:active .icon-wrap {
+      transform: scale(2.15) rotate(-5deg);
+      color: #EF3D42;
+      animation: none;
+  }
+}
+
+/* Add Horizontal Scroll */
+.horizontal-scroll {
+    display: flex;
+    flex-wrap: nowrap;                
+    overflow-x: auto;                  
+    -webkit-overflow-scrolling: touch;
+    gap: 0.5rem;                      
+    padding-bottom: 0.5rem;            
+  }
+
+  .horizontal-scroll .hover-card {
+    flex: 0 0 auto;   /* prevent shrinking */
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+  }
+
+/* Program schedule cards */
+  .schedule-card {
+    flex: 0 0 auto;         /* prevent shrinking */
+    min-width: 220px;       /* card width */
+    border: 1px solid #ffffff;  /* white border */
+    border-radius: 0.5rem;      /* rounded corners */
+    padding: 1rem;           /* inner spacing */
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    background-color: transparent; /* optional if background is dark/colored */
+  }
+
+/* Events Page Background fixes */
+.calendar-container section {
+    width: 100vw;         /* Full viewport width */
+    position: relative;   /* Keeps it aligned properly */
+    left: 50%;            /* Reset offset from parent container */
+    right: 50%;
+    margin-left: -50vw;
+    margin-right: -50vw;
+    box-sizing: border-box;
+}
+
+.youth-center-calendar {
+    background-color: #F1EBDE;
+    padding: 3rem 0;
+}
+
+.local-events {
+    background-color: #DFDCE3;
+    padding: 3rem 0;
+}
+
+.youth-center-scripture {
+    background-color: #20B3A8;
+    padding: 3rem 1rem;
+    color: #ffffff;
+    text-align: center;
+    margin-bottom: -85px;
+}
+
+div.col-sm-12.eventsList,
+div.col-sm-12.eventsList * {
+  font-size: 17px;
+}
+
+
+/* ================================
+   Brand Color: #2F4857
+   ================================ */
+
+/* Solid Primary Button */
+.btn-primary {
+  background-color: #2F4857 !important;
+  border-color: #2F4857 !important;
+  color: #fff !important;
+  transition: all 0.3s ease;
+}
+
+.btn-primary:hover,
+.btn-primary:focus,
+.btn-primary:active,
+.btn-primary.active {
+  background-color: #233746 !important; /* slightly darker shade for hover */
+  border-color: #233746 !important;
+  color: #fff !important;
+  transform: translateY(-3px);
+  box-shadow: 0 0.5rem 1rem rgba(47, 72, 87, 0.25);
+}
+
+.btn-primary:focus-visible {
+  outline: 2px solid #EF3D42; /* Red Shield focus ring for accessibility */
+  outline-offset: 2px;
+}
+
+/* ================================
+   Outline Primary Button
+   ================================ */
+.btn-outline-primary {
+  color: #2F4857 !important;
+  border-color: #2F4857 !important;
+  background-color: transparent !important;
+  transition: all 0.3s ease;
+}
+
+.btn-outline-primary:hover,
+.btn-outline-primary:focus,
+.btn-outline-primary:active,
+.btn-outline-primary.active {
+  background-color: #2F4857 !important;
+  color: #fff !important;
+  border-color: #2F4857 !important;
+  transform: translateY(-3px);
+  box-shadow: 0 0.5rem 1rem rgba(47, 72, 87, 0.25);
+}
+
+.btn-outline-primary:focus-visible {
+  outline: 2px solid #EF3D42;
+  outline-offset: 2px;
+}
+
+/* ================================
+   Disabled and Accessibility Tweaks
+   ================================ */
+.btn-primary:disabled,
+.btn-outline-primary:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+  box-shadow: none;
+  transform: none;
+}
+
+
+
+
+
+/* Replace words in Hero Theatre Slide */
+
+</style>
+
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+    // Wrap all hero headline text in .underline-whole span if not already wrapped
+    document.querySelectorAll('.heroText-headline').forEach(function(el) {
+        if (!el.querySelector('.underline-whole')) {
+            const span = document.createElement('span');
+            span.className = 'underline-whole';
+            span.innerHTML = el.innerHTML;
+            el.innerHTML = '';
+            el.appendChild(span);
+        }
+    });
+
+    // Ensure any <em> inside hero headline uses correct style (class already defined in CSS)
+    document.querySelectorAll('.heroText-headline em').forEach(function(el) {
+        // No extra work needed since CSS handles it
+    });
+});
+</script>
+
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+  const headline = document.querySelector(".heroText-headline .underline-whole");
+  if (headline) {
+    let html = headline.innerHTML;
+
+    // Replace multiple words with <em>
+    html = html.replace(/\b(Adventures)\b/g, "<em>$1</em>");
+    html = html.replace(/\b(Youth)\b/g, "<em>$1</em>");
+    html = html.replace(/\b(Events)\b/g, "<em>$1</em>");
+    html = html.replace(/\b(Involved)\b/g, "<em>$1</em>");
+    html = html.replace(/\b(Locations)\b/g, "<em>$1</em>");
+    html = html.replace(/\b(Safety)\b/g, "<em>$1</em>");
+    html = html.replace(/\b(Donor)\b/g, "<em>$1</em>");
+    html = html.replace(/\b(Parent)\b/g, "<em>$1</em>");
+    html = html.replace(/\b(Change)\b/g, "<em>$1</em>");
+
+
+
+
+    headline.innerHTML = html;
+  }
+});
+</script>

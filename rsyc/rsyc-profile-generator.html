@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RSYC Profile Generator</title>
+    <link rel="stylesheet" href="rsyc-generator.css">
+</head>
+<body>
+    <div class="app-container">
+        <header>
+            <h1>🧒🏽 Red Shield Youth Center Profile Generator</h1>
+            <p class="subtitle">Generate HTML profiles for RSYC units</p>
+        </header>
+
+        <div class="main-content">
+            <!-- Left Panel: Center Selection -->
+            <aside class="center-panel">
+                <div class="panel-header">
+                    <h2>Select Center</h2>
+                    <input type="text" id="centerSearch" placeholder="Search centers..." class="search-box">
+                </div>
+                <div id="centerList" class="center-list">
+                    <div class="loading">Loading centers...</div>
+                </div>
+            </aside>
+
+            <!-- Center Panel: Profile Builder -->
+            <main class="builder-panel">
+                <div id="noCenterSelected" class="no-selection">
+                    <p>👈 Select a center from the list to begin</p>
+                </div>
+
+                <div id="centerProfile" class="center-profile" style="display: none;">
+                    <div class="profile-header">
+                        <h2 id="centerName"></h2>
+                        <p id="centerLocation"></p>
+                        <div class="profile-actions">
+                            <button id="selectAllSections" class="btn btn-secondary">Select All Sections</button>
+                            <button id="clearAllSections" class="btn btn-secondary">Clear All</button>
+                        </div>
+                    </div>
+
+                    <div class="sections-container">
+                        <h3>Profile Sections</h3>
+                        <div id="sectionsList" class="sections-list">
+                            <!-- Dynamically populated -->
+                        </div>
+                    </div>
+
+                    <div class="generation-actions">
+                        <button id="generateHTML" class="btn btn-primary">Generate HTML</button>
+                        <button id="previewHTML" class="btn btn-secondary">Preview</button>
+                    </div>
+                </div>
+            </main>
+
+            <!-- Right Panel: Output & Tracking -->
+            <aside class="output-panel">
+                <div class="panel-header">
+                    <h2>Output</h2>
+                    <div class="output-tabs">
+                        <button class="tab-btn active" data-tab="html">HTML</button>
+                        <button class="tab-btn" data-tab="preview">Preview</button>
+                        <button class="tab-btn" data-tab="history">History</button>
+                    </div>
+                </div>
+
+                <div id="htmlOutput" class="output-content active">
+                    <div class="output-actions">
+                        <button id="copyHTML" class="btn btn-small">Copy to Clipboard</button>
+                        <button id="downloadHTML" class="btn btn-small">Download</button>
+                        <button id="markPublished" class="btn btn-small btn-success">Mark as Published</button>
+                    </div>
+                    <pre id="htmlCode" class="code-output">Generated HTML will appear here...</pre>
+                </div>
+
+                <div id="previewOutput" class="output-content" style="display: none;">
+                    <iframe id="previewFrame" class="preview-frame"></iframe>
+                </div>
+
+                <div id="historyOutput" class="output-content" style="display: none;">
+                    <div id="versionHistory" class="version-history">
+                        <p class="no-data">No version history yet</p>
+                    </div>
+                </div>
+            </aside>
+        </div>
+
+        <!-- Status Bar -->
+        <footer class="status-bar">
+            <div class="status-info">
+                <span id="dataStatus">Data: Not Loaded</span>
+                <span id="selectedCenter">Selected: None</span>
+                <span id="lastGenerated">Last Generated: Never</span>
+            </div>
+        </footer>
+    </div>
+
+    <!-- Modal for Section Details -->
+    <div id="sectionModal" class="modal">
+        <div class="modal-content">
+            <span class="modal-close">&times;</span>
+            <h3 id="modalTitle">Section Details</h3>
+            <div id="modalBody"></div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="rsyc-data.js"></script>
+    <script src="rsyc-templates.js"></script>
+    <script src="rsyc-tracker.js"></script>
+    <script src="rsyc-generator.js"></script>
+</body>
+</html>

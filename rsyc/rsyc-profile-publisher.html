@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RSYC Profile Generator</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+    <link rel="stylesheet" href="rsyc-generator-v2.css">
+</head>
+<body>
+    <div class="app-container">
+        <header class="app-header">
+            <h1>🧒🏽 Red Shield Youth Center Profile Generator</h1>
+        </header>
+
+        <!-- Compact Controls Header -->
+        <div class="controls-header">
+            <div class="control-row">
+                <!-- Center Dropdown -->
+                <div class="control-group">
+                    <label for="centerSelect">Select Center:</label>
+                    <select id="centerSelect" class="center-dropdown">
+                        <option value="">-- Choose a Center --</option>
+                    </select>
+                </div>
+
+                <!-- Section Checkboxes (Compact) -->
+                <div class="control-group sections-group">
+                    <label>Sections:</label>
+                    <div class="section-checkboxes">
+                        <label><input type="checkbox" value="schedules" checked> Schedules</label>
+                        <label><input type="checkbox" value="hours" checked> Hours</label>
+                        <label><input type="checkbox" value="facilities" checked> Facilities</label>
+                        <label><input type="checkbox" value="programs" checked> Programs</label>
+                        <label><input type="checkbox" value="staff" checked> Staff & Leadership</label>
+                        <label><input type="checkbox" value="parents" checked> For Parents</label>
+                        <label><input type="checkbox" value="youth" checked> For Youth</label>
+                        <label><input type="checkbox" value="volunteer" checked> Get Involved</label>
+                        <label><input type="checkbox" value="contact" checked> Footer Scripture</label>
+                    </div>
+                    <div style="margin-top:6px;font-size:0. ninerem; color:#666;">
+                        <strong>Selected sections:</strong> <span id="sectionsCount">0</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Action Buttons Row -->
+            <div class="action-row">
+                <button id="selectAllSections" class="btn btn-sm">Select All</button>
+                <button id="clearAllSections" class="btn btn-sm">Clear All</button>
+                <button id="generateHTML" class="btn btn-primary" disabled>Generate HTML</button>
+                <button id="copyHTML" class="btn btn-success" disabled>Copy HTML</button>
+                <button id="downloadHTML" class="btn btn-info" disabled>Download</button>
+                <button id="markPublished" class="btn btn-warning" disabled>Mark Published</button>
+            </div>
+        </div>
+
+        <!-- Full Width Live Preview -->
+        <div class="preview-section">
+            <div class="preview-header">
+                <h2>Live Preview</h2>
+                <span class="preview-status" id="previewStatus">Select a center to begin</span>
+            </div>
+            <div class="preview-container" id="livePreview">
+                <div class="preview-placeholder">
+                    <div class="placeholder-icon">👆</div>
+                    <p>Select a center and sections above to see the live preview</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Status Bar -->
+        <footer class="status-bar">
+            <span id="dataStatus">Data: Loading...</span>
+            <span id="selectedCenter">Selected: None</span>
+            <span id="lastGenerated">Last Generated: Never</span>
+        </footer>
+    </div>
+
+    <!-- Scripts -->
+    <script src="rsyc-data.js"></script>
+    <script src="rsyc-templates.js"></script>
+    <script src="rsyc-tracker.js"></script>
+    <script src="rsyc-generator-v2.js"></script>
+</body>
+</html>
