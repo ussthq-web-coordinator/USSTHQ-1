@@ -5,24 +5,9 @@
 
 class RSYCDataLoader {
     constructor() {
-        // Auto-detect environment and set appropriate base URL
-        const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-        
-        // Three options:
-        // 1. Local data files (recommended for development)
-        // 2. CORS proxy (backup for development)
-        // 3. Direct URL (production on thisishoperva.org)
-        
-        if (isLocalhost) {
-            // Try local files first, fall back to CORS proxy
-            this.useLocalFiles = true;
-            this.baseURL = './data/'; // Local data folder
-            this.fallbackURL = 'https://corsproxy.io/?https://thisishoperva.org/rsyc/';
-        } else {
-            this.useLocalFiles = false;
-            this.baseURL = 'https://thisishoperva.org/rsyc/';
-            this.fallbackURL = null;
-        }
+        // Use CORS proxy for all environments to avoid CORS issues
+        this.corsProxy = 'https://corsproxy.io/?';
+        this.baseURL = 'https://thisishoperva.org/rsyc/';
         
         this.cache = {
             centers: null,
@@ -90,25 +75,20 @@ class RSYCDataLoader {
      * Fetch JSON from URL with fallback
      */
     async fetchJSON(filename) {
-        let url = this.baseURL + filename;
+        // Use CORS proxy to avoid CORS issues
+        const url = this.corsProxy + encodeURIComponent(this.baseURL + filename);
         
         try {
+            console.log(`📥 Fetching: ${filename}`);
             const response = await fetch(url);
             if (!response.ok) {
                 throw new Error(`HTTP ${response.status}: ${response.statusText}`);
             }
-            return await response.json();
+            const data = await response.json();
+            console.log(`✅ Loaded: ${filename}`);
+            return data;
         } catch (error) {
-            // If using local files failed and we have a fallback, try it
-            if (this.useLocalFiles && this.fallbackURL) {
-                console.warn(`⚠️ Local file failed for ${filename}, trying CORS proxy...`);
-                url = this.fallbackURL + filename;
-                const response = await fetch(url);
-                if (!response.ok) {
-                    throw new Error(`Failed to fetch ${filename} from both local and remote: ${response.statusText}`);
-                }
-                return await response.json();
-            }
+            console.error(`❌ Failed to fetch ${filename}:`, error);
             throw new Error(`Failed to fetch ${filename}: ${error.message}`);
         }
     }
