@@ -6,11 +6,14 @@
     <title>RSYC Profile Generator</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
     <link rel="stylesheet" href="rsyc-generator-v2.css">
+    <style id="globalStyles">
+        /* Global styles will be injected here on page load */
+    </style>
 </head>
 <body>
     <div class="app-container">
         <header class="app-header">
-            <h1>🧒🏽 Red Shield Youth Center Profile Generator</h1>
+            <h3>🧒🏽 Red Shield Youth Center Profile Generator</h3>
         </header>
 
         <!-- Compact Controls Header -->
@@ -33,6 +36,7 @@
                         <label><input type="checkbox" value="facilities" checked> Facilities</label>
                         <label><input type="checkbox" value="programs" checked> Programs</label>
                         <label><input type="checkbox" value="staff" checked> Staff & Leadership</label>
+                        <label><input type="checkbox" value="nearby" checked> Nearby Centers</label>
                         <label><input type="checkbox" value="parents" checked> For Parents</label>
                         <label><input type="checkbox" value="youth" checked> For Youth</label>
                         <label><input type="checkbox" value="volunteer" checked> Get Involved</label>
@@ -52,13 +56,15 @@
                 <button id="copyHTML" class="btn btn-success" disabled>Copy HTML</button>
                 <button id="downloadHTML" class="btn btn-info" disabled>Download</button>
                 <button id="markPublished" class="btn btn-warning" disabled>Mark Published</button>
+                <button id="viewCustomCSS" class="btn btn-secondary">View Custom CSS</button>
+                <button id="viewGlobalCSS" class="btn btn-secondary">View Global CSS</button>
             </div>
         </div>
 
         <!-- Full Width Live Preview -->
         <div class="preview-section">
             <div class="preview-header">
-                <h2>Live Preview</h2>
+                <h4>Live Preview</h4>
                 <span class="preview-status" id="previewStatus">Select a center to begin</span>
             </div>
             <div class="preview-container" id="livePreview">
@@ -75,6 +81,21 @@
             <span id="selectedCenter">Selected: None</span>
             <span id="lastGenerated">Last Generated: Never</span>
         </footer>
+    </div>
+
+    <!-- CSS Viewer Modal -->
+    <div id="cssModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); z-index:9999; overflow:auto;">
+        <div style="background:white; margin:50px auto; padding:20px; max-width:900px; border-radius:8px; box-shadow:0 4px 20px rgba(0,0,0,0.3);">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+                <h2 id="cssModalTitle" style="margin:0;">CSS Viewer</h2>
+                <button id="closeCSSModal" style="background:#dc3545; color:white; border:none; padding:8px 16px; border-radius:4px; cursor:pointer; font-size:18px; font-weight:bold;">&times;</button>
+            </div>
+            <p id="cssModalDescription" style="color:#666; margin-bottom:15px;"></p>
+            <div style="position:relative;">
+                <button id="copyCSSContent" style="position:absolute; top:10px; right:10px; background:#28a745; color:white; border:none; padding:6px 12px; border-radius:4px; cursor:pointer; z-index:1;">Copy All</button>
+                <textarea id="cssModalContent" style="width:100%; background:#f4f4f4; padding:15px; border:1px solid #ddd; border-radius:4px; overflow:auto; min-height:500px; max-height:600px; font-family:monospace; font-size:13px; line-height:1.5; resize:vertical;" spellcheck="false"></textarea>
+            </div>
+        </div>
     </div>
 
     <!-- Scripts -->

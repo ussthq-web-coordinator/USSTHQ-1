@@ -545,14 +545,40 @@ div.col-sm-12.eventsList * {
 .btn-outline-primary:focus,
 .btn-outline-primary:active,
 .btn-outline-primary.active {
-  background-color: #2F4857 !important;
+  background-color: #EF3D42 !important;
   color: #fff !important;
-  border-color: #2F4857 !important;
-  transform: translateY(-3px);
-  box-shadow: 0 0.5rem 1rem rgba(47, 72, 87, 0.25);
+  border-color: #EF3D42 !important;
+  transform: translateY(-5px);
+  box-shadow: 0 1rem 2rem rgba(0,0,0,0.1);
 }
 
 .btn-outline-primary:focus-visible {
+  outline: 2px solid #EF3D42;
+  outline-offset: 2px;
+}
+
+/* ================================
+   Schedule Detail Button (Dark outline, Red hover)
+   ================================ */
+.btn-schedule-detail {
+  color: #2F4857 !important;
+  border-color: #2F4857 !important;
+  background-color: transparent !important;
+  transition: all 0.3s ease;
+}
+
+.btn-schedule-detail:hover,
+.btn-schedule-detail:focus,
+.btn-schedule-detail:active,
+.btn-schedule-detail.active {
+  background-color: #EF3D42 !important;
+  color: #fff !important;
+  border-color: #EF3D42 !important;
+  transform: translateY(-3px);
+  box-shadow: 0 0.5rem 1rem rgba(239, 61, 66, 0.25);
+}
+
+.btn-schedule-detail:focus-visible {
   outline: 2px solid #EF3D42;
   outline-offset: 2px;
 }

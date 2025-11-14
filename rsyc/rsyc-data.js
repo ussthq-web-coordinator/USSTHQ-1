@@ -119,7 +119,7 @@ class RSYCDataLoader {
             aboutText: center.AboutThisCenter || '',
             // Normalize scripture: handle object wrappers, rich text, or plain string
             scripture: (function() {
-                const raw = center.FooterScripture || center.Scripture || '';
+                const raw = center.FooterScriptureVerse || center.FooterScripture || center.Scripture || '';
                 if (!raw) return '';
                 // If SharePoint returns an expanded reference object with Value
                 if (typeof raw === 'object' && raw.Value) return String(raw.Value).trim();
@@ -162,9 +162,23 @@ class RSYCDataLoader {
             centerId: schedule['Center#Id'],
             title: schedule.CustomProgramScheduleTitle,
             status: schedule.Status?.Value || '',
+            description: schedule.Narrative || schedule.Description || '',
+            ageRange: schedule.AgeRange || '',
+            cost: schedule.Cost || '',
+            location: schedule.Location || '',
+            contactInfo: schedule.ContactInfo || '',
+            capacity: schedule.Capacity || '',
+            prerequisites: schedule.Prerequisites || '',
+            materialsProvided: schedule.MaterialsProvided || '',
+            whatToBring: schedule.WhatToBring || '',
+            registrationDeadline: schedule.RegistrationDeadline || '',
+            dropOffPickUp: schedule.DropOffPickUp || '',
             // Extract .Value from ScheduleDays array
             scheduleDays: (schedule.ScheduleDays || []).map(d => d.Value),
             scheduleTime: schedule.ScheduleTime,
+            scheduleDisclaimer: schedule.ScheduleDisclaimer || '',
+            timezone: schedule.Timezone?.Value || schedule.TimeZone?.Value || '',
+            frequency: schedule.Frequency?.Value || '',
             // Extract .Value from ProgramRunsIn array
             programRunsIn: (schedule.ProgramRunsIn || []).map(m => m.Value),
             // Extract .Value from RegistrationTypicallyOpensin array

@@ -15,8 +15,9 @@ class RSYCTemplates {
             'programs': { name: 'Featured Programs', enabled: true, order: 6 },
             // Staff immediately after Featured Programs
             'staff': { name: 'Staff & Leadership', enabled: true, order: 7 },
-            'volunteer': { name: 'Volunteer Opportunities', enabled: true, order: 8 },
-            'contact': { name: 'Contact & Donate', enabled: true, order: 9 }
+            'nearby': { name: 'Nearby Centers', enabled: true, order: 8 },
+            'volunteer': { name: 'Volunteer Opportunities', enabled: true, order: 9 },
+            'contact': { name: 'Contact & Donate', enabled: true, order: 10 }
         };
     }
 
@@ -48,7 +49,7 @@ class RSYCTemplates {
             'programs': this.generatePrograms,
             'facilities': this.generateFacilities,
             'staff': this.generateStaff,
-            'nearby': this.generateNearbyCenters,
+            'nearby': this.generateNearby,
             'parents': this.generateParents,
             'youth': this.generateYouth,
             'volunteer': this.generateVolunteer,
@@ -105,19 +106,55 @@ class RSYCTemplates {
      * Featured Programs Section
      */
     generatePrograms(data) {
-        const { programDetails, photos } = data;
+        const { programDetails, photos, center } = data;
         if (!programDetails || programDetails.length === 0) return '';
 
         // Default program photo - will be manually updated
         const programPhoto = 'https://s3.amazonaws.com/uss-cache.salvationarmy.org/c11a1b73-6893-4eb4-a24c-8ecf98058b14_484033880_1061382646027353_8208563035826151450_n.jpg';
 
-        const programItems = programDetails.map(program => {
+        const totalPrograms = programDetails.length;
+        const showViewAll = totalPrograms > 8;
+        const displayPrograms = showViewAll ? programDetails.slice(0, 8) : programDetails;
+
+        const programItems = displayPrograms.map(program => {
             const icon = program.iconClass || 'bi-star';
             return `
                     <div class="d-flex align-items-center" style="flex: 1 1 45%;">
                         <i class="bi ${this.escapeHTML(icon)} feature-icon"></i> ${this.escapeHTML(program.name)}
                     </div>`;
         }).join('');
+
+        // All programs for modal
+        const allProgramItems = programDetails.map(program => {
+            const icon = program.iconClass || 'bi-star';
+            return `
+                    <div class="col-sm-12 col-md-6 d-flex align-items-center mb-3">
+                        <i class="bi ${this.escapeHTML(icon)} feature-icon me-2"></i> ${this.escapeHTML(program.name)}
+                    </div>`;
+        }).join('');
+
+        const viewAllButton = showViewAll ? `
+                            <div class="text-center mt-3">
+                                <button class="btn btn-outline-primary btn-sm" onclick="showRSYCModal('programs', '${this.escapeHTML(center.name, true)}')">
+                                    View All ${totalPrograms} Programs
+                                </button>
+                            </div>` : '';
+
+        const modal = showViewAll ? `
+<!-- Modal for All Programs -->
+<div id="rsyc-modal-programs" class="rsyc-modal" style="display:none;">
+    <div class="rsyc-modal-content">
+        <div class="rsyc-modal-header">
+            <h3>All Featured Programs</h3>
+            <button class="rsyc-modal-close" onclick="closeRSYCModal('programs')">&times;</button>
+        </div>
+        <div class="rsyc-modal-body">
+            <div class="row">
+                ${allProgramItems}
+            </div>
+        </div>
+    </div>
+</div>` : '';
 
         return `<!-- Featured Programs -->
 <div id="freeTextArea-programs" class="freeTextArea u-centerBgImage section u-sa-whiteBg u-coverBgImage">
@@ -151,13 +188,15 @@ class RSYCTemplates {
                             <div class="d-flex flex-wrap gap-3 mt-auto">
                                 ${programItems}
                             </div>
+                            ${viewAllButton}
                         </div>
                     </div>
                 </div>
             </div>
         </div>
     </div>
-</div>`;
+</div>
+${modal}`;
     }
 
     /**
@@ -175,7 +214,32 @@ class RSYCTemplates {
             // Only show title if there are schedule items
             scheduleTitleSection = `<h2 class="fw-bold mb-4 text-center">Program <em>Schedule</em></h2>`;
             
-            scheduleCards = schedules.map(schedule => {
+            // Sort schedules by proximity to current month
+            const currentMonth = new Date().getMonth(); // 0-11
+            const monthOrder = ['January', 'February', 'March', 'April', 'May', 'June', 
+                              'July', 'August', 'September', 'October', 'November', 'December'];
+            
+            const sortedSchedules = [...schedules].sort((a, b) => {
+                // Get the earliest month for each schedule
+                const getEarliestMonth = (schedule) => {
+                    if (!schedule.programRunsIn || schedule.programRunsIn.length === 0) return 999;
+                    const monthIndices = schedule.programRunsIn.map(m => monthOrder.indexOf(m)).filter(i => i !== -1);
+                    if (monthIndices.length === 0) return 999;
+                    
+                    // Find the closest upcoming month (wrapping around the year)
+                    let minDistance = 999;
+                    for (const monthIdx of monthIndices) {
+                        let distance = monthIdx - currentMonth;
+                        if (distance < 0) distance += 12; // Wrap to next year
+                        if (distance < minDistance) minDistance = distance;
+                    }
+                    return minDistance;
+                };
+                
+                return getEarliestMonth(a) - getEarliestMonth(b);
+            });
+            
+            scheduleCards = sortedSchedules.map(schedule => {
                 // Parse days - format as "Monday - Friday" or list individual days
                 let daysText = '';
                 if (schedule.scheduleDays && Array.isArray(schedule.scheduleDays) && schedule.scheduleDays.length > 0) {
@@ -208,37 +272,136 @@ class RSYCTemplates {
                     ? this.summarizeMonths(schedule.registrationOpensIn)
                     : '';
                 
-                // Create tooltip if we have registration info
-                const hasTooltip = months || registrationMonths;
-                const tooltipText = hasTooltip ? `
-                    <span aria-label="More info" class="tooltip-icon" tabindex="0">
-                        <i class="bi bi-info-circle" style="font-size:16px; vertical-align:middle; margin-left:6px; color:#2F4857;"></i>
-                        <span class="tooltip-text" role="tooltip">
-                            ${months ? `Occurs in ${this.escapeHTML(months)}.<br>` : ''}
-                            ${registrationMonths ? `Registration typically opens in ${this.escapeHTML(registrationMonths)}.` : ''}
-                        </span>
-                    </span>
+                // Wrap registration months after first month
+                let wrappedRegistrationMonths = '';
+                if (registrationMonths) {
+                    const parts = registrationMonths.split(',');
+                    if (parts.length > 1) {
+                        wrappedRegistrationMonths = parts[0] + ',<br>' + parts.slice(1).join(',');
+                    } else {
+                        wrappedRegistrationMonths = registrationMonths;
+                    }
+                }
+                
+                // Get schedule disclaimer if available
+                const disclaimer = schedule.scheduleDisclaimer || '';
+                
+                // Wrap occurs value every 3 words to prevent card expansion
+                let wrappedMonths = '';
+                if (months) {
+                    const words = months.split(' ');
+                    const chunks = [];
+                    for (let i = 0; i < words.length; i += 3) {
+                        chunks.push(words.slice(i, i + 3).join(' '));
+                    }
+                    wrappedMonths = chunks.join('<br>');
+                }
+                
+                // Wrap disclaimer every 3 words to prevent card expansion
+                let wrappedDisclaimer = '';
+                if (disclaimer) {
+                    const words = disclaimer.split(' ');
+                    const chunks = [];
+                    for (let i = 0; i < words.length; i += 3) {
+                        chunks.push(words.slice(i, i + 3).join(' '));
+                    }
+                    wrappedDisclaimer = chunks.join('<br>');
+                }
+                
+                // Create expandable info section if we have additional details
+                const hasAdditionalInfo = months || registrationMonths || disclaimer;
+                const scheduleId = `schedule-${schedule.id}`;
+                
+                const expandableInfo = hasAdditionalInfo ? `
+                    <div class="mt-2">
+                        <button class="btn btn-link p-0 text-decoration-none d-flex align-items-center" 
+                                onclick="toggleScheduleInfo('${scheduleId}')" 
+                                style="font-size:0.875rem; color:#2F4857;">
+                            <i id="${scheduleId}-icon" class="bi bi-chevron-down me-1" style="transition: transform 0.2s;"></i>
+                            More Info
+                        </button>
+                        <div id="${scheduleId}" class="schedule-info-content" style="display:none; margin-top:0.5rem; padding-top:0.5rem; border-top:1px solid #e0e0e0; font-size:0.875rem; color:#666;">
+                            ${months ? `<div class="mb-1"><strong>Occurs:</strong> ${wrappedMonths}</div>` : ''}
+                            ${registrationMonths ? `<div class="mb-1"><strong>Registration starts in:</strong> ${wrappedRegistrationMonths}</div>` : ''}
+                            ${disclaimer ? `<div class="mb-1">${wrappedDisclaimer}</div>` : ''}
+                            <button class="btn btn-outline-primary btn-sm mt-2" onclick="showRSYCModal('schedule-${schedule.id}', '${this.escapeHTML(schedule.title, true)}')">
+                                View Full Details
+                            </button>
+                        </div>
+                    </div>
                 ` : '';
+                
+                // Create modal with full schedule details
+                const scheduleModal = `
+<!-- Modal for Schedule Details -->
+<div id="rsyc-modal-schedule-${schedule.id}" class="rsyc-modal" style="display:none;">
+    <div class="rsyc-modal-content">
+        <div class="rsyc-modal-header">
+            <h3>${this.escapeHTML(schedule.title)}</h3>
+            <button class="rsyc-modal-close" onclick="closeRSYCModal('schedule-${schedule.id}')">&times;</button>
+        </div>
+        <div class="rsyc-modal-body" style="color:#333;">
+            ${schedule.description ? `<div class="mb-4"><div style="font-size:1rem; line-height:1.6; color:#333;">${schedule.description}</div></div>` : ''}
+            
+            <div class="row">
+                ${schedule.ageRange ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Age Range:</strong><br>${this.escapeHTML(schedule.ageRange)}</div>` : ''}
+                ${daysText ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Days:</strong><br>${this.escapeHTML(daysText)}</div>` : ''}
+                ${timeText ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Time:</strong><br>${this.escapeHTML(timeText)}</div>` : ''}
+                ${schedule.timezone ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Time Zone:</strong><br>${this.escapeHTML(schedule.timezone)}</div>` : ''}
+                ${schedule.frequency ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Frequency:</strong><br>${this.escapeHTML(schedule.frequency)}</div>` : ''}
+                ${months ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Program Runs:</strong><br>${this.escapeHTML(months)}</div>` : ''}
+                ${registrationMonths ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Registration Opens:</strong><br>${this.escapeHTML(registrationMonths)}</div>` : ''}
+                ${schedule.registrationDeadline ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Registration Deadline:</strong><br>${this.escapeHTML(schedule.registrationDeadline)}</div>` : ''}
+                ${schedule.cost ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Cost:</strong><br>${this.escapeHTML(schedule.cost)}</div>` : ''}
+                ${schedule.location ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Location:</strong><br>${this.escapeHTML(schedule.location)}</div>` : ''}
+                ${schedule.capacity ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Capacity:</strong><br>${this.escapeHTML(schedule.capacity)}</div>` : ''}
+                ${schedule.contactInfo ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Contact:</strong><br>${this.escapeHTML(schedule.contactInfo)}</div>` : ''}
+                ${schedule.prerequisites ? `<div class="col-sm-12 mb-3" style="color:#333;"><strong>Prerequisites:</strong><br>${this.escapeHTML(schedule.prerequisites)}</div>` : ''}
+                ${schedule.materialsProvided ? `<div class="col-sm-12 mb-3" style="color:#333;"><strong>Materials Provided:</strong><br>${this.escapeHTML(schedule.materialsProvided)}</div>` : ''}
+                ${schedule.whatToBring ? `<div class="col-sm-12 mb-3" style="color:#333;"><strong>What to Bring:</strong><br>${this.escapeHTML(schedule.whatToBring)}</div>` : ''}
+                ${schedule.dropOffPickUp ? `<div class="col-sm-12 mb-3" style="color:#333;"><strong>Drop-off/Pick-up Info:</strong><br>${this.escapeHTML(schedule.dropOffPickUp)}</div>` : ''}
+            </div>
+            
+            ${disclaimer ? `<div class="mt-3 p-3" style="background:#f8f9fa; border-left:3px solid #2F4857; border-radius:4px; color:#333;">${this.escapeHTML(disclaimer)}</div>` : ''}
+            
+            ${schedule.relatedPrograms && schedule.relatedPrograms.length > 0 ? `
+                <div class="mt-3" style="color:#333;">
+                    <strong>Related Programs:</strong>
+                    <div class="mt-2">
+                        ${schedule.relatedPrograms.map(p => `<span class="badge bg-secondary me-1">${this.escapeHTML(p.name)}</span>`).join('')}
+                    </div>
+                </div>
+            ` : ''}
+        </div>
+    </div>
+</div>`;
 
                 return `
                 <div class="schedule-card text-dark d-flex flex-column h-100" style="min-width:230px;padding:1rem;border-radius:8px;background:#fff;box-shadow:0 1px 4px rgba(0,0,0,0.06);">
                     <h5 class="fw-bold mb-1">${this.escapeHTML(schedule.title)}</h5>
                     <p class="mb-0">
-                        ${daysText ? `<strong>Days:</strong> <span class="d-inline-block">${this.escapeHTML(daysText)}</span>${tooltipText}<br>` : ''}
+                        ${daysText ? `<strong>Days:</strong> <span class="d-inline-block">${this.escapeHTML(daysText)}</span><br>` : ''}
                         ${timeText ? `<strong>Time:</strong> ${this.escapeHTML(timeText)}` : ''}
                     </p>
-                </div>`;
+                    ${expandableInfo}
+                </div>
+                ${scheduleModal}`;
             }).join('');
             
-            scheduleScrollSection = `
+            // Conditionally center if 3 or fewer cards, otherwise left-align for proper scrolling
+            const justifyContent = schedules.length <= 3 ? 'justify-content-center' : '';
+            const scrollHint = schedules.length > 3 ? `
     <p class="text-center mb-n2">
         <small class="text-light">
             Scroll to view more 
             <i class="bi bi-arrow-right-circle" style="font-size: 0.85em; vertical-align: middle;"></i>
         </small>
-    </p>
+    </p>` : '';
+            
+            scheduleScrollSection = `
+    ${scrollHint}
 
-    <div class="horizontal-scroll" style="display:flex;gap:1rem;overflow-x:auto;overflow-y:visible;padding-bottom:0.5rem;">
+    <div class="horizontal-scroll ${justifyContent}" style="display:flex;gap:1rem;overflow-x:auto;overflow-y:visible;padding-bottom:0.5rem;">
         ${scheduleCards}
     </div>`;
         }
@@ -250,7 +413,8 @@ class RSYCTemplates {
     <div class="mt-5 d-flex justify-content-center">
         <div class="schedule-card text-dark" style="max-width:800px;width:100%;padding:1.5rem;border-radius:8px;background:#fff;box-shadow:0 1px 4px rgba(0,0,0,0.06);">
             <h3 class="fw-bold mb-3 text-center" style="font-size: 1.5rem;">About This <em>Center</em></h3>
-            <div class="about-content">
+            <p class="text-center mb-3"><strong>The Salvation Army ${this.escapeHTML(center.name || center.Title)}</strong></p>
+            <div class="about-content" style="font-family: inherit; font-size: 1rem; line-height: 1.6;">
                 ${center.aboutText}
             </div>
         </div>
@@ -296,10 +460,12 @@ class RSYCTemplates {
 <div id="freeTextArea-schedules" class="freeTextArea u-centerBgImage section u-sa-tealBg u-coverBgImage">
     <div class="u-positionRelative">
         <div class="container">
-            <div class="container my-5">
+            <div class="my-5">
                 ${scheduleTitleSection}
                 
-                ${scheduleScrollSection}
+                <div class="schedule-scroll-wrapper">
+                    ${scheduleScrollSection}
+                </div>
                 
                 ${aboutSection}
                 
@@ -529,13 +695,49 @@ ${summerSection}
         // Default facility photo - will be manually updated
         const facilityPhoto = 'https://s3.amazonaws.com/uss-cache.salvationarmy.org/9150a418-1c58-4d01-bf81-5753d1c608ae_salvation+army+building+1.png';
 
-        const featuresHTML = facilityFeatures.map(feature => {
-            const icon = feature.biClass || 'bi-check-circle'; // Use biClass from JSON, fallback to check
+        const totalFeatures = facilityFeatures.length;
+        const showViewAll = totalFeatures > 8;
+        const displayFeatures = showViewAll ? facilityFeatures.slice(0, 8) : facilityFeatures;
+
+        const featuresHTML = displayFeatures.map(feature => {
+            const icon = feature.biClass || 'bi-check-circle';
             return `
           <div class="d-flex align-items-center mb-3" style="flex:1 1 45%;">
             <i class="bi ${this.escapeHTML(icon)} feature-icon me-2"></i> ${this.escapeHTML(feature.name)}
           </div>`;
         }).join('');
+
+        // All features for modal
+        const allFeaturesHTML = facilityFeatures.map(feature => {
+            const icon = feature.biClass || 'bi-check-circle';
+            return `
+          <div class="col-sm-12 col-md-6 d-flex align-items-center mb-3">
+            <i class="bi ${this.escapeHTML(icon)} feature-icon me-2"></i> ${this.escapeHTML(feature.name)}
+          </div>`;
+        }).join('');
+
+        const viewAllButton = showViewAll ? `
+                            <div class="text-center mt-3">
+                                <button class="btn btn-outline-primary btn-sm" onclick="showRSYCModal('facilities', '${this.escapeHTML(center.name, true)}')">
+                                    View All ${totalFeatures} Features
+                                </button>
+                            </div>` : '';
+
+        const modal = showViewAll ? `
+<!-- Modal for All Facilities -->
+<div id="rsyc-modal-facilities" class="rsyc-modal" style="display:none;">
+    <div class="rsyc-modal-content">
+        <div class="rsyc-modal-header">
+            <h3>All Facility Features</h3>
+            <button class="rsyc-modal-close" onclick="closeRSYCModal('facilities')">&times;</button>
+        </div>
+        <div class="rsyc-modal-body">
+            <div class="row">
+                ${allFeaturesHTML}
+            </div>
+        </div>
+    </div>
+</div>` : '';
 
         return `<!-- Facility Features -->
 <div id="freeTextArea-facilities" class="freeTextArea u-centerBgImage section u-sa-creamBg u-coverBgImage">
@@ -552,6 +754,7 @@ ${summerSection}
                             <div class="d-flex flex-wrap justify-content-between mt-auto">
                                 ${featuresHTML}
                             </div>
+                            ${viewAllButton}
                         </div>
                     </div>
 
@@ -574,7 +777,8 @@ ${summerSection}
             </div>
         </div>
     </div>
-</div>`;
+</div>
+${modal}`;
     }
 
     /**
@@ -888,16 +1092,151 @@ ${summerSection}
     }
 
     /**
+     * Nearby Centers Section
+     */
+    generateNearby(data) {
+        const { center } = data;
+        
+        // Use postal code from center data
+        const postalCode = center.zip || '27107';
+        const locationFinderUrl = `https://www.salvationarmyusa.org/location-finder/?address=${postalCode}`;
+
+        return `<!-- Nearby Salvation Army Centers -->
+<div id="freeTextArea-nearby" class="freeTextArea u-centerBgImage section u-sa-greyVeryLightBg u-coverBgImage">
+    <div class="u-positionRelative">
+        <div class="container">
+            <div class="container my-5">
+                <div class="row align-items-stretch flex-column-reverse flex-md-row">
+                    <!-- Left block: Nearby Centers card (7 columns) -->
+                    <div class="col-md-7 d-flex mb-4 mb-md-0">
+                        <div class="hover-card w-100 d-flex flex-column">
+                            <i class="bi bi-geo-alt icon-lg"></i>
+                            <h2 class="fw-bold mb-4">Nearby <em>Salvation Army</em> Centers</h2>
+
+                            <!-- Icons row: 2 columns per row -->
+                            <div class="d-flex flex-wrap justify-content-between mt-auto">
+
+                                <div class="d-flex align-items-center mb-3" style="flex: 1 1 45%;">
+                                    <i class="bi bi-geo feature-icon"></i>
+                                    <div>
+                                        Corps Community Center (Church)<br>
+                                        <span style="font-size:12px;">Worship, programs, and community support for all ages.</span>
+                                    </div>
+                                </div>
+
+                                <div class="d-flex align-items-center mb-3" style="flex: 1 1 45%;">
+                                    <i class="bi bi-geo feature-icon"></i>
+                                    <div>
+                                        Red Shield Youth Center<br>
+                                        <span style="font-size:12px;">Mentoring, recreation, and enrichment for kids and teens.</span>
+                                    </div>
+                                </div>
+
+                                <div class="d-flex align-items-center mb-3" style="flex: 1 1 45%;">
+                                    <i class="bi bi-geo feature-icon"></i>
+                                    <div>
+                                        Thrift Store &amp; Donation Center<br>
+                                        <span style="font-size:12px;">Shop or donate items that fund local programs.</span>
+                                    </div>
+                                </div>
+
+                                <div class="d-flex align-items-center mb-3" style="flex: 1 1 45%;">
+                                    <i class="bi bi-geo feature-icon"></i>
+                                    <div>
+                                        Social Services Office<br>
+                                        <span style="font-size:12px;">Assistance with food, bills, and emergency support.</span>
+                                    </div>
+                                </div>
+
+                                <div class="d-flex align-items-center mb-3" style="flex: 1 1 45%;">
+                                    <i class="bi bi-geo feature-icon"></i>
+                                    <div>
+                                        Shelter / Housing Program<br>
+                                        <span style="font-size:12px;">Safe housing and guidance for individuals and families.</span>
+                                    </div>
+                                </div>
+
+                                <div class="d-flex align-items-center mb-3" style="flex: 1 1 45%;">
+                                    <i class="bi bi-geo feature-icon"></i>
+                                    <div>
+                                        Center of Hope<br>
+                                        <span style="font-size:12px;">Shelter, meals, and programs to help people regain stability.</span>
+                                    </div>
+                                </div>
+
+                            </div>
+
+                            <a class="btn btn-outline-primary btn-sm mt-3" href="${locationFinderUrl}" target="_blank">
+                                <i class="bi bi-map me-2"></i> Get More Details
+                            </a>
+                        </div>
+                    </div>
+
+                    <!-- Right block: Photo (5 columns) -->
+                    <div class="col-md-5 d-flex">
+                        <div class="photo-card w-100 h-100 flex-fill">
+                            <img alt="Nearby Centers Photo" class="img-fluid w-100 h-100" src="https://s3.amazonaws.com/uss-cache.salvationarmy.org/71fe3cd2-5a53-4557-91ea-bb40ab76e2f5_nearby-corps-1.jpg" style="object-fit:cover;">
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>`;
+    }
+
+    /**
      * Get Involved Section (Volunteer/Donate/Mentor)
      */
     generateVolunteer(data) {
-        const { center, photos } = data;
+        const { center, photos, volunteerText } = data;
 
         // Default volunteer photo - will be manually updated
         const photoUrl = 'https://s3.amazonaws.com/uss-cache.salvationarmy.org/22971941-6318-4db7-8231-ff5435aa654b_Low+Res+Web+Ready-30112_Tulsa_group_of_young_boys_playing_drums.png';
 
         // Use center's donation URL or fallback to default
         const donationURL = center.donationURL || 'https://give.salvationarmysouth.org/campaign/703141/donate?c_src=RSYC-Center-Page';
+
+        // Volunteer/Mentor modal content
+        const volunteerModal = volunteerText ? `
+<!-- Modal for Volunteer/Mentor Info -->
+<div id="rsyc-modal-volunteer" class="rsyc-modal" style="display:none;">
+    <div class="rsyc-modal-content">
+        <div class="rsyc-modal-header">
+            <h3>Volunteer / Mentor Youth</h3>
+            <button class="rsyc-modal-close" onclick="closeRSYCModal('volunteer')">&times;</button>
+        </div>
+        <div class="rsyc-modal-body">
+            <div style="font-size: 1rem; line-height: 1.6;">
+                ${this.escapeHTML(volunteerText).replace(/\n/g, '<br>')}
+            </div>
+        </div>
+    </div>
+</div>` : '';
+
+        // Legacy modal content
+        const legacyModal = `
+<!-- Modal for Leave a Legacy -->
+<div id="rsyc-modal-legacy" class="rsyc-modal" style="display:none;">
+    <div class="rsyc-modal-content">
+        <div class="rsyc-modal-header">
+            <h3>Leave a Legacy That Impacts Youth for Generations to Come</h3>
+            <button class="rsyc-modal-close" onclick="closeRSYCModal('legacy')">&times;</button>
+        </div>
+        <div class="rsyc-modal-body">
+            <div style="font-size: 1.1rem; line-height: 1.8; margin-bottom: 2rem;">
+                <p>As a partner in the mission of the Red Shield Youth Center, your legacy can boldly change the future of young lives.</p>
+                <p>By including the Center in your plans—through a bequest, beneficiary designation, or other legacy gift—you create a lasting foundation of hope, growth and purpose for children, teens and families.</p>
+                <p>Your legacy today becomes the stories of success, resilience and transformation that we tell for years to come.</p>
+            </div>
+            <div class="text-center">
+                <a href="https://www.tsalegacyoflove.org/" target="_blank" class="btn btn-primary btn-lg">
+                    Create Your Legacy <i class="bi bi-arrow-right ms-2"></i>
+                </a>
+            </div>
+        </div>
+    </div>
+</div>`;
 
         const html = `
 <div id="freeTextArea-volunteer" data-index="8" class="freeTextArea u-centerBgImage section u-sa-whiteBg u-coverBgImage">
@@ -924,8 +1263,8 @@ ${summerSection}
 
                             <div class="d-grid gap-2 mt-auto">
                                 <a class="btn btn-outline-primary btn-lg" href="${this.escapeHTML(donationURL)}" target="_blank"><i class="bi bi-gift me-2"></i> Donate </a>
-                                <a class="btn btn-outline-primary btn-lg" href="/redshieldyouth/volunteer"> <i class="bi bi-hand-thumbs-up me-2"></i> Volunteer </a>
-                                <a class="btn btn-outline-primary btn-lg" href="/redshieldyouth/volunteer"> <i class="bi bi-people-fill me-2"></i> Mentor Youth </a>
+                                ${volunteerText ? `<button class="btn btn-outline-primary btn-lg" onclick="showRSYCModal('volunteer', '${this.escapeHTML(center.name, true)}')"><i class="bi bi-hand-thumbs-up me-2"></i> Volunteer / Mentor Youth </button>` : `<a class="btn btn-outline-primary btn-lg" href="/redshieldyouth/volunteer"><i class="bi bi-hand-thumbs-up me-2"></i> Volunteer / Mentor Youth </a>`}
+                                <button class="btn btn-outline-primary btn-lg" onclick="showRSYCModal('legacy', '${this.escapeHTML(center.name, true)}')"><i class="bi bi-star me-2"></i> Leave a Legacy </button>
                             </div>
                         </div>
                     </div>
@@ -934,6 +1273,8 @@ ${summerSection}
         </div>
     </div>
 </div>
+${volunteerModal}
+${legacyModal}
         `;
 
         return html;
@@ -949,19 +1290,27 @@ ${summerSection}
             scripture: center?.scripture 
         });
         
-        // Default scripture
-        let scriptureText = "How good and pleasant it is when God's people live together in unity!";
-        let scriptureReference = "Psalm 133:1";
+        // Parse scripture if provided, otherwise use default
+        let scriptureText = '';
+        let scriptureReference = '';
         
-        // Parse custom scripture if provided
         if (center.scripture && center.scripture.trim()) {
             const parsed = this.parseScripture(center.scripture);
-            if (parsed.text) {
-                scriptureText = parsed.text;
+            scriptureText = parsed.text;
+            scriptureReference = parsed.reference;
+            
+            // Remove all types of quotes from scripture text if they exist
+            if (scriptureText) {
+                // Remove leading and trailing quotes: ", ', ", ", ', ', «, »
+                scriptureText = scriptureText
+                    .replace(/^["""'''«»'"]+/, '')
+                    .replace(/["""'''«»'"]+$/, '')
+                    .trim();
             }
-            if (parsed.reference) {
-                scriptureReference = parsed.reference;
-            }
+        } else {
+            // Default scripture
+            scriptureText = "How good and pleasant it is when God's people live together in unity!";
+            scriptureReference = "Psalm 133:1";
         }
         
         return `<!-- Footer Scripture -->
@@ -976,16 +1325,34 @@ ${summerSection}
 .localSites-website {
   display: none !important;
 }
+
+div #freeTextArea-0 {
+  margin-bottom: -75px !important;
+}
+  
+#freeTextArea-scripture .container {
+  padding-bottom: 25px !important;
+  margin-bottom: 0 !important;
+}
+
+#freeTextArea-scripture p:last-child {
+  margin-bottom: 0 !important;
+  padding-bottom: 0 !important;
+}
 </style>
 
 <div id="freeTextArea-scripture" data-index="10" class="freeTextArea u-centerBgImage section u-sa-tealBg u-coverBgImage">
     <div class="u-positionRelative">
         <div class="container">
             
+            <h2 style="text-align: center; margin-bottom: 1.5rem;">
+                ${this.escapeHTML(center.name || center.Title)}
+            </h2>
+            
             <p style="text-align: center;">
-                <cite>"${this.escapeHTML(scriptureText)}"</cite>
+                <cite>${this.escapeHTML(scriptureText)}</cite>
             </p>
-
+            
             <p style="text-align: center;">
                 <strong><cite>-&nbsp;${this.escapeHTML(scriptureReference)}</cite></strong>
             </p>
