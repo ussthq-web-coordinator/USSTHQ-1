@@ -312,24 +312,13 @@ ${modal}`;
                 const hasAdditionalInfo = months || registrationMonths || disclaimer;
                 const scheduleId = `schedule-${schedule.id}`;
                 
-                const expandableInfo = hasAdditionalInfo ? `
+                const expandableInfo = `
                     <div class="mt-2">
-                        <button class="btn btn-link p-0 text-decoration-none d-flex align-items-center" 
-                                onclick="toggleScheduleInfo('${scheduleId}')" 
-                                style="font-size:0.875rem; color:#2F4857;">
-                            <i id="${scheduleId}-icon" class="bi bi-chevron-down me-1" style="transition: transform 0.2s;"></i>
-                            More Info
+                        <button class="btn btn-outline-primary" style="font-size: 0.7rem; padding: 0.25rem 0.5rem;" onclick="showRSYCModal('schedule-${schedule.id}', '${this.escapeHTML(schedule.title, true)}')">
+                            View Full Details
                         </button>
-                        <div id="${scheduleId}" class="schedule-info-content" style="display:none; margin-top:0.5rem; padding-top:0.5rem; border-top:1px solid #e0e0e0; font-size:0.875rem; color:#666;">
-                            ${months ? `<div class="mb-1"><strong>Occurs:</strong> ${wrappedMonths}</div>` : ''}
-                            ${registrationMonths ? `<div class="mb-1"><strong>Registration starts in:</strong> ${wrappedRegistrationMonths}</div>` : ''}
-                            ${disclaimer ? `<div class="mb-1">${wrappedDisclaimer}</div>` : ''}
-                            <button class="btn btn-outline-primary btn-sm mt-2" onclick="showRSYCModal('schedule-${schedule.id}', '${this.escapeHTML(schedule.title, true)}')">
-                                View Full Details
-                            </button>
-                        </div>
                     </div>
-                ` : '';
+                `;
                 
                 // Create modal with full schedule details
                 const scheduleModal = `
@@ -341,6 +330,13 @@ ${modal}`;
             <button class="rsyc-modal-close" onclick="closeRSYCModal('schedule-${schedule.id}')">&times;</button>
         </div>
         <div class="rsyc-modal-body" style="color:#333;">
+            ${schedule.videoEmbedCode ? `
+                <div class="mb-4">
+                    <div class="ratio ratio-16x9" style="border-radius: 12px; overflow: hidden;">
+                        ${schedule.videoEmbedCode}
+                    </div>
+                </div>
+            ` : ''}
             ${schedule.description ? `<div class="mb-4"><div style="font-size:1rem; line-height:1.6; color:#333;">${schedule.description}</div></div>` : ''}
             
             <div class="row">
@@ -352,6 +348,7 @@ ${modal}`;
                 ${months ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Program Runs:</strong><br>${this.escapeHTML(months)}</div>` : ''}
                 ${registrationMonths ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Registration Opens:</strong><br>${this.escapeHTML(registrationMonths)}</div>` : ''}
                 ${schedule.registrationDeadline ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Registration Deadline:</strong><br>${this.escapeHTML(schedule.registrationDeadline)}</div>` : ''}
+                ${schedule.registrationFee ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Registration Fee:</strong><br>${this.escapeHTML(schedule.registrationFee)}</div>` : ''}
                 ${schedule.cost ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Cost:</strong><br>${this.escapeHTML(schedule.cost)}</div>` : ''}
                 ${schedule.location ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Location:</strong><br>${this.escapeHTML(schedule.location)}</div>` : ''}
                 ${schedule.capacity ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Capacity:</strong><br>${this.escapeHTML(schedule.capacity)}</div>` : ''}

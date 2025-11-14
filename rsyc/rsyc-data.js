@@ -172,7 +172,9 @@ class RSYCDataLoader {
             materialsProvided: schedule.MaterialsProvided || '',
             whatToBring: schedule.WhatToBring || '',
             registrationDeadline: schedule.RegistrationDeadline || '',
+            registrationFee: schedule.RegistrationFee || '',
             dropOffPickUp: schedule.DropOffPickUp || '',
+            videoEmbedCode: schedule.VideoEmbedCode || '',
             // Extract .Value from ScheduleDays array
             scheduleDays: (schedule.ScheduleDays || []).map(d => d.Value),
             scheduleTime: schedule.ScheduleTime,
