@@ -779,6 +779,40 @@ class RSYCGeneratorV2 {
 }
 
 /* ========================================
+   Button Styles - Outline Primary (ADDED 2025-11-14)
+   Red hover effect for schedule buttons
+   ======================================== */
+.btn.btn-outline-primary,
+button.btn-outline-primary {
+    color: #2F4857 !important;
+    border-color: #2F4857 !important;
+    background-color: transparent !important;
+    transition: all 0.3s ease;
+}
+
+.btn.btn-outline-primary:hover,
+.btn.btn-outline-primary:focus,
+.btn.btn-outline-primary:active,
+.btn.btn-outline-primary.active,
+button.btn-outline-primary:hover,
+button.btn-outline-primary:focus,
+button.btn-outline-primary:active,
+button.btn-outline-primary.active {
+    background-color: #EF3D42 !important;
+    color: #fff !important;
+    border-color: #EF3D42 !important;
+    transform: translateY(-5px);
+    box-shadow: 0 1rem 2rem rgba(0,0,0,0.1);
+}
+
+.btn.btn-outline-primary:focus-visible,
+button.btn-outline-primary:focus-visible {
+    outline: 2px solid #EF3D42;
+    outline-offset: 2px;
+}
+/* ======================================== END ADDED STYLES ======================================== */
+
+/* ========================================
    MODAL JAVASCRIPT - Add to CMS
    Copy this JavaScript to your CMS global scripts
    ======================================== */
