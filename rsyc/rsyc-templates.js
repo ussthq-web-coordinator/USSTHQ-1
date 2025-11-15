@@ -1010,10 +1010,51 @@ ${modal}`;
         // Check if staff section has data (to show/hide Meet Our Staff button)
         const hasStaff = leaders && leaders.length > 0;
         
+        // A Place for Growth modal
+        const growthModal = `
+<!-- Modal for A Place for Growth -->
+<div id="rsyc-modal-growth" class="rsyc-modal" style="display:none;">
+    <div class="rsyc-modal-content">
+        <div class="rsyc-modal-header">
+            <h3>A Place for Growth</h3>
+            <button class="rsyc-modal-close" onclick="closeRSYCModal('growth')">&times;</button>
+        </div>
+        <div class="rsyc-modal-body">
+            <div style="font-size: 1rem; line-height: 1.6; margin-bottom: 2rem;">
+                <p>The Red Shield Youth Center is more than a safe place after school—it's a space where children and teens can grow, explore, and build the skills they need for the future. Our programs support the whole child through a variety of opportunities:</p>
+                
+                <ul style="margin-left: 1.5rem; margin-bottom: 1.5rem;">
+                    <li><strong>Spiritual Development</strong> – connecting youth with Christ centered purpose and values</li>
+                    <li><strong>Academic Support</strong> – tutoring, homework help, and enrichment activities</li>
+                    <li><strong>Social-Emotional Learning</strong> – building confidence, empathy, and communication skills</li>
+                    <li><strong>Character & Leadership Development</strong> – opportunities to lead, problem-solve, and make decisions</li>
+                    <li><strong>STEM & Creative Exploration</strong> – hands-on activities that spark curiosity and creativity</li>
+                    <li><strong>Physical Activity & Team Sports</strong> – promoting health, teamwork, and well-being</li>
+                    <li><strong>Music & Arts</strong> – nurturing creative talents and self-expression</li>
+                </ul>
+                
+                <p>Staff provide guidance, encouragement, and individualized attention to help every child thrive. By combining learning, creativity, and meaningful relationships, the Youth Center creates a space where youth feel supported, challenged, and inspired. Sign up your youth today and give them a place to learn, grow, and succeed.</p>
+            </div>
+            <div class="text-center" style="padding-top: 1.5rem; border-top: 1px solid #dee2e6;">
+                <p style="font-size: 1rem; margin-bottom: 1rem;">Learn more about our programs and safety standards</p>
+                <div class="d-flex gap-2 justify-content-center flex-wrap">
+                    <a class="btn btn-outline-primary" href="/redshieldyouth/about" target="_blank">
+                        <i class="bi bi-info-circle me-2"></i> About Us
+                    </a>
+                    <a class="btn btn-outline-primary" href="/redshieldyouth/safety" target="_blank">
+                        <i class="bi bi-shield-check me-2"></i> Safety Policies
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>`;
+        
         return `<!-- For Parents -->
 <div id="freeTextArea-parents" class="freeTextArea u-centerBgImage section u-sa-whiteBg u-coverBgImage">
     <div class="u-positionRelative">
         <div class="container">
+            ${growthModal}
             <div class="container my-5">
                 <div class="row align-items-stretch">
                     <!-- Left block: Photo (5 columns) -->
@@ -1043,9 +1084,9 @@ ${modal}`;
                             </p>
                             
                             <div class="d-grid gap-2 mt-auto">
-                                <a class="btn btn-outline-primary btn-md" href="/redshieldyouth/safety">
-                                    <i class="bi bi-file-earmark-text me-2"></i> Safety Policies
-                                </a>
+                                <button class="btn btn-outline-primary btn-md" onclick="showRSYCModal('growth', '${this.escapeHTML(center.name, true)}')">
+                                    <i class="bi bi-flower2 me-2"></i> A Place for Growth
+                                </button>
                                 <a class="btn btn-outline-primary btn-md" 
                                    href="${this.escapeHTML(registrationURL)}" 
                                    target="_blank">

@@ -33,15 +33,25 @@ class RSYCDataLoader {
         try {
             console.log('🔄 Loading RSYC data...');
             
-            const [centers, schedules, leaders, photos, hours, facilities, featuredPrograms] = await Promise.all([
+            // Load critical data first, then optional data
+            const [centers, schedules, leaders, hours, facilities, featuredPrograms] = await Promise.all([
                 this.fetchJSON('units-rsyc-profiles.json'),
                 this.fetchJSON('RSYCProgramSchedules.json'),
                 this.fetchJSON('RSYCLeaders.json'),
-                this.fetchJSON('RSYCHomepagePhotos.json'),
                 this.fetchJSON('RSYCHours.json'),
                 this.fetchJSON('RSYCFacilityFeatures.json'),
                 this.fetchJSON('RSYCPrograms.json')
             ]);
+
+            // Load photos separately with error handling (optional data)
+            let photos = [];
+            try {
+                photos = await this.fetchJSON('RSYCHomepagePhotos.json');
+                console.log('✅ Photos loaded successfully');
+            } catch (error) {
+                console.warn('⚠️ Photos not available, using defaults:', error.message);
+                photos = []; // Empty array, templates will use default images
+            }
 
             this.cache.centers = this.processCenters(centers);
             this.cache.schedules = this.processSchedules(schedules);
