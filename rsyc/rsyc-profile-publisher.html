@@ -12,72 +12,79 @@
 </head>
 <body>
     <div class="app-container">
-        <header class="app-header">
-            <h3>🧒🏽 Red Shield Youth Center Profile Generator</h3>
+        <!-- Minimal Fixed Header -->
+        <header class="minimal-header">
+            <div class="header-main">
+                <h3 class="app-title">🧒🏽 RSYC Profile Publisher</h3>
+                
+                <!-- Primary Controls -->
+                <div class="primary-controls">
+                    <select id="centerSelect" class="center-dropdown-minimal">
+                        <option value="">-- Select Center --</option>
+                    </select>
+                    <button id="generateHTML" class="btn btn-primary" disabled>Generate</button>
+                    <button id="copyHTML" class="btn btn-success" disabled><i class="bi bi-clipboard"></i> Copy HTML</button>
+                </div>
+
+                <!-- Toggle Button -->
+                <button id="toggleAdvanced" class="btn-toggle" title="Show/Hide Advanced Options">
+                    <i class="bi bi-chevron-down"></i> More Options
+                </button>
+            </div>
+
+            <!-- Collapsible Advanced Controls -->
+            <div class="advanced-controls" id="advancedControls" style="display:none;">
+                <div class="advanced-row">
+                    <!-- Section Checkboxes (Compact) -->
+                    <div class="control-group sections-group">
+                        <label>Sections:</label>
+                        <div class="section-checkboxes">
+                            <label><input type="checkbox" value="schedules" checked> Schedules</label>
+                            <label><input type="checkbox" value="hours" checked> Hours</label>
+                            <label><input type="checkbox" value="facilities" checked> Facilities</label>
+                            <label><input type="checkbox" value="programs" checked> Programs</label>
+                            <label><input type="checkbox" value="staff" checked> Staff & Leadership</label>
+                            <label><input type="checkbox" value="nearby" checked> Nearby Centers</label>
+                            <label><input type="checkbox" value="parents" checked> For Parents</label>
+                            <label><input type="checkbox" value="youth" checked> For Youth</label>
+                            <label><input type="checkbox" value="volunteer" checked> Get Involved</label>
+                            <label><input type="checkbox" value="footerPhoto" checked> Footer Photo</label>
+                            <label><input type="checkbox" value="contact" checked> Footer Scripture</label>
+                        </div>
+                        <div style="margin-top:6px;font-size:0.75rem; color:#666;">
+                            <strong>Selected sections:</strong> <span id="sectionsCount">0</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Action Buttons Row -->
+                <div class="action-row">
+                    <button id="selectAllSections" class="btn btn-sm">Select All</button>
+                    <button id="clearAllSections" class="btn btn-sm">Clear All</button>
+                    <button id="downloadHTML" class="btn btn-info" disabled>Download</button>
+                    <button id="markPublished" class="btn btn-warning" disabled>Mark Published</button>
+                    <button id="viewCustomCSS" class="btn btn-secondary">View Custom CSS</button>
+                    <button id="viewGlobalCSS" class="btn btn-secondary">View Global CSS</button>
+                </div>
+            </div>
         </header>
 
-        <!-- Compact Controls Header -->
-        <div class="controls-header">
-            <div class="control-row">
-                <!-- Center Dropdown -->
-                <div class="control-group">
-                    <label for="centerSelect">Select Center:</label>
-                    <select id="centerSelect" class="center-dropdown">
-                        <option value="">-- Choose a Center --</option>
-                    </select>
-                </div>
-
-                <!-- Section Checkboxes (Compact) -->
-                <div class="control-group sections-group">
-                    <label>Sections:</label>
-                    <div class="section-checkboxes">
-                        <label><input type="checkbox" value="schedules" checked> Schedules</label>
-                        <label><input type="checkbox" value="hours" checked> Hours</label>
-                        <label><input type="checkbox" value="facilities" checked> Facilities</label>
-                        <label><input type="checkbox" value="programs" checked> Programs</label>
-                        <label><input type="checkbox" value="staff" checked> Staff & Leadership</label>
-                        <label><input type="checkbox" value="nearby" checked> Nearby Centers</label>
-                        <label><input type="checkbox" value="parents" checked> For Parents</label>
-                        <label><input type="checkbox" value="youth" checked> For Youth</label>
-                        <label><input type="checkbox" value="volunteer" checked> Get Involved</label>
-                        <label><input type="checkbox" value="footerPhoto" checked> Footer Photo</label>
-                        <label><input type="checkbox" value="contact" checked> Footer Scripture</label>
-                    </div>
-                    <div style="margin-top:6px;font-size:0. ninerem; color:#666;">
-                        <strong>Selected sections:</strong> <span id="sectionsCount">0</span>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Action Buttons Row -->
-            <div class="action-row">
-                <button id="selectAllSections" class="btn btn-sm">Select All</button>
-                <button id="clearAllSections" class="btn btn-sm">Clear All</button>
-                <button id="generateHTML" class="btn btn-primary" disabled>Generate HTML</button>
-                <button id="copyHTML" class="btn btn-success" disabled>Copy HTML</button>
-                <button id="downloadHTML" class="btn btn-info" disabled>Download</button>
-                <button id="markPublished" class="btn btn-warning" disabled>Mark Published</button>
-                <button id="viewCustomCSS" class="btn btn-secondary">View Custom CSS</button>
-                <button id="viewGlobalCSS" class="btn btn-secondary">View Global CSS</button>
-            </div>
-        </div>
-
-        <!-- Full Width Live Preview -->
-        <div class="preview-section">
-            <div class="preview-header">
-                <h4>Live Preview</h4>
+        <!-- Full Height Live Preview -->
+        <div class="preview-section-fullscreen">
+            <div class="preview-header-minimal">
+                <h6><i class="bi bi-eye"></i> Live Preview</h6>
                 <span class="preview-status" id="previewStatus">Select a center to begin</span>
             </div>
-            <div class="preview-container" id="livePreview">
+            <div class="preview-container-fullscreen" id="livePreview">
                 <div class="preview-placeholder">
                     <div class="placeholder-icon">👆</div>
-                    <p>Select a center and sections above to see the live preview</p>
+                    <p>Select a center above to see the live preview with full modal functionality</p>
                 </div>
             </div>
         </div>
 
-        <!-- Status Bar -->
-        <footer class="status-bar">
+        <!-- Minimal Status Bar -->
+        <footer class="status-bar-minimal">
             <span id="dataStatus">Data: Loading...</span>
             <span id="selectedCenter">Selected: None</span>
             <span id="lastGenerated">Last Generated: Never</span>

@@ -920,4 +920,21 @@ document.addEventListener('keydown', function(e) {
 // Initialize app when DOM is ready
 document.addEventListener('DOMContentLoaded', () => {
     window.rsycApp = new RSYCGeneratorV2();
+    
+    // ADDED 2025-11-15: Toggle advanced controls
+    const toggleBtn = document.getElementById('toggleAdvanced');
+    const advancedControls = document.getElementById('advancedControls');
+    
+    if (toggleBtn && advancedControls) {
+        toggleBtn.addEventListener('click', () => {
+            const isHidden = advancedControls.style.display === 'none' || advancedControls.style.display === '';
+            advancedControls.style.display = isHidden ? 'block' : 'none';
+            toggleBtn.classList.toggle('expanded', isHidden);
+            toggleBtn.innerHTML = isHidden 
+                ? '<i class="bi bi-chevron-up"></i> Hide Options'
+                : '<i class="bi bi-chevron-down"></i> More Options';
+        });
+    }
+    // END ADDED 2025-11-15
 });
+
