@@ -1090,7 +1090,7 @@ ${modal}`;
                                 <a class="btn btn-outline-primary btn-md" 
                                    href="${this.escapeHTML(registrationURL)}" 
                                    target="_blank">
-                                    <i class="bi bi-calendar-check me-2"></i> Register for Programs
+                                    <i class="bi bi-calendar-check me-2"></i> Sign-up your Youth
                                 </a>
                                 ${hasStaff ? `
                                 <a class="btn btn-outline-primary btn-md" href="#profiles">
