@@ -311,6 +311,21 @@ class RSYCGeneratorV2 {
         const previewContainer = document.getElementById('livePreview');
         if (!previewContainer) return;
 
+        // Override showRSYCModal and closeRSYCModal to work within preview
+        window.showRSYCModal = (type, centerName) => {
+            const modal = previewContainer.querySelector('#rsyc-modal-' + type);
+            if (modal) {
+                modal.style.display = 'flex';
+            }
+        };
+
+        window.closeRSYCModal = (type) => {
+            const modal = previewContainer.querySelector('#rsyc-modal-' + type);
+            if (modal) {
+                modal.style.display = 'none';
+            }
+        };
+
         // Attach modal functionality
         const viewAllButtons = previewContainer.querySelectorAll('.view-all-btn');
         viewAllButtons.forEach(btn => {
