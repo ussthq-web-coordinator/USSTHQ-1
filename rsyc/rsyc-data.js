@@ -221,7 +221,14 @@ class RSYCDataLoader {
             id: photo.ID,
             centerId: photo['Center#Id'],
             title: photo.Title,
-            // Photo URLs would be in photo.Photo or similar field
+            urlExteriorPhoto: photo.URLExteriorPhoto || '',
+            urlFacilityFeaturesPhoto: photo.URLFacilityFeaturesPhoto || '',
+            urlProgramsPhoto: photo.URLProgramsPhoto || '',
+            urlNearbyCentersPhoto: photo.URLNearbyCentersPhoto || '',
+            urlParentsSectionPhoto: photo.URLParentsSectionPhoto || '',
+            urlYouthSectionPhoto: photo.URLYouthSectionPhoto || '',
+            urlGetInvolvedPhoto: photo.URLGetInvolvedPhoto || '',
+            urlFooterPhoto: photo.URLFooterPhoto || ''
         }));
     }
 

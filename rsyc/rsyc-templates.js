@@ -17,7 +17,8 @@ class RSYCTemplates {
             'staff': { name: 'Staff & Leadership', enabled: true, order: 7 },
             'nearby': { name: 'Nearby Centers', enabled: true, order: 8 },
             'volunteer': { name: 'Volunteer Opportunities', enabled: true, order: 9 },
-            'contact': { name: 'Contact & Donate', enabled: true, order: 10 }
+            'footerPhoto': { name: 'Footer Photo', enabled: true, order: 10 },
+            'contact': { name: 'Contact & Donate', enabled: true, order: 11 }
         };
     }
 
@@ -53,6 +54,7 @@ class RSYCTemplates {
             'parents': this.generateParents,
             'youth': this.generateYouth,
             'volunteer': this.generateVolunteer,
+            'footerPhoto': this.generateFooterPhoto,
             'contact': this.generateContact
         };
 
@@ -88,15 +90,26 @@ class RSYCTemplates {
      * About This Center Section
      */
     generateAbout(data) {
-        const { center } = data;
+        const { center, photos } = data;
         if (!center.aboutText) return '';
+
+        // Get exterior photo from photos array
+        const photoData = photos && photos.length > 0 ? photos[0] : null;
+        const exteriorPhoto = photoData?.urlExteriorPhoto || '';
+
+        const exteriorPhotoHTML = exteriorPhoto ? `
+        <div class="mb-4">
+            <img src="${this.escapeHTML(exteriorPhoto)}" alt="${this.escapeHTML(center.name)} Exterior" 
+                 class="img-fluid" style="width: 100%; height: auto; border-radius: 12px; object-fit: cover;">
+        </div>` : '';
 
         return `<!-- About This Center -->
 <section class="rsyc-about">
     <div class="container">
+        ${exteriorPhotoHTML}
         <h2>About This Center</h2>
         <div class="about-content">
-            ${center.aboutText}
+            ${this.makeContactsClickable(center.aboutText)}
         </div>
     </div>
 </section>`;
@@ -109,8 +122,9 @@ class RSYCTemplates {
         const { programDetails, photos, center } = data;
         if (!programDetails || programDetails.length === 0) return '';
 
-        // Default program photo - will be manually updated
-        const programPhoto = 'https://s3.amazonaws.com/uss-cache.salvationarmy.org/c11a1b73-6893-4eb4-a24c-8ecf98058b14_484033880_1061382646027353_8208563035826151450_n.jpg';
+        // Get programs photo from photos array, fallback to default
+        const photoData = photos && photos.length > 0 ? photos[0] : null;
+        const programPhoto = photoData?.urlProgramsPhoto || 'https://s3.amazonaws.com/uss-cache.salvationarmy.org/c11a1b73-6893-4eb4-a24c-8ecf98058b14_484033880_1061382646027353_8208563035826151450_n.jpg';
 
         const totalPrograms = programDetails.length;
         const showViewAll = totalPrograms > 8;
@@ -164,12 +178,12 @@ class RSYCTemplates {
                 <div class="row align-items-stretch">
                     <!-- Left block: Photo (5 columns) -->
                     <div class="col-md-5 d-flex">
-                        <div class="photo-card w-100 h-100 flex-fill">
+                        <div class="photo-card w-100 h-100 flex-fill" style="aspect-ratio: 1 / 1;">
                             ${programPhoto ? `
                             <img alt="Program Photo" 
                                  class="img-fluid w-100 h-100" 
                                  src="${this.escapeHTML(programPhoto)}" 
-                                 style="object-fit:cover;">
+                                 style="object-fit:cover; object-position: center;">
                             ` : `
                             <div class="bg-light w-100 h-100 d-flex align-items-center justify-content-center" style="min-height:300px;">
                                 <p class="text-muted">Program Photo</p>
@@ -406,9 +420,20 @@ ${modal}`;
         // Build About This Center section (always show if available) in white rounded card
         let aboutSection = '';
         if (center.aboutText) {
+            // Get exterior photo from photos array
+            const photoData = data.photos && data.photos.length > 0 ? data.photos[0] : null;
+            const exteriorPhoto = photoData?.urlExteriorPhoto || '';
+            
+            const exteriorPhotoHTML = exteriorPhoto ? `
+            <div class="mb-4">
+                <img src="${this.escapeHTML(exteriorPhoto)}" alt="${this.escapeHTML(center.name)} Exterior" 
+                     class="img-fluid" style="width: 100%; height: 300px; border-radius: 12px; object-fit: cover; object-position: center;">
+            </div>` : '';
+            
             aboutSection = `
     <div class="mt-5 d-flex justify-content-center">
         <div class="schedule-card text-dark" style="max-width:800px;width:100%;padding:1.5rem;border-radius:8px;background:#fff;box-shadow:0 1px 4px rgba(0,0,0,0.06);">
+            ${exteriorPhotoHTML}
             <h3 class="fw-bold mb-3 text-center" style="font-size: 1.5rem;">About This <em>Center</em></h3>
             <p class="text-center mb-3"><strong>The Salvation Army ${this.escapeHTML(center.name || center.Title)}</strong></p>
             <div class="about-content" style="font-family: inherit; font-size: 1rem; line-height: 1.6;">
@@ -689,8 +714,9 @@ ${summerSection}
         const { center, facilityFeatures, photos } = data;
         if (!facilityFeatures || facilityFeatures.length === 0) return '';
 
-        // Default facility photo - will be manually updated
-        const facilityPhoto = 'https://s3.amazonaws.com/uss-cache.salvationarmy.org/9150a418-1c58-4d01-bf81-5753d1c608ae_salvation+army+building+1.png';
+        // Get facility photo from photos array, fallback to default
+        const photoData = photos && photos.length > 0 ? photos[0] : null;
+        const facilityPhoto = photoData?.urlFacilityFeaturesPhoto || 'https://s3.amazonaws.com/uss-cache.salvationarmy.org/9150a418-1c58-4d01-bf81-5753d1c608ae_salvation+army+building+1.png';
 
         const totalFeatures = facilityFeatures.length;
         const showViewAll = totalFeatures > 8;
@@ -757,12 +783,12 @@ ${summerSection}
 
                     <!-- Right block: Photo (5 columns) -->
                     <div class="col-md-5 d-flex mt-4 mt-md-0 order-1 order-md-2">
-                        <div class="photo-card w-100 h-100">
+                        <div class="photo-card w-100 h-100" style="aspect-ratio: 1 / 1;">
                             ${facilityPhoto ? `
                             <img alt="Facility Exterior" 
                                  src="${this.escapeHTML(facilityPhoto)}" 
                                  class="img-fluid w-100 h-100" 
-                                 style="object-fit:cover;">
+                                 style="object-fit:cover; object-position: center;">
                             ` : `
                             <div class="bg-light w-100 h-100 d-flex align-items-center justify-content-center" style="min-height:300px;">
                                 <p class="text-muted">Facility Photo</p>
@@ -974,8 +1000,9 @@ ${modal}`;
     generateParents(data) {
         const { center, leaders, photos } = data;
         
-        // Default parent/youth photo - will be manually updated
-        const parentPhoto = 'https://s3.amazonaws.com/uss-cache.salvationarmy.org/c86f2661-8584-4ec2-9a2b-efb037af243c_480824461_1048794390619512_2584431963266610630_n.jpg';
+        // Get parents section photo from photos array, fallback to default
+        const photoData = photos && photos.length > 0 ? photos[0] : null;
+        const parentPhoto = photoData?.urlParentsSectionPhoto || 'https://s3.amazonaws.com/uss-cache.salvationarmy.org/c86f2661-8584-4ec2-9a2b-efb037af243c_480824461_1048794390619512_2584431963266610630_n.jpg';
         
         // Use center's registration URL if available
         const registrationURL = center.signUpURL || 'https://online.traxsolutions.com/southernusasalvationarmy/winston-salem#/dashboard';
@@ -991,12 +1018,12 @@ ${modal}`;
                 <div class="row align-items-stretch">
                     <!-- Left block: Photo (5 columns) -->
                     <div class="col-md-5 d-flex">
-                        <div class="photo-card w-100 h-100 flex-fill">
+                        <div class="photo-card w-100 h-100 flex-fill" style="aspect-ratio: 1 / 1;">
                             ${parentPhoto ? `
                             <img alt="Youth Center" 
                                  class="img-fluid w-100 h-100" 
                                  src="${this.escapeHTML(parentPhoto)}" 
-                                 style="object-fit:cover;">
+                                 style="object-fit:cover; object-position: center;">
                             ` : `
                             <div class="bg-light w-100 h-100 d-flex align-items-center justify-content-center" style="min-height:300px;">
                                 <p class="text-muted">Youth Center Photo</p>
@@ -1042,8 +1069,9 @@ ${modal}`;
     generateYouth(data) {
         const { center, photos } = data;
 
-        // Default youth photo - will be manually updated
-        const photoUrl = 'https://s3.amazonaws.com/uss-cache.salvationarmy.org/adcebba0-1957-44b7-b252-52047fba3012_493289641_24370578925875198_8553369015658130819_n.jpg';
+        // Get youth section photo from photos array, fallback to default
+        const photoData = photos && photos.length > 0 ? photos[0] : null;
+        const photoUrl = photoData?.urlYouthSectionPhoto || 'https://s3.amazonaws.com/uss-cache.salvationarmy.org/adcebba0-1957-44b7-b252-52047fba3012_493289641_24370578925875198_8553369015658130819_n.jpg';
 
         // Dynamic registration URLs
         const registrationURL = center.signUpURL || 'https://online.traxsolutions.com/southernusasalvationarmy/winston-salem#/dashboard';
@@ -1074,8 +1102,8 @@ ${modal}`;
                     </div>
                     <!-- Right block: Photo (5 columns) -->
                     <div class="col-md-5 d-flex order-1 order-md-2">
-                        <div class="photo-card w-100" style="height:300px; overflow:hidden; border-radius:12px;">
-                            <img alt="Teens Photo" src="${photoUrl}" style="width:100%; height:100%; object-fit:cover;">
+                        <div class="photo-card w-100" style="aspect-ratio: 1 / 1; overflow:hidden; border-radius:12px;">
+                            <img alt="Teens Photo" src="${photoUrl}" style="width:100%; height:100%; object-fit:cover; object-position: center;">
                         </div>
                     </div>
                 </div>
@@ -1092,11 +1120,15 @@ ${modal}`;
      * Nearby Centers Section
      */
     generateNearby(data) {
-        const { center } = data;
+        const { center, photos } = data;
         
         // Use postal code from center data
         const postalCode = center.zip || '27107';
         const locationFinderUrl = `https://www.salvationarmyusa.org/location-finder/?address=${postalCode}`;
+        
+        // Get nearby centers photo from photos array, fallback to default
+        const photoData = photos && photos.length > 0 ? photos[0] : null;
+        const nearbyPhoto = photoData?.urlNearbyCentersPhoto || 'https://s3.amazonaws.com/uss-cache.salvationarmy.org/71fe3cd2-5a53-4557-91ea-bb40ab76e2f5_nearby-corps-1.jpg';
 
         return `<!-- Nearby Salvation Army Centers -->
 <div id="freeTextArea-nearby" class="freeTextArea u-centerBgImage section u-sa-greyVeryLightBg u-coverBgImage">
@@ -1106,7 +1138,7 @@ ${modal}`;
                 <div class="row align-items-stretch flex-column-reverse flex-md-row">
                     <!-- Left block: Nearby Centers card (7 columns) -->
                     <div class="col-md-7 d-flex mb-4 mb-md-0">
-                        <div class="hover-card w-100 d-flex flex-column">
+                        <div class="hover-card w-100 d-flex flex-column h-100">
                             <i class="bi bi-geo-alt icon-lg"></i>
                             <h2 class="fw-bold mb-4">Nearby <em>Salvation Army</em> Centers</h2>
 
@@ -1171,8 +1203,8 @@ ${modal}`;
 
                     <!-- Right block: Photo (5 columns) -->
                     <div class="col-md-5 d-flex">
-                        <div class="photo-card w-100 h-100 flex-fill">
-                            <img alt="Nearby Centers Photo" class="img-fluid w-100 h-100" src="https://s3.amazonaws.com/uss-cache.salvationarmy.org/71fe3cd2-5a53-4557-91ea-bb40ab76e2f5_nearby-corps-1.jpg" style="object-fit:cover;">
+                        <div class="photo-card w-100 h-100 flex-fill" style="aspect-ratio: 1 / 1;">
+                            <img alt="Nearby Centers Photo" class="img-fluid w-100 h-100" src="${this.escapeHTML(nearbyPhoto)}" style="object-fit:cover; object-position: center;">
                         </div>
                     </div>
                 </div>
@@ -1186,10 +1218,12 @@ ${modal}`;
      * Get Involved Section (Volunteer/Donate/Mentor)
      */
     generateVolunteer(data) {
-        const { center, photos, volunteerText } = data;
+        const { center, photos } = data;
+        const volunteerText = center.volunteerText || '';
 
-        // Default volunteer photo - will be manually updated
-        const photoUrl = 'https://s3.amazonaws.com/uss-cache.salvationarmy.org/22971941-6318-4db7-8231-ff5435aa654b_Low+Res+Web+Ready-30112_Tulsa_group_of_young_boys_playing_drums.png';
+        // Get get involved photo from photos array, fallback to default
+        const photoData = photos && photos.length > 0 ? photos[0] : null;
+        const photoUrl = photoData?.urlGetInvolvedPhoto || 'https://s3.amazonaws.com/uss-cache.salvationarmy.org/22971941-6318-4db7-8231-ff5435aa654b_Low+Res+Web+Ready-30112_Tulsa_group_of_young_boys_playing_drums.png';
 
         // Use center's donation URL or fallback to default
         const donationURL = center.donationURL || 'https://give.salvationarmysouth.org/campaign/703141/donate?c_src=RSYC-Center-Page';
@@ -1204,8 +1238,14 @@ ${modal}`;
             <button class="rsyc-modal-close" onclick="closeRSYCModal('volunteer')">&times;</button>
         </div>
         <div class="rsyc-modal-body">
-            <div style="font-size: 1rem; line-height: 1.6;">
-                ${this.escapeHTML(volunteerText).replace(/\n/g, '<br>')}
+            <div style="font-size: 1rem; line-height: 1.6; margin-bottom: 2rem;">
+                ${this.makeContactsClickable(volunteerText)}
+            </div>
+            <div class="text-center" style="padding-top: 1.5rem; border-top: 1px solid #dee2e6;">
+                <p style="font-size: 1rem; margin-bottom: 1rem;">Learn more about volunteering at Red Shield Youth Centers</p>
+                <a class="btn btn-outline-primary" href="/redshieldyouth/volunteer" target="_blank">
+                    <i class="bi bi-hand-thumbs-up me-2"></i> Volunteer Information
+                </a>
             </div>
         </div>
     </div>
@@ -1243,8 +1283,8 @@ ${modal}`;
                 <div class="row align-items-stretch">
                     <!-- Left block: Photo (5 columns) -->
                     <div class="col-md-5 d-flex">
-                        <div class="photo-card w-100" style="height:300px; overflow:hidden; border-radius:12px;">
-                            <img alt="Get Involved Photo" src="${photoUrl}" style="width:100%; height:100%; object-fit:cover;">
+                        <div class="photo-card w-100" style="aspect-ratio: 1 / 1; overflow:hidden; border-radius:12px;">
+                            <img alt="Get Involved Photo" src="${photoUrl}" style="width:100%; height:100%; object-fit:cover; object-position: center;">
                         </div>
                     </div>
                     <!-- Right block: Hover card (7 columns) -->
@@ -1275,6 +1315,27 @@ ${legacyModal}
         `;
 
         return html;
+    }
+
+    /**
+     * Footer Photo Section
+     */
+    generateFooterPhoto(data) {
+        const { photos } = data;
+        
+        // Get footer photo from photos array
+        const photoData = photos && photos.length > 0 ? photos[0] : null;
+        const footerPhoto = photoData?.urlFooterPhoto || '';
+        
+        // Only show section if there's a photo
+        if (!footerPhoto) return '';
+
+        return `<!-- Footer Photo Section -->
+<section id="freeTextArea-footerPhoto" class="freeTextArea u-centerBgImage section u-coverBgImage" style="min-height: 400px; background-image: url('${this.escapeHTML(footerPhoto)}'); background-size: cover; background-position: center;">
+    <div class="u-positionRelative" style="min-height: 400px;">
+        <!-- Empty content - just showing the photo -->
+    </div>
+</section>`;
     }
 
     /**
@@ -1575,6 +1636,30 @@ div #freeTextArea-0 {
         div.textContent = str;
         return div.innerHTML;
     }
+
+    /**
+     * Make email addresses and phone numbers clickable
+     * ADDED 2025-11-15: Auto-link emails and phones in content
+     */
+    makeContactsClickable(text) {
+        if (!text) return '';
+        
+        // Make email addresses clickable
+        // Match emails: word@domain.tld
+        text = text.replace(/([a-zA-Z0-9._-]+@[a-zA-Z0-9._-]+\.[a-zA-Z0-9._-]+)/gi, 
+            '<a href="mailto:$1">$1</a>');
+        
+        // Make phone numbers clickable
+        // Match formats: (123) 456-7890, 123-456-7890, 123.456.7890, 1234567890
+        text = text.replace(/(\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4})/g, function(match) {
+            // Clean number for tel: link (remove all non-digits)
+            const cleanNumber = match.replace(/\D/g, '');
+            return `<a href="tel:+1${cleanNumber}">${match}</a>`;
+        });
+        
+        return text;
+    }
+    // END ADDED 2025-11-15
 
     /**
      * Get section list
