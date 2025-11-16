@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>RSYC Profile Generator</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
     <link rel="stylesheet" href="rsyc-generator-v2.css">
@@ -15,15 +15,21 @@
         <!-- Minimal Fixed Header -->
         <header class="minimal-header">
             <div class="header-main">
-                <h3 class="app-title">🧒🏽 RSYC Profile Publisher</h3>
+                <h6 class="app-title">🧒🏽 RSYC Profile Publisher</h6>
                 
                 <!-- Primary Controls -->
                 <div class="primary-controls">
+                    <button id="prevCenter" class="btn btn-sm btn-outline-secondary" title="Previous Center" disabled>
+                        <i class="bi bi-chevron-left"></i>
+                    </button>
                     <select id="centerSelect" class="center-dropdown-minimal">
                         <option value="">-- Select Center --</option>
                     </select>
-                    <button id="generateHTML" class="btn btn-primary" disabled>Generate</button>
-                    <button id="copyHTML" class="btn btn-success" disabled><i class="bi bi-clipboard"></i> Copy HTML</button>
+                    <button id="nextCenter" class="btn btn-sm btn-outline-secondary" title="Next Center" disabled>
+                        <i class="bi bi-chevron-right"></i>
+                    </button>
+                    <button id="generateHTML" class="btn btn-sm btn-primary" disabled>Generate</button>
+                    <button id="copyHTML" class="btn btn-sm btn-success" disabled><i class="bi bi-clipboard"></i> Copy HTML</button>
                 </div>
 
                 <!-- Toggle Button -->
@@ -61,10 +67,9 @@
                 <div class="action-row">
                     <button id="selectAllSections" class="btn btn-sm">Select All</button>
                     <button id="clearAllSections" class="btn btn-sm">Clear All</button>
-                    <button id="downloadHTML" class="btn btn-info" disabled>Download</button>
-                    <button id="markPublished" class="btn btn-warning" disabled>Mark Published</button>
-                    <button id="viewCustomCSS" class="btn btn-secondary">View Custom CSS</button>
-                    <button id="viewGlobalCSS" class="btn btn-secondary">View Global CSS</button>
+                    <button id="downloadHTML" class="btn btn-sm btn-info" disabled>Download</button>
+                    <button id="viewCustomCSS" class="btn btn-sm btn-secondary">✏️ Edit Custom CSS</button>
+                    <button id="viewDataStructure" class="btn btn-sm btn-secondary">🔍 Templates & Data</button>
                 </div>
             </div>
         </header>
@@ -89,6 +94,13 @@
             <span id="selectedCenter">Selected: None</span>
             <span id="lastGenerated">Last Generated: Never</span>
         </footer>
+
+        <!-- Visible error banner (hidden by default) -->
+        <div id="rsyc-error-banner" style="display:none; position:fixed; bottom:16px; left:16px; right:16px; background:#ffe6e6; color:#990000; border:1px solid #ffcccc; padding:12px 16px; border-radius:6px; z-index:11000; box-shadow:0 4px 10px rgba(0,0,0,0.1);">
+            <strong>RSYC Error:</strong>
+            <span id="rsyc-error-text" style="margin-left:8px;">An error occurred while loading the data. Open DevTools console for details.</span>
+            <button id="rsyc-error-close" style="float:right; background:transparent; border:none; font-weight:700; color:#990000; cursor:pointer;">✖</button>
+        </div>
     </div>
 
     <!-- CSS Viewer Modal -->
@@ -101,7 +113,19 @@
             <p id="cssModalDescription" style="color:#666; margin-bottom:15px;"></p>
             <div style="position:relative;">
                 <button id="copyCSSContent" style="position:absolute; top:10px; right:10px; background:#28a745; color:white; border:none; padding:6px 12px; border-radius:4px; cursor:pointer; z-index:1;">Copy All</button>
+                <button id="saveCSSContent" style="position:absolute; top:10px; right:110px; background:#007bff; color:white; border:none; padding:6px 12px; border-radius:4px; cursor:pointer; z-index:1; display:none;">💾 Save CSS</button>
                 <textarea id="cssModalContent" style="width:100%; background:#f4f4f4; padding:15px; border:1px solid #ddd; border-radius:4px; overflow:auto; min-height:500px; max-height:600px; font-family:monospace; font-size:13px; line-height:1.5; resize:vertical;" spellcheck="false"></textarea>
+            </div>
+            <div id="cssUpdateHistory" style="margin-top:15px; padding:10px; background:#f9f9f9; border:1px solid #ddd; border-radius:4px; display:none;">
+                <h4 style="margin:0 0 10px 0; font-size:14px;">Recent Updates:</h4>
+                <div id="cssHistoryList" style="font-size:12px; font-family:monospace; color:#666;"></div>
+            </div>
+            <div id="symphonyLinkInfo" style="margin-top:15px; padding:10px; background:#e7f3ff; border:1px solid #b3d9ff; border-radius:4px; display:none;">
+                <h4 style="margin:0 0 10px 0; font-size:14px; color:#0066cc;">📌 Required Symphony CSS Link:</h4>
+                <div style="font-size:12px; font-family:monospace; color:#333; background:white; padding:8px; border-radius:4px; word-break:break-all;">
+                    <code id="symphonyLinkCode"></code>
+                </div>
+                <p style="margin:8px 0 0 0; font-size:11px; color:#666;">This link is already included in the generated profiles. Do not copy it to CMS.</p>
             </div>
         </div>
     </div>
@@ -113,3 +137,4 @@
     <script src="rsyc-generator-v2.js"></script>
 </body>
 </html>
+

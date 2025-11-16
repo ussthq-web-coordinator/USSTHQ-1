@@ -1,3 +1,20 @@
+<!-- 
+   ========================================
+   RSYC CUSTOM STYLES - MASTER FILE
+   Version: 1.0.2
+   Last Updated: 2025-11-15
+   
+   This file contains ALL custom CSS for RSYC profiles.
+   Copy this ENTIRE file to CMS when updated.
+   ======================================== 
+
+   CHANGE LOG:
+   2025-11-15 - Version 1.0.2 - Updated with verified production code (removed Symphony link, fixed btn-outline-primary hover)
+   2025-11-15 - Version 1.0.1 - FIXED: Added missing modal JavaScript (showRSYCModal, closeRSYCModal)
+   2025-11-15 - Version 1.0.0 - Organized and documented existing styles
+   2025-11-14 - Initial styles added
+-->
+
 <!-- RSYC Custom Styles and Scripts -->
 <!-- This file contains all custom CSS and JavaScript for RSYC profiles -->
 <!-- Update this file to apply changes to all generated profiles -->
@@ -545,11 +562,11 @@ div.col-sm-12.eventsList * {
 .btn-outline-primary:focus,
 .btn-outline-primary:active,
 .btn-outline-primary.active {
-  background-color: #EF3D42 !important;
+  background-color: #2F4857 !important;
   color: #fff !important;
-  border-color: #EF3D42 !important;
-  transform: translateY(-5px);
-  box-shadow: 0 1rem 2rem rgba(0,0,0,0.1);
+  border-color: #2F4857 !important;
+  transform: translateY(-3px);
+  box-shadow: 0 0.5rem 1rem rgba(47, 72, 87, 0.25);
 }
 
 .btn-outline-primary:focus-visible {
@@ -557,49 +574,432 @@ div.col-sm-12.eventsList * {
   outline-offset: 2px;
 }
 
-/* ================================
-   Schedule Detail Button (Dark outline, Red hover)
-   ================================ */
-.btn-schedule-detail {
-  color: #2F4857 !important;
-  border-color: #2F4857 !important;
-  background-color: transparent !important;
-  transition: all 0.3s ease;
+/* Staff bio: scroll after 4 lines */
+.card-body .card-text {
+  max-height: calc(0.875rem * 1.5 * 4); /* font-size * line-height * 4 lines */
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: thin;
+  scrollbar-color: #ccc #f8f9fa;
 }
 
-.btn-schedule-detail:hover,
-.btn-schedule-detail:focus,
-.btn-schedule-detail:active,
-.btn-schedule-detail.active {
-  background-color: #EF3D42 !important;
-  color: #fff !important;
-  border-color: #EF3D42 !important;
-  transform: translateY(-3px);
-  box-shadow: 0 0.5rem 1rem rgba(239, 61, 66, 0.25);
+/* Webkit scrollbar styling for staff bio */
+.card-body .card-text::-webkit-scrollbar {
+  width: 6px;
 }
 
-.btn-schedule-detail:focus-visible {
-  outline: 2px solid #EF3D42;
-  outline-offset: 2px;
+.card-body .card-text::-webkit-scrollbar-track {
+  background: #f8f9fa;
+  border-radius: 3px;
 }
 
-/* ================================
-   Disabled and Accessibility Tweaks
-   ================================ */
-.btn-primary:disabled,
-.btn-outline-primary:disabled {
-  opacity: 0.65;
-  cursor: not-allowed;
-  box-shadow: none;
-  transform: none;
+.card-body .card-text::-webkit-scrollbar-thumb {
+  background: #ccc;
+  border-radius: 3px;
 }
 
+.card-body .card-text::-webkit-scrollbar-thumb:hover {
+  background: #999;
+}
 
+/* Staff bio: scroll after 4 lines */
+.card-body .card-text {
+  max-height: calc(0.875rem * 1.5 * 4); /* font-size * line-height * 4 lines */
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: thin;
+  scrollbar-color: #ccc #f8f9fa;
+}
 
+/* Webkit scrollbar styling for staff bio */
+.card-body .card-text::-webkit-scrollbar {
+  width: 6px;
+}
+
+.card-body .card-text::-webkit-scrollbar-track {
+  background: #f8f9fa;
+  border-radius: 3px;
+}
+
+.card-body .card-text::-webkit-scrollbar-thumb {
+  background: #ccc;
+  border-radius: 3px;
+}
+
+.card-body .card-text::-webkit-scrollbar-thumb:hover {
+  background: #999;
+}
+
+/* ========================================
+   RSYC Profile - Global CSS
+   Add this to your CMS global styles
+   ======================================== */
+
+/* Tooltip styles for schedule cards */
+.tooltip-icon { 
+    position: relative; 
+    display: inline-flex; 
+    align-items: center; 
+    cursor: help; 
+    margin-left: 6px; 
+}
+
+.tooltip-text {
+    position: absolute;
+    bottom: 110%; /* tooltip appears above */
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0,0,0,0.88);
+    color: #fff;
+    padding: 6px 8px;
+    border-radius: 6px;
+    font-size: 13px;
+    white-space: nowrap;
+    z-index: 9999;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .14s ease-in-out;
+}
+
+/* Show tooltip on hover/focus */
+.tooltip-icon:hover .tooltip-text,
+.tooltip-icon:focus .tooltip-text { 
+    opacity: 1; 
+    pointer-events: auto; 
+}
+
+/* Tooltip arrow */
+.tooltip-text::after {
+    content: "";
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    border-width: 6px;
+    border-style: solid;
+    border-color: rgba(0,0,0,0.88) transparent transparent transparent;
+}
+
+/* Mobile adjustment: shift tooltip down and left */
+@media (max-width: 768px) {
+    .tooltip-text {
+        transform: translateX(calc(-50% - 15px)) translateY(30px);
+    }
+}
+
+/* Horizontal scroll styling for schedule cards */
+.horizontal-scroll {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255,255,255,0.3) transparent;
+}
+
+/* Center schedule cards when using justify-content-center */
+.horizontal-scroll.justify-content-center {
+    flex-wrap: wrap;
+}
+
+/* Schedule scroll wrapper - break out of container on mobile */
+.schedule-scroll-wrapper {
+    margin-left: 0;
+    margin-right: 0;
+}
+
+@media (max-width: 767px) {
+    .schedule-scroll-wrapper {
+        margin-left: calc(-1 * var(--bs-gutter-x, 0.75rem));
+        margin-right: calc(-1 * var(--bs-gutter-x, 0.75rem));
+    }
+    
+    .schedule-scroll-wrapper .horizontal-scroll {
+        padding-left: var(--bs-gutter-x, 0.75rem);
+        padding-right: var(--bs-gutter-x, 0.75rem);
+    }
+}
+
+.horizontal-scroll::-webkit-scrollbar {
+    height: 8px;
+}
+
+.horizontal-scroll::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.horizontal-scroll::-webkit-scrollbar-thumb {
+    background: rgba(255,255,255,0.3);
+    border-radius: 4px;
+}
+
+.horizontal-scroll::-webkit-scrollbar-thumb:hover {
+    background: rgba(255,255,255,0.5);
+}
+
+/* Dark text on white schedule cards */
+#freeTextArea-schedules .schedule-card,
+#freeTextArea-schedules .schedule-card h5,
+#freeTextArea-schedules .schedule-card p,
+#freeTextArea-schedules .schedule-card strong {
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+    color: #111 !important;
+}
+
+#freeTextArea-schedules .schedule-card * { 
+    color: inherit !important; 
+}
+
+/* Exception: Keep tooltip text white */
+#freeTextArea-schedules .tooltip-text {
+    color: #fff !important;
+}
+
+/* Staff bio: scroll after 4 lines */
+.card-body .card-text {
+    max-height: calc(0.875rem * 1.5 * 4); /* font-size * line-height * 4 lines */
+    overflow-y: auto;
+    overflow-x: hidden;
+    scrollbar-width: thin;
+    scrollbar-color: #ccc #f8f9fa;
+}
+
+/* Webkit scrollbar styling for staff bio */
+.card-body .card-text::-webkit-scrollbar {
+    width: 6px;
+}
+
+.card-body .card-text::-webkit-scrollbar-track {
+    background: #f8f9fa;
+    border-radius: 3px;
+}
+
+.card-body .card-text::-webkit-scrollbar-thumb {
+    background: #ccc;
+    border-radius: 3px;
+}
+
+.card-body .card-text::-webkit-scrollbar-thumb:hover {
+    background: #999;
+}
+
+/* ========================================
+   MODAL STYLES - View All Features/Programs
+   ======================================== */
+
+/* Modal overlay */
+.rsyc-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.7);
+    z-index: 10000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+}
+
+/* Modal content container */
+.rsyc-modal-content {
+    background: white;
+    border-radius: 12px;
+    max-width: 900px;
+    width: 100%;
+    max-height: 85vh;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+    animation: rsycModalSlideIn 0.3s ease-out;
+}
+
+@keyframes rsycModalSlideIn {
+    from {
+        opacity: 0;
+        transform: translateY(-30px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Modal header */
+.rsyc-modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px 30px;
+    border-bottom: 1px solid #e0e0e0;
+}
+
+.rsyc-modal-header h3 {
+    margin: 0;
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: #333;
+}
+
+/* Close button */
+.rsyc-modal-close {
+    background: none;
+    border: none;
+    font-size: 2rem;
+    color: #666;
+    cursor: pointer;
+    padding: 0;
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    transition: all 0.2s;
+    line-height: 1;
+}
+
+.rsyc-modal-close:hover {
+    background: #f0f0f0;
+    color: #333;
+}
+
+/* Modal body */
+.rsyc-modal-body {
+    padding: 30px;
+    overflow-y: auto;
+    flex: 1;
+}
+
+/* Scrollbar styling for modal body */
+.rsyc-modal-body::-webkit-scrollbar {
+    width: 10px;
+}
+
+.rsyc-modal-body::-webkit-scrollbar-track {
+    background: #f8f9fa;
+}
+
+.rsyc-modal-body::-webkit-scrollbar-thumb {
+    background: #ccc;
+    border-radius: 5px;
+}
+
+.rsyc-modal-body::-webkit-scrollbar-thumb:hover {
+    background: #999;
+}
+
+/* ========================================
+   Button Styles - Outline Primary (ADDED 2025-11-14)
+   Red hover effect for schedule buttons
+   ======================================== */
+.btn.btn-outline-primary,
+button.btn-outline-primary {
+    color: #2F4857 !important;
+    border-color: #2F4857 !important;
+    background-color: transparent !important;
+    transition: all 0.3s ease;
+}
+
+.btn.btn-outline-primary:hover,
+.btn.btn-outline-primary:focus,
+.btn.btn-outline-primary:active,
+.btn.btn-outline-primary.active,
+button.btn-outline-primary:hover,
+button.btn-outline-primary:focus,
+button.btn-outline-primary:active,
+button.btn-outline-primary.active {
+    background-color: #EF3D42 !important;
+    color: #fff !important;
+    border-color: #EF3D42 !important;
+    transform: translateY(-5px);
+    box-shadow: 0 1rem 2rem rgba(0,0,0,0.1);
+}
+
+.btn.btn-outline-primary:focus-visible,
+button.btn-outline-primary:focus-visible {
+    outline: 2px solid #EF3D42;
+    outline-offset: 2px;
+}
+/* ======================================== END ADDED STYLES ======================================== */
 
 
 /* Replace words in Hero Theatre Slide */
 
+</style>
+
+<!-- Scoped overrides: when this page is embedding the RSYC generator we add
+   the `rsyc-embedded` class to <body> so we can neutralize global Symphony
+   layout rules that would otherwise push the publisher UI down. These
+   rules are intentionally specific and use !important to ensure they
+   win against the imported Symphony stylesheet only in this embed context. -->
+<style>
+body.rsyc-embedded {
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+/* Ensure the app container and preview are truly edge-to-edge inside the
+   publisher and not nudged by global header/footer spacing from Symphony */
+body.rsyc-embedded .app-container,
+body.rsyc-embedded #livePreview,
+body.rsyc-embedded .preview-container-fullscreen {
+  margin: 0 !important;
+  padding: 0 !important;
+  width: 100% !important;
+  max-width: none !important;
+}
+
+/* Neutralize common body/top-bar patterns Symphony may apply (padding-top etc.) */
+body.rsyc-embedded, body.rsyc-embedded html {
+  -webkit-text-size-adjust: 100%;
+  -ms-text-size-adjust: 100%;
+  box-sizing: border-box;
+}
+
+/* If Symphony injects a fixed global header that also adds page padding,
+   remove it for the embedded publisher to avoid shifting content */
+body.rsyc-embedded .globalHeader,
+body.rsyc-embedded .globalHeader + * {
+  display: none !important;
+}
+
+/* Reset container spacing inside the embedded app so generated .container
+   wrappers don't add unintended top/bottom gaps */
+body.rsyc-embedded .app-container .container,
+body.rsyc-embedded #livePreview .container {
+  margin-top: 0 !important;
+  margin-bottom: 0 !important;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+}
+</style>
+<style>
+/* Force the minimal header to use the official Red Shield red gradient when
+   embedded in the publisher. Symphony or other global styles may override
+   variables or header rules, so make this explicit and scoped to the
+   embedded state. */
+body.rsyc-embedded .minimal-header {
+    background: linear-gradient(135deg, #EF3D42 0%, #C8102E 100%) !important;
+    color: #ffffff !important;
+}
+
+/* Only color the header title, icons and buttons white — avoid coloring
+   form controls (selects) so dropdown text remains readable. */
+body.rsyc-embedded .minimal-header .header-main .app-title,
+body.rsyc-embedded .minimal-header .header-main .app-title *,
+body.rsyc-embedded .minimal-header .header-main .btn-toggle,
+body.rsyc-embedded .minimal-header .header-main .btn-toggle *,
+body.rsyc-embedded .minimal-header .header-main .btn,
+body.rsyc-embedded .minimal-header .header-main .btn *,
+body.rsyc-embedded .minimal-header .header-main .bi,
+body.rsyc-embedded .minimal-header .header-main .bi * {
+  color: #ffffff !important;
+}
+
+/* Keep the center dropdown text dark so it's readable against the light background */
+body.rsyc-embedded .center-dropdown-minimal,
+body.rsyc-embedded .center-dropdown-minimal option {
+  color: #111 !important;
+  background: rgba(255,255,255,0.95) !important;
+}
 </style>
 
 <script>
@@ -644,5 +1044,58 @@ document.addEventListener("DOMContentLoaded", function() {
 
     headline.innerHTML = html;
   }
+});
+</script>
+
+
+<script>
+function showRSYCModal(type, centerName) {
+    const modal = document.getElementById('rsyc-modal-' + type);
+    if (modal) {
+        modal.style.display = 'flex';
+        document.body.style.overflow = 'hidden'; // Prevent background scroll
+    }
+}
+
+function closeRSYCModal(type) {
+    const modal = document.getElementById('rsyc-modal-' + type);
+    if (modal) {
+        modal.style.display = 'none';
+        document.body.style.overflow = ''; // Restore scroll
+    }
+}
+
+// Toggle schedule info accordion
+function toggleScheduleInfo(scheduleId) {
+    const content = document.getElementById(scheduleId);
+    const icon = document.getElementById(scheduleId + '-icon');
+    
+    if (content.style.display === 'none' || content.style.display === '') {
+        content.style.display = 'block';
+        icon.style.transform = 'rotate(180deg)';
+    } else {
+        content.style.display = 'none';
+        icon.style.transform = 'rotate(0deg)';
+    }
+}
+
+// Close modal when clicking outside content
+document.addEventListener('click', function(e) {
+    if (e.target.classList.contains('rsyc-modal')) {
+        const modalId = e.target.id;
+        const type = modalId.replace('rsyc-modal-', '');
+        closeRSYCModal(type);
+    }
+});
+
+// Close modal with Escape key
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        const openModals = document.querySelectorAll('.rsyc-modal[style*="display: flex"]');
+        openModals.forEach(modal => {
+            const type = modal.id.replace('rsyc-modal-', '');
+            closeRSYCModal(type);
+        });
+    }
 });
 </script>

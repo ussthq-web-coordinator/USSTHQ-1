@@ -4,8 +4,10 @@
 
 /* === CSS Variables === */
 :root {
-    --sa-red: #C8102E;
-    --sa-dark-red: #A00020;
+    /* Use the official Red Shield red (master CSS uses #EF3D42) */
+    --sa-red: #EF3D42;
+    /* A slightly darker shade for hover/accents */
+    --sa-dark-red: #C8102E;
     --sa-navy: #003F87;
     --sa-gold: #FDB913;
     --sa-teal: #2F4857;
@@ -31,6 +33,21 @@
     box-sizing: border-box;
 }
 
+/* Ensure no accidental safe-area white gaps and full-bleed behavior */
+html, body {
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    -webkit-text-size-adjust: 100%;
+    -webkit-font-smoothing: antialiased;
+}
+
+/* Allow content to extend into iOS safe areas when viewport-fit=cover is set */
+body {
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+}
+
 html {
     height: 100%;
     font-size: 85%; /* Base font size reduction affects all rem/em units */
@@ -48,8 +65,18 @@ body {
 .app-container {
     display: flex;
     flex-direction: column;
-    height: 100vh;
+    min-height: 100vh; /* avoid exact 100vh on mobile which can create viewport issues */
     overflow: hidden;
+}
+
+/* Force preview containers to be full width with no margins/padding across all sizes */
+.preview-section, .preview-section-fullscreen, .preview-container, .preview-container-fullscreen, #livePreview {
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
 }
 
 /* === Header === */
@@ -387,6 +414,8 @@ body {
     z-index: 1000;
 }
 
+.minimal-header { margin: 0; }
+
 .header-main {
     display: flex;
     align-items: center;
@@ -404,8 +433,27 @@ body {
 .primary-controls {
     display: flex;
     align-items: center;
-    gap: 0.75rem;
+    gap: 0.5rem;
     flex: 1;
+    flex-wrap: wrap; /* allow wrapping on narrow viewports */
+}
+
+#prevCenter, #nextCenter {
+    padding: 0.5rem 0.65rem;
+    min-width: auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Lighter grey chevrons for the minimal header navigation (prev/next) */
+#prevCenter i, #nextCenter i {
+    color: var(--gray-400);
+    font-size: 1rem;
+}
+
+#prevCenter:hover i, #nextCenter:hover i {
+    color: var(--gray-700);
 }
 
 .center-dropdown-minimal {
@@ -514,6 +562,27 @@ body {
     min-height: 0;
 }
 
+/* Make live preview area full-bleed (edge-to-edge) so preview content uses the full viewport width */
+.preview-section-fullscreen.full-bleed,
+.preview-section-fullscreen {
+    margin: 0; /* remove outer gaps */
+    width: 100%;
+    max-width: 100%;
+    border-radius: 0; /* remove rounded corners for full-bleed look */
+    box-shadow: none; /* avoid outer shadow when full width */
+}
+
+#livePreview {
+    width: 100%;
+    max-width: 100%;
+    margin: 0;
+    padding: 0; /* inner templates control their own padding */
+}
+
+.preview-container-fullscreen {
+    padding: 0; /* let preview content span full width; inner sections include their own spacing */
+}
+
 .preview-header-minimal {
     display: flex;
     justify-content: space-between;
@@ -555,6 +624,90 @@ body {
 
 .status-bar-minimal span {
     font-weight: 500;
+}
+
+/* Responsive tweaks: dropdown expands, controls reorder, and preview padding reduced on small screens */
+@media (max-width: 768px) {
+    .header-main {
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        align-items: center;
+    }
+
+    .app-title {
+        flex: 0 0 100%;
+        font-size: 1.05rem;
+        padding-bottom: 0.25rem;
+    }
+
+    .center-dropdown-minimal {
+        min-width: 0;
+        width: 100%;
+        max-width: none;
+        order: 2;
+    }
+
+    #prevCenter, #nextCenter {
+        order: 1;
+    }
+
+    .btn-toggle {
+        order: 3;
+        width: 100%;
+        justify-content: center;
+    }
+
+    .preview-container-fullscreen {
+        padding: 0.75rem !important;
+    }
+
+    .preview-header-minimal {
+        padding: 0.4rem 0.75rem;
+    }
+
+    .status-bar-minimal {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.5rem;
+    }
+}
+
+/* Ensure fullscreen preview uses remaining viewport height on desktop */
+@media (min-width: 769px) {
+    .preview-section-fullscreen {
+        height: calc(100vh - 64px);
+    }
+}
+
+/* Extra small screens: remove ALL margins/padding so preview is truly edge-to-edge */
+@media (max-width: 575.98px) {
+    .preview-section-fullscreen {
+        margin: 0 !important;
+        padding: 0 !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        border-radius: 0 !important;
+        box-shadow: none !important;
+    }
+
+    .preview-container-fullscreen,
+    #livePreview {
+        padding: 0 !important;
+        margin: 0 !important;
+        width: 100% !important;
+        max-width: 100% !important;
+    }
+
+    /* Reduce preview header padding to avoid extra spacing */
+    .preview-header-minimal {
+        padding: 0.35rem 0.5rem;
+    }
+
+    /* Ensure status bar stays compact */
+    .status-bar-minimal {
+        padding: 0.25rem 0.5rem;
+        gap: 0.25rem;
+    }
 }
 /* === END MINIMAL HEADER LAYOUT === */
 

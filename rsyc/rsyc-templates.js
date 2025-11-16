@@ -45,6 +45,8 @@ class RSYCTemplates {
      */
     generateSection(sectionKey, data) {
         const methods = {
+            'hero': this.generateHero,
+            'about': this.generateAbout,
             'schedules': this.generateSchedules,
             'hours': this.generateHours,
             'programs': this.generatePrograms,
@@ -108,8 +110,8 @@ class RSYCTemplates {
     <div class="container">
         ${exteriorPhotoHTML}
         <h2>About This Center</h2>
-        <div class="about-content">
-            ${this.makeContactsClickable(center.aboutText)}
+        <div class="about-content" data-make-contacts-clickable>
+            ${center.aboutText}
         </div>
     </div>
 </section>`;
@@ -279,9 +281,9 @@ ${modal}`;
                 }
                 
                 // Parse months for tooltip - summarize into readable ranges
-                const months = schedule.programRunsIn && Array.isArray(schedule.programRunsIn) 
-                    ? this.summarizeMonths(schedule.programRunsIn)
-                    : '';
+                            const months = schedule.programRunsIn && Array.isArray(schedule.programRunsIn)
+                                ? this.summarizeMonths(schedule.programRunsIn)
+                                : '';
                 const registrationMonths = schedule.registrationOpensIn && Array.isArray(schedule.registrationOpensIn)
                     ? this.summarizeMonths(schedule.registrationOpensIn)
                     : '';
@@ -334,6 +336,9 @@ ${modal}`;
                     </div>
                 `;
                 
+                // Helper to check if a field has content
+                const hasContent = (field) => typeof field === 'string' && field.trim() !== '';
+                
                 // Create modal with full schedule details
                 const scheduleModal = `
 <!-- Modal for Schedule Details -->
@@ -354,28 +359,28 @@ ${modal}`;
             ${schedule.description ? `<div class="mb-4"><div style="font-size:1rem; line-height:1.6; color:#333;">${schedule.description}</div></div>` : ''}
             
             <div class="row">
-                ${schedule.ageRange ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Age Range:</strong><br>${this.escapeHTML(schedule.ageRange)}</div>` : ''}
-                ${daysText ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Days:</strong><br>${this.escapeHTML(daysText)}</div>` : ''}
-                ${timeText ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Time:</strong><br>${this.escapeHTML(timeText)}</div>` : ''}
-                ${schedule.timezone ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Time Zone:</strong><br>${this.escapeHTML(schedule.timezone)}</div>` : ''}
-                ${schedule.frequency ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Frequency:</strong><br>${this.escapeHTML(schedule.frequency)}</div>` : ''}
-                ${months ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Program Runs:</strong><br>${this.escapeHTML(months)}</div>` : ''}
-                ${registrationMonths ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Registration Opens:</strong><br>${this.escapeHTML(registrationMonths)}</div>` : ''}
-                ${schedule.registrationDeadline ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Registration Deadline:</strong><br>${this.escapeHTML(schedule.registrationDeadline)}</div>` : ''}
-                ${schedule.registrationFee ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Registration Fee:</strong><br>${this.escapeHTML(schedule.registrationFee)}</div>` : ''}
-                ${schedule.cost ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Cost:</strong><br>${this.escapeHTML(schedule.cost)}</div>` : ''}
-                ${schedule.location ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Location:</strong><br>${this.escapeHTML(schedule.location)}</div>` : ''}
-                ${schedule.capacity ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Capacity:</strong><br>${this.escapeHTML(schedule.capacity)}</div>` : ''}
-                ${schedule.contactInfo ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Contact:</strong><br>${this.escapeHTML(schedule.contactInfo)}</div>` : ''}
-                ${schedule.prerequisites ? `<div class="col-sm-12 mb-3" style="color:#333;"><strong>Prerequisites:</strong><br>${this.escapeHTML(schedule.prerequisites)}</div>` : ''}
-                ${schedule.materialsProvided ? `<div class="col-sm-12 mb-3" style="color:#333;"><strong>Materials Provided:</strong><br>${this.escapeHTML(schedule.materialsProvided)}</div>` : ''}
-                ${schedule.whatToBring ? `<div class="col-sm-12 mb-3" style="color:#333;"><strong>What to Bring:</strong><br>${this.escapeHTML(schedule.whatToBring)}</div>` : ''}
-                ${schedule.dropOffPickUp ? `<div class="col-sm-12 mb-3" style="color:#333;"><strong>Drop-off/Pick-up Info:</strong><br>${this.escapeHTML(schedule.dropOffPickUp)}</div>` : ''}
+                ${hasContent(schedule.ageRange) ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Age Range:</strong><br>${this.escapeHTML(schedule.ageRange)}</div>` : ''}
+                ${hasContent(daysText) ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Days:</strong><br>${this.escapeHTML(daysText)}</div>` : ''}
+                ${hasContent(timeText) ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Time:</strong><br>${this.escapeHTML(timeText)}</div>` : ''}
+                ${hasContent(schedule.timezone) ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Time Zone:</strong><br>${this.escapeHTML(schedule.timezone)}</div>` : ''}
+                ${hasContent(schedule.frequency) ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Frequency:</strong><br>${this.escapeHTML(schedule.frequency)}</div>` : ''}
+                ${hasContent(months) ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Program Runs In:</strong><br>${this.escapeHTML(months)}</div>` : ''}
+                ${hasContent(registrationMonths) ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Registration Opens:</strong><br>${this.escapeHTML(registrationMonths)}</div>` : ''}
+                ${hasContent(schedule.registrationDeadline) ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Registration Deadline:</strong><br>${this.escapeHTML(schedule.registrationDeadline)}</div>` : ''}
+                ${hasContent(schedule.registrationFee) ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Registration Fee:</strong><br>${this.escapeHTML(schedule.registrationFee)}</div>` : ''}
+                ${hasContent(schedule.cost) ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Cost:</strong><br>${this.escapeHTML(schedule.cost)}</div>` : ''}
+                ${hasContent(schedule.location) ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Location:</strong><br>${this.escapeHTML(schedule.location)}</div>` : ''}
+                ${hasContent(schedule.capacity) ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Capacity:</strong><br>${this.escapeHTML(schedule.capacity)}</div>` : ''}
+                ${hasContent(schedule.contactInfo) ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Contact:</strong><br>${this.escapeHTML(schedule.contactInfo)}</div>` : ''}
+                ${hasContent(schedule.prerequisites) ? `<div class="col-sm-12 mb-3" style="color:#333;"><strong>Prerequisites:</strong><br>${this.escapeHTML(schedule.prerequisites)}</div>` : ''}
+                ${hasContent(schedule.materialsProvided) ? `<div class="col-sm-12 mb-3" style="color:#333;"><strong>Materials Provided:</strong><br>${this.escapeHTML(schedule.materialsProvided)}</div>` : ''}
+                ${hasContent(schedule.whatToBring) ? `<div class="col-sm-12 mb-3" style="color:#333;"><strong>What to Bring:</strong><br>${this.escapeHTML(schedule.whatToBring)}</div>` : ''}
+                ${hasContent(schedule.dropOffPickUp) ? `<div class="col-sm-12 mb-3" style="color:#333;"><strong>Drop-off/Pick-up Info:</strong><br>${this.escapeHTML(schedule.dropOffPickUp)}</div>` : ''}
             </div>
             
-            ${disclaimer ? `<div class="mt-3 p-3" style="background:#f8f9fa; border-left:3px solid #2F4857; border-radius:4px; color:#333;">${this.escapeHTML(disclaimer)}</div>` : ''}
+            ${hasContent(disclaimer) ? `<div class="mt-3 p-3" style="background:#f8f9fa; border-left:3px solid #2F4857; border-radius:4px; color:#333;">${this.escapeHTML(disclaimer)}</div>` : ''}
             
-            ${schedule.relatedPrograms && schedule.relatedPrograms.length > 0 ? `
+            ${schedule.relatedPrograms?.length > 0 ? `
                 <div class="mt-3" style="color:#333;">
                     <strong>Related Programs:</strong>
                     <div class="mt-2">
@@ -387,16 +392,22 @@ ${modal}`;
     </div>
 </div>`;
 
+                // For small screens, force a break after three words of the Active value
+                // For small screens, format Active text robustly and force a break after three words
+                // Use formatActiveForDisplay() to normalize spacing (fixes cases like "exceptJune")
+                let activeHTML = months ? this.formatActiveForDisplay(months) : '';
+
                 return `
-                <div class="schedule-card text-dark d-flex flex-column h-100" style="min-width:230px;padding:1rem;border-radius:8px;background:#fff;box-shadow:0 1px 4px rgba(0,0,0,0.06);">
-                    <h5 class="fw-bold mb-1">${this.escapeHTML(schedule.title)}</h5>
-                    <p class="mb-0">
-                        ${daysText ? `<strong>Days:</strong> <span class="d-inline-block">${this.escapeHTML(daysText)}</span><br>` : ''}
-                        ${timeText ? `<strong>Time:</strong> ${this.escapeHTML(timeText)}` : ''}
-                    </p>
-                    ${expandableInfo}
-                </div>
-                ${scheduleModal}`;
+                    <div class="schedule-card text-dark d-flex flex-column h-100" style="min-width:230px;padding:1rem;border-radius:8px;background:#fff;box-shadow:0 1px 4px rgba(0,0,0,0.06);">
+                        <h5 class="fw-bold mb-1">${this.escapeHTML(schedule.title)}</h5>
+                        <p class="mb-0">
+                            ${daysText ? `<strong>Days:</strong> <span class="d-inline-block">${this.escapeHTML(daysText)}</span><br>` : ''}
+                            ${timeText ? `<strong>Time:</strong> ${this.escapeHTML(timeText)}<br>` : ''}
+                            ${activeHTML}
+                        </p>
+                        ${expandableInfo}
+                    </div>
+                    ${scheduleModal}`;
             }).join('');
             
             // Conditionally center if 3 or fewer cards, otherwise left-align for proper scrolling
@@ -432,7 +443,7 @@ ${modal}`;
             
             aboutSection = `
     <div class="mt-5 d-flex justify-content-center">
-        <div class="schedule-card text-dark" style="max-width:800px;width:100%;padding:1.5rem;border-radius:8px;background:#fff;box-shadow:0 1px 4px rgba(0,0,0,0.06);">
+        <div class="schedule-card w-100 text-dark" style="max-width:800px;width:100%;padding:1.5rem;border-radius:8px;background:#fff;box-shadow:0 1px 4px rgba(0,0,0,0.06);">
             ${exteriorPhotoHTML}
             <h3 class="fw-bold mb-3 text-center" style="font-size: 1.5rem;">About This <em>Center</em></h3>
             <p class="text-center mb-3"><strong>The Salvation Army ${this.escapeHTML(center.name || center.Title)}</strong></p>
@@ -861,7 +872,13 @@ ${modal}`;
 
             const title = leader.positionTitle || leader.roleType || 'Role or Title';
             const bio = leader.biography || 'This is a short description or contact info placeholder text. Keep it concise so all cards align perfectly.';
-            const photo = defaultPhoto; // Use default image for all staff
+
+            // Prefer leader-specific image fields when available, fall back to person-level fields (including person.picture), then default
+            const photo = (
+                leader.imageURL || leader.ImageURL || leader.imageUrl || leader.image || leader.photo || leader.photoUrl || leader.photoURL ||
+                (person && (person.picture || person.imageURL || person.imageUrl || person.photo || person.photoUrl || person.image)) ||
+                defaultPhoto
+            );
 
             return `
 		<div class="card shadow border rounded-3 flex-shrink-0" style="width: 280px; scroll-snap-align: start; border: 1px solid #dee2e6; overflow:hidden;">
@@ -1279,8 +1296,8 @@ ${modal}`;
             <button class="rsyc-modal-close" onclick="closeRSYCModal('volunteer')">&times;</button>
         </div>
         <div class="rsyc-modal-body">
-            <div style="font-size: 1rem; line-height: 1.6; margin-bottom: 2rem;">
-                ${this.makeContactsClickable(volunteerText)}
+            <div style="font-size: 1rem; line-height: 1.6; margin-bottom: 2rem;" data-volunteer-text>
+                ${volunteerText}
             </div>
             <div class="text-center" style="padding-top: 1.5rem; border-top: 1px solid #dee2e6;">
                 <p style="font-size: 1rem; margin-bottom: 1rem;">Learn more about volunteering at Red Shield Youth Centers</p>
@@ -1289,8 +1306,8 @@ ${modal}`;
                 </a>
             </div>
         </div>
-    </div>
-</div>` : '';
+        </div>
+        </div>` : '';
 
         // Legacy modal content
         const legacyModal = `
@@ -1669,6 +1686,46 @@ div #freeTextArea-0 {
     }
 
     /**
+     * Normalize and format the Active / Program Runs In text for display.
+     * Ensures missing spaces (e.g., "exceptJune") are fixed and inserts
+     * a small-screen break after the third word using a responsive <br>.
+     */
+    formatActiveForDisplay(months) {
+        if (!months) return '';
+
+        // Normalize to string and collapse non-breaking spaces
+        let s = months.toString();
+        s = s.replace(/\u00A0/g, ' ');
+
+        // Ensure commas have a single space after them
+        s = s.replace(/,\s*/g, ', ');
+
+        // If input accidentally glued words like 'exceptJune', insert a space
+        // between a lowercase followed by uppercase (fixes "exceptJune")
+        s = s.replace(/([a-z])([A-Z])/g, '$1 $2');
+
+        // Also guard common keyword run-ons (e.g., 'exceptJune' without capital)
+        s = s.replace(/except(?=[A-Za-z0-9])/gi, 'except ');
+
+        // Collapse multiple spaces and trim
+        s = s.replace(/\s+/g, ' ').trim();
+
+    // Split into tokens (words and punctuation-aware)
+    const tokens = s.split(/\s+/).filter(Boolean);
+
+        if (tokens.length <= 3) {
+            return `<strong>Active:</strong> ${this.escapeHTML(s)}`;
+        }
+
+        const first3 = this.escapeHTML(tokens.slice(0, 3).join(' '));
+        const rest = this.escapeHTML(tokens.slice(3).join(' '));
+
+        // Insert a normal space before the responsive <br> so DESKTOPs keep a space
+        // while small screens (<992px) will break after the third word.
+        return `<strong>Active:</strong> ${first3} <br class="d-lg-none">${rest}`;
+    }
+
+    /**
      * Escape HTML to prevent XSS
      */
     escapeHTML(str) {
@@ -1685,20 +1742,43 @@ div #freeTextArea-0 {
     makeContactsClickable(text) {
         if (!text) return '';
         
-        // Make email addresses clickable
-        // Match emails: word@domain.tld
-        text = text.replace(/([a-zA-Z0-9._-]+@[a-zA-Z0-9._-]+\.[a-zA-Z0-9._-]+)/gi, 
-            '<a href="mailto:$1">$1</a>');
+        // Process text node by node to avoid matching inside HTML tags
+        // Split by HTML tags while preserving them
+        const parts = text.split(/(<[^>]+>)/g);
         
-        // Make phone numbers clickable
-        // Match formats: (123) 456-7890, 123-456-7890, 123.456.7890, 1234567890
-        text = text.replace(/(\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4})/g, function(match) {
-            // Clean number for tel: link (remove all non-digits)
-            const cleanNumber = match.replace(/\D/g, '');
-            return `<a href="tel:+1${cleanNumber}">${match}</a>`;
+        const processedParts = parts.map((part) => {
+            // Skip HTML tags (anything starting with < and ending with >)
+            if (part.startsWith('<') && part.endsWith('>')) {
+                return part;
+            }
+            
+            // Skip if empty or only whitespace
+            if (!part.trim()) {
+                return part;
+            }
+            
+            // Process text content only
+            let processed = part;
+            
+            // Make email addresses clickable - very permissive pattern
+            // Matches any email format including after labels, in lists, etc.
+            processed = processed.replace(/([a-zA-Z0-9][a-zA-Z0-9._+-]*@[a-zA-Z0-9][a-zA-Z0-9._-]*\.[a-zA-Z0-9._-]+)/gi, 
+                '<a href="mailto:$1">$1</a>');
+            
+            // Make phone numbers clickable with very flexible matching
+            // Handles: (864) 576-8330, (803)522- 2963, 864-576-8330, etc.
+            processed = processed.replace(/(\(?\d{3}\)?[-.\s]*\d{3}[-.\s]*\d{4})/g, function(match) {
+                const cleanNumber = match.replace(/\D/g, '');
+                if (cleanNumber.length === 10) {
+                    return `<a href="tel:+1${cleanNumber}">${match}</a>`;
+                }
+                return match;
+            });
+            
+            return processed;
         });
         
-        return text;
+        return processedParts.join('');
     }
     // END ADDED 2025-11-15
 

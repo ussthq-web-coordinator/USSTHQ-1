@@ -85,20 +85,20 @@ class RSYCDataLoader {
      * Fetch JSON from URL with fallback
      */
     async fetchJSON(filename) {
-        // Use CORS proxy to avoid CORS issues
-        const url = this.corsProxy + encodeURIComponent(this.baseURL + filename);
-        
+        // Always fetch the canonical remote JSON via CORS proxy. No local fallback.
+        const remoteUrl = this.corsProxy + encodeURIComponent(this.baseURL + filename);
         try {
-            console.log(`📥 Fetching: ${filename}`);
-            const response = await fetch(url);
+            console.log(`📥 Fetching remote (via CORS proxy): ${filename} -> ${remoteUrl}`);
+            const response = await fetch(remoteUrl);
             if (!response.ok) {
                 throw new Error(`HTTP ${response.status}: ${response.statusText}`);
             }
             const data = await response.json();
-            console.log(`✅ Loaded: ${filename}`);
+            console.log(`✅ Loaded remote: ${filename}`);
             return data;
         } catch (error) {
-            console.error(`❌ Failed to fetch ${filename}:`, error);
+            console.error(`❌ Failed to fetch ${filename} (remote):`, error);
+            // Surface a clear error so the caller can show UI feedback
             throw new Error(`Failed to fetch ${filename}: ${error.message}`);
         }
     }
@@ -195,7 +195,7 @@ class RSYCDataLoader {
             programRunsIn: (schedule.ProgramRunsIn || []).map(m => m.Value),
             // Extract .Value from RegistrationTypicallyOpensin array
             registrationOpensIn: (schedule.RegistrationTypicallyOpensin || []).map(m => m.Value),
-            relatedPrograms: (schedule.RelatedProgram || []).map(p => ({
+            relatedPrograms: (Array.isArray(schedule.RelatedProgram) ? schedule.RelatedProgram : []).map(p => ({
                 id: p.Id,
                 name: p.Value
             }))
@@ -213,10 +213,13 @@ class RSYCDataLoader {
             positionTitle: leader.PositionTitle,
             alternateName: leader.AlternateName,
             biography: leader.Biography,
+            // Top-level image fields (many naming variants) to allow templates to prefer leader.imageURL
+            imageURL: leader.ImageURL || leader.ImageUrl || leader.Image || leader.Photo || leader.PhotoURL || leader.Picture || null,
+            // Preserve person object (if present)
             person: leader.Person ? {
                 name: leader.Person.DisplayName,
                 email: leader.Person.Email,
-                picture: leader.Person.Picture,
+                picture: leader.Person.Picture || null,
                 department: leader.Person.Department,
                 title: leader.Person.JobTitle
             } : null
