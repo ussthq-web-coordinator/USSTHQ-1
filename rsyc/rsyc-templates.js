@@ -1045,7 +1045,7 @@ ${modal}`;
                     <li><strong>Academic Support</strong> – tutoring, homework help, and enrichment activities</li>
                     <li><strong>Social-Emotional Learning</strong> – building confidence, empathy, and communication skills</li>
                     <li><strong>Character & Leadership Development</strong> – opportunities to lead, problem-solve, and make decisions</li>
-                    <li><strong>STEM & Creative Exploration</strong> – hands-on activities that spark curiosity and creativity</li>
+                    <li><strong>STEAM & Creative Exploration</strong> – hands-on activities that spark curiosity and creativity</li>
                     <li><strong>Physical Activity & Team Sports</strong> – promoting health, teamwork, and well-being</li>
                     <li><strong>Music & Arts</strong> – nurturing creative talents and self-expression</li>
                 </ul>
