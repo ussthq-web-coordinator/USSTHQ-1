@@ -506,15 +506,35 @@ async function loadQaLookupCsv(){
   const cdnUrl = 'https://hopewell.pages.dev/DashboardData.json';
   let json = null;
   try{
+    // Try local file first. Read as text and parse safely so an empty file doesn't throw.
     try{
       const r = await fetch(localUrl);
-      if (r && r.ok) json = await r.json();
+      if (r && r.ok){
+        const txt = await r.text();
+        if (txt && txt.trim()){
+          try{
+            json = JSON.parse(txt);
+          }catch(parseErr){
+            console.warn('Local DashboardData.json found but JSON.parse failed, will try CDN...', parseErr);
+            json = null;
+          }
+        } else {
+          console.warn('Local DashboardData.json is empty, trying CDN...');
+        }
+      }
     }catch(e){ console.warn('Local DashboardData.json fetch failed, trying CDN...', e); }
 
+    // Try CDN if local not usable. Also parse text safely and provide clearer errors.
     if (!json){
       const r2 = await fetch(cdnUrl);
       if (!r2.ok) throw new Error('Failed to load remote dashboard JSON');
-      json = await r2.json();
+      const txt2 = await r2.text();
+      if (!txt2 || !txt2.trim()) throw new Error('Remote DashboardData.json is empty');
+      try{
+        json = JSON.parse(txt2);
+      }catch(parseErr){
+        throw new Error('Remote DashboardData.json parse failed: ' + (parseErr && parseErr.message));
+      }
     }
 
     // Show refreshDate if present (use window.APP_VERSION as the authoritative version)
@@ -587,6 +607,22 @@ async function loadQaLookupCsv(){
     console.info('Site Migration Dashboard data loaded', { rows: tableData.length });
   }catch(err){
     console.error('Dashboard data load failed', err);
+    // Fallback: use embedded sample data so the dashboard remains usable in dev or when
+    // both local and remote JSON are unavailable or invalid.
+    try{
+      console.info('Falling back to embedded _migrationSampleData');
+      json = { data: Array.isArray(_migrationSampleData) ? _migrationSampleData : [] };
+      tableData = json.data;
+      pageCache = {};
+      tableData.forEach((d,i)=>{ d._id = i; pageCache[i] = d; d._ModifiedMs = dateToUtcMidnightMs(d.Modified) || 0; });
+      masterData = tableData;
+      try{ if (typeof initFilters === 'function') initFilters(); }catch(e){}
+      try{ if (typeof updateDashboard === 'function') updateDashboard(); }catch(e){}
+      try{ window.__SM_dashboard = window.__SM_dashboard || {}; window.__SM_dashboard.loaded = true; window.__SM_dashboard.rowCount = tableData.length; }catch(e){}
+      console.info('Dashboard loaded from embedded sample data', { rows: tableData.length });
+    }catch(e){
+      console.error('Fallback to embedded sample data failed', e);
+    }
   }
 })();
 
