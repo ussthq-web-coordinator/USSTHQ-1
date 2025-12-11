@@ -373,6 +373,24 @@ class RSYCGeneratorV2 {
             });
 
             if (container.dataset) container.dataset.rsycContactsProcessed = 'true';
+
+            // Ensure all links inside the processed container open in a new tab
+            try {
+                const anchors = Array.from(container.querySelectorAll('a'));
+                anchors.forEach(a => {
+                    try {
+                        // Skip anchors that explicitly opt out via data-target="self"
+                        if (a.dataset && a.dataset.target === 'self') return;
+                        // Set target and rel for security when opening new tabs
+                        a.setAttribute('target', '_blank');
+                        // Preserve existing rel tokens but ensure noopener noreferrer are present
+                        const existingRel = (a.getAttribute('rel') || '').split(/\s+/).filter(Boolean);
+                        if (!existingRel.includes('noopener')) existingRel.push('noopener');
+                        if (!existingRel.includes('noreferrer')) existingRel.push('noreferrer');
+                        a.setAttribute('rel', existingRel.join(' '));
+                    } catch (e) { /* ignore per-anchor errors */ }
+                });
+            } catch (e) { /* ignore */ }
         };
     }
 
@@ -420,6 +438,14 @@ class RSYCGeneratorV2 {
             dropdown.appendChild(option);
         });
 
+        // Ensure change listener is attached (in case DOM was replaced)
+        try {
+            if (!dropdown.dataset || dropdown.dataset.rsycListenerAttached !== 'true') {
+                dropdown.addEventListener('change', (e) => { this.onCenterSelect(e.target.value); });
+                if (dropdown.dataset) dropdown.dataset.rsycListenerAttached = 'true';
+            }
+        } catch (e) { /* ignore listener attach errors */ }
+
         // Log sample of loaded centers for debugging
         try {
             console.log('📋 Center samples:', sortedUnits.slice(0,5).map(u => ({ Id: u.Id, Title: u.Title }))); 
@@ -441,6 +467,49 @@ class RSYCGeneratorV2 {
 
         document.getElementById('nextCenter')?.addEventListener('click', () => {
             this.navigateCenter(1);
+        });
+
+        // Refresh data button - reloads live JSON and updates UI & preview
+        document.getElementById('refreshData')?.addEventListener('click', async () => {
+            const btn = document.getElementById('refreshData');
+            try {
+                if (btn) btn.disabled = true;
+                this.updateStatus('dataStatus', 'Data: Refreshing...');
+
+                // Reload all JSON from remote sources
+                await this.dataLoader.loadAll();
+
+                // Re-process centers to ensure rich text contact linking
+                try { this.processAllCenterContacts(); } catch (e) { /* ignore */ }
+
+                // Repopulate dropdown with fresh data
+                try { this.populateCenterDropdown(); } catch (e) { console.warn('Repopulate dropdown failed after refresh', e); }
+
+                // If a center was selected before refresh, try to preserve selection and regenerate preview
+                if (this.currentCenter) {
+                    const currentId = this.currentCenter.id || this.currentCenter.Id;
+                    const newCenter = (this.dataLoader.cache.centers || []).find(c => (c.id && c.id == currentId) || (c.Id && c.Id == currentId));
+                    if (newCenter) {
+                        this.currentCenter = newCenter;
+                        // Ensure dropdown value matches
+                        const dd = document.getElementById('centerSelect');
+                        if (dd) dd.value = newCenter.Id || newCenter.id;
+                        // Regenerate preview for current center
+                        try { await this.autoGeneratePreview(); } catch (e) { console.warn('autoGeneratePreview failed after refresh', e); }
+                    } else {
+                        // If the selected center no longer exists, clear and show placeholder
+                        this.currentCenter = null;
+                        this.showPlaceholder('Selected center not found after refresh');
+                    }
+                }
+
+                this.updateStatus('dataStatus', `Data: Refreshed (${(this.dataLoader.cache.centers||[]).length} centers)`);
+            } catch (error) {
+                console.error('❌ Data refresh failed:', error);
+                this.updateStatus('dataStatus', 'Data: Refresh Failed ⚠️');
+            } finally {
+                if (btn) btn.disabled = false;
+            }
         });
 
         // Section checkboxes - auto-update on change + update count
@@ -486,6 +555,26 @@ class RSYCGeneratorV2 {
         // View Data Structure button
         document.getElementById('viewDataStructure')?.addEventListener('click', () => {
             this.showDataStructureModal();
+        });
+
+                                window.addEventListener('resize', this._rsycScheduleResizeHandler);
+                                // Delegated listener for center selection to ensure handler works even if
+                                // the select element is replaced by other scripts or re-rendered.
+                                const self = this;
+                                if (!document._rsycDelegatedCenterListenerAttached) {
+                                    document.addEventListener('change', function (e) {
+                                        try {
+                                            if (!e || !e.target) return;
+                                            if (e.target.id === 'centerSelect') {
+                                                self.onCenterSelect(e.target.value);
+                                            }
+                                        } catch (err) { /* ignore per-event errors */ }
+                                    });
+                                    document._rsycDelegatedCenterListenerAttached = true;
+                                    console.log('✅ RSYC: delegated centerSelect change listener attached');
+                                }
+        document.getElementById('openDataAudit')?.addEventListener('click', () => {
+            try { this.showDataAuditModal(); } catch (e) { console.warn('showDataAuditModal failed', e); }
         });
 
         // Close CSS Modal
@@ -538,9 +627,26 @@ class RSYCGeneratorV2 {
             this.disableButtons();
             return;
         }
+        // Find the selected center. Be permissive: match by Id, id, sharePointId, Title or name
+        const centers = this.dataLoader?.cache?.centers || [];
+        const findCenter = (val) => {
+            if (!val) return null;
+            // Try exact Id match
+            let c = centers.find(u => (u.Id && String(u.Id) === String(val)) || (u.id && String(u.id) === String(val)));
+            if (c) return c;
+            // Try numeric SharePoint ID
+            c = centers.find(u => u.sharePointId && String(u.sharePointId) === String(val));
+            if (c) return c;
+            // Try matching by Title or name (case-insensitive)
+            const lower = String(val).toLowerCase();
+            c = centers.find(u => (u.Title && String(u.Title).toLowerCase() === lower) || (u.name && String(u.name).toLowerCase() === lower));
+            if (c) return c;
+            // Last resort: try partial match on Title
+            c = centers.find(u => (u.Title && String(u.Title).toLowerCase().includes(lower)) || (u.name && String(u.name).toLowerCase().includes(lower)));
+            return c || null;
+        };
 
-        // Find the selected center
-        this.currentCenter = this.dataLoader.cache.centers.find(u => u.Id == centerId);
+        this.currentCenter = findCenter(centerId);
         console.log('🎯 Center found:', this.currentCenter ? this.currentCenter.Title : 'NOT FOUND');
         
         if (this.currentCenter) {
@@ -558,7 +664,10 @@ class RSYCGeneratorV2 {
             // Auto-generate preview
             this.autoGeneratePreview();
         } else {
-            console.error('❌ Center not found for ID:', centerId);
+            console.error('❌ Center not found for ID:', centerId, '— available samples:', centers.slice(0,5).map(c => ({Id:c.Id, sharePointId:c.sharePointId, Title:c.Title}))); 
+            // As a fallback, reset dropdown to empty so user knows selection didn't stick
+            const dd = document.getElementById('centerSelect');
+            try { if (dd) dd.value = ''; } catch (e) {}
         }
         
         // Update arrow button states
@@ -1022,8 +1131,329 @@ class RSYCGeneratorV2 {
         modal.style.display = 'block';
     }
 
+    /**
+     * Build and show a Data Audit modal listing which centers have custom data
+     * in key sections and aggregate counts. Rows are clickable to select a
+     * center in the dropdown and jump to the live preview.
+     */
+    showDataAuditModal() {
+        // Remove existing modal if present
+        const existing = document.getElementById('dataAuditModal');
+        if (existing) existing.remove();
+
+        const centers = this.dataLoader.cache.centers || [];
+        const schedules = this.dataLoader.cache.schedules || [];
+        const leaders = this.dataLoader.cache.leaders || [];
+        const photos = this.dataLoader.cache.photos || [];
+        const hours = this.dataLoader.cache.hours || [];
+
+        // Helper: normalize hour strings for robust comparison
+        const normalizeHourValue = (v) => {
+            if (v === null || v === undefined) return '';
+            let s = String(v).trim();
+            if (!s) return '';
+            // Treat explicit 'closed' as empty
+            if (/^closed$/i.test(s)) return '';
+            // Normalize various dashes to simple hyphen
+            s = s.replace(/[\u2012\u2013\u2014\u2015\u2212]/g, '-');
+            // Normalize spacing around hyphen
+            s = s.replace(/\s*-\s*/g, ' - ');
+            // Collapse multiple spaces
+            s = s.replace(/\s+/g, ' ');
+            // Upper-case AM/PM markers
+            s = s.replace(/\b(am|pm)\b/ig, (m) => m.toUpperCase());
+            return s;
+        };
+
+        // Canonical default Symphony hours (normalized)
+        const defaultRegular = {
+            monday: normalizeHourValue('2:00 PM - 7:30 PM'),
+            tuesday: normalizeHourValue('2:00 PM - 7:30 PM'),
+            wednesday: normalizeHourValue('2:00 PM - 7:30 PM'),
+            thursday: normalizeHourValue('2:00 PM - 7:30 PM'),
+            friday: normalizeHourValue('2:00 PM - 7:30 PM'),
+            saturday: normalizeHourValue(''),
+            sunday: normalizeHourValue('')
+        };
+        const defaultSummer = {
+            monday: normalizeHourValue('7:30 AM - 5:30 PM'),
+            tuesday: normalizeHourValue('7:30 AM - 5:30 PM'),
+            wednesday: normalizeHourValue('7:30 AM - 5:30 PM'),
+            thursday: normalizeHourValue('7:30 AM - 5:30 PM'),
+            friday: normalizeHourValue('7:30 AM - 5:30 PM'),
+            saturday: normalizeHourValue(''),
+            sunday: normalizeHourValue('')
+        };
+
+        const isDefaultHoursRecord = (h) => {
+            if (!h) return false;
+            try {
+                const rh = h.regularHours || {};
+                const sh = h.summerHours || {};
+                const days = ['monday','tuesday','wednesday','thursday','friday','saturday','sunday'];
+                for (const d of days) {
+                    const a = normalizeHourValue(rh[d]);
+                    const b = defaultRegular[d];
+                    if (a !== b) return false;
+                }
+                for (const d of days) {
+                    const a = normalizeHourValue(sh[d]);
+                    const b = defaultSummer[d];
+                    if (a !== b) return false;
+                }
+                return true;
+            } catch (e) {
+                return false;
+            }
+        };
+
+        // Compute per-center indicators
+        const rows = centers.map(c => {
+            const spId = c.sharePointId;
+            const hasAbout = !!(c.aboutText && String(c.aboutText).trim());
+            const hasVolunteer = !!(c.volunteerText && String(c.volunteerText).trim());
+            const schedCount = schedules.filter(s => s.centerId == spId).length;
+            const leaderCount = leaders.filter(l => (l.centerIds || []).includes(spId)).length;
+            // Count distinct populated photo URL fields for this center across photo records
+            const photosForCenter = photos.filter(p => p.centerId == spId);
+            const urlFields = ['urlExteriorPhoto','urlFacilityFeaturesPhoto','urlProgramsPhoto','urlNearbyCentersPhoto','urlParentsSectionPhoto','urlYouthSectionPhoto','urlGetInvolvedPhoto','urlFooterPhoto'];
+            const urlSet = new Set();
+            photosForCenter.forEach(p => {
+                urlFields.forEach(f => {
+                    const v = (p && p[f]) ? String(p[f]).trim() : '';
+                    if (v) urlSet.add(v);
+                });
+            });
+            const photoCount = urlSet.size;
+            const hasFooterPhoto = photosForCenter.some(p => {
+                const v = (p && p.urlFooterPhoto) ? String(p.urlFooterPhoto).trim() : '';
+                return !!v;
+            });
+            const hasFooterScripture = !!(c.scripture && String(c.scripture).trim());
+            const hoursForCenter = hours.find(h => h.centerId == spId);
+            // Consider hours 'custom' only when an hours record exists AND it does not match the
+            // canonical Symphony default hours block. If it matches the default (no changes),
+            // treat as no custom hours.
+            let hasHours = !!hoursForCenter;
+            if (hasHours && isDefaultHoursRecord(hoursForCenter)) {
+                hasHours = false;
+            }
+            const facilityCount = (c.facilityFeatures || []).length;
+            const programCount = (c.featuredPrograms || []).length;
+            return {
+                id: c.id || c.Id,
+                sharePointId: spId,
+                name: c.name || c.Title || '(unnamed)',
+                hasAbout,
+                hasVolunteer,
+                hasFooterPhoto,
+                hasFooterScripture,
+                schedCount,
+                leaderCount,
+                photoCount,
+                hasHours,
+                facilityCount,
+                programCount
+            };
+        });
+
+        // Aggregate counts: both number of centers with data and total item counts
+        // Also compute distinct counts for facility features and featured programs
+        const facilitySet = new Set();
+        const programSet = new Set();
+        centers.forEach(c => {
+            const feats = c.facilityFeatures || [];
+            feats.forEach(f => {
+                const fid = f && (f.id || f.Id || f.FeatureId || f.featureId || f.name || f.Name || f.Title) || (f ? JSON.stringify(f) : null);
+                if (fid !== undefined && fid !== null) facilitySet.add(String(fid));
+            });
+            const progs = c.featuredPrograms || [];
+            progs.forEach(p => {
+                const pid = p && (p.id || p.Id || p.ProgramId || p.programId || p.name || p.Name || p.Title) || (p ? JSON.stringify(p) : null);
+                if (pid !== undefined && pid !== null) programSet.add(String(pid));
+            });
+        });
+
+        const aggregates = {
+            centers: centers.length,
+            about: rows.filter(r => r.hasAbout).length,
+            volunteers: rows.reduce((s, r) => s + (r.hasVolunteer ? 1 : 0), 0),
+            footerPhoto: rows.reduce((s, r) => s + (r.hasFooterPhoto ? 1 : 0), 0),
+            footerScripture: rows.reduce((s, r) => s + (r.hasFooterScripture ? 1 : 0), 0),
+            schedules_centers: rows.reduce((s, r) => s + (r.schedCount > 0 ? 1 : 0), 0),
+            schedules_items: rows.reduce((s, r) => s + (r.schedCount || 0), 0),
+            leaders_centers: rows.reduce((s, r) => s + (r.leaderCount > 0 ? 1 : 0), 0),
+            leaders_items: rows.reduce((s, r) => s + (r.leaderCount || 0), 0),
+            photos_centers: rows.reduce((s, r) => s + (r.photoCount > 0 ? 1 : 0), 0),
+            photos_items: rows.reduce((s, r) => s + (r.photoCount || 0), 0),
+            hours: rows.reduce((s, r) => s + (r.hasHours ? 1 : 0), 0),
+            facilities_centers: rows.reduce((s, r) => s + (r.facilityCount > 0 ? 1 : 0), 0),
+            facilities_items: rows.reduce((s, r) => s + (r.facilityCount || 0), 0),
+            facilities_distinct: facilitySet.size,
+            programs_centers: rows.reduce((s, r) => s + (r.programCount > 0 ? 1 : 0), 0),
+            programs_items: rows.reduce((s, r) => s + (r.programCount || 0), 0),
+            programs_distinct: programSet.size
+        };
+
+    // Build modal HTML
+        const modal = document.createElement('div');
+        modal.id = 'dataAuditModal';
+        modal.style.position = 'fixed';
+        modal.style.inset = '0';
+        modal.style.background = 'rgba(0,0,0,0.6)';
+        modal.style.zIndex = 12500;
+        modal.style.overflow = 'auto';
+
+        const modalInner = document.createElement('div');
+        modalInner.style.background = 'white';
+        modalInner.style.margin = '30px auto';
+        modalInner.style.padding = '16px';
+        modalInner.style.maxWidth = '1100px';
+        modalInner.style.borderRadius = '8px';
+        modalInner.style.boxShadow = '0 10px 40px rgba(0,0,0,0.25)';
+
+        // Header
+        const header = document.createElement('div');
+        header.style.display = 'flex';
+        header.style.justifyContent = 'space-between';
+        header.style.alignItems = 'center';
+        header.style.marginBottom = '12px';
+        header.innerHTML = `<h3 style="margin:0;">Data Audit — ${aggregates.centers} centers</h3>`;
+        const closeBtn = document.createElement('button');
+        closeBtn.textContent = 'Close';
+        closeBtn.className = 'btn btn-sm btn-danger';
+        closeBtn.onclick = () => modal.remove();
+        header.appendChild(closeBtn);
+
+        // Summary counts
+        const summary = document.createElement('div');
+        summary.style.display = 'flex';
+        summary.style.gap = '12px';
+        summary.style.flexWrap = 'wrap';
+        summary.style.marginBottom = '12px';
+        const makeBadge = (label, centersCount, itemsCount) => {
+            const itemsLine = (typeof itemsCount === 'number') ? `<div style='font-size:12px;color:#666;margin-top:4px'>${itemsCount} total</div>` : '';
+            return `<div style="background:#f8f9fa;border:1px solid #e9ecef;padding:8px 10px;border-radius:6px;min-width:140px;text-align:center;margin-bottom:6px;">
+                        <div style='font-size:12px;color:#666'>${label}</div>
+                        <div style='font-weight:700;font-size:16px'>${centersCount} centers</div>
+                        ${itemsLine}
+                    </div>`;
+        };
+
+        summary.innerHTML =
+            makeBadge('About', aggregates.about) +
+            makeBadge('Schedules', aggregates.schedules_centers, aggregates.schedules_items) +
+            makeBadge('Leaders', aggregates.leaders_centers, aggregates.leaders_items) +
+            makeBadge('Volunteers', aggregates.volunteers) +
+            makeBadge('Photos', aggregates.photos_centers, aggregates.photos_items) +
+            makeBadge('Footer Photo', aggregates.footerPhoto) +
+            makeBadge('Footer Scripture', aggregates.footerScripture) +
+            makeBadge('Hours', aggregates.hours) +
+            // Facility Features: show distinct and total
+            `<div style="background:#f8f9fa;border:1px solid #e9ecef;padding:8px 10px;border-radius:6px;min-width:140px;text-align:center;margin-bottom:6px;">
+                        <div style='font-size:12px;color:#666'>Facility Features</div>
+                        <div style='font-weight:700;font-size:16px'>${aggregates.facilities_centers} centers</div>
+                        <div style='font-size:12px;color:#666;margin-top:4px'>${aggregates.facilities_distinct} distinct • ${aggregates.facilities_items} total</div>
+                    </div>` +
+            // Featured Programs
+            `<div style="background:#f8f9fa;border:1px solid #e9ecef;padding:8px 10px;border-radius:6px;min-width:140px;text-align:center;margin-bottom:6px;">
+                        <div style='font-size:12px;color:#666'>Featured Programs</div>
+                        <div style='font-weight:700;font-size:16px'>${aggregates.programs_centers} centers</div>
+                        <div style='font-size:12px;color:#666;margin-top:4px'>${aggregates.programs_distinct} distinct • ${aggregates.programs_items} total</div>
+                    </div>`;
+
+        // Table
+        const tableWrap = document.createElement('div');
+        tableWrap.style.maxHeight = '60vh';
+        tableWrap.style.overflow = 'auto';
+        tableWrap.style.border = '1px solid #e9ecef';
+        tableWrap.style.borderRadius = '6px';
+
+        const table = document.createElement('table');
+        table.className = 'table table-sm';
+        table.style.margin = '0';
+        const thead = document.createElement('thead');
+    thead.innerHTML = `<tr><th>Center</th><th>About</th><th>Schedules</th><th>Leaders</th><th>Volunteer</th><th>Photos</th><th>Footer Photo</th><th>Footer Scripture</th><th>Hours</th><th>Features</th><th>Programs</th></tr>`;
+        // Make header sticky so it stays visible while the table body scrolls
+        thead.style.position = 'sticky';
+        thead.style.top = '0';
+        thead.style.zIndex = '5';
+        thead.style.background = '#fff';
+        thead.style.boxShadow = '0 2px 4px rgba(0,0,0,0.04)';
+        // Ensure individual th cells also render with white background
+        Array.from(thead.querySelectorAll('th')).forEach(th => {
+            th.style.background = 'inherit';
+            th.style.position = 'relative';
+        });
+        const tbody = document.createElement('tbody');
+
+        // small HTML-escape helper (avoid depending on template engine here)
+        const esc = (v) => {
+            if (v === null || v === undefined) return '';
+            return String(v)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        };
+
+        rows.forEach(r => {
+            const tr = document.createElement('tr');
+            // highlight currently selected center
+            if (this.currentCenter && (this.currentCenter.id == r.id || this.currentCenter.Id == r.id || this.currentCenter.sharePointId == r.sharePointId)) {
+                tr.style.background = '#f1f9ff';
+            }
+            tr.style.cursor = 'pointer';
+            tr.onclick = () => {
+                // Select center in dropdown and regenerate preview
+                const dd = document.getElementById('centerSelect');
+                if (dd) {
+                    dd.value = r.id;
+                    dd.dispatchEvent(new Event('change'));
+                }
+                modal.remove();
+            };
+
+            const yesNo = (v) => v ? '✓' : '';
+            tr.innerHTML = `
+                <td style="min-width:220px;"><i class="bi bi-mouse2" style="margin-right:8px;color:#007bff;"></i>${esc(r.name)}</td>
+                <td style="text-align:center">${yesNo(r.hasAbout)}</td>
+                <td style="text-align:center">${r.schedCount || ''}</td>
+                <td style="text-align:center">${r.leaderCount || ''}</td>
+                <td style="text-align:center">${yesNo(r.hasVolunteer)}</td>
+                <td style="text-align:center">${r.photoCount || ''}</td>
+                <td style="text-align:center">${yesNo(r.hasFooterPhoto)}</td>
+                <td style="text-align:center">${yesNo(r.hasFooterScripture)}</td>
+                <td style="text-align:center">${yesNo(r.hasHours)}</td>
+                <td style="text-align:center">${r.facilityCount || ''}</td>
+                <td style="text-align:center">${r.programCount || ''}</td>
+            `;
+            tbody.appendChild(tr);
+        });
+
+        table.appendChild(thead);
+        table.appendChild(tbody);
+        tableWrap.appendChild(table);
+
+        // Footer note
+    const note = document.createElement('div');
+    note.style.marginTop = '10px';
+    note.style.color = '#666';
+    note.style.fontSize = '13px';
+    note.textContent = 'Click a row to select that center and open the live preview. Counts indicate presence or number of items in the dataset.';
+
+        modalInner.appendChild(header);
+        modalInner.appendChild(summary);
+        modalInner.appendChild(tableWrap);
+        modalInner.appendChild(note);
+        modal.appendChild(modalInner);
+        document.body.appendChild(modal);
+    }
+
     createTemplateViewer(hasCenter = false) {
-        const sections = [
+        // Build sections list; hide About button when a center is selected but About is empty
+        let sections = [
             { key: 'about', name: 'About This Center' },
             { key: 'schedules', name: 'Program Schedules' },
             { key: 'hours', name: 'Hours of Operation' },
@@ -1037,6 +1467,14 @@ class RSYCGeneratorV2 {
             { key: 'footerPhoto', name: 'Footer Photo' },
             { key: 'contact', name: 'Footer Scripture' }
         ];
+
+        if (hasCenter && this.currentCenter) {
+            const aboutText = (this.currentCenter.aboutText || '').toString().trim();
+            if (!aboutText) {
+                // Remove the About section from the viewer when it's empty for the selected center
+                sections = sections.filter(s => s.key !== 'about');
+            }
+        }
 
         const viewModeButtons = hasCenter ? `
             <button id="viewFullPageCode" class="template-section-btn" style="
@@ -1743,6 +2181,17 @@ ${JSON.stringify(this.currentCenter, null, 2)}
                 const cards = Array.from(container.querySelectorAll('.schedule-card'));
                 if (!cards.length) return;
 
+                // Ensure every schedule card has the Bootstrap h-100 utility so
+                // cards expand to full available height (helps when some cards
+                // have more content than others). Also ensure they stretch in
+                // the cross-axis for flexbox layouts.
+                cards.forEach(c => {
+                    try {
+                        c.classList.add('h-100');
+                        c.style.alignSelf = 'stretch';
+                    } catch (e) {}
+                });
+
                 // Measure first up to 3 cards (if present)
                 const firstThree = cards.slice(0, 3);
                 const widths = firstThree.map(c => {
@@ -1755,6 +2204,7 @@ ${JSON.stringify(this.currentCenter, null, 2)}
 
                 // Apply only for viewports that typically show up to 3 cards (mobile/tablet narrow)
                 // Use 991px as an upper bound so small tablets/large phones are covered.
+                // Width adjustments only for small viewports (keep desktop flexible)
                 if (window.innerWidth <= 991) {
                     // Only set the first three cards to the computed max width so the
                     // visible set appears consistent. Leave later cards flexible.
@@ -1763,12 +2213,24 @@ ${JSON.stringify(this.currentCenter, null, 2)}
                         c.style.flex = '0 0 ' + Math.max(maxWidth, 0) + 'px';
                     });
                 } else {
-                    // Clear inline sizing on larger viewports
+                    // Clear inline width/flex sizing on larger viewports
                     cards.forEach(c => {
                         c.style.width = '';
                         c.style.flex = '';
                     });
                 }
+
+                // Normalize heights across ALL viewports: compute tallest card and apply
+                // that height to all cards so they appear uniform regardless of content length.
+                try {
+                    const heights = cards.map(c => {
+                        try { return c.getBoundingClientRect().height; } catch (e) { return 0; }
+                    }).filter(h => h > 0);
+                    if (heights.length) {
+                        const maxH = Math.max(...heights);
+                        cards.forEach(c => { c.style.height = maxH + 'px'; c.style.minHeight = maxH + 'px'; });
+                    }
+                } catch (e) { /* ignore */ }
             });
         } catch (e) {
             // Do not block main flow

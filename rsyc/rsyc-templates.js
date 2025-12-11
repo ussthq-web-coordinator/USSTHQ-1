@@ -56,6 +56,7 @@ class RSYCTemplates {
             'parents': this.generateParents,
             'youth': this.generateYouth,
             'volunteer': this.generateVolunteer,
+            // Sort schedules primarily by start time, then by first day, then by proximity to current month
             'footerPhoto': this.generateFooterPhoto,
             'contact': this.generateContact
         };
@@ -122,41 +123,47 @@ class RSYCTemplates {
      */
     generatePrograms(data) {
         const { programDetails, photos, center } = data;
-        if (!programDetails || programDetails.length === 0) return '';
+        // Always show section, even if empty
+        const hasPrograms = programDetails && programDetails.length > 0;
 
         // Get programs photo from photos array, fallback to default
         const photoData = photos && photos.length > 0 ? photos[0] : null;
         const programPhoto = photoData?.urlProgramsPhoto || 'https://s3.amazonaws.com/uss-cache.salvationarmy.org/c11a1b73-6893-4eb4-a24c-8ecf98058b14_484033880_1061382646027353_8208563035826151450_n.jpg';
 
-        const totalPrograms = programDetails.length;
-        const showViewAll = totalPrograms > 8;
-        const displayPrograms = showViewAll ? programDetails.slice(0, 8) : programDetails;
+        let programItems = '';
+        let viewAllButton = '';
+        let modal = '';
 
-        const programItems = displayPrograms.map(program => {
-            const icon = program.iconClass || 'bi-star';
-            return `
+        if (hasPrograms) {
+            const totalPrograms = programDetails.length;
+            const showViewAll = totalPrograms > 8;
+            const displayPrograms = showViewAll ? programDetails.slice(0, 8) : programDetails;
+
+            programItems = displayPrograms.map(program => {
+                const icon = program.iconClass || 'bi-star';
+                return `
                     <div class="d-flex align-items-center" style="flex: 1 1 45%;">
                         <i class="bi ${this.escapeHTML(icon)} feature-icon"></i> ${this.escapeHTML(program.name)}
                     </div>`;
-        }).join('');
+            }).join('');
 
-        // All programs for modal
-        const allProgramItems = programDetails.map(program => {
-            const icon = program.iconClass || 'bi-star';
-            return `
+            // All programs for modal
+            const allProgramItems = programDetails.map(program => {
+                const icon = program.iconClass || 'bi-star';
+                return `
                     <div class="col-sm-12 col-md-6 d-flex align-items-center mb-3">
                         <i class="bi ${this.escapeHTML(icon)} feature-icon me-2"></i> ${this.escapeHTML(program.name)}
                     </div>`;
-        }).join('');
+            }).join('');
 
-        const viewAllButton = showViewAll ? `
+            viewAllButton = showViewAll ? `
                             <div class="text-center mt-3">
                                 <button class="btn btn-outline-primary btn-sm" onclick="showRSYCModal('programs', '${this.escapeHTML(center.name, true)}')">
                                     View All ${totalPrograms} Programs
                                 </button>
                             </div>` : '';
 
-        const modal = showViewAll ? `
+            modal = showViewAll ? `
 <!-- Modal for All Programs -->
 <div id="rsyc-modal-programs" class="rsyc-modal" style="display:none;">
     <div class="rsyc-modal-content">
@@ -171,6 +178,7 @@ class RSYCTemplates {
         </div>
     </div>
 </div>` : '';
+        }
 
         return `<!-- Featured Programs -->
 <div id="freeTextArea-programs" class="freeTextArea u-centerBgImage section u-sa-whiteBg u-coverBgImage">
@@ -235,24 +243,63 @@ ${modal}`;
             const monthOrder = ['January', 'February', 'March', 'April', 'May', 'June', 
                               'July', 'August', 'September', 'October', 'November', 'December'];
             
+            // Sort schedules primarily by proximity to current month, then by first day and start time
+            const getEarliestMonth = (schedule) => {
+                if (!schedule.programRunsIn || schedule.programRunsIn.length === 0) return 999;
+                const monthIndices = schedule.programRunsIn.map(m => monthOrder.indexOf(m)).filter(i => i !== -1);
+                if (monthIndices.length === 0) return 999;
+
+                // Find the closest upcoming month (wrapping around the year)
+                let minDistance = 999;
+                for (const monthIdx of monthIndices) {
+                    let distance = monthIdx - currentMonth;
+                    if (distance < 0) distance += 12; // Wrap to next year
+                    if (distance < minDistance) minDistance = distance;
+                }
+                return minDistance;
+            };
+
+            // Sort considering explicit start dates if present. Order:
+            // 1) Explicit start timestamp (earlier first)
+            // 2) Program run month proximity
+            // 3) Start day of week
+            // 4) Start time
+            // 5) Fewer days (more specific)
+            // 6) End timestamp (earlier end first)
             const sortedSchedules = [...schedules].sort((a, b) => {
-                // Get the earliest month for each schedule
-                const getEarliestMonth = (schedule) => {
-                    if (!schedule.programRunsIn || schedule.programRunsIn.length === 0) return 999;
-                    const monthIndices = schedule.programRunsIn.map(m => monthOrder.indexOf(m)).filter(i => i !== -1);
-                    if (monthIndices.length === 0) return 999;
-                    
-                    // Find the closest upcoming month (wrapping around the year)
-                    let minDistance = 999;
-                    for (const monthIdx of monthIndices) {
-                        let distance = monthIdx - currentMonth;
-                        if (distance < 0) distance += 12; // Wrap to next year
-                        if (distance < minDistance) minDistance = distance;
-                    }
-                    return minDistance;
-                };
-                
-                return getEarliestMonth(a) - getEarliestMonth(b);
+                const aStart = Number.isFinite(a._startTimestamp) ? a._startTimestamp : null;
+                const bStart = Number.isFinite(b._startTimestamp) ? b._startTimestamp : null;
+                if (aStart && bStart) {
+                    if (aStart !== bStart) return aStart - bStart;
+                } else if (aStart && !bStart) {
+                    return -1;
+                } else if (!aStart && bStart) {
+                    return 1;
+                }
+
+                const ma = getEarliestMonth(a);
+                const mb = getEarliestMonth(b);
+                if (ma !== mb) return ma - mb;
+
+                const aDay = Number.isFinite(a._firstDayIndex) ? a._firstDayIndex : 99;
+                const bDay = Number.isFinite(b._firstDayIndex) ? b._firstDayIndex : 99;
+                if (aDay !== bDay) return aDay - bDay;
+
+                const aTime = Number.isFinite(a._timeMinutes) ? a._timeMinutes : 24 * 60;
+                const bTime = Number.isFinite(b._timeMinutes) ? b._timeMinutes : 24 * 60;
+                if (aTime !== bTime) return aTime - bTime;
+
+                const aLen = Array.isArray(a.scheduleDays) ? a.scheduleDays.length : 99;
+                const bLen = Array.isArray(b.scheduleDays) ? b.scheduleDays.length : 99;
+                if (aLen !== bLen) return aLen - bLen;
+
+                const aEnd = Number.isFinite(a._endTimestamp) ? a._endTimestamp : null;
+                const bEnd = Number.isFinite(b._endTimestamp) ? b._endTimestamp : null;
+                if (aEnd && bEnd) return aEnd - bEnd;
+                if (aEnd && !bEnd) return -1;
+                if (!aEnd && bEnd) return 1;
+
+                return 0;
             });
             
             scheduleCards = sortedSchedules.map(schedule => {
@@ -400,6 +447,7 @@ ${modal}`;
                 return `
                     <div class="schedule-card text-dark d-flex flex-column h-100" style="min-width:230px;padding:1rem;border-radius:8px;background:#fff;box-shadow:0 1px 4px rgba(0,0,0,0.06);">
                         <h5 class="fw-bold mb-1">${this.escapeHTML(schedule.title)}</h5>
+                        ${schedule.subtitle ? `<div class="text-muted small mb-1">${this.escapeHTML(schedule.subtitle)}</div>` : ''}
                         <p class="mb-0">
                             ${daysText ? `<strong>Days:</strong> <span class="d-inline-block">${this.escapeHTML(daysText)}</span><br>` : ''}
                             ${timeText ? `<strong>Time:</strong> ${this.escapeHTML(timeText)}<br>` : ''}
@@ -423,33 +471,48 @@ ${modal}`;
             scheduleScrollSection = `
     ${scrollHint}
 
-    <div class="horizontal-scroll ${justifyContent}" style="display:flex;gap:1rem;overflow-x:auto;overflow-y:visible;padding-bottom:0.5rem;">
+    <div class="horizontal-scroll ${justifyContent}" style="display:flex;gap:1rem;overflow-x:auto;overflow-y:visible;padding-bottom:0.5rem;align-items:stretch;">
         ${scheduleCards}
     </div>`;
         }
         
         // Build About This Center section (always show if available) in white rounded card
         let aboutSection = '';
+        let aboutImageSection = '';
         if (center.aboutText) {
             // Get exterior photo from photos array
             const photoData = data.photos && data.photos.length > 0 ? data.photos[0] : null;
             const exteriorPhoto = photoData?.urlExteriorPhoto || '';
             
-            const exteriorPhotoHTML = exteriorPhoto ? `
-            <div class="mb-4">
-                <img src="${this.escapeHTML(exteriorPhoto)}" alt="${this.escapeHTML(center.name)} Exterior" 
-                     class="img-fluid" style="width: 100%; height: 300px; border-radius: 12px; object-fit: cover; object-position: center;">
-            </div>` : '';
+            // Place image outside and above the white card, as wide as the schedule
+            aboutImageSection = exteriorPhoto ? `
+    <div class="mt-5 d-flex justify-content-center">
+        <div style="max-width:800px;width:100%;">
+            <img src="${this.escapeHTML(exteriorPhoto)}" alt="${this.escapeHTML(center.name)} Exterior" 
+                 class="img-fluid" style="width: 100%; height: 400px; border-radius: 12px; object-fit: cover; object-position: center;">
+        </div>
+    </div>` : '';
+            
+            // Add bottom margin only if we have schedules to display below
+            const hasSchedules = schedules && schedules.length > 0;
+            const bottomMarginClass = hasSchedules ? ' mb-5' : '';
+            
+            // Get explainer video embed code
+            const explainerVideoEmbedCode = center.explainerVideoEmbedCode || center.ExplainerVideoEmbedCode || '';
+            const videoHTML = explainerVideoEmbedCode ? `
+                <div class="mt-4" style="border-radius: 12px; overflow: hidden;">
+                    ${explainerVideoEmbedCode}
+                </div>` : '';
             
             aboutSection = `
-    <div class="mt-5 d-flex justify-content-center">
+    <div class="mt-3 d-flex justify-content-center${bottomMarginClass}">
         <div class="schedule-card w-100 text-dark" style="max-width:800px;width:100%;padding:1.5rem;border-radius:8px;background:#fff;box-shadow:0 1px 4px rgba(0,0,0,0.06);">
-            ${exteriorPhotoHTML}
-            <h3 class="fw-bold mb-3 text-center" style="font-size: 1.5rem;">About This <em>Center</em></h3>
+            <h2 class="fw-bold mb-3 text-center">About This <em>Center</em></h2>
             <p class="text-center mb-3"><strong>The Salvation Army ${this.escapeHTML(center.name || center.Title)}</strong></p>
             <div class="about-content" style="font-family: inherit; font-size: 1rem; line-height: 1.6;">
                 ${center.aboutText}
             </div>
+            ${videoHTML}
         </div>
     </div>`;
         }
@@ -489,18 +552,25 @@ ${modal}`;
     </div>`;
         }
 
+        // If there is no schedules, no about content and no social links, don't render the entire section
+        if ((!scheduleCards || scheduleCards.trim() === '') && (!aboutSection || aboutSection.trim() === '') && (!socialSection || socialSection.trim() === '')) {
+            return '';
+        }
+
         return `<!-- Program Schedules -->
 <div id="freeTextArea-schedules" class="freeTextArea u-centerBgImage section u-sa-tealBg u-coverBgImage">
     <div class="u-positionRelative">
         <div class="container">
             <div class="my-5">
+                ${aboutImageSection}
+                
+                ${aboutSection}
+                
                 ${scheduleTitleSection}
                 
                 <div class="schedule-scroll-wrapper">
                     ${scheduleScrollSection}
                 </div>
-                
-                ${aboutSection}
                 
                 ${socialSection}
             </div>
@@ -723,41 +793,47 @@ ${summerSection}
      */
     generateFacilities(data) {
         const { center, facilityFeatures, photos } = data;
-        if (!facilityFeatures || facilityFeatures.length === 0) return '';
+        // Always show section, even if empty
+        const hasFeatures = facilityFeatures && facilityFeatures.length > 0;
 
         // Get facility photo from photos array, fallback to default
         const photoData = photos && photos.length > 0 ? photos[0] : null;
         const facilityPhoto = photoData?.urlFacilityFeaturesPhoto || 'https://s3.amazonaws.com/uss-cache.salvationarmy.org/9150a418-1c58-4d01-bf81-5753d1c608ae_salvation+army+building+1.png';
 
-        const totalFeatures = facilityFeatures.length;
-        const showViewAll = totalFeatures > 8;
-        const displayFeatures = showViewAll ? facilityFeatures.slice(0, 8) : facilityFeatures;
+        let featuresHTML = '';
+        let viewAllButton = '';
+        let modal = '';
 
-        const featuresHTML = displayFeatures.map(feature => {
-            const icon = feature.biClass || 'bi-check-circle';
-            return `
+        if (hasFeatures) {
+            const totalFeatures = facilityFeatures.length;
+            const showViewAll = totalFeatures > 8;
+            const displayFeatures = showViewAll ? facilityFeatures.slice(0, 8) : facilityFeatures;
+
+            featuresHTML = displayFeatures.map(feature => {
+                const icon = feature.biClass || 'bi-check-circle';
+                return `
           <div class="d-flex align-items-center mb-3" style="flex:1 1 45%;">
             <i class="bi ${this.escapeHTML(icon)} feature-icon me-2"></i> ${this.escapeHTML(feature.name)}
           </div>`;
-        }).join('');
+            }).join('');
 
-        // All features for modal
-        const allFeaturesHTML = facilityFeatures.map(feature => {
-            const icon = feature.biClass || 'bi-check-circle';
-            return `
+            // All features for modal
+            const allFeaturesHTML = facilityFeatures.map(feature => {
+                const icon = feature.biClass || 'bi-check-circle';
+                return `
           <div class="col-sm-12 col-md-6 d-flex align-items-center mb-3">
             <i class="bi ${this.escapeHTML(icon)} feature-icon me-2"></i> ${this.escapeHTML(feature.name)}
           </div>`;
-        }).join('');
+            }).join('');
 
-        const viewAllButton = showViewAll ? `
+            viewAllButton = showViewAll ? `
                             <div class="text-center mt-3">
                                 <button class="btn btn-outline-primary btn-sm" onclick="showRSYCModal('facilities', '${this.escapeHTML(center.name, true)}')">
                                     View All ${totalFeatures} Features
                                 </button>
                             </div>` : '';
 
-        const modal = showViewAll ? `
+            modal = showViewAll ? `
 <!-- Modal for All Facilities -->
 <div id="rsyc-modal-facilities" class="rsyc-modal" style="display:none;">
     <div class="rsyc-modal-content">
@@ -772,6 +848,7 @@ ${summerSection}
         </div>
     </div>
 </div>` : '';
+        }
 
         return `<!-- Facility Features -->
 <div id="freeTextArea-facilities" class="freeTextArea u-centerBgImage section u-sa-creamBg u-coverBgImage">
@@ -825,35 +902,103 @@ ${modal}`;
         // Default photo for all staff - will be manually replaced later
         const defaultPhoto = 'https://8hxvw8tw.media.zestyio.com/SAL_Leaders_Desktop-2.png';
 
-        // Order staff by prioritized role types (use the order from the provided choices)
-        const priorityRoles = [
-            'Executive Director',
-            'Site Director',
-            'Program Manager',
-            'Program Coordinator',
-            'Youth Development Professional',
-            'Membership Clerk',
-            'Area Director',
-            'Corps Officer',
-            'Area Commander',
-            'Other'
-        ];
+        // Order staff by prioritized role types. This list is configurable from the publisher UI
+        // and is saved to localStorage under 'rsycRoleOrder'. The UI script (rsyc-staff-order.js)
+        // exposes the current order on window.RSYC.roleOrder.
+        const priorityRoles = (function(){
+            try{
+                if(window.RSYC && Array.isArray(window.RSYC.roleOrder) && window.RSYC.roleOrder.length) return window.RSYC.roleOrder.slice();
+                const raw = localStorage.getItem('rsycRoleOrder');
+                if(raw){
+                    const parsed = JSON.parse(raw);
+                    if(Array.isArray(parsed) && parsed.length) return parsed;
+                }
+            }catch(e){ /* ignore and fall back to defaults */ }
+            return [
+                'Area Commander',
+                'Corps Officer',
+                'Area Executive Director',
+                'Area Director',
+                'Executive Director',
+                'Center Director',
+                'Program Manager',
+                'Program Coordinator',
+                'Youth Development Professional',
+                'Administrative Clerk',
+                'Membership Clerk',
+                'Other'
+            ];
+        })();
 
         const getPriority = (role) => {
+            // Normalize
             if (!role) return priorityRoles.length;
-            const idx = priorityRoles.findIndex(r => r.toLowerCase() === role.toLowerCase());
-            return idx === -1 ? priorityRoles.length : idx;
+            const r = role.toString().toLowerCase().trim();
+
+            // 1) Exact match (case-insensitive)
+            const exactIdx = priorityRoles.findIndex(pr => pr.toLowerCase() === r);
+            if (exactIdx !== -1) return exactIdx;
+
+            // Tokenize role and priority roles
+            const roleTokens = r.split(/[^a-z0-9]+/).filter(Boolean);
+            if (!roleTokens.length) return priorityRoles.length;
+
+            // Use the last token as the base (e.g., 'coordinator', 'director')
+            const base = roleTokens[roleTokens.length - 1];
+
+            // 2) Prefer a priority role that contains the same base token
+            const baseMatchIdx = priorityRoles.findIndex(pr => {
+                const prTokens = pr.toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
+                return prTokens.includes(base);
+            });
+            if (baseMatchIdx !== -1) return baseMatchIdx;
+
+            // 3) Fallback: find any priority role whose tokens appear in the role string
+            const substringIdx = priorityRoles.findIndex(pr => {
+                const prTokens = pr.toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
+                return prTokens.some(t => roleTokens.includes(t));
+            });
+            if (substringIdx !== -1) return substringIdx;
+
+            // 4) As a last resort, see if the role string contains the full priority phrase
+            const phraseIdx = priorityRoles.findIndex(pr => r.includes(pr.toLowerCase()));
+            if (phraseIdx !== -1) return phraseIdx;
+
+            // Unknown roles go to the end
+            return priorityRoles.length;
         };
 
         const sorted = [...leaders].sort((a, b) => {
-            // prefer roleType, fall back to positionTitle
-            const roleA = (a.roleType || a.positionTitle || '').toString();
-            const roleB = (b.roleType || b.positionTitle || '').toString();
+            // prefer roleType, but if roleType is 'Other' (or contains 'other')
+            // use the actual positionTitle from the record so specific titles are respected
+            const rawRoleA = (a.roleType || '').toString();
+            let roleA = '';
+            if (rawRoleA && !/\bother\b/i.test(rawRoleA)) {
+                roleA = rawRoleA;
+            } else {
+                roleA = (a.positionTitle || rawRoleA || '').toString();
+            }
+
+            const rawRoleB = (b.roleType || '').toString();
+            let roleB = '';
+            if (rawRoleB && !/\bother\b/i.test(rawRoleB)) {
+                roleB = rawRoleB;
+            } else {
+                roleB = (b.positionTitle || rawRoleB || '').toString();
+            }
             const pA = getPriority(roleA);
             const pB = getPriority(roleB);
             if (pA !== pB) return pA - pB;
 
-            // If same priority, sort by person name (primary then alternate)
+            // If both mapped to the same priority, prefer the leader whose role string
+            // exactly matches the priority role (e.g., 'Program Coordinator') so the
+            // official Program Coordinator appears before other coordinator types.
+            const pr = priorityRoles[pA] || '';
+            const isExactA = pr && roleA.toLowerCase() === pr.toLowerCase();
+            const isExactB = pr && roleB.toLowerCase() === pr.toLowerCase();
+            if (isExactA !== isExactB) return isExactA ? -1 : 1;
+
+            // If still tied, sort by person name (primary then alternate)
             const nameA = ((a.person && (a.person.name || '')) || (a.alternateName || '')).toString();
             const nameB = ((b.person && (b.person.name || '')) || (b.alternateName || '')).toString();
             return nameA.localeCompare(nameB);
@@ -1388,8 +1533,55 @@ ${legacyModal}
         // Only show section if there's a photo
         if (!footerPhoto) return '';
 
+        // Determine background-position based on optional focus field on the photo record.
+        // Be extra-robust: check processed property, raw variants, and any string values on the object.
+        let bgPosition = 'center';
+        try {
+            let focusRaw = '';
+            // Prefer processed property if present
+            if (photoData?.footerPhotoFocus) {
+                focusRaw = photoData.footerPhotoFocus;
+            }
+            // Check common raw variants
+            if (!focusRaw) focusRaw = photoData?.FooterPhotoFocus || photoData?.URLFooterPhotoFocus || photoData?.Focus || photoData?.FocalPoint || photoData?.focalPoint || '';
+            // If still empty, scan all string values on the photoData object for a likely focus token
+            if (!focusRaw && photoData && typeof photoData === 'object') {
+                for (const k of Object.keys(photoData)) {
+                    try {
+                        const v = photoData[k];
+                        if (typeof v === 'string' && /^(top|center|bottom)$/i.test(v.trim())) {
+                            focusRaw = v; break;
+                        }
+                        // handle nested objects with .Value
+                        if (v && typeof v === 'object' && typeof v.Value === 'string' && /^(top|center|bottom)$/i.test(v.Value.trim())) {
+                            focusRaw = v.Value; break;
+                        }
+                        // handle string that contains top/bottom as part
+                        if (typeof v === 'string' && /(top|bottom)/i.test(v)) {
+                            focusRaw = v; break;
+                        }
+                    } catch (e) { /* ignore */ }
+                }
+            }
+
+            focusRaw = (focusRaw || '').toString().trim().toLowerCase();
+
+            if (focusRaw.includes('top')) {
+                bgPosition = 'center top';
+            } else if (focusRaw.includes('bottom')) {
+                bgPosition = 'center bottom';
+            } else {
+                bgPosition = 'center';
+            }
+            // Debug: expose detected focus in console for troubleshooting (non-blocking)
+            try { console.debug('RSYC: footerPhoto focusRaw=', focusRaw, '=> bgPosition=', bgPosition, 'photoKeys=', Object.keys(photoData || {})); } catch (e) {}
+        } catch (e) {
+            // fallback to center on any unexpected value
+            bgPosition = 'center';
+        }
+
         return `<!-- Footer Photo Section -->
-<section id="freeTextArea-footerPhoto" class="freeTextArea u-centerBgImage section u-coverBgImage" style="min-height: 400px; background-image: url('${this.escapeHTML(footerPhoto)}'); background-size: cover; background-position: center;">
+<section id="freeTextArea-footerPhoto" class="freeTextArea u-centerBgImage section u-coverBgImage" style="min-height: 400px; background-image: url('${this.escapeHTML(footerPhoto)}'); background-size: cover; background-position: ${bgPosition} !important;">
     <div class="u-positionRelative" style="min-height: 400px;">
         <!-- Empty content - just showing the photo -->
     </div>

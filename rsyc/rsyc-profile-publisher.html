@@ -25,6 +25,12 @@
                     <select id="centerSelect" class="center-dropdown-minimal">
                         <option value="">-- Select Center --</option>
                     </select>
+                    <button id="refreshData" class="btn btn-sm btn-outline-secondary" title="Reload live JSON">
+                        <i class="bi bi-arrow-clockwise"></i>
+                    </button>
+                    <button id="openDataAudit" class="btn btn-sm btn-outline-info" title="Open Data Audit">
+                        <i class="bi bi-table"></i>
+                    </button>
                     <button id="nextCenter" class="btn btn-sm btn-outline-secondary" title="Next Center" disabled>
                         <i class="bi bi-chevron-right"></i>
                     </button>
@@ -70,6 +76,11 @@
                     <button id="downloadHTML" class="btn btn-sm btn-info" disabled>Download</button>
                     <button id="viewCustomCSS" class="btn btn-sm btn-secondary">✏️ Edit Custom CSS</button>
                     <button id="viewDataStructure" class="btn btn-sm btn-secondary">🔍 Templates & Data</button>
+                    <div id="roleOrderDisplayContainer" style="display:flex; align-items:center; gap:8px;">
+                        <strong style="font-size:12px; color:#333;">Role Order (view only):</strong>
+                        <div id="roleOrderDisplay" style="font-size:13px; color:#555; max-width:540px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+                            border:1px solid #e9ecef; padding:6px 8px; border-radius:6px; background:#fff;">Loading…</div>
+                    </div>
                 </div>
             </div>
         </header>
@@ -132,9 +143,29 @@
 
     <!-- Scripts -->
     <script src="rsyc-data.js"></script>
+    <script src="rsyc-staff-order.js"></script>
     <script src="rsyc-templates.js"></script>
     <script src="rsyc-tracker.js"></script>
     <script src="rsyc-generator-v2.js"></script>
+
+    <!-- Staff Order Modal (in-page so it can be toggled from the publisher UI) -->
+    <div id="staffOrderModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.6); z-index:12000;">
+        <div style="background:white; margin:40px auto; padding:18px; max-width:700px; border-radius:8px; box-shadow:0 6px 30px rgba(0,0,0,0.25);">
+            <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;">
+                <h3 style="margin:0; font-size:18px;">Staff Role Order</h3>
+                <button id="closeStaffOrderModal" style="background:#dc3545; color:white; border:none; padding:6px 10px; border-radius:4px; cursor:pointer;">✖</button>
+            </div>
+            <p style="margin:0 0 10px 0; color:#444; font-size:13px;">Drag to reorder role types. The templates will use this order when sorting staff.</p>
+            <div style="border:1px solid #e6e6e6; padding:10px; border-radius:6px; background:#fafafa;">
+                <ul id="roleOrderList" style="list-style:none; padding:6px; margin:0; display:block;">
+                </ul>
+            </div>
+            <div style="display:flex; gap:8px; justify-content:flex-end; margin-top:12px;">
+                <button id="resetRoleOrder" class="btn btn-sm btn-outline-secondary">Reset Default</button>
+                <button id="saveRoleOrder" class="btn btn-sm btn-primary">Save Order</button>
+            </div>
+        </div>
+    </div>
 </body>
 </html>
 

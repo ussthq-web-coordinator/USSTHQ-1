@@ -84,14 +84,16 @@
 
             async loadData() {
                 try {
-                    // Use CORS proxy to fetch the JSON files
-                    const corsProxy = 'https://corsproxy.io/?';
-                    
-                    const facilitiesResponse = await fetch(corsProxy + 'https://thisishoperva.org/rsyc/RSYCFacilityFeatures.json');
+                    // Always use the production domain for JSON files
+                    const baseURL = 'https://thisishoperva.org/rsyc/';
+
+                    console.log('Loading from:', baseURL);
+
+                    const facilitiesResponse = await fetch(baseURL + 'RSYCFacilityFeatures.json');
                     const facilitiesData = await facilitiesResponse.json();
                     this.facilities = facilitiesData.value || facilitiesData;
 
-                    const programsResponse = await fetch(corsProxy + 'https://thisishoperva.org/rsyc/RSYCPrograms.json');
+                    const programsResponse = await fetch(baseURL + 'RSYCPrograms.json');
                     const programsData = await programsResponse.json();
                     this.programs = programsData.value || programsData;
 

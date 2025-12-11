@@ -5,9 +5,15 @@
 
 class RSYCDataLoader {
     constructor() {
-        // Use CORS proxy for all environments to avoid CORS issues
+        // CORS / fetch configuration
+        // By default we prefer trying the direct URL first. If that fails due to CORS
+        // restrictions we fall back to the configured proxy. You can disable the
+        // proxy by setting `useCorsProxy` to false (and make sure your server
+        // sends Access-Control-Allow-Origin headers for the publisher origin).
         this.corsProxy = 'https://corsproxy.io/?';
         this.baseURL = 'https://thisishoperva.org/rsyc/';
+        this.useCorsProxy = false;         // set to false to never use corsproxy.io
+        this.tryDirectFirst = true;      // attempt direct fetch before using proxy
         
         this.cache = {
             centers: null,
@@ -85,22 +91,46 @@ class RSYCDataLoader {
      * Fetch JSON from URL with fallback
      */
     async fetchJSON(filename) {
-        // Always fetch the canonical remote JSON via CORS proxy. No local fallback.
-        const remoteUrl = this.corsProxy + encodeURIComponent(this.baseURL + filename);
-        try {
-            console.log(`📥 Fetching remote (via CORS proxy): ${filename} -> ${remoteUrl}`);
-            const response = await fetch(remoteUrl);
-            if (!response.ok) {
-                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        const directUrl = this.baseURL + filename;
+
+        // Helper to fetch and parse JSON, with nice error messages
+        const doFetch = async (url, label) => {
+            try {
+                console.log(`📥 Fetching ${label}: ${filename} -> ${url}`);
+                const resp = await fetch(url, { mode: 'cors' });
+                if (!resp.ok) throw new Error(`HTTP ${resp.status}: ${resp.statusText}`);
+                const json = await resp.json();
+                console.log(`✅ Loaded ${label}: ${filename}`);
+                return json;
+            } catch (err) {
+                // Re-throw so caller can decide fallback
+                throw err;
             }
-            const data = await response.json();
-            console.log(`✅ Loaded remote: ${filename}`);
-            return data;
-        } catch (error) {
-            console.error(`❌ Failed to fetch ${filename} (remote):`, error);
-            // Surface a clear error so the caller can show UI feedback
-            throw new Error(`Failed to fetch ${filename}: ${error.message}`);
+        };
+
+        // Try direct fetch first if configured
+        if (this.tryDirectFirst) {
+            try {
+                return await doFetch(directUrl, 'direct');
+            } catch (err) {
+                console.warn(`⚠️ Direct fetch failed for ${filename}:`, err.message);
+                // fall through to proxy
+            }
         }
+
+        // If using proxy fallback is allowed, attempt proxy fetch
+        if (this.useCorsProxy && this.corsProxy) {
+            const proxied = this.corsProxy + encodeURIComponent(directUrl);
+            try {
+                return await doFetch(proxied, 'via-cors-proxy');
+            } catch (err) {
+                console.error(`❌ Proxy fetch failed for ${filename}:`, err);
+                throw new Error(`Failed to fetch ${filename}: ${err.message}`);
+            }
+        }
+
+        // If proxy disabled and direct failed, surface error
+        throw new Error(`Failed to fetch ${filename}: direct fetch failed and proxy is disabled.`);
     }
 
     /**
@@ -127,6 +157,7 @@ class RSYCDataLoader {
             corpName: center.field_10,
             gdosID: center.field_19,
             aboutText: center.AboutThisCenter || '',
+            explainerVideoEmbedCode: center.ExplainerVideoEmbedCode || '',
             // Normalize scripture: handle object wrappers, rich text, or plain string
             scripture: (function() {
                 const raw = center.FooterScriptureVerse || center.FooterScripture || center.Scripture || '';
@@ -167,39 +198,140 @@ class RSYCDataLoader {
      * Process program schedules
      */
     processSchedules(data) {
-        return data.map(schedule => ({
-            id: schedule.ID,
-            centerId: schedule['Center#Id'],
-            title: schedule.CustomProgramScheduleTitle,
-            status: schedule.Status?.Value || '',
-            description: schedule.Narrative || schedule.Description || '',
-            ageRange: schedule.AgeRange || '',
-            cost: schedule.Cost || '',
-            location: schedule.Location || '',
-            contactInfo: schedule.ContactInfo || '',
-            capacity: schedule.Capacity || '',
-            prerequisites: schedule.Prerequisites || '',
-            materialsProvided: schedule.MaterialsProvided || '',
-            whatToBring: schedule.WhatToBring || '',
-            registrationDeadline: schedule.RegistrationDeadline || '',
-            registrationFee: schedule.RegistrationFee || '',
-            dropOffPickUp: schedule.DropOffPickUp || '',
-            videoEmbedCode: schedule.VideoEmbedCode || '',
-            // Extract .Value from ScheduleDays array
-            scheduleDays: (schedule.ScheduleDays || []).map(d => d.Value),
-            scheduleTime: schedule.ScheduleTime,
-            scheduleDisclaimer: schedule.ScheduleDisclaimer || '',
-            timezone: schedule.Timezone?.Value || schedule.TimeZone?.Value || '',
-            frequency: schedule.Frequency?.Value || '',
-            // Extract .Value from ProgramRunsIn array
-            programRunsIn: (schedule.ProgramRunsIn || []).map(m => m.Value),
-            // Extract .Value from RegistrationTypicallyOpensin array
-            registrationOpensIn: (schedule.RegistrationTypicallyOpensin || []).map(m => m.Value),
-            relatedPrograms: (Array.isArray(schedule.RelatedProgram) ? schedule.RelatedProgram : []).map(p => ({
-                id: p.Id,
-                name: p.Value
-            }))
-        }));
+        return data.map((schedule) => {
+            // Helper to safely extract subtitle-like fields from several possible keys
+            const rawSubtitle = schedule.CustomProgramScheduleSubtitle || schedule.CustomProgramScheduleSubTitle || schedule.ScheduleSubtitle || schedule.Subtitle || schedule.CustomSubtitle || '';
+            const subtitle = (function(v) {
+                if (!v) return '';
+                if (typeof v === 'object' && v.Value) return String(v.Value).trim();
+                return String(v).trim();
+            })(rawSubtitle);
+
+            // Normalize schedule days to array of strings (already mapping .Value in many cases)
+            const scheduleDays = (schedule.ScheduleDays || []).map(d => d.Value);
+
+            // Compute first day index (Monday=1 ... Sunday=7). If no days, use 99.
+            const dayOrder = { monday: 1, tuesday: 2, wednesday: 3, thursday: 4, friday: 5, saturday: 6, sunday: 7 };
+            let firstDayIndex = 99;
+            if (Array.isArray(scheduleDays) && scheduleDays.length > 0) {
+                for (const d of scheduleDays) {
+                    if (!d) continue;
+                    const low = String(d).toLowerCase();
+                    // match by full name or first 3 letters
+                    for (const [name, idx] of Object.entries(dayOrder)) {
+                        if (low.includes(name) || low.startsWith(name.slice(0,3))) {
+                            firstDayIndex = Math.min(firstDayIndex, idx);
+                        }
+                    }
+                }
+            }
+
+            // Parse start time in minutes from schedule.ScheduleTime (e.g. "8:30 AM - 10:00 AM").
+            // Improve parsing by inheriting AM/PM from a later token in ranges like "2:30-6:30 pm".
+            // Default to end-of-day so schedules without a time sort after those with explicit start times.
+            let timeMinutes = 24 * 60; // 1440 minutes
+            const rawTime = schedule.ScheduleTime || schedule.scheduleTime || '';
+            if (rawTime && typeof rawTime === 'string') {
+                const timeRegex = /(\d{1,2})(?::(\d{2}))?\s*(AM|PM|am|pm)?/g;
+                const matches = [];
+                let mm;
+                while ((mm = timeRegex.exec(rawTime)) !== null) {
+                    matches.push(mm);
+                }
+                if (matches.length > 0) {
+                    const first = matches[0]; // first time token
+                    // Determine am/pm: prefer first token's AM/PM, otherwise inherit from a later token that has it
+                    let ampm = first[3] ? first[3].toLowerCase() : null;
+                    if (!ampm) {
+                        for (let i = 1; i < matches.length; i++) {
+                            if (matches[i][3]) { ampm = matches[i][3].toLowerCase(); break; }
+                        }
+                    }
+
+                    let hours = parseInt(first[1], 10);
+                    const minutes = first[2] ? parseInt(first[2], 10) : 0;
+                    if (ampm === 'pm' && hours < 12) hours += 12;
+                    if (ampm === 'am' && hours === 12) hours = 0;
+                    timeMinutes = (hours * 60) + minutes;
+                }
+            }
+
+            // Parse explicit start/end dates if present in a few common field names.
+            // Accept strings like '2025-06-01', '6/1/2025', or ISO timestamps. Fall back to null.
+            const parseDateCandidate = (v) => {
+                if (!v) return null;
+                try {
+                    // If it's an object with .Value or .Date
+                    if (typeof v === 'object') {
+                        v = v.Value || v.Date || JSON.stringify(v) || '';
+                    }
+                    const s = String(v).trim();
+                    if (!s) return null;
+                    // Use Date.parse which handles ISO and many common formats
+                    const t = Date.parse(s);
+                    if (!isNaN(t)) return t;
+                    // Try swapping month/day if ambiguous (MM/DD vs DD/MM) - naive: try US MM/DD first already handled
+                    return null;
+                } catch (e) {
+                    return null;
+                }
+            };
+
+            // Look for likely start/end fields in the incoming schedule object
+            const startCandidates = [schedule.StartDate, schedule.Start, schedule.EffectiveStart, schedule.Start_x0020_Date, schedule.StartDateTime, schedule['Start Date'], schedule['Start_Date']];
+            const endCandidates = [schedule.EndDate, schedule.End, schedule.EffectiveEnd, schedule.End_x0020_Date, schedule.EndDateTime, schedule['End Date'], schedule['End_Date']];
+            let startTs = null;
+            let endTs = null;
+            for (const cand of startCandidates) {
+                const v = parseDateCandidate(cand);
+                if (v) { startTs = v; break; }
+            }
+            for (const cand of endCandidates) {
+                const v = parseDateCandidate(cand);
+                if (v) { endTs = v; break; }
+            }
+
+            return {
+                id: schedule.ID,
+                centerId: schedule['Center#Id'],
+                title: schedule.CustomProgramScheduleTitle,
+                subtitle: subtitle,
+                status: schedule.Status?.Value || '',
+                description: schedule.Narrative || schedule.Description || '',
+                ageRange: schedule.AgeRange || '',
+                cost: schedule.Cost || '',
+                location: schedule.Location || '',
+                contactInfo: schedule.ContactInfo || '',
+                capacity: schedule.Capacity || '',
+                prerequisites: schedule.Prerequisites || '',
+                materialsProvided: schedule.MaterialsProvided || '',
+                whatToBring: schedule.WhatToBring || '',
+                registrationDeadline: schedule.RegistrationDeadline || '',
+                registrationFee: schedule.RegistrationFee || '',
+                dropOffPickUp: schedule.DropOffPickUp || '',
+                videoEmbedCode: schedule.VideoEmbedCode || '',
+                // Extract .Value from ScheduleDays array
+                scheduleDays: scheduleDays,
+                scheduleTime: schedule.ScheduleTime,
+                scheduleDisclaimer: schedule.ScheduleDisclaimer || '',
+                timezone: schedule.Timezone?.Value || schedule.TimeZone?.Value || '',
+                frequency: schedule.Frequency?.Value || '',
+                // Extract .Value from ProgramRunsIn array
+                programRunsIn: (schedule.ProgramRunsIn || []).map(m => m.Value),
+                // Extract .Value from RegistrationTypicallyOpensin array
+                registrationOpensIn: (schedule.RegistrationTypicallyOpensin || []).map(m => m.Value),
+                relatedPrograms: (Array.isArray(schedule.RelatedProgram) ? schedule.RelatedProgram : []).map(p => ({
+                    id: p.Id,
+                    name: p.Value
+                })),
+                // Internal helper fields for sorting
+                _firstDayIndex: firstDayIndex,
+                _timeMinutes: timeMinutes,
+                // optional explicit timestamps (ms since epoch) for sorting by date range
+                _startTimestamp: startTs,
+                _endTimestamp: endTs
+            };
+        });
     }
 
     /**
@@ -241,7 +373,28 @@ class RSYCDataLoader {
             urlParentsSectionPhoto: photo.URLParentsSectionPhoto || '',
             urlYouthSectionPhoto: photo.URLYouthSectionPhoto || '',
             urlGetInvolvedPhoto: photo.URLGetInvolvedPhoto || '',
-            urlFooterPhoto: photo.URLFooterPhoto || ''
+                urlFooterPhoto: photo.URLFooterPhoto || '',
+                // Optional: focal point for footer photo. New field added to RSYCHomepagePhotos.json
+                // Accepts values like 'Top', 'Center', 'Bottom' (case-insensitive). Keep as string for templates to consume.
+                // Be robust: check several likely key names and nested .Value variants.
+                footerPhotoFocus: (function() {
+                    try {
+                        if (!photo || typeof photo !== 'object') return '';
+                        // Candidate keys to consider (case-insensitive)
+                        const keys = Object.keys(photo);
+                        const match = keys.find(k => /footer.*focus|urlfooterphotofocus|focalpoint|focal|verticalfocus|focusvertical|footerfocus|footertop|footerbottom|focus$/i.test(k));
+                        let val = '';
+                        if (match) {
+                            val = photo[match]?.Value ?? photo[match];
+                        } else {
+                            // common explicit fallbacks
+                            val = photo.FooterPhotoFocus?.Value || photo.FooterPhotoFocus || photo.URLFooterPhotoFocus || photo.Focus || photo.FocalPoint || photo.focalPoint || '';
+                        }
+                        return (val || '').toString().trim();
+                    } catch (e) {
+                        return '';
+                    }
+                })()
         }));
     }
 
@@ -353,9 +506,75 @@ class RSYCDataLoader {
             console.log('🔍 All hours centerIds:', this.cache.hours.map(h => h.centerId).sort((a,b) => a-b).join(', '));
         }
 
+        // Filter and sort schedules: primary by first day index, secondary by start time
+        const schedulesForCenter = (this.cache.schedules || [])
+            .filter(s => s.centerId === center.sharePointId)
+            .slice(); // copy to avoid mutating cache
+
+        // Sort schedules considering explicit start dates when available. Order:
+        // 1) Explicit start timestamp (earlier first) if present for both; a schedule with a start date
+        //    sorts before one without.
+        // 2) Program run month proximity (keeps seasonal relevance)
+        // 3) Start day of week (_firstDayIndex)
+        // 4) Start time (_timeMinutes)
+        // 5) Final tie-breaker: shorter schedule (fewer days) first
+        schedulesForCenter.sort((a, b) => {
+            const aStart = Number.isFinite(a._startTimestamp) ? a._startTimestamp : null;
+            const bStart = Number.isFinite(b._startTimestamp) ? b._startTimestamp : null;
+            if (aStart && bStart) {
+                if (aStart !== bStart) return aStart - bStart;
+            } else if (aStart && !bStart) {
+                // schedules with explicit starts come before those without
+                return -1;
+            } else if (!aStart && bStart) {
+                return 1;
+            }
+
+            // Month proximity metric (reuse same logic as templates: compute earliest month distance)
+            const monthOrder = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+            const getEarliestMonth = (schedule) => {
+                if (!schedule.programRunsIn || schedule.programRunsIn.length === 0) return 999;
+                const monthIndices = schedule.programRunsIn.map(m => monthOrder.indexOf(m)).filter(i => i !== -1);
+                if (monthIndices.length === 0) return 999;
+                let minDistance = 999;
+                const currentMonth = new Date().getMonth();
+                for (const monthIdx of monthIndices) {
+                    let distance = monthIdx - currentMonth;
+                    if (distance < 0) distance += 12;
+                    if (distance < minDistance) minDistance = distance;
+                }
+                return minDistance;
+            };
+
+            const ma = getEarliestMonth(a);
+            const mb = getEarliestMonth(b);
+            if (ma !== mb) return ma - mb;
+
+            const aDay = Number.isFinite(a._firstDayIndex) ? a._firstDayIndex : 99;
+            const bDay = Number.isFinite(b._firstDayIndex) ? b._firstDayIndex : 99;
+            if (aDay !== bDay) return aDay - bDay;
+
+            const aTime = Number.isFinite(a._timeMinutes) ? a._timeMinutes : 24 * 60;
+            const bTime = Number.isFinite(b._timeMinutes) ? b._timeMinutes : 24 * 60;
+            if (aTime !== bTime) return aTime - bTime;
+
+            const aLen = Array.isArray(a.scheduleDays) ? a.scheduleDays.length : 99;
+            const bLen = Array.isArray(b.scheduleDays) ? b.scheduleDays.length : 99;
+            if (aLen !== bLen) return aLen - bLen;
+
+            // As last measure, compare end timestamps (so shorter/ending sooner shows earlier)
+            const aEnd = Number.isFinite(a._endTimestamp) ? a._endTimestamp : null;
+            const bEnd = Number.isFinite(b._endTimestamp) ? b._endTimestamp : null;
+            if (aEnd && bEnd) return aEnd - bEnd;
+            if (aEnd && !bEnd) return -1;
+            if (!aEnd && bEnd) return 1;
+
+            return 0;
+        });
+
         return {
             center,
-            schedules: this.cache.schedules.filter(s => s.centerId === center.sharePointId),
+            schedules: schedulesForCenter,
             leaders: this.cache.leaders.filter(l => l.centerIds.includes(center.sharePointId)),
             photos: this.cache.photos.filter(p => p.centerId === center.sharePointId),
             hours,

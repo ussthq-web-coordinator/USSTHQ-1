@@ -36,6 +36,9 @@ let differencesData = [];
 let gdosMap = new Map();
 let duplicateMap = new Map();
 let duplicateCheckRecords = [];
+// October data for change tracking
+let octoberGdosMap = new Map();
+const GDOS_DATA_VERSION = 'December 10, 2024';
 // Polling/adaptive sync configuration
 let pollIntervalMsDefault = 10000; // normal short poll
 let pollIntervalMs = pollIntervalMsDefault;
@@ -500,23 +503,41 @@ function shouldIgnoreField(field, zestyValue) {
 
 // Load JSON data from both territories and locations
 Promise.all([
-    fetch('GDOS-10-14-18-53-USW.json').then(response => {
+    // December 2024 GDOS data (current/latest)
+    fetch('GDOS-12-10-18-11-USW.json').then(response => {
         if (!response.ok) throw new Error('USW file not found');
         return response.json();
     }),
-    fetch('GDOS-10-14-18-10-USS.json').then(response => {
+    fetch('GDOS-12-10-18-09-USS.json').then(response => {
         if (!response.ok) throw new Error('USS file not found');
         return response.json();
     }),
-    fetch('GDOS-10-15-04-22-USC.json').then(response => {
+    fetch('GDOS-12-10-18-14-USC.json').then(response => {
         if (!response.ok) throw new Error('USC file not found');
         return response.json();
     }),
-    fetch('GDOS-10-15-04-57-USE.json').then(response => {
+    fetch('GDOS-12-10-18-16-USE.json').then(response => {
         if (!response.ok) throw new Error('USE file not found');
         return response.json();
     }),
-    fetch('../LocationsData.json?v=' + Date.now()).then(response => {
+    // October 2024 GDOS data (for change detection)
+    fetch('GDOS-10-14-18-10-USS.json').then(response => {
+        if (!response.ok) { console.warn('October USS file not found'); return []; }
+        return response.json();
+    }),
+    fetch('GDOS-10-14-18-09.json').then(response => {
+        if (!response.ok) { console.warn('October USW file not found'); return []; }
+        return response.json();
+    }),
+    fetch('GDOS-10-15-04-22-USC.json').then(response => {
+        if (!response.ok) { console.warn('October USC file not found'); return []; }
+        return response.json();
+    }),
+    fetch('GDOS-10-15-04-57-USE.json').then(response => {
+        if (!response.ok) { console.warn('October USE file not found'); return []; }
+        return response.json();
+    }),
+    fetch('LocationsData-12-10.json?v=' + Date.now()).then(response => {
         if (!response.ok) throw new Error('LocationsData file not found');
         return response.json();
     }),
@@ -542,8 +563,8 @@ Promise.all([
         }
     })
 ])
-.then(([uswData, ussData, uscData, useData, locationsData, duplicateCheckData, hoursData]) => {
-    // store raw JSONs for modal use
+.then(([uswData, ussData, uscData, useData, octUssData, octUswData, octUscData, octUseData, locationsData, duplicateCheckData, hoursData]) => {
+    // store raw JSONs for modal use (December data)
     rawUsw = uswData;
     rawUss = ussData;
     rawUsc = uscData;
@@ -553,6 +574,18 @@ Promise.all([
     if (!Array.isArray(ussData)) throw new Error('USS data is not an array');
     if (!Array.isArray(uscData)) throw new Error('USC data is not an array');
     if (!Array.isArray(useData)) throw new Error('USE data is not an array');
+    
+    // Build October GDOS map for change detection
+    const octoberGdosData = [
+        ...(Array.isArray(octUswData) ? octUswData : []),
+        ...(Array.isArray(octUssData) ? octUssData : []),
+        ...(Array.isArray(octUscData) ? octUscData : []),
+        ...(Array.isArray(octUseData) ? octUseData : [])
+    ];
+    octoberGdosData.forEach(g => {
+        if (g && g.id) octoberGdosMap.set(String(g.id), g);
+    });
+    console.log('October GDOS records loaded:', octoberGdosMap.size);
     if (!locationsData.data || !Array.isArray(locationsData.data)) throw new Error('LocationsData.data is not an array');
     if (!duplicateCheckData.data || !Array.isArray(duplicateCheckData.data)) throw new Error('DuplicateLocationCheck.data is not an array');
 
@@ -631,6 +664,56 @@ Promise.all([
     });
     console.log('Total GDOS data length:', gdosData.length);
 
+    // Helper function to check if a GDOS record or specific field has changed since October
+    function hasChangedSinceOctober(decemberGdos, fieldPath) {
+        if (!decemberGdos || !decemberGdos.id) return false;
+        const octoberGdos = octoberGdosMap.get(String(decemberGdos.id));
+        if (!octoberGdos) return true; // New record in December
+        
+        // If specific field provided, check only that field
+        if (fieldPath) {
+            const octVal = getNestedValue(octoberGdos, fieldPath);
+            const decVal = getNestedValue(decemberGdos, fieldPath);
+            const octNorm = normalizeValue(octVal, fieldPath);
+            const decNorm = normalizeValue(decVal, fieldPath);
+            return octNorm !== decNorm;
+        }
+        
+        // Otherwise check all key fields for any changes
+        const fieldsToCheck = [
+            { path: 'name' },
+            { path: 'address1' },
+            { path: 'location.latitude' },
+            { path: 'location.longitude' },
+            { path: 'zip.zipcode' },
+            { path: 'phone.phoneNumber' },
+            { path: 'openHoursText' },
+            { path: 'published' }
+        ];
+        
+        for (const field of fieldsToCheck) {
+            const octVal = getNestedValue(octoberGdos, field.path);
+            const decVal = getNestedValue(decemberGdos, field.path);
+            const octNorm = normalizeValue(octVal, field.path);
+            const decNorm = normalizeValue(decVal, field.path);
+            if (octNorm !== decNorm) return true;
+        }
+        
+        return false;
+    }
+    
+    // Helper to check if Zesty value differs from October GDOS value for a specific field
+    function hasZestyChangedSinceOctober(decemberGdos, fieldPath, zestyValue) {
+        if (!decemberGdos || !decemberGdos.id || !fieldPath) return false;
+        const octoberGdos = octoberGdosMap.get(String(decemberGdos.id));
+        if (!octoberGdos) return false; // Can't compare if no October data
+        
+        const octVal = getNestedValue(octoberGdos, fieldPath);
+        const octNorm = normalizeValue(octVal, fieldPath);
+        const zestyNorm = normalizeValue(zestyValue, fieldPath);
+        return octNorm !== zestyNorm;
+    }
+    
     // Fields to compare - with mapping for GDOS nested fields and Zesty flattened fields
     const fieldsToCompare = [
         { field: 'name', gdosPath: 'name', zestyPath: 'Column1.content.name' },
@@ -729,6 +812,13 @@ Promise.all([
                     zestyVal = zestyValue || '';
                 }
                 
+                // Check if this record changed since October
+                const updatedSinceOct = hasChangedSinceOctober(gdos);
+                const gdosChangedSinceOct = hasChangedSinceOctober(gdos, fieldObj.gdosPath);
+                const zestyChangedSinceOct = hasZestyChangedSinceOctober(gdos, fieldObj.gdosPath, zestyVal);
+                // zestyAndChanged will be recalculated after corrections are loaded from storage
+                const zestyAndChanged = false;
+                
                 differencesData.push({
                     gdos_id: gdos.id,
                     name: gdos.name,
@@ -744,7 +834,11 @@ Promise.all([
                     zesty_value: zestyVal, // Allow empty zesty value for editing
                     correct: correctValue,
                     editable: fieldObj.alwaysShow, // Mark as editable for alwaysShow fields
-                    siteTitleRow: isSiteTitleRow
+                    siteTitleRow: isSiteTitleRow,
+                    updatedSinceOct: updatedSinceOct,
+                    gdosChangedSinceOct: gdosChangedSinceOct,
+                    zestyChangedSinceOct: zestyChangedSinceOct,
+                    zestyAndChanged: zestyAndChanged
                 });
             }
         });
@@ -753,7 +847,9 @@ Promise.all([
         // the team can mark it unpublished (published=false) before import.
         const isDuplicate = duplicateRecord && duplicateRecord.duplicate === '1';
         const doNotImportFlag = duplicateRecord && (duplicateRecord.doNotImport === 'True' || duplicateRecord.doNotImport === true || String(duplicateRecord.doNotImport).toLowerCase() === 'true');
-        if (isDuplicate || doNotImportFlag) {
+        // Only add synthetic published-row when GDOS record is currently published
+        // and the duplicate/doNotImport file indicates it should be unpublished.
+        if ((isDuplicate || doNotImportFlag) && isPublished) {
             // push a published-field difference if one doesn't already exist for this record
             const already = differencesData.find(d => d.gdos_id === gdos.id && d.field === 'published');
             if (!already) {
@@ -763,15 +859,19 @@ Promise.all([
                     property_type: getNestedValue(gdos, 'wm4SiteType.name') || 'Unknown',
                     division: division,
                     territory: territory,
-                    published: isPublished ? 'True' : 'False',
+                    published: 'True',
                     // reflect duplicate/doNotImport exactly as present in DuplicateLocationCheck.json when available
                     duplicate: duplicateRecord && duplicateRecord.duplicate != null ? String(duplicateRecord.duplicate) : '0',
                     doNotImport: duplicateRecord && duplicateRecord.doNotImport != null ? String(duplicateRecord.doNotImport) : 'False',
                     field: 'published',
-                    gdos_value: isPublished ? 'True' : 'False',
+                    gdos_value: 'True',
                     zesty_value: 'False',
                     correct: 'Zesty',
-                    synthetic: true
+                    synthetic: true,
+                    updatedSinceOct: hasChangedSinceOctober(gdos),
+                    gdosChangedSinceOct: hasChangedSinceOctober(gdos, 'published'),
+                    zestyChangedSinceOct: hasZestyChangedSinceOctober(gdos, 'published', 'False'),
+                    zestyAndChanged: false
                 });
             }
         }
@@ -818,7 +918,11 @@ Promise.all([
             gdos_value: 'True',
             zesty_value: 'False', // Default to unpublished
             correct: 'Zesty',
-            synthetic: true
+            synthetic: true,
+            updatedSinceOct: hasChangedSinceOctober(gdos),
+            gdosChangedSinceOct: hasChangedSinceOctober(gdos, 'published'),
+            zestyChangedSinceOct: hasZestyChangedSinceOctober(gdos, 'published', 'False'),
+            zestyAndChanged: false
         });
     });
 
@@ -904,7 +1008,11 @@ Promise.all([
                 zesty_value: cleanedHours, // Use cleaned hours with fixed encoding
                 correct: 'GDOS',
                 editable: true,
-                siteTitleRow: false
+                siteTitleRow: false,
+                updatedSinceOct: hasChangedSinceOctober(gdosRecord),
+                gdosChangedSinceOct: hasChangedSinceOctober(gdosRecord, 'openHoursText'),
+                zestyChangedSinceOct: hasZestyChangedSinceOctober(gdosRecord, 'openHoursText', cleanedHours),
+                zestyAndChanged: false // Hours rows default to GDOS, not Zesty
             });
             hoursRowsCreated++;
         });
@@ -946,13 +1054,386 @@ Promise.all([
         zesty_value_preview: r.zesty_value ? r.zesty_value.substring(0, 50) + '...' : 'EMPTY'
     })));
     
+    // Helper: set a nested path on an object (e.g. setDeep(obj,'zip.zipcode','12345'))
+    function setDeep(obj, path, value) {
+        const parts = String(path).split('.');
+        let cur = obj;
+        for (let i = 0; i < parts.length; i++) {
+            const p = parts[i];
+            if (i === parts.length - 1) {
+                cur[p] = value;
+            } else {
+                if (!cur[p] || typeof cur[p] !== 'object') cur[p] = {};
+                cur = cur[p];
+            }
+        }
+    }
+
+    // Map internal comparison field names to the API patch keys expected by /rest/center
+    function mapFieldToApiKey(field) {
+        switch (field) {
+            case 'name': return 'name';
+            case 'address': return 'address1';
+            case 'phone': return 'phoneNumber';
+            case 'zipcode': return 'zip.zipcode';
+            case 'openHoursText': return 'openHoursText';
+            case 'latitude': return 'location.latitude';
+            case 'longitude': return 'location.longitude';
+            case 'published': return 'published';
+            case 'siteTitle': return 'wm4SiteTitle';
+            default: return null;
+        }
+    }
+
+    // Normalize a final value for inclusion in the patch payload
+    function normalizeFinalValueForPatch(val, field) {
+        if (val == null) return null;
+        // For published, coerce common truthy/falsey strings to booleans
+        if (field === 'published') {
+            if (typeof val === 'boolean') return val;
+            const s = String(val).toLowerCase().trim();
+            if (s === 'true' || s === '1') return true;
+            if (s === 'false' || s === '0') return false;
+            return Boolean(val);
+        }
+        // For latitude/longitude, try parseFloat
+        if (field === 'latitude' || field === 'longitude') {
+            const n = parseFloat(val);
+            return Number.isFinite(n) ? n : val;
+        }
+        // For strings, fix encoding issues and preserve as-is
+        if (typeof val === 'string') return fixEncodingIssues(val);
+        return val;
+    }
+
+    // Build a minimal PATCH payload for a given GDOS id by aggregating rows
+    function buildPatchForGdosId(gdosId) {
+        if (gdosId == null) return null;
+        const rows = differencesData.filter(r => String(r.gdos_id) === String(gdosId));
+        if (!rows || rows.length === 0) return null;
+        const patch = {};
+        rows.forEach(r => {
+            try {
+                const apiKey = mapFieldToApiKey(r.field);
+                if (!apiKey) return; // unsupported field mapping
+                // choose the selected source value (respect current 'correct' selection)
+                const finalValue = r.final_value !== undefined ? r.final_value : (r.correct === 'GDOS' ? r.gdos_value : r.zesty_value);
+                // If finalValue is empty/blank, skip (PATCH should only send meaningful values)
+                if (finalValue === undefined || finalValue === null || String(finalValue).trim() === '') return;
+                const norm = normalizeFinalValueForPatch(finalValue, r.field);
+                setDeep(patch, apiKey, norm);
+            } catch (e) {
+                /* ignore per-row errors */
+            }
+        });
+        // if patch empty, return null
+        if (Object.keys(patch).length === 0) return null;
+        return { gdos_id: gdosId, patch };
+    }
+
+    // Build patches for all centers that have at least one applicable change
+    function buildAllPatches() {
+        const ids = Array.from(new Set(differencesData.map(r => String(r.gdos_id))));
+        const out = [];
+        ids.forEach(id => {
+            const p = buildPatchForGdosId(id);
+            if (p) out.push(p);
+        });
+        return out;
+    }
+
+    // Simple JSON modal to show/copy/download generated payloads
+    function showJsonModal(jsonObj, title) {
+        try {
+            const jsonText = typeof jsonObj === 'string' ? jsonObj : JSON.stringify(jsonObj, null, 2);
+            // create overlay
+            let modal = document.getElementById('gdosPatchModal');
+            if (!modal) {
+                modal = document.createElement('div');
+                modal.id = 'gdosPatchModal';
+                modal.style.position = 'fixed';
+                modal.style.left = '0';
+                modal.style.top = '0';
+                modal.style.width = '100%';
+                modal.style.height = '100%';
+                modal.style.background = 'rgba(0,0,0,0.6)';
+                modal.style.zIndex = 99999;
+                modal.innerHTML = `
+                    <div style="position: absolute; left: 50%; top: 50%; transform: translate(-50%,-50%); width: 90%; max-width: 1000px; background: #fff; border-radius:6px; padding:16px; box-shadow:0 8px 30px rgba(0,0,0,.4)">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+                            <strong id="gdosPatchModalTitle"></strong>
+                            <div>
+                                <button id="gdosPatchCopyBtn" class="btn btn-sm btn-primary">Copy</button>
+                                <button id="gdosPatchDownloadBtn" class="btn btn-sm btn-secondary">Download</button>
+                                <button id="gdosPatchCloseBtn" class="btn btn-sm btn-light">Close</button>
+                            </div>
+                        </div>
+                        <textarea id="gdosPatchModalText" style="width:100%;height:60vh;font-family:monospace;font-size:12px;white-space:pre;" ></textarea>
+                    </div>
+                `;
+                document.body.appendChild(modal);
+                document.getElementById('gdosPatchCloseBtn').addEventListener('click', () => modal.remove());
+                document.getElementById('gdosPatchCopyBtn').addEventListener('click', () => {
+                    const t = document.getElementById('gdosPatchModalText');
+                    t.select();
+                    try { document.execCommand('copy'); showTransientMessage('Copied JSON to clipboard', 2000); } catch (e) { showTransientMessage('Copy failed', 2000); }
+                });
+                document.getElementById('gdosPatchDownloadBtn').addEventListener('click', () => {
+                    const blob = new Blob([document.getElementById('gdosPatchModalText').value], { type: 'application/json' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = (document.getElementById('gdosPatchModalTitle').textContent || 'patch') + '.json';
+                    document.body.appendChild(a);
+                    a.click();
+                    a.remove();
+                    URL.revokeObjectURL(url);
+                });
+            }
+            document.getElementById('gdosPatchModalTitle').textContent = title || 'Patch JSON';
+            document.getElementById('gdosPatchModalText').value = jsonText;
+            modal.style.display = 'block';
+        } catch (e) { console.warn('showJsonModal failed', e); }
+    }
+
+    // Download CSV for an array of patches: [{ gdos_id, patch }, ...]
+    function downloadPatchesCsv(patchesArray, filename) {
+        try {
+            if (!Array.isArray(patchesArray) || patchesArray.length === 0) {
+                showTransientMessage('No patches to export', 2000);
+                return;
+            }
+
+            function escapeCsvField(val) {
+                if (val === null || val === undefined) return '';
+                let s = String(val);
+                // Double quotes -> two double quotes
+                if (s.indexOf('"') !== -1) s = s.replace(/"/g, '""');
+                // If field contains comma, quote, CR or LF, wrap in quotes
+                if (/[",\r\n]/.test(s)) return '"' + s + '"';
+                return s;
+            }
+
+            const header = ['gdos_id', 'patch_json'];
+            const rows = [header.map(escapeCsvField).join(',')];
+
+            patchesArray.forEach(item => {
+                const gid = item && (item.gdos_id || item.gdosId || item.gdos) ? String(item.gdos_id || item.gdosId || item.gdos) : '';
+                const patchJson = item && item.patch ? JSON.stringify(item.patch) : '';
+                rows.push([escapeCsvField(gid), escapeCsvField(patchJson)].join(','));
+            });
+
+            // Prepend UTF-8 BOM for Excel compatibility
+            const csvContent = '\ufeff' + rows.join('\r\n') + '\r\n';
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename || 'gdos_patches.csv';
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            URL.revokeObjectURL(url);
+            showTransientMessage('CSV downloaded', 2000);
+        } catch (e) {
+            console.warn('downloadPatchesCsv failed', e);
+            showTransientMessage('Failed to create CSV', 3000);
+        }
+    }
+
+    // Build a flattened CSV row for a GDOS id containing only the new values (patch) using API key names.
+    // Returns an object mapping API key -> new value, or null if there's no patch for this id.
+    function buildFlatPatchRow(gdosId, apiKeys) {
+        const p = buildPatchForGdosId(gdosId);
+        if (!p || !p.patch) return null;
+        const patch = p.patch;
+        const out = { gdos_id: String(gdosId) };
+        // Determine which original comparison rows contributed to this patch
+        const rows = differencesData.filter(r => String(r.gdos_id) === String(gdosId));
+
+        // Try to find an api_id for this center from the Zesty/Locations data if available
+        let apiId = '';
+        try {
+            if (typeof locationMap !== 'undefined' && locationMap) {
+                const loc = locationMap.get(String(gdosId));
+                if (loc) {
+                    // Common places Zesty export might store the API id
+                    apiId = loc['Column1.content._id'] || loc['Column1.content.id'] || loc['_id'] || loc['id'] || '';
+                    // Some exports nest Column1 as an object
+                    if (!apiId && loc.Column1 && loc.Column1.content) {
+                        apiId = loc.Column1.content._id || loc.Column1.content.id || '';
+                    }
+                }
+            }
+        } catch (e) { apiId = ''; }
+
+        // Compute changed columns by checking which API keys are present in the patch
+        const changedCols = new Set();
+        apiKeys.forEach(k => {
+            try {
+                const v = getNestedValue(patch, k);
+                if (v !== undefined) changedCols.add(k);
+            } catch (e) { /* ignore */ }
+        });
+
+        // Compute inclusion reasons from row metadata and whether fields changed
+        const reasons = new Set();
+        rows.forEach(r => {
+            try {
+                if (r.synthetic) reasons.add('synthetic');
+                if (r.doNotImport && String(r.doNotImport).toLowerCase() === 'true') reasons.add('doNotImport');
+                if (r.duplicate && String(r.duplicate) === '1') reasons.add('duplicate');
+                // If the row's field maps to an API key present in the patch, note a difference
+                const apiKey = mapFieldToApiKey(r.field);
+                if (apiKey && changedCols.has(apiKey)) {
+                    reasons.add('difference');
+                }
+            } catch (e) { /* ignore per-row */ }
+        });
+
+        // Populate API key columns with values from the patch
+        apiKeys.forEach(k => {
+            const v = getNestedValue(patch, k);
+            out[k] = v === undefined || v === null ? '' : v;
+        });
+
+        // Ensure changed_columns always contains at least the patched keys
+        const changedList = Array.from(changedCols);
+
+        // Build inclusionReason: include any metadata reasons and a 'changed:<keys>' element
+        const reasonParts = [];
+        if (reasons.size > 0) reasonParts.push(...Array.from(reasons));
+        if (changedList.length > 0) reasonParts.push('changed:' + changedList.join(','));
+        // Fallback to 'patch' if nothing descriptive
+        if (reasonParts.length === 0) reasonParts.push('patch');
+
+        out.api_id = apiId || '';
+        out.inclusionReason = reasonParts.join(';');
+        out.changed_columns = changedList.join(',');
+        return out;
+    }
+
+    function downloadFlatPatchesCsv(gdosIdArray, filename) {
+        try {
+            if (!Array.isArray(gdosIdArray) || gdosIdArray.length === 0) {
+                showTransientMessage('No patches to export', 2000);
+                return;
+            }
+
+            // Define the API keys to include as columns (normalized to match /rest/center patch keys)
+            const apiKeys = [
+                'name',
+                'address1',
+                'phoneNumber',
+                'zip.zipcode',
+                'openHoursText',
+                'wm4SiteTitle',
+                'published'
+            ];
+
+            // Header: gdos_id, api_id, inclusionReason, changed_columns, then API key columns (dot-notation kept as-is)
+            const header = ['gdos_id', 'api_id', 'inclusionReason', 'changed_columns', ...apiKeys];
+
+            function escapeCsvField(val) {
+                if (val === null || val === undefined) return '';
+                let s = String(val);
+                if (s.indexOf('"') !== -1) s = s.replace(/"/g, '""');
+                if (/[",\r\n]/.test(s)) return '"' + s + '"';
+                return s;
+            }
+
+            const rows = [header.map(escapeCsvField).join(',')];
+
+            // Build rows only for ids that actually have a patch
+            gdosIdArray.forEach(gid => {
+                const flat = buildFlatPatchRow(gid, apiKeys);
+                if (!flat) return; // no patch -> skip row
+                const row = header.map(col => escapeCsvField(flat[col] === undefined ? '' : flat[col]));
+                rows.push(row.join(','));
+            });
+
+            const csvContent = '\ufeff' + rows.join('\r\n') + '\r\n';
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename || 'gdos_patches_flat.csv';
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            URL.revokeObjectURL(url);
+            showTransientMessage('Flat CSV downloaded', 2000);
+        } catch (e) {
+            console.warn('downloadFlatPatchesCsv failed', e);
+            showTransientMessage('Failed to create flat CSV', 3000);
+        }
+    }
+
+    // Wire up patch builder modal button events
+    function setupPatchBuilderEvents() {
+        try {
+            document.getElementById('gdosPatchShowBtn').addEventListener('click', () => {
+                const val = document.getElementById('gdosPatchInput').value || '';
+                const ids = val.split(',').map(s => s.trim()).filter(Boolean);
+                if (ids.length === 0) { showTransientMessage('Enter a GDOS id or comma-separated list', 2000); return; }
+                if (ids.length === 1) {
+                    const p = buildPatchForGdosId(ids[0]);
+                    if (!p) { showTransientMessage('No patchable fields found for GDOS id ' + ids[0], 3000); return; }
+                    showJsonModal(p.patch, 'Patch for ' + ids[0]);
+                } else {
+                    const arr = ids.map(id => buildPatchForGdosId(id)).filter(Boolean).map(x => ({ gdos_id: x.gdos_id, patch: x.patch }));
+                    if (arr.length === 0) { showTransientMessage('No patches found for given ids', 3000); return; }
+                    showJsonModal(arr, 'Patches for multiple ids');
+                }
+            });
+
+            document.getElementById('gdosPatchAllBtn').addEventListener('click', () => {
+                const all = buildAllPatches();
+                if (!all || all.length === 0) { showTransientMessage('No patchable centers found', 2000); return; }
+                showJsonModal(all, 'All patches (' + all.length + ')');
+            });
+
+            document.getElementById('gdosPatchCsvBtn').addEventListener('click', () => {
+                const all = buildAllPatches();
+                if (!all || all.length === 0) { showTransientMessage('No patchable centers found', 2000); return; }
+                downloadPatchesCsv(all, 'gdos_patches_all.csv');
+            });
+
+            document.getElementById('gdosPatchCsvSelectedBtn').addEventListener('click', () => {
+                const val = document.getElementById('gdosPatchInput').value || '';
+                const ids = val.split(',').map(s => s.trim()).filter(Boolean);
+                if (ids.length === 0) { showTransientMessage('Enter a GDOS id or comma-separated list', 2000); return; }
+                const arr = ids.map(id => buildPatchForGdosId(id)).filter(Boolean).map(x => ({ gdos_id: x.gdos_id, patch: x.patch }));
+                if (!arr || arr.length === 0) { showTransientMessage('No patches found for given ids', 3000); return; }
+                downloadPatchesCsv(arr, 'gdos_patches_selected.csv');
+            });
+
+            document.getElementById('gdosPatchFlatCsvBtn').addEventListener('click', () => {
+                const allIds = buildAllPatches().map(x => String(x.gdos_id));
+                if (!allIds || allIds.length === 0) { showTransientMessage('No patchable centers found', 2000); return; }
+                downloadFlatPatchesCsv(allIds, 'gdos_patches_flat_all.csv');
+            });
+
+            document.getElementById('gdosPatchFlatCsvSelectedBtn').addEventListener('click', () => {
+                const val = document.getElementById('gdosPatchInput').value || '';
+                const ids = val.split(',').map(s => s.trim()).filter(Boolean);
+                if (ids.length === 0) { showTransientMessage('Enter a GDOS id or comma-separated list', 2000); return; }
+                const arr = ids.map(id => buildPatchForGdosId(id)).filter(Boolean).map(x => String(x.gdos_id));
+                if (!arr || arr.length === 0) { showTransientMessage('No patches found for given ids', 3000); return; }
+                downloadFlatPatchesCsv(arr, 'gdos_patches_flat_selected.csv');
+            });
+        } catch (e) { console.warn('setupPatchBuilderEvents failed', e); }
+    }
+
     // Load any previously saved changes and only render after corrections are applied.
     // This prevents the table from rendering once and then switching when saved corrections arrive.
     loadSavedChanges().then(() => {
         try { renderDifferencesTable(); } catch (e) { console.error('renderDifferencesTable failed', e); }
+        try { setupPatchBuilderEvents(); } catch (e) { /* ignore */ }
     }).catch(err => {
         console.warn('loadSavedChanges failed, still rendering table', err);
         try { renderDifferencesTable(); } catch (e) { console.error('renderDifferencesTable failed', e); }
+        try { setupPatchBuilderEvents(); } catch (e) { /* ignore */ }
     });
 })
 .catch(error => {
@@ -1789,6 +2270,72 @@ function snapshotDifferences() {
     return map;
 }
 
+// Helper: Check if KV storage needs updating
+// Shows "Action" when:
+// 1. You chose Zesty in storage AND current Zesty differs from stored value
+// 2. OR data changed since October AND storage value differs from current correct value
+function hasZestyChangedFromStorage(rowData) {
+    if (!rowData) return false;
+    const key = makeCorrectionKey(rowData);
+    const stored = loadedCorrections[key];
+    
+    // CASE 1: No stored correction exists
+    if (!stored) {
+        // Check if data changed since October - if so, storage needs a decision
+        const gdosRecord = gdosMap.get(String(rowData.gdos_id));
+        if (!gdosRecord) return false;
+        
+        const octoberRecord = octoberGdosMap.get(String(rowData.gdos_id));
+        if (!octoberRecord) return false; // New record, no October baseline
+        
+        // Get field path for comparison
+        let fieldPath = rowData.field;
+        if (fieldPath === 'address') fieldPath = 'address1';
+        if (fieldPath === 'phone') fieldPath = 'phone.phoneNumber';
+        if (fieldPath === 'zipcode') fieldPath = 'zip.zipcode';
+        if (fieldPath === 'name' || fieldPath === 'siteTitle') fieldPath = 'name';
+        
+        // Compare current values to October
+        const octVal = getNestedValue(octoberRecord, fieldPath);
+        const decGdosVal = getNestedValue(gdosRecord, fieldPath);
+        const decZestyVal = rowData.zesty_value;
+        
+        const octNorm = normalizeValue(octVal, rowData.field);
+        const gdosNorm = normalizeValue(decGdosVal, rowData.field);
+        const zestyNorm = normalizeValue(decZestyVal, rowData.field);
+        
+        // Return true if either GDOS or Zesty changed from October
+        return (octNorm !== gdosNorm) || (octNorm !== zestyNorm);
+    }
+    
+    // CASE 2: Stored correction exists - check if current data differs from storage
+    const storedCorrect = stored.correct || 'GDOS';
+    const storedValue = stored.value;
+    
+    // Get current correct value based on rowData.correct
+    const currentCorrect = rowData.correct || 'GDOS';
+    const currentValue = currentCorrect === 'GDOS' ? rowData.gdos_value : rowData.zesty_value;
+    
+    // Normalize for comparison
+    const storedNorm = normalizeValue(storedValue, rowData.field);
+    const currentNorm = normalizeValue(currentValue, rowData.field);
+    
+    // Return true if:
+    // - Stored chose Zesty AND current Zesty value differs from stored
+    // - OR stored chose GDOS AND current GDOS value differs from stored
+    if (storedCorrect === 'Zesty' && currentCorrect === 'Zesty') {
+        return storedNorm !== currentNorm;
+    }
+    if (storedCorrect === 'GDOS' && currentCorrect === 'GDOS') {
+        return storedNorm !== currentNorm;
+    }
+    
+    // If correct selection changed (GDOS <-> Zesty), show action required
+    if (storedCorrect !== currentCorrect) return true;
+    
+    return false;
+}
+
 function applyChanges(changes) {
     console.log('Applying changes from shared storage:', changes);
     Object.entries(changes).forEach(([key, savedRow]) => {
@@ -1801,6 +2348,8 @@ function applyChanges(changes) {
             if (currentRow) {
                 currentRow.correct = 'GDOS';
                 currentRow.final_value = currentRow.gdos_value;
+                // Recalculate zestyAndChanged
+                currentRow.zestyAndChanged = hasZestyChangedFromStorage(currentRow);
             }
             return;
         }
@@ -1815,6 +2364,8 @@ function applyChanges(changes) {
                 currentRow.zesty_value = savedRow.value;
             }
             currentRow.final_value = savedRow.correct === 'GDOS' ? currentRow.gdos_value : currentRow.zesty_value;
+            // Recalculate zestyAndChanged after applying stored correction
+            currentRow.zestyAndChanged = hasZestyChangedFromStorage(currentRow);
         } else {
             // Row not present yet; save for later application when rows are available
             pendingCorrections[key] = savedRow;
@@ -1860,6 +2411,8 @@ function applyPendingCorrections() {
             // Only apply saved correction value when non-empty so we preserve populated hours_of_operation
             if (savedRow.value !== undefined && String(savedRow.value).trim() !== '') row.zesty_value = savedRow.value;
             row.final_value = row.correct === 'GDOS' ? row.gdos_value : row.zesty_value;
+            // Recalculate zestyAndChanged after applying pending correction
+            row.zestyAndChanged = hasZestyChangedFromStorage(row);
             appliedCount++;
             delete pendingCorrections[key];
             console.log('Applied pending correction for key:', key);
@@ -1932,20 +2485,43 @@ function applyIncrementalChangesToTable(table, changedKeys) {
         const allRows = differencesData.filter(r => {
             try {
                 if (!r) return false;
-                // Include anything explicitly marked as non-GDOS
+
+                const fieldName = String(r.field || '').toLowerCase();
+
+                // Compute the final value we would export: prefer final_value, fall back to zesty_value
+                let finalValRaw = '';
+                if (r.final_value !== undefined && r.final_value !== null && String(r.final_value).trim() !== '') {
+                    finalValRaw = r.final_value;
+                } else if (r.zesty_value !== undefined && r.zesty_value !== null && String(r.zesty_value).trim() !== '') {
+                    finalValRaw = r.zesty_value;
+                }
+
+                // Normalize both sides for comparison. If they are equal, this is a no-op and should be excluded.
+                const normalizedFinal = normalizeValue(finalValRaw, fieldName) || '';
+                const normalizedGdos = normalizeValue(r.gdos_value, fieldName) || '';
+
+                if (normalizedFinal === normalizedGdos) {
+                    // no effective change; exclude from CSV
+                    if (excludedExamples.length < 5) excludedExamples.push({ gdos_id: r.gdos_id, field: r.field, reason: 'no-op-same-as-gdos', gdos_value: r.gdos_value, final_value: finalValRaw });
+                    return false;
+                }
+
+                // Now include only rows that represent an actual change:
+                // - explicit corrections (correct != 'GDOS') where final value differs from GDOS
+                // - staging fields (siteTitle/openHoursText) with a non-empty final value that differs
                 if (r.correct && r.correct !== 'GDOS') {
                     if (includedExamples.length < 5) includedExamples.push({ gdos_id: r.gdos_id, field: r.field, reason: 'correct!=GDOS' });
                     return true;
                 }
-                // For staging fields, include when either final_value or zesty_value contains a non-empty user value
+
                 if (r.field && (r.field === 'siteTitle' || /openhours/i.test(r.field))) {
-                    const fv = r.final_value !== undefined && r.final_value !== null ? String(r.final_value).trim() : '';
-                    const zv = r.zesty_value !== undefined && r.zesty_value !== null ? String(r.zesty_value).trim() : '';
-                    if (fv !== '' || zv !== '') {
-                        if (includedExamples.length < 5) includedExamples.push({ gdos_id: r.gdos_id, field: r.field, reason: fv !== '' ? 'final_value' : 'zesty_value', value: fv !== '' ? fv : zv });
+                    if (finalValRaw !== '') {
+                        if (includedExamples.length < 5) includedExamples.push({ gdos_id: r.gdos_id, field: r.field, reason: 'staging-final-value', value: finalValRaw });
                         return true;
                     }
                 }
+
+                // Otherwise exclude
                 if (excludedExamples.length < 5) excludedExamples.push({ gdos_id: r.gdos_id, field: r.field, correct: r.correct, final_value: r.final_value, zesty_value: r.zesty_value });
                 return false;
             } catch (e) {
@@ -2229,15 +2805,43 @@ function applyIncrementalChangesToTable(table, changedKeys) {
                 publishedChanges.length === 0;
         });
         
-        // Filter to only include records that have corrections OR should be unpublished
-        // EXCLUDE rows that only have Site Title from GDOS with no other changes
+        // Filter to only include records that have corrections OR are explicit unpublish actions.
+        // EXCLUDE rows that only have Site Title from GDOS with no other changes.
+        // Additionally, exclude any records that are marked as duplicate or Do Not Import
+        // — the user requested duplicate/doNotImport locations be removed from the CSV.
+        // Synthetic/unpublish rows are only included when there's an explicit published
+        // change from True -> False with source 'Zesty'.
         const finalRows = rows.filter(entry => {
             // Exclude Site Title-only from GDOS changes
             if (entry.isSiteTitleOnlyFromGDOS) {
                 return false;
             }
-            // Include if has corrections or should be unpublished
-            return entry.hasCorrections || entry.published === 'False';
+
+            // Exclude any records marked duplicate or doNotImport entirely
+            const dupVal = String(entry.duplicate || '').toLowerCase();
+            const doNotVal = String(entry.doNotImport || '').toLowerCase();
+            if (dupVal === '1' || dupVal === 'true' || doNotVal === '1' || doNotVal === 'true') {
+                return false;
+            }
+
+            // If the entry has normal corrections, include it
+            if (entry.hasCorrections) return true;
+
+            // Otherwise, look for an explicit published change that indicates an unpublish
+            // action: published changed from True -> False and source is Zesty.
+            if (entry.changedFields && Array.isArray(entry.changedFields)) {
+                const pubChange = entry.changedFields.find(c => String(c.field).toLowerCase() === 'published');
+                if (pubChange) {
+                    const fromNorm = normalizeValue(pubChange.from, 'published') || '';
+                    const toNorm = normalizeValue(pubChange.to, 'published') || '';
+                    const source = String(pubChange.source || '').trim();
+                    if (fromNorm === 'true' && toNorm === 'false' && source === 'Zesty') {
+                        return true;
+                    }
+                }
+            }
+
+            return false;
         });
         
         if (finalRows.length === 0) {
@@ -2245,10 +2849,76 @@ function applyIncrementalChangesToTable(table, changedKeys) {
             return;
         }
 
-        const headers = ['GDOS ID','Name','Address1','Address2','City','State','Zip','PhoneNumber','OpenHoursText','PrimaryWebsite','Published','Site Title','Division','Territory','Change Reason'];
+    const headers = ['GDOS ID','Name','Address1','Address2','City','State','Zip','PhoneNumber','OpenHoursText','PrimaryWebsite','Published','Site Title','Division','Territory','Inclusion Reason','Change Reason'];
         const csvLines = [headers.join(',')];
 
         finalRows.forEach(r => {
+            // Compute a human-friendly inclusion reason when the GDOS record was already unpublished
+            let inclusionReason = '';
+            try {
+                const gdosRec = gdosMap.get(String(r.gdos_id));
+                const gdosWasPublished = gdosRec ? !!gdosRec.published : null;
+                // Only compute inclusionReason when there are no other field changes for this record.
+                const hasOtherFieldChanges = r.changedFields && Array.isArray(r.changedFields) && r.changedFields.some(c => String(c.field).toLowerCase() !== 'published');
+
+                if (!hasOtherFieldChanges) {
+                    // CASE A: GDOS is currently unpublished (false)
+                    // For unpublished GDOS records we do NOT use duplicate/doNotImport file reasons.
+                    // Prefer an explicit published-change reason if present, otherwise use a generic
+                    // message that the record was already unpublished.
+                    if (gdosWasPublished === false) {
+                        if (r.changedFields && Array.isArray(r.changedFields)) {
+                            const pubChange = r.changedFields.find(c => String(c.field).toLowerCase() === 'published' && c.reason);
+                            if (pubChange && pubChange.reason) {
+                                inclusionReason = pubChange.reason;
+                            }
+                        }
+                        if (!inclusionReason) {
+                            inclusionReason = 'GDOS already unpublished — included for review';
+                        }
+                    }
+
+                    // CASE B: GDOS is currently published (true)
+                    // Only in this case do we surface duplicate/doNotImport reasons from the
+                    // duplicate check file (per requested rule).
+                    if (gdosWasPublished === true) {
+                        // Prefer an explicit published-change reason if present
+                        if (r.changedFields && Array.isArray(r.changedFields)) {
+                            const pubChange = r.changedFields.find(c => String(c.field).toLowerCase() === 'published' && c.reason);
+                            if (pubChange && pubChange.reason) {
+                                inclusionReason = pubChange.reason;
+                            }
+                        }
+                        // If no explicit reason, check duplicate map for doNotImport/duplicate flags
+                        if (!inclusionReason) {
+                            let dup = duplicateMap.get(String(r.gdos_id));
+                            if (!dup && Array.isArray(duplicateCheckRecords)) {
+                                dup = duplicateCheckRecords.find(d => {
+                                    if (!d) return false;
+                                    const candidate = d.gdosid ?? d.gdos_id ?? d.gdosId ?? d['gdos id'] ?? (d.gdos && d.gdos.id);
+                                    return String(candidate) === String(r.gdos_id);
+                                }) || null;
+                            }
+                            if (dup) {
+                                if (dup.doNotImport === 'True' || dup.doNotImport === true || String(dup.doNotImport).toLowerCase() === 'true') {
+                                    inclusionReason = 'Marked do not import';
+                                } else if (dup.duplicate === '1' || dup.duplicate === 1) {
+                                    inclusionReason = 'Marked as duplicate location';
+                                }
+                            }
+                        }
+                    }
+                }
+            } catch (e) {
+                inclusionReason = '';
+            }
+
+            // Ensure Inclusion Reason is never left blank — use a clear placeholder when
+            // the column isn't applicable. The actual human-friendly reason is only set
+            // for the specific case(s) above.
+            if (!inclusionReason) {
+                inclusionReason = 'N/A';
+            }
             const vals = [
                 escapeCsv(r.gdos_id),
                 escapeCsv(r.name),
@@ -2264,6 +2934,8 @@ function applyIncrementalChangesToTable(table, changedKeys) {
                 escapeCsv(r.siteTitle),
                 escapeCsv(r.division),
                 escapeCsv(r.territory),
+                // Inclusion Reason: computed earlier for cases where GDOS was already unpublished
+                escapeCsv(typeof inclusionReason !== 'undefined' ? inclusionReason : (r.inclusionReason || '')),
                 escapeCsv(r.changeReason || '')
             ];
             csvLines.push(vals.join(','));
@@ -2400,11 +3072,74 @@ function renderDifferencesTable() {
                 cssClass: "final-value-highlight",
                 headerFilter: "input"
             },
+            {
+                title: "KV Storage",
+                field: "storage_value",
+                width: 250,
+                formatter: function(cell) {
+                    const rowData = cell.getRow().getData();
+                    const key = makeCorrectionKey(rowData);
+                    const stored = loadedCorrections[key];
+                    
+                    const container = document.createElement('div');
+                    container.style.fontSize = '0.85em';
+                    
+                    if (!stored) {
+                        container.textContent = '(not in storage)';
+                        container.style.color = '#999';
+                        container.style.fontStyle = 'italic';
+                        return container;
+                    }
+                    
+                    const sourceLabel = document.createElement('span');
+                    sourceLabel.className = stored.correct === 'GDOS' ? 'badge bg-primary me-1' : 'badge bg-success me-1';
+                    sourceLabel.textContent = stored.correct || 'GDOS';
+                    sourceLabel.style.fontSize = '0.7em';
+                    
+                    const valueText = document.createElement('span');
+                    valueText.textContent = stored.value || '';
+                    
+                    container.appendChild(sourceLabel);
+                    container.appendChild(valueText);
+                    return container;
+                },
+                tooltip: function(cell) {
+                    const rowData = cell.getRow().getData();
+                    const key = makeCorrectionKey(rowData);
+                    const stored = loadedCorrections[key];
+                    if (!stored) return 'No value stored in KV storage yet';
+                    return `Stored: ${stored.correct} = "${stored.value || ''}" (this is what will be imported)`;
+                }
+            },
             { title: "GDOS ID", field: "gdos_id", width: 120, headerFilter: "input" },
             { title: "Name", field: "name", width: 200, headerFilter: "input" },
             { title: "Property Type", field: "property_type", width: 150, headerFilter: "input" },
             { title: "Division", field: "division", width: 80, headerFilter: "input" },
             { title: "Territory", field: "territory", width: 70, headerFilter: "input" },
+            { 
+                title: "Update Storage", 
+                field: "zestyAndChanged", 
+                width: 100, 
+                formatter: function(cell) {
+                    const value = cell.getValue();
+                    if (value === true) {
+                        const span = document.createElement('span');
+                        span.className = 'badge bg-danger';
+                        span.textContent = 'Action';
+                        span.title = 'KV storage needs updating - data changed since October or differs from stored value';
+                        return span;
+                    }
+                    return '';
+                },
+                headerFilter: "list", 
+                headerFilterParams: { values: {"true": "Action Required", "false": "No Action"} },
+                headerFilterFunc: function(headerValue, rowValue) {
+                    if (headerValue === "true") return rowValue === true;
+                    if (headerValue === "false") return rowValue !== true;
+                    return true;
+                },
+                tooltip: "Shows when KV storage needs updating because data changed since October baseline"
+            },
             { title: "Published", field: "published", width: 70, headerFilter: "list", headerFilterParams: { values: {"True": "Published", "False": "Not Published"} } },
             { title: "Duplicate", field: "duplicate", width: 70, headerFilter: "list", headerFilterParams: { values: {"0": "Not Duplicate", "1": "Duplicate"} } },
             { title: "Do Not Import", field: "doNotImport", width: 80, headerFilter: "list", headerFilterParams: { values: {"False": "Import", "True": "Do Not Import"} } }
@@ -2436,6 +3171,12 @@ function renderDifferencesTable() {
     // Apply any saved global filters after table is built
     table.on("tableBuilt", function(){
         applySavedGlobalFilters();
+        // Update data version badge
+        const badge = document.getElementById('dataVersionBadge');
+        if (badge && typeof GDOS_DATA_VERSION !== 'undefined') {
+            badge.textContent = GDOS_DATA_VERSION;
+            badge.title = 'Current GDOS data from ' + GDOS_DATA_VERSION;
+        }
     });
     // Update metrics (immediately and shortly after render to ensure Tabulator has processed data)
     try { updateMetrics(); } catch (e) { console.warn('updateMetrics immediate failed', e); }

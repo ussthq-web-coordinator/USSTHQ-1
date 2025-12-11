@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Data Version Manager - GDOS/Zesty Comparison</title>
+    <link href="https://unpkg.com/tabulator-tables@5.5.0/dist/css/tabulator.min.css" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.2em;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+
+        .stats-panel {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            padding: 30px;
+            background: #f8f9fa;
+            border-bottom: 1px solid #e9ecef;
+        }
+
+        .stat-card {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+
+        .stat-card .value {
+            font-size: 2.5em;
+            font-weight: bold;
+            color: #667eea;
+            display: block;
+            margin-bottom: 8px;
+        }
+
+        .stat-card .label {
+            font-size: 0.9em;
+            color: #6c757d;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .controls-panel {
+            padding: 30px;
+            border-bottom: 1px solid #e9ecef;
+        }
+
+        .control-group {
+            margin-bottom: 20px;
+        }
+
+        .control-group label {
+            display: block;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: #495057;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 6px;
+            font-size: 1em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-right: 10px;
+            margin-bottom: 10px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            background: #5a6268;
+        }
+
+        .btn-success {
+            background: #28a745;
+            color: white;
+        }
+
+        .btn-success:hover {
+            background: #218838;
+        }
+
+        .btn-warning {
+            background: #ffc107;
+            color: #212529;
+        }
+
+        .btn-warning:hover {
+            background: #e0a800;
+        }
+
+        .filter-controls {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .filter-controls select,
+        .filter-controls input {
+            padding: 10px;
+            border: 1px solid #ced4da;
+            border-radius: 4px;
+            font-size: 0.95em;
+        }
+
+        .table-container {
+            padding: 30px;
+        }
+
+        #versionComparisonTable {
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .status-loading {
+            display: none;
+            padding: 20px;
+            text-align: center;
+            background: #e7f3ff;
+            border: 1px solid #b3d9ff;
+            border-radius: 6px;
+            margin: 20px 0;
+            color: #004085;
+        }
+
+        .status-loading.active {
+            display: block;
+        }
+
+        .change-badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.85em;
+            font-weight: 600;
+        }
+
+        .change-badge.changed {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        .change-badge.unchanged {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .version-comparison {
+            font-size: 0.9em;
+        }
+
+        .version-comparison .version-label {
+            font-weight: 600;
+            color: #6c757d;
+            display: block;
+            margin-top: 8px;
+        }
+
+        .version-comparison .version-label:first-child {
+            margin-top: 0;
+        }
+
+        .diff-highlight {
+            background: #fff3cd;
+            padding: 2px 4px;
+            border-radius: 3px;
+        }
+
+        .kv-storage-value {
+            background: #d4edda;
+            padding: 2px 6px;
+            border-radius: 3px;
+            color: #155724;
+            font-family: 'Courier New', monospace;
+            font-size: 0.95em;
+        }
+
+        .kv-not-set {
+            color: #999;
+            font-style: italic;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.6);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: white;
+            border-radius: 12px;
+            max-width: 900px;
+            max-height: 90vh;
+            overflow-y: auto;
+            padding: 30px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+        }
+
+        .modal-header {
+            border-bottom: 2px solid #e9ecef;
+            padding-bottom: 15px;
+            margin-bottom: 20px;
+        }
+
+        .modal-header h2 {
+            color: #495057;
+        }
+
+        .field-update-selector {
+            margin: 20px 0;
+        }
+
+        .field-checkbox {
+            display: block;
+            padding: 12px;
+            margin-bottom: 10px;
+            background: #f8f9fa;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .field-checkbox:hover {
+            background: #e9ecef;
+        }
+
+        .field-checkbox input {
+            margin-right: 10px;
+        }
+
+        .field-checkbox .field-name {
+            font-weight: 600;
+            color: #495057;
+        }
+
+        .field-checkbox .field-change {
+            display: block;
+            margin-top: 8px;
+            margin-left: 24px;
+            font-size: 0.9em;
+            color: #6c757d;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📊 Data Version Manager</h1>
+            <p>Compare and safely update GDOS & Zesty data between October and December 2024</p>
+        </div>
+
+        <div class="stats-panel" id="statsPanel">
+            <div class="stat-card">
+                <span class="value" id="statTotalRecords">--</span>
+                <span class="label">Total Records (Dec)</span>
+            </div>
+            <div class="stat-card">
+                <span class="value" id="statChangedRecords">--</span>
+                <span class="label">Records with Changes</span>
+            </div>
+            <div class="stat-card">
+                <span class="value" id="statUpdatesApplied">0</span>
+                <span class="label">Updates Applied</span>
+            </div>
+            <div class="stat-card">
+                <span class="value" id="statPendingReview">--</span>
+                <span class="label">Pending Review</span>
+            </div>
+        </div>
+
+        <div class="controls-panel">
+            <div class="control-group">
+                <label>Quick Actions</label>
+                <button class="btn btn-primary" id="btnLoadVersions">🔄 Load All Data Versions</button>
+                <button class="btn btn-secondary" id="btnShowChanges">📋 Show Only Changed Records</button>
+                <button class="btn btn-secondary" id="btnShowAll">📄 Show All Records</button>
+                <button class="btn btn-success" id="btnExportHistory">💾 Export Update History</button>
+                <button class="btn btn-warning" id="btnClearCache">🗑️ Clear Comparison Cache</button>
+            </div>
+
+            <div class="control-group">
+                <label>Filters</label>
+                <div class="filter-controls">
+                    <select id="filterTerritory">
+                        <option value="">All Territories</option>
+                        <option value="USW">USW - West</option>
+                        <option value="USS">USS - South</option>
+                        <option value="USC">USC - Central</option>
+                        <option value="USE">USE - East</option>
+                    </select>
+                    <select id="filterChangeType">
+                        <option value="">All Changes</option>
+                        <option value="gdos-only">GDOS Changed Only</option>
+                        <option value="zesty-only">Zesty Changed Only</option>
+                        <option value="both">Both Changed</option>
+                    </select>
+                    <input type="text" id="searchGdosId" placeholder="Search GDOS ID...">
+                </div>
+            </div>
+        </div>
+
+        <div class="status-loading" id="statusLoading">
+            <strong>Loading...</strong> Please wait while data is being processed.
+        </div>
+
+        <div class="table-container">
+            <div id="versionComparisonTable"></div>
+        </div>
+    </div>
+
+    <!-- Update Modal -->
+    <div class="modal" id="updateModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Update Record: <span id="modalGdosId"></span></h2>
+                <p><strong>Location:</strong> <span id="modalLocationName"></span></p>
+            </div>
+            <div class="field-update-selector" id="fieldSelector">
+                <!-- Dynamically populated -->
+            </div>
+            <div style="text-align: right; margin-top: 20px;">
+                <button class="btn btn-secondary" id="btnCancelUpdate">Cancel</button>
+                <button class="btn btn-success" id="btnConfirmUpdate">Apply Selected Updates</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/tabulator-tables@5.5.0/dist/js/tabulator.min.js"></script>
+    <script src="version-manager.js"></script>
+    <script src="version-manager-ui.js"></script>
+</body>
+</html>
