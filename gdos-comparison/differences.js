@@ -2978,14 +2978,53 @@ function applyIncrementalChangesToTable(table, changedKeys) {
      * - Double quotes ("): Escaped by doubling ("")
      * - Commas (,): Field is quoted to prevent column splitting
      * - Tabs (\t): Field is quoted to preserve formatting
-     * - Unicode characters: Preserved as-is (file uses UTF-8 with BOM)
+     * - Unicode characters: Normalized to NFC form and preserved as UTF-8
+     * - Smart quotes, em-dashes, etc.: Converted to standard ASCII equivalents for SQL Server compatibility
      * 
      * @param {*} str - The value to escape (will be converted to string)
      * @returns {string} - Properly escaped CSV field value
      */
     function escapeCsv(str) {
         if (str == null) return '';
-        const s = String(str);
+        let s = String(str);
+        
+        // Normalize Unicode to NFC form (composed characters) for better SQL Server compatibility
+        if (typeof s.normalize === 'function') {
+            s = s.normalize('NFC');
+        }
+        
+        // Replace common problematic Unicode characters with ASCII equivalents
+        // This prevents display issues in SQL Server and ensures consistent imports
+        const replacements = {
+            // Smart quotes
+            '\u2018': "'",  // Left single quote
+            '\u2019': "'",  // Right single quote
+            '\u201C': '"',  // Left double quote
+            '\u201D': '"',  // Right double quote
+            // Dashes
+            '\u2013': '-',  // En dash
+            '\u2014': '-',  // Em dash
+            '\u2212': '-',  // Minus sign
+            // Spaces
+            '\u00A0': ' ',  // Non-breaking space
+            '\u2003': ' ',  // Em space
+            '\u2009': ' ',  // Thin space
+            // Ellipsis
+            '\u2026': '...',
+            // Other common characters
+            '\u00B7': '*',  // Middle dot
+            '\u2022': '*',  // Bullet
+            '\u2023': '>',  // Triangular bullet
+            '\u2043': '-',  // Hyphen bullet
+            '\u00D7': 'x',  // Multiplication sign
+            '\u00F7': '/',  // Division sign
+        };
+        
+        // Apply replacements
+        for (const [unicode, ascii] of Object.entries(replacements)) {
+            s = s.replace(new RegExp(unicode, 'g'), ascii);
+        }
+        
         // Always quote if contains: comma, newline, carriage return, double quote, or tab
         // This ensures proper CSV formatting for all special characters
         if (s.includes(',') || s.includes('\n') || s.includes('\r') || s.includes('"') || s.includes('\t')) {
