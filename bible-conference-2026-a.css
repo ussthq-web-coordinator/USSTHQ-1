@@ -1,0 +1,542 @@
+.eventDetails {
+    display:none !important;
+    }
+    .eventTitle {
+    display:none !important;
+    }
+      .mainImage {
+      padding-top: 5px;
+      padding-bottom: 15px;
+  }
+      .padding-top-xl {
+    display:none !important;
+    }
+    .row.padding-top-xl {
+      display: none;
+        padding-bottom: 20px;
+  }
+    .globalFooter {
+    background: #005063;
+  }
+  .globalFooter-input {
+    background-color: #333333;
+  }
+  .givingToolbar-toolbar {
+    background: #005063;
+  }
+  .flyoutNav {
+    background: #005063;
+  }
+  @media only screen and (min-width: 761px) {
+    .col-sm-8 {
+    width: 100%
+    }
+    }
+  @media only screen and (min-width: 761px) {
+    .span {
+    padding-left: 30px;
+    padding-right: 30px
+    }
+    }
+  @media only screen and (min-width: 971px) {
+    .col-sm-offset-2 {
+    padding-right: 35%
+    }
+    }	
+    
+        /* Style the buttons that are used to open and close the accordion panel */
+  .accordion {
+    color: #444;
+    cursor: pointer;
+    padding: 18px;
+    width: 100%;
+    text-align: left;
+    border: none;
+    outline: none;
+    transition: 0.4s;
+  }
+  
+  /* Add a background color to the button if it is clicked on (add the .active class with JS), and when you move the mouse over it (hover) */
+  /*.active, .accordion:hover {
+    background-color: #ccc;
+  }
+  */
+  /* Style the accordion panel. Note: hidden by default */
+  .panel {
+    padding: 0 18px;
+    background-color: white;
+    display: none;
+    overflow: hidden;
+  }
+  .youtube-video-container {
+    position: relative;
+    overflow: hidden;
+    width: 100%;
+  }
+  
+  .youtube-video-container::after {
+    display: block;
+    content: "";
+    padding-top: 56.25%;
+  }
+  
+  .youtube-video-container iframe {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+        }
+  
+  .center {
+    margin: auto;
+    padding: 10px;
+  }
+  
+    .framed-image {
+      width: 380px;
+      border-radius: 0px;
+      padding: 10px;
+      background: white;
+      box-shadow: 5px 5px 15px rgba(0, 0, 0, 0.2);
+      display: block;
+      margin: 20px auto;
+  }
+   .div.section.storyContent {
+    margin: 0px;
+    padding: 0px 0px -75px 0px;
+    }
+  .date-section {
+    width: 100%;
+    background: #4AB682;
+    color: white;
+    padding: 20px 20px 20px 20px;
+    }
+   .schedule-section {
+    width: 100%;
+    background: #005063;
+    color: white;
+    padding: 20px 20px 20px 20px;
+    }
+    .guests-1-section {
+    width: 100%;
+    background: #76AAB6;
+    color: white;
+    padding: 20px 20px 20px 20px;
+    }
+      .guests-2-section {
+    margin: 20px 0px 20px 0px;
+    }
+      .promo-materials-section {
+    width: 100%;
+    background: #75AF76;
+    color: white;
+    padding: 20px 20px 20px 20px;
+    }
+        .facebook-group-section {
+    width: 100%;
+    background: #2E5C8C;
+    color: white;
+    padding: 20px 20px 20px 20px;
+    }
+    .recordings-section {
+    width: 100%;
+    background: #E9B54E;
+    color: white;
+    padding: 20px 20px 20px 20px;
+    }
+  .musical-guest-section {
+    width: 100%;
+    padding: 20px 50px;
+    color: white;
+    background: linear-gradient(270deg, 
+      #567395,
+    #4a98bd,   /* Original sky blue */
+      #b48ec7,   /* Soft lavender */
+      #e0a899,   /* Peachy rose */
+      #88c999,   /* Minty green */
+      #f2d479,   /* Warm pastel yellow */
+      #d28e77    /* Terracotta blush */
+    );
+    background-size: 1200% 1200%;
+    animation: gradientShift 45s ease infinite;
+  }
+  
+  @keyframes gradientShift {
+    0%   { background-position: 0% 50%; }
+    25%  { background-position: 50% 50%; }
+    50%  { background-position: 100% 50%; }
+    75%  { background-position: 50% 50%; }
+    100% { background-position: 0% 50%; }
+  }
+  
+  
+      .livestream-section {
+    width: 100%;
+    background: #EFEFEF;
+    color: darkblue;
+    padding: 20px 20px 20px 20px;
+    }  
+    .singing-section {
+    width: 100%;
+    background: #F5DE6D;
+    color: white;
+    padding: 20px 20px 20px 20px;
+    }  
+    .golf-section {
+    width: 100%;
+    background: #709B53;
+    color: white;
+    padding: 20px 20px 20px 20px;
+    } 
+    .lodging-section {
+    width: 100%;
+    background: #77597C;
+    color: white;
+    padding: 20px 20px 20px 20px;
+    }
+    .commissioning-section {
+    width: 100%;
+    background: #CAA78C;
+    color: white;
+    padding: 30px 30px 30px 30px;
+    }
+    .southernspirit-section {
+    width: 100%;
+    background: #d5d6d6;
+    color: white;
+    padding: 30px 30px 30px 30px;
+    }
+  .lake-cross-section {
+      background: url('https://s3.amazonaws.com/uss-cache.salvationarmy.org/37317582-80b2-4002-b747-14dd12a3b733_20240809-Bible+Conference-JA-301+Wide.jpg') center / cover no-repeat;
+      height: 500px;
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      text-align: center;
+      color: white;
+      margin: 20px 0 0 0;
+      position: relative;
+  }
+  
+  
+  .social-share-buttons {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+        margin-top: -30px;
+        margin-bottom: -30px;
+  }
+       .countdown-timer-container {
+          margin-top: 0 !important;
+          margin-bottom: 0 !important;
+          padding-top: 5px;
+          padding-bottom: 5px;
+    }
+         .countdown-container {
+          margin-top: 0 !important;
+          margin-bottom: 0 !important;
+          padding: 5px;
+    }
+           .countdown-container-0 {
+          margin-top: 0 !important;
+          margin-bottom: 0 !important;
+          padding: 5px;
+    }
+          .leader-container {
+              display: flex;
+              flex-wrap: wrap;
+              justify-content: center;
+              gap: 20px;
+                background-color: rgba(86, 115, 149, 0.35);
+          }
+  
+          .leader-card {
+              width: 330px;
+              overflow: hidden;
+              background-color: #567395;
+              box-shadow: 5px 5px 15px rgba(0, 0, 0, 0.2);
+          }
+    
+  
+          .leader-front {
+              padding: 20px;
+              color: white;
+          }
+    
+          .leader-image {
+              width: 280px;
+              border-radius: 0px;
+              padding: 10px;
+              background: white;
+              box-shadow: 5px 5px 15px rgba(0, 0, 0, 0.2);
+              display: block;
+              margin: 20px auto;
+          }
+  
+  .leader-bio {
+      padding: 20px;
+      margin-top: -40px;
+      text-align: left;
+      color: white;
+  }
+  
+  /* Make links light grey inside .leader-bio */
+  .leader-bio a {
+      color: lightgrey;
+  }
+  
+  .leader-bio a:hover {
+      color: #d3d3d3;
+      text-decoration: underline;
+      text-decoration-color: red;  
+  
+  }
+  
+  
+          /* Hide the full bio by default */
+          .bio-content {
+              max-height: 210px;
+              overflow: hidden;
+              position: relative;
+              transition: max-height 0.5s ease;
+          }
+  
+          /* Checkbox to toggle the bio visibility */
+          input[type="checkbox"] {
+              display: none;
+          }
+  
+          /* Smooth expand and collapse with bounce and fade effect */
+          input[type="checkbox"]:checked + .bio-content {
+              max-height: 1000px; /* Large enough to reveal full content */
+              opacity: 1;
+              transform: scaleY(1);
+              transition: max-height 1s cubic-bezier(0.22, 1, 0.36, 1), 
+                          opacity 0.7s ease, 
+                          transform 0.7s cubic-bezier(0.22, 1, 0.36, 1);
+          }
+  
+          /* Default state: hidden with collapsed effect */
+          .bio-content {
+              max-height: 210px;
+              overflow: hidden;
+          }
+  
+  
+          /* View More Link */
+          .view-more-label {
+              display: block;
+              color: white;
+              cursor: pointer;
+              margin-top: 10px;
+              text-decoration: underline;
+          }
+  /* Applying styles specifically to the name paragraph */
+  .name-text {
+    font-size: 40px;
+    font-weight: 700;
+    background: linear-gradient(45deg, #4a98bd, #b48ec7, #e0a899, #88c999, #f2d479, #d28e77);
+    background-size: 50% auto;
+    color: white;
+    background-clip: text;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: white;
+    animation: glowPulse 12s ease-in-out infinite;
+    margin: 30px 0;
+    white-space: nowrap; /* Prevent wrapping */
+    text-align: center;
+  }
+  
+  /* Shimmer effect animation */
+  @keyframes glowPulse {
+    0% {
+      background-position: 0% center;
+      filter: drop-shadow(0 0 5px #ff4081);
+    }
+    50% {
+      background-position: 100% center;
+      filter: drop-shadow(0 0 5px #ffd740);
+    }
+    100% {
+      background-position: 0% center;
+      filter: drop-shadow(0 0 9px #4a98bd);
+    }
+  }
+  
+  /* Media Queries for responsive text */
+  @media (max-width: 768px) {
+    .name-text {
+      font-size: 30px; /* Shrink the font on smaller screens */
+    }
+  }
+  
+  @media (max-width: 480px) {
+    .name-text {
+      font-size: 24px; /* Further shrink the font on very small screens */
+    }
+  }
+  /* Carousel */
+#carouselExampleCaptions .carousel-inner {
+  overflow: hidden;
+  margin-bottom: 38px;
+  border-radius: 0px;
+}
+#carouselExampleCaptions .carousel-item img {
+  border-radius: 0px;
+}
+
+
+#carouselExampleCaptions .carousel-control-prev,
+#carouselExampleCaptions .carousel-control-next,
+#carouselExampleCaptions .carousel-indicators {
+  opacity: 0;
+  transition: opacity 0.4s ease-in-out;
+  pointer-events: none;
+}
+
+#carouselExampleCaptions:hover .carousel-control-prev,
+#carouselExampleCaptions:hover .carousel-control-next,
+#carouselExampleCaptions:hover .carousel-indicators {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* Schedule Accordion Styles */
+  .accordion-button {
+    color: #3d0072; /* dark purple */
+    font-weight: bold;
+  }
+
+  .accordion-body p {
+    color: #008080; /* teal */
+    margin-bottom: 0.5rem;
+  }
+
+  .accordion-body p:has(strong:contains("Main Session")) {
+    color: #3d0072; /* purple override for main sessions */
+  }
+
+  /* Fallback for browsers not supporting :has */
+  .accordion-body p.main-session {
+    color: #3d0072 !important;
+  }
+  /* ========== Live Stream Video Gallery ========== */
+/* Section container */
+.comm25-thumbnails-section {
+  display: flex;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  gap: 1rem;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 1rem;
+  box-sizing: border-box;
+  scrollbar-width: thin;
+  scrollbar-color: gold white;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Optional: WebKit scrollbar styling */
+.comm25-thumbnails-section::-webkit-scrollbar {
+  height: 8px;
+}
+.comm25-thumbnails-section::-webkit-scrollbar-thumb {
+  background: gold;
+  border-radius: 10px;
+}
+.comm25-thumbnails-section::-webkit-scrollbar-track {
+  background: white;
+}
+
+.comm25-thumbnail {
+  flex: 0 0 auto;
+  width: 160px;
+  border-radius: 8px;
+  overflow: hidden;
+  cursor: pointer;
+  border: 3px solid transparent;
+  transition: transform 0.2s ease;
+}
+
+.comm25-thumbnail img {
+  width: 100%;
+  display: block;
+  transition: transform 0.3s ease;
+}
+
+
+/* Featured video */
+.comm25-featured-video iframe {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  transition: all 0.3s ease;
+}
+
+@media (max-width: 800px) {
+  .scroll-hint {
+    display: block;
+  }
+}
+
+@media (max-width: 800px) {
+  .comm25-thumbnails-wrapper {
+    width: 70vw !important;
+    max-width: 80vw !important;
+    padding: 1rem 0;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
+    box-sizing: border-box;
+    margin: auto;
+    padding-left: 0;
+    padding-right: 50px;
+  }
+
+  .comm25-thumbnails-section {
+    width: max-content;
+    max-width: none !important;
+    display: flex;
+    flex-direction: row;
+    gap: 1rem;
+    padding: 0 1rem;
+    box-sizing: border-box;
+    margin: 0;
+    grid-template-columns: 1fr;
+  }
+
+  body {
+    overflow-x: hidden;
+  }
+  .container-thumbnails {
+    width: 100vw !important;
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+    max-width: none !important;
+  }
+
+  .middle-column-thumbnails {
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+  }
+   .container-thumbnails {
+     overflow-x: hidden;
+  }
+
+  }
+/* End of media query */
+
+
+.comm25-thumbnails-section::before,
+.comm25-thumbnails-section::after {
+  content: "";
+  flex: 0 0 1rem;
+}
