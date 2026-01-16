@@ -956,6 +956,8 @@
   pointer-events: auto;
 }
 
+/* 26 Gallery */
+
 .comm26-event-gallery {
   padding: 4rem 1.5rem;
   background: #f3f3f3;
@@ -967,65 +969,73 @@
   margin-bottom: 2rem;
 }
 
-.comm26-masonry-gallery {
-  column-count: 4;
-  column-gap: 1rem;
+/* Symmetrical Grid */
+.comm26-photo-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1.25rem;
 }
 
 @media (max-width: 1100px) {
-  .comm26-masonry-gallery {
-    column-count: 3;
+  .comm26-photo-grid {
+    grid-template-columns: repeat(3, 1fr);
   }
 }
 
 @media (max-width: 768px) {
-  .comm26-masonry-gallery {
-    column-count: 2;
+  .comm26-photo-grid {
+    grid-template-columns: repeat(2, 1fr);
   }
 }
 
 @media (max-width: 480px) {
-  .comm26-masonry-gallery {
-    column-count: 1;
+  .comm26-photo-grid {
+    grid-template-columns: 1fr;
   }
 }
 
-.comm26-gallery-item {
+/* Card */
+.comm26-photo-card {
   position: relative;
-  margin-bottom: 1rem;
-  cursor: pointer;
+  aspect-ratio: 4 / 3;
   overflow: hidden;
-  border-radius: 12px;
+  border-radius: 14px;
+  cursor: pointer;
+  background: #eaeaea;
 }
 
-.comm26-gallery-item img {
+/* Image normalization */
+.comm26-photo-card img {
   width: 100%;
-  display: block;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
   transition: transform 0.4s ease;
 }
 
-.comm26-gallery-item:hover img {
-  transform: scale(1.06);
+.comm26-photo-card:hover img {
+  transform: scale(1.05);
 }
 
-.comm26-overlay {
+/* Overlay */
+.comm26-photo-overlay {
   position: absolute;
   inset: 0;
-  background: linear-gradient(to top, rgba(0,0,0,0.6), transparent);
+  background: linear-gradient(to top, rgba(0,0,0,0.55), rgba(0,0,0,0));
   display: flex;
   align-items: flex-end;
   padding: 1rem;
   opacity: 0;
-  transition: opacity 0.3s ease;
+  transition: opacity 0.25s ease;
 }
 
-.comm26-gallery-item:hover .comm26-overlay {
+.comm26-photo-card:hover .comm26-photo-overlay {
   opacity: 1;
 }
 
-.comm26-overlay span {
+.comm26-photo-overlay span {
   color: #ffffff;
-  font-size: 1rem;
+  font-size: 0.95rem;
   font-weight: 600;
 }
 
@@ -1033,7 +1043,7 @@
 .comm26-lightbox {
   position: fixed;
   inset: 0;
-  background: rgba(0,0,0,0.85);
+  background: rgba(0,0,0,0.88);
   display: none;
   align-items: center;
   justify-content: center;
@@ -1048,8 +1058,8 @@
 
 .comm26-lightbox-close {
   position: absolute;
-  top: 20px;
-  right: 30px;
+  top: 18px;
+  right: 28px;
   font-size: 2rem;
   color: #ffffff;
   cursor: pointer;
