@@ -539,3 +539,87 @@
   content: "";
   flex: 0 0 1rem;
 }
+
+/* 26 Gallery */
+
+/* Horizontal scroll strip */
+.comm26-scroll-row {
+  display: flex;
+  gap: 16px;
+  overflow-x: auto;
+  padding: 10px 0 20px;
+  scroll-behavior: smooth;
+}
+
+.comm26-scroll-row::-webkit-scrollbar {
+  height: 6px;
+}
+.comm26-scroll-row::-webkit-scrollbar-thumb {
+  background: rgba(0,0,0,0.2);
+  border-radius: 0px;
+}
+
+/* Image tiles */
+.comm26-scroll-item {
+  flex: 0 0 auto;
+  cursor: pointer;
+  transition: transform 0.3s ease;
+}
+
+.comm26-scroll-item img {
+  width: 280px;
+  height: 280px;
+  object-fit: cover;
+  border-radius: 0px;
+  display: block;
+}
+
+.comm26-scroll-item:hover {
+  transform: scale(1.04);
+}
+
+/* Lightbox */
+#comm26-lightbox {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.85);
+  z-index: 9999;
+  align-items: center;
+  justify-content: center;
+}
+
+#comm26-lightbox img {
+  max-width: 85vw;
+  max-height: 75vh;
+  border-radius: 0px;
+}
+
+/* Controls */
+#comm26-lightbox button {
+  position: absolute;
+  background: rgba(255,255,255,0.9);
+  border: none;
+  padding: 8px 12px;
+  font-size: 18px;
+  border-radius: 0px;
+  cursor: pointer;
+}
+
+#comm26-close {
+  top: 20px;
+  right: 20px;
+  font-size: 16px;
+}
+
+#comm26-prev {
+  left: 20px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+#comm26-next {
+  right: 20px;
+  top: 50%;
+  transform: translateY(-50%);
+}
