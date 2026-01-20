@@ -773,6 +773,23 @@
         .carousel-caption {
             z-index: 2;
         }
+
+        .wrapVideo {
+            position: relative;
+            padding-bottom: 56.25%; /* 16:9 */
+            height: 0;
+            overflow: hidden;
+            margin-bottom: 1rem;
+        }
+
+        .wrapVideo iframe {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100% !important;
+            height: 100% !important;
+            border: 0;
+        }
     </style>
 </head>
 <body>
@@ -3158,8 +3175,10 @@
                 iframes.forEach(iframe => {
                     const src = iframe.getAttribute('src') || '';
                     const isYoutube = src.includes('youtube.com') || src.includes('youtu.be');
+                    const isVimeo = src.includes('vimeo.com') || src.includes('player.vimeo.com');
                     const alreadyWrapped = iframe.closest('.wrapVideo');
-                    if (isYoutube && !alreadyWrapped) {
+
+                    if ((isYoutube || isVimeo) && !alreadyWrapped) {
                         const container = doc.createElement('div');
                         container.className = 'container';
                         const row = doc.createElement('div');
@@ -3175,7 +3194,14 @@
                         row.appendChild(col);
                         container.appendChild(row);
 
-                        iframe.replaceWith(container);
+                        // If it's already wrapped in a ratio container from buildPropertySnapshotHtml, 
+                        // replace the ratio container instead of just the iframe to keep clean.
+                        const ratioWrapper = iframe.closest('.ratio');
+                        if (ratioWrapper) {
+                            ratioWrapper.replaceWith(container);
+                        } else {
+                            iframe.replaceWith(container);
+                        }
                     }
                 });
                 updated = doc.body.innerHTML;
@@ -4630,8 +4656,36 @@
                                 // 2. Constrain internal images to fit within the intended ratio (approx 200-280px max)
                                 doc.querySelectorAll('img').forEach(img => {
                                     img.style.maxHeight = '280px';
+                                    img.style.maxWidth = '100%';
                                     img.style.width = 'auto';
                                     img.style.objectFit = 'contain';
+                                });
+                                
+                                // 3. Make iframes/videos responsive using wrapVideo structure
+                                doc.querySelectorAll('iframe, video, embed, object').forEach(el => {
+                                    // If already inside wrapVideo, skip
+                                    if (el.closest('.wrapVideo')) return;
+
+                                    const container = doc.createElement('div');
+                                    container.className = 'container';
+                                    const row = doc.createElement('div');
+                                    row.className = 'row';
+                                    const col = doc.createElement('div');
+                                    col.className = 'col-12';
+                                    const wrap = doc.createElement('div');
+                                    wrap.className = 'wrapVideo';
+
+                                    // Clean up attributes that might interfere with responsive wrapper
+                                    el.removeAttribute('width');
+                                    el.removeAttribute('height');
+
+                                    const clonedEl = el.cloneNode(true);
+                                    wrap.appendChild(clonedEl);
+                                    col.appendChild(wrap);
+                                    row.appendChild(col);
+                                    container.appendChild(row);
+
+                                    el.replaceWith(container);
                                 });
                                 
                                 cleanContent = doc.body.innerHTML.trim();
@@ -4650,10 +4704,10 @@
                                     <!-- Mobile Aspect Ratio Spacer (enforces MINIMUM natural image ratio) -->
                                     <img src="${bgImage}" class="w-100 d-block d-md-none" style="grid-area: 1/1; visibility: hidden; pointer-events: none;">
                                     
-                                    <!-- Desktop Background (Contain + Vertical Tiling) -->
-                                    <div class="d-none d-md-block" style="grid-area: 1/1; background: url('${bgImage}') repeat-y center top; background-size: contain; z-index: 1;"></div>
-                                    <!-- Mobile Background (Cover + Vertical Tiling) -->
-                                    <div class="d-block d-md-none" style="grid-area: 1/1; background: url('${bgImage}') repeat-y center top; background-size: cover; z-index: 1;"></div>
+                                    <!-- Desktop Background (Contain + Tiling) -->
+                                    <div class="d-none d-md-block" style="grid-area: 1/1; background: url('${bgImage}') repeat center center; background-size: contain; z-index: 1;"></div>
+                                    <!-- Mobile Background (Cover + Tiling) -->
+                                    <div class="d-block d-md-none" style="grid-area: 1/1; background: url('${bgImage}') repeat center center; background-size: cover; z-index: 1;"></div>
                                     
                                     ${overlayHtml}
                                     
