@@ -2083,8 +2083,8 @@
                                         const isSlideType = String(p.property_type || '').toLowerCase().includes('slide') || String(p.property_type || '').toLowerCase().includes('carousel');
                                         let isHeroMode = false;
                                         if (isSlideType) {
-                                            const items = parseObjectsArray(p.objects_array);
-                                            const slides = items ? parseSlides(items) : [];
+                                            const items = parseObjectsArray(p.objects_array || p.value);
+                                            const slides = items ? parseSlides(items, isSlideType) : [];
                                             const activeSlides = slides.filter(s => !s.isExpired);
                                             const isPosOne = parseInt(p.position, 10) === 1;
                                             const isSingleSlide = activeSlides.length === 1;
@@ -2132,7 +2132,32 @@
                                                 <td style="padding-left: 20px;">${p.position}</td>
                                                 <td>
                                                     <div style="font-weight: bold; color: #333;">${escapeHtml(p.manifest_title || p.db_name || p.property_type || 'Unknown')}</div>
-                                                    <div style="font-size: 9px; color: #666;">Type: ${escapeHtml(p.property_type)}</div>
+                                                    <div style="font-size: 9px; color: #666; display: flex; align-items: center; gap: 5px;">
+                                                        Type: ${escapeHtml(p.property_type)}
+                                                        ${(() => {
+                                                            const itms = parseObjectsArray(p.objects_array || p.value);
+                                                            const pType = String(p.property_type || '').toLowerCase();
+                                                            const isObjProp = ['slide', 'carousel', 'accordiongroup', 'card', 'tile', 'feature', 'formbuilder', 'ministr'].some(t => pType.includes(t));
+                                                            let isEmpt = isObjProp && (!itms || (Array.isArray(itms) && itms.length === 0) || (typeof itms === 'object' && Object.keys(itms).length === 0));
+                                                            
+                                                            // If not literally empty, check if any items are active
+                                                            if (!isEmpt && isObjProp && Array.isArray(itms)) {
+                                                                const isSlideType = pType.includes('slide') || pType.includes('carousel');
+                                                                const hasActive = itms.some(item => {
+                                                                    const isActive = item.active !== false && item.active !== 'false' && item.active !== 0;
+                                                                    const isFeatured = item.featured !== false && item.featured !== 'false' && item.featured !== 0;
+                                                                    const hasEnded = item.endDate ? new Date(item.endDate) < new Date() : false;
+                                                                    
+                                                                    // For slides/carousels, we respect featured flag. For others (cards, etc), we ignore it.
+                                                                    const isBasicallyActive = isActive && !hasEnded;
+                                                                    return isBasicallyActive && (isSlideType ? isFeatured : true);
+                                                                });
+                                                                if (!hasActive) isEmpt = true;
+                                                            }
+                                                            
+                                                            return isEmpt ? '<span class="badge bg-danger" style="font-size: 8px; padding: 2px 4px;">EMPTY</span>' : '';
+                                                        })()}
+                                                    </div>
                                                 </td>
                                                 <td class="text-monospace" style="font-size: 10px;">
                                                     <span title="Click to copy ID" style="cursor: pointer; color: #0066cc;" onclick="navigator.clipboard.writeText('${p.id}'); this.style.color='green'; setTimeout(()=>this.style.color='#0066cc',1000)">${p.id}</span>
@@ -2250,8 +2275,8 @@
                 const isSlideType = String(prop.property_type || '').toLowerCase().includes('slide') || String(prop.property_type || '').toLowerCase().includes('carousel');
                 let isHeroMode = false;
                 if (isSlideType) {
-                    const items = parseObjectsArray(prop.objects_array);
-                    const slides = items ? parseSlides(items) : [];
+                    const items = parseObjectsArray(prop.objects_array || prop.value);
+                    const slides = items ? parseSlides(items, isSlideType) : [];
                     const activeSlides = slides.filter(s => !s.isExpired);
                     const isPosOne = parseInt(prop.position, 10) === 1;
                     const isSingleSlide = activeSlides.length === 1;
@@ -2414,11 +2439,12 @@
             
             // Add objects_array to hidden properties and parse slides if applicable
             let slidesData = null;
-            if (prop.objects_array) {
-                const objectsValue = typeof prop.objects_array === 'string' ? prop.objects_array : JSON.stringify(prop.objects_array, null, 2);
+            if (prop.objects_array || prop.value) {
+                const rawVal = prop.objects_array || prop.value;
+                const objectsValue = typeof rawVal === 'string' ? rawVal : JSON.stringify(rawVal, null, 2);
                 try {
                     const parsed = parseObjectsArray(objectsValue);
-                    if (!parsed) throw new Error('objects_array parse failed');
+                    if (!parsed) throw new Error('parse failed');
 
                     // For accordiongroup, render HTML next to Objects Array
                     if (prop.property_type && String(prop.property_type).toLowerCase().includes('accordiongroup')) {
@@ -2453,7 +2479,7 @@
                     });
 
                     if (isSlideType || hasBackgroundFields) {
-                        slidesData = parseSlides(parsed);
+                        slidesData = parseSlides(parsed, isSlideType);
                         console.log('Parsed slides data:', slidesData);
                     }
                 } catch (e) {
@@ -2537,9 +2563,30 @@
                                     titleStyles = 'background:#fff3cd; color:#856404; padding:4px 10px; border-radius:4px; font-weight:700; border: 1px solid #ffeeba;';
                                 }
 
+                                const itms = parseObjectsArray(prop.objects_array || prop.value);
+                                const pType = String(prop.property_type || '').toLowerCase();
+                                const isObjProp = ['slide', 'carousel', 'accordiongroup', 'card', 'tile', 'feature', 'formbuilder', 'ministr'].some(t => pType.includes(t));
+                                let isEmpt = isObjProp && (!itms || (Array.isArray(itms) && itms.length === 0) || (typeof itms === 'object' && Object.keys(itms).length === 0));
+
+                                // If not literally empty, check if any items are active
+                                if (!isEmpt && isObjProp && Array.isArray(itms)) {
+                                    const isSlideType = pType.includes('slide') || pType.includes('carousel');
+                                    const hasActive = itms.some(item => {
+                                        const isActive = item.active !== false && item.active !== 'false' && item.active !== 0;
+                                        const isFeatured = item.featured !== false && item.featured !== 'false' && item.featured !== 0;
+                                        const hasEnded = item.endDate ? new Date(item.endDate) < new Date() : false;
+                                        
+                                        // For slides/carousels, we respect featured flag. For others (cards, etc), we ignore it.
+                                        const isBasicallyActive = isActive && !hasEnded;
+                                        return isBasicallyActive && (isSlideType ? isFeatured : true);
+                                    });
+                                    if (!hasActive) isEmpt = true;
+                                }
+
                                 return `
                                     <span class="property-title-tag" style="${titleStyles}">${escapeHtml(String(title).trim())}</span>
                                     ${!isSame && type !== 'unknown' ? `<span class="property-type" style="background:#f8f9fa; color:#6c757d; border: 1px solid #e9ecef;">${escapeHtml(type)}</span>` : ''}
+                                    ${isEmpt ? `<span class="property-type" style="background:#dc3545; color:white; border: 1px solid #b71c1c; margin-left: 5px;">EMPTY / NO ACTIVE ITEMS</span>` : ''}
                                 `;
                             })()}
                             <span class="property-position">Pos: ${String(prop.position).trim()}</span>
@@ -3361,6 +3408,48 @@
                                  }
                                  parent.removeChild(span);
                              }
+                        }
+                    });
+
+                    // 4. IMAGE ALIGNMENT (User request: default to left if not centered)
+                    const allImages = Array.from(doc.body.querySelectorAll('img'));
+                    allImages.forEach(img => {
+                        // Skip images that are already part of a recognized layout (like cards or carousels)
+                        if (img.closest('.card, .carousel-item')) return;
+
+                        const parent = img.parentElement;
+                        // Check if it's the "Lone Content" of its block parent
+                        // (Legacy CMS behavior: if an image is in its own paragraph, it's usually intended to be centered)
+                        const isLoneContent = parent && 
+                                             (parent.tagName === 'P' || parent.tagName === 'DIV' || parent.tagName === 'CENTER') &&
+                                             (parent.textContent.trim().length === 0) &&
+                                             (parent.querySelectorAll('img, video, iframe').length === 1);
+
+                        // Check for explicit left-alignment intent (Bootstrap classes or legacy align attribute)
+                        const hasLeftAlignment = img.classList.contains('float-start') || 
+                                                 img.classList.contains('me-auto') ||
+                                                 img.getAttribute('align') === 'left' ||
+                                                 (parent && (parent.classList.contains('text-start') || parent.style.textAlign === 'left' || parent.getAttribute('align') === 'left'));
+
+                        const hasCentering = img.classList.contains('text-center') || 
+                                             img.classList.contains('mx-auto') || 
+                                             (img.style.textAlign === 'center') ||
+                                             (parent && (parent.classList.contains('text-center') || parent.style.textAlign === 'center' || parent.getAttribute('align') === 'center'));
+                        
+                        const hasAlignment = hasLeftAlignment || img.style.float || img.classList.contains('float-end') || 
+                                             img.getAttribute('align') || (parent && (parent.style.textAlign || parent.getAttribute('align')));
+
+                        if (isLoneContent && !hasAlignment) {
+                            // Automatically center "Lone" images in paragraphs unless they have explicit alignment
+                            img.className += ' d-block mx-auto mb-3';
+                            img.style.display = 'block';
+                            img.style.marginLeft = 'auto';
+                            img.style.marginRight = 'auto';
+                        } else if (!hasCentering && !hasAlignment) {
+                            // Default to left alignment for other free-floating images
+                            img.style.display = 'block';
+                            img.style.marginLeft = '0';
+                            img.style.marginRight = 'auto';
                         }
                     });
 
@@ -4198,9 +4287,11 @@
                             // Check for active/featured/visible status on the item itself
                             // Most common keys: active, featured, visible
                             const isActive = item.active !== false && item.active !== 'false' && item.active !== 0;
-                            const isFeatured = item.featured !== false && item.featured !== 'false'; // slides often use featured
+                            const isFeatured = item.featured !== false && item.featured !== 'false' && item.featured !== 0;
+                            const hasEnded = item.endDate ? new Date(item.endDate) < new Date() : false;
                             
-                            return isActive && isFeatured;
+                            // Accordions don't usually use featured, so we only check if explicitly false or if it's a slide
+                            return isActive && !hasEnded && isFeatured;
                         });
 
                         if (activeItems.length === 0) return '';
@@ -4322,13 +4413,17 @@
                     
                     // 1. Accordions - return actual HTML of items
                     if (propType.includes('accordiongroup')) {
-                        const items = parseObjectsArray(prop.objects_array);
+                        const items = parseObjectsArray(prop.objects_array || prop.value);
                         if (Array.isArray(items) && items.length > 0) {
                              // Use a cleaner, shorter ID base to ensure compatibility
                              const shortId = (prop.id || '').replace(/[^a-zA-Z0-9]/g, '').substring(0, 8) || 'acc' + Math.floor(Math.random()*10000);
                              const accordionId = `accordion-${shortId}`;
                              
-                             const itemsHtml = items.map((item, index) => {
+                             const itemsHtml = items.filter(item => {
+                                 const isActive = item.active !== false && item.active !== 'false' && item.active !== 0;
+                                 const hasEnded = item.endDate ? new Date(item.endDate) < new Date() : false;
+                                 return isActive && !hasEnded;
+                             }).map((item, index) => {
                                  const uniqueSuffix = `${shortId}-${index+1}`;
                                  const headingId = `heading-${uniqueSuffix}`;
                                  const collapseId = `collapse-${uniqueSuffix}`;
@@ -4358,9 +4453,9 @@
 
                     // 2. Slides/Carousels
                     if (propType.includes('slide') || propType.includes('carousel')) {
-                        const items = parseObjectsArray(prop.objects_array);
+                        const items = parseObjectsArray(prop.objects_array || prop.value);
                         if (items && items.length > 0) {
-                            const slides = parseSlides(items);
+                            const slides = parseSlides(items, true);
                             const activeSlides = slides.filter(s => !s.isExpired);
                             if (activeSlides.length > 0) {
                                 const carouselId = `carousel-${prop.id}`;
@@ -4544,10 +4639,14 @@
 
                     // 3. Cards/Tiles/Features - return Bootstrap 5 Grid layout
                     if (propType.includes('card') || propType.includes('tile') || propType.includes('feature')) {
-                        let items = parseObjectsArray(prop.objects_array);
+                        let items = parseObjectsArray(prop.objects_array || prop.value);
                         // Filter out inactive items based on 'active' property
                         if (Array.isArray(items)) {
-                            items = items.filter(item => item.active !== false);
+                            items = items.filter(item => {
+                                const isActive = item.active !== false && item.active !== 'false' && item.active !== 0;
+                                const hasEnded = item.endDate ? new Date(item.endDate) < new Date() : false;
+                                return isActive && !hasEnded;
+                            });
                         }
 
                         if (Array.isArray(items) && items.length > 0) {
@@ -4596,9 +4695,12 @@
 
                     // 4. Worship Schedule
                     if (propType.includes('worship')) {
-                        const items = parseObjectsArray(prop.objects_array);
+                        const items = parseObjectsArray(prop.objects_array || prop.value);
                         if (Array.isArray(items) && items.length > 0) {
-                            const worshipHtml = items.map(it => `
+                            const worshipHtml = items.filter(item => {
+                                const isActive = item.active !== false && item.active !== 'false' && item.active !== 0;
+                                return isActive;
+                            }).map(it => `
                                 <div class="worship-item">
                                     <strong>${escapeHtml(it.day || '')} ${escapeHtml(it.time || '')}</strong>
                                     <p>${escapeHtml(it.description || '')}</p>
@@ -4653,12 +4755,51 @@
                                     }
                                 });
 
-                                // 2. Constrain internal images to fit within the intended ratio (approx 200-280px max)
+                                // 2. Constrain internal images and handle alignment
                                 doc.querySelectorAll('img').forEach(img => {
                                     img.style.maxHeight = '280px';
                                     img.style.maxWidth = '100%';
                                     img.style.width = 'auto';
                                     img.style.objectFit = 'contain';
+                                    
+                                    // User request: Default to left alignment unless already centered or aligned
+                                    // Check if image or parent has centering classes/styles from old CMS
+                                    const parent = img.parentElement;
+                                    
+                                    // Check if it's the "Lone Content" of its block parent
+                                    // (Legacy CMS behavior: if an image is in its own paragraph, it's usually intended to be centered)
+                                    const isLoneContent = parent && 
+                                                         (parent.tagName === 'P' || parent.tagName === 'DIV' || parent.tagName === 'CENTER') &&
+                                                         (parent.textContent.trim().length === 0) &&
+                                                         (parent.querySelectorAll('img, video, iframe').length === 1);
+
+                                    // Check for explicit left-alignment intent (Bootstrap classes or legacy align attribute)
+                                    const hasLeftAlignment = img.classList.contains('float-start') || 
+                                                             img.classList.contains('me-auto') ||
+                                                             img.getAttribute('align') === 'left' ||
+                                                             (parent && (parent.classList.contains('text-start') || parent.style.textAlign === 'left' || parent.getAttribute('align') === 'left'));
+
+                                    const hasCentering = img.classList.contains('text-center') || 
+                                                         img.classList.contains('mx-auto') || 
+                                                         (img.style.textAlign === 'center') ||
+                                                         (parent && (parent.classList.contains('text-center') || parent.style.textAlign === 'center' || parent.getAttribute('align') === 'center'));
+                                    
+                                    const hasAlignment = hasLeftAlignment || img.style.float || img.classList.contains('float-end') || 
+                                                         img.getAttribute('align') || (parent && (parent.style.textAlign || parent.getAttribute('align')));
+
+                                    if (isLoneContent && !hasAlignment) {
+                                        // Automatically center "Lone" images in paragraphs unless they have explicit alignment
+                                        img.classList.add('d-block', 'mx-auto', 'mb-3');
+                                        img.style.display = 'block';
+                                        img.style.marginLeft = 'auto';
+                                        img.style.marginRight = 'auto';
+                                    } else if (!hasCentering && !hasAlignment) {
+                                        // If no centering or alignment is found, default to left
+                                        // and ensure it doesn't inherit centering from a global wrapper
+                                        img.style.display = 'block';
+                                        img.style.marginLeft = '0';
+                                        img.style.marginRight = 'auto';
+                                    }
                                 });
                                 
                                 // 3. Make iframes/videos responsive using wrapVideo structure
@@ -4712,8 +4853,8 @@
                                     ${overlayHtml}
                                     
                                     <!-- Content Wrapper: Flow-based so it stretches the parent if needed -->
-                                    <div class="d-flex align-items-center justify-content-center" style="grid-area: 1/1; z-index: 3;">
-                                        <div class="w-100 p-4 p-md-5 ${textColorClass}">
+                                    <div class="d-flex align-items-center justify-content-start" style="grid-area: 1/1; z-index: 3;">
+                                        <div class="w-100 p-4 p-md-5 ${textColorClass} text-start">
                                             ${cleanContent}
                                         </div>
                                     </div>
@@ -4743,7 +4884,7 @@
             return '';
         }
 
-        function parseSlides(objectsArray) {
+        function parseSlides(objectsArray, isSlideType = false) {
             // Parse slides from objects array - slides have background/backgroundMobile fields
             const slides = [];
             
@@ -4753,13 +4894,16 @@
                     const imageUrl = item.background || item.backgroundMobile || '';
                     
                     if (imageUrl) {
-                        // Determine if slide is visible: Must be featured/active and not expired
-                        // slides without an explicit featured/active=true are treated as not visible
-                        const isFeatured = (item.featured === true || String(item.featured) === 'true' || String(item.featured) === '1');
-                        const isActive = (item.active === true || String(item.active) === 'true' || String(item.active) === '1' || item.active === undefined);
+                        // Determine if slide is visible: Must be active and not expired
+                        // Featured is often used as a secondary toggle or for specific layouts,
+                        // but shouldn't exclusively determine 'active' status unless it's explicitly false.
+                        const isActive = (item.active !== false && item.active !== 'false' && item.active !== 0);
+                        const isFeatured = (item.featured !== false && item.featured !== 'false' && item.featured !== 0);
                         
                         const hasEnded = item.endDate ? new Date(item.endDate) < new Date() : false;
-                        const isExpired = !isFeatured || !isActive || hasEnded;
+                        // For pure carousel/slide properties, featured: false usually means hidden.
+                        // For generic card/list properties that happen to have background images, we ignore featured.
+                        const isExpired = !isActive || hasEnded || (isSlideType && !isFeatured);
                         
                         // Extract title from title field - DON'T auto-generate "Slide X" if missing
                         const title = (item.title !== undefined && item.title !== null) ? item.title : '';
