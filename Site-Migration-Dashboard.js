@@ -83,8 +83,8 @@ const _migrationSampleData = [
   },
   {
     "Site Title": "Florida",
-    "Migration Date": "",
-    "View Website URL": "",
+    "Migration Date": "2026-01-28",
+    "View Website URL": "https://www.salvationarmyusa.org/usa-southern-territory/florida/",
     "Division": "Florida",
     "meta.zuid": "7-d4ecfdb8aa-ggn7w9",
     "meta.title": "Florida Division",
@@ -93,8 +93,8 @@ const _migrationSampleData = [
   },
   {
     "Site Title": "Georgia",
-    "Migration Date": "",
-    "View Website URL": "",
+    "Migration Date": "2026-01-29",
+    "View Website URL": "https://www.salvationarmyusa.org/usa-southern-territory/georgia/",
     "Division": "Georgia",
     "meta.zuid": "7-d4ebbcf3b4-lwqwp2",
     "meta.title": "Georgia Division",
