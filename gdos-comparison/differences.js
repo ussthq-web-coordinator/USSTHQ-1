@@ -3046,6 +3046,200 @@ function escapeHtml(str) {
         .replace(/'/g, '&#39;');
 }
 
+// Export transactions as an XLSX workbook with one sheet per territory
+function exportTransactionsXlsx() {
+    try {
+        if (typeof XLSX === 'undefined') {
+            alert('SheetJS (XLSX) library not loaded.');
+            return;
+        }
+
+        // Build transaction rows from differencesData
+        const txRowsByTerritory = new Map();
+
+        differencesData.forEach(r => {
+            if (!r || !r.gdos_id) return;
+
+            // Determine final value (user-finalized or zesty)
+            let finalVal = (r.final_value !== undefined && r.final_value !== null && String(r.final_value).trim() !== '') ? r.final_value : (r.zesty_value !== undefined && r.zesty_value !== null ? r.zesty_value : '');
+
+            // Normalize and decide if this row represents a change/transaction
+            const fieldName = String(r.field || '').toLowerCase();
+            const normalizedFinal = normalizeValue(finalVal, fieldName) || '';
+            const normalizedGdos = normalizeValue(r.gdos_value, fieldName) || '';
+
+            // Include only when the chosen correction comes from Zesty (we are adjusting GDOS to match Zesty)
+            // Accept any correction whose label starts with 'Zesty' (e.g., 'Zesty' or 'Zesty Name to Site Title')
+            const correctionStr = (r.correct || '').toString();
+            const isFromZesty = correctionStr.toLowerCase().startsWith('zesty');
+            // For staging fields (siteTitle/openHours), only include when a final value exists and it was chosen from Zesty
+            const isStagingWithFinal = (fieldName === 'sitetitle' || /openhours/i.test(fieldName)) && String(finalVal).trim() !== '' && isFromZesty;
+            if (!isFromZesty && !isStagingWithFinal) return;
+            if (normalizedFinal === normalizedGdos) return; // no effective change
+
+            const territory = r.territory || 'Unknown';
+            if (!txRowsByTerritory.has(territory)) txRowsByTerritory.set(territory, []);
+
+            txRowsByTerritory.get(territory).push({
+                Territory: territory,
+                Division: r.division || '',
+                GDOS_ID: r.gdos_id,
+                Name: r.name || '',
+                Field: r.field || '',
+                GDOS_Value: r.gdos_value === undefined || r.gdos_value === null ? '' : String(r.gdos_value),
+                Zesty_Value: r.zesty_value === undefined || r.zesty_value === null ? '' : String(r.zesty_value),
+                Final_Value: finalVal === undefined || finalVal === null ? '' : String(finalVal),
+                Correct: r.correct || '',
+                Synthetic: r.synthetic ? 'True' : 'False',
+                Duplicate: r.duplicate || '0',
+                DoNotImport: r.doNotImport || 'False',
+                UpdatedSinceOct: r.updatedSinceOct ? 'True' : 'False'
+            });
+        });
+
+        if (txRowsByTerritory.size === 0) {
+            alert('No transactions found to export.');
+            return;
+        }
+
+        const wb = XLSX.utils.book_new();
+
+        // Create a sheet for each territory
+        txRowsByTerritory.forEach((rows, territory) => {
+            const header = ['Territory','Division','GDOS_ID','Name','Field','GDOS_Value','Zesty_Value','Final_Value','Correct','Synthetic','Duplicate','DoNotImport','UpdatedSinceOct'];
+            const aoa = [header];
+            rows.forEach(r => {
+                aoa.push([r.Territory, r.Division, r.GDOS_ID, r.Name, r.Field, r.GDOS_Value, r.Zesty_Value, r.Final_Value, r.Correct, r.Synthetic, r.Duplicate, r.DoNotImport, r.UpdatedSinceOct]);
+            });
+            const ws = XLSX.utils.aoa_to_sheet(aoa);
+            // sanitize sheet name length
+            const safeName = (territory || 'Sheet').toString().substr(0,31);
+            XLSX.utils.book_append_sheet(wb, ws, safeName);
+        });
+
+        // Also add a summary sheet with counts
+        const summary = [['Territory','Transactions']];
+        txRowsByTerritory.forEach((rows, territory) => summary.push([territory, rows.length]));
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(summary), 'Summary');
+
+        const wbout = XLSX.write(wb, {bookType:'xlsx', type:'array'});
+        const blob = new Blob([wbout], { type: 'application/octet-stream' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'gdos_transactions_by_territory.xlsx';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    } catch (e) {
+        console.error('exportTransactionsXlsx failed', e);
+        alert('Export failed: ' + (e && e.message ? e.message : e));
+    }
+}
+
+// Export combined 'Do Not Import' units as CSV with reason
+function downloadDoNotImportCsv() {
+    try {
+        // Gather unique units marked doNotImport or duplicate
+        const unitsMap = new Map();
+
+        // Pull from duplicateMap first (explicit file-based flags)
+        duplicateMap.forEach((dup, gdosId) => {
+            const isDup = dup && (dup.duplicate === '1' || String(dup.duplicate).toLowerCase() === '1');
+            const doNot = dup && (dup.doNotImport === 'True' || dup.doNotImport === true || String(dup.doNotImport).toLowerCase() === 'true');
+            if (!isDup && !doNot) return;
+            unitsMap.set(String(gdosId), {
+                gdos_id: String(gdosId),
+                name: (dup && dup.name) || '',
+                territory: (dup && dup.territory) || '',
+                division: (dup && dup.division) || '',
+                duplicate: isDup ? 'True' : 'False',
+                doNotImport: doNot ? 'True' : 'False',
+                reason: isDup ? 'Marked as duplicate location' : 'Marked do not import'
+            });
+        });
+
+        // Also scan differencesData for synthetic/unpublished rows with doNotImport flags
+        differencesData.forEach(r => {
+            if (!r || !r.gdos_id) return;
+            const g = String(r.gdos_id);
+            const isDup = String(r.duplicate || '').toLowerCase() === '1' || String(r.duplicate || '').toLowerCase() === 'true';
+            const doNot = String(r.doNotImport || '').toLowerCase() === 'true' || String(r.doNotImport || '').toLowerCase() === '1';
+            if (!isDup && !doNot) return;
+            if (!unitsMap.has(g)) {
+                unitsMap.set(g, {
+                    gdos_id: g,
+                    name: r.name || '',
+                    territory: r.territory || '',
+                    division: r.division || '',
+                    duplicate: isDup ? 'True' : 'False',
+                    doNotImport: doNot ? 'True' : 'False',
+                    reason: isDup ? 'Marked as duplicate location' : 'Marked do not import'
+                });
+            }
+        });
+
+        // Also scan duplicateCheckRecords array for additional entries
+        if (Array.isArray(duplicateCheckRecords)) {
+            duplicateCheckRecords.forEach(d => {
+                try {
+                    const candidate = d.gdosid ?? d.gdos_id ?? d.gdosId ?? d['gdos id'] ?? (d.gdos && d.gdos.id);
+                    if (!candidate) return;
+                    const g = String(candidate);
+                    const isDup = d && (d.duplicate === '1' || String(d.duplicate).toLowerCase() === '1');
+                    const doNot = d && (d.doNotImport === 'True' || d.doNotImport === true || String(d.doNotImport).toLowerCase() === 'true');
+                    if (!isDup && !doNot) return;
+                    if (!unitsMap.has(g)) {
+                        unitsMap.set(g, {
+                            gdos_id: g,
+                            name: d.name || d.gdosName || '',
+                            territory: d.territory || '',
+                            division: d.division || '',
+                            duplicate: isDup ? 'True' : 'False',
+                            doNotImport: doNot ? 'True' : 'False',
+                            reason: isDup ? 'Marked as duplicate location' : 'Marked do not import'
+                        });
+                    }
+                } catch (e) { /* ignore */ }
+            });
+        }
+
+        const rows = Array.from(unitsMap.values());
+        if (rows.length === 0) {
+            alert('No Do Not Import or Duplicate units found.');
+            return;
+        }
+
+        const headers = ['GDOS ID','Name','Territory','Division','Duplicate','DoNotImport','Reason'];
+        const csvLines = [headers.join(',')];
+        rows.forEach(r => {
+            const vals = [escapeCsv(r.gdos_id), escapeCsv(r.name), escapeCsv(r.territory), escapeCsv(r.division), escapeCsv(r.duplicate), escapeCsv(r.doNotImport), escapeCsv(r.reason)];
+            csvLines.push(vals.join(','));
+        });
+
+        const csvContent = csvLines.join('\r\n');
+        const BOM = new Uint8Array([0xEF,0xBB,0xBF]);
+        const encoder = new TextEncoder();
+        const contentBytes = encoder.encode(csvContent);
+        const csvBytes = new Uint8Array(BOM.length + contentBytes.length);
+        csvBytes.set(BOM, 0);
+        csvBytes.set(contentBytes, BOM.length);
+        const blob = new Blob([csvBytes], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'gdos_do_not_import_units.csv';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    } catch (e) {
+        console.error('downloadDoNotImportCsv failed', e);
+        alert('Export failed: ' + (e && e.message ? e.message : e));
+    }
+}
+
 function renderDifferencesTable() {
     // Clear summary (we don't display the auto-generated summary line)
     const summaryDiv = document.getElementById('differencesSummary');

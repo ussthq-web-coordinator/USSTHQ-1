@@ -444,6 +444,7 @@ app.get('/api/mountaindew/properties', async (req, res) => {
                 description: docDetails.description,
                 content: docDetails.content,
                 redirect_external_url: docDetails.redirect_external_url,
+                custom_head_content: docDetails.custom_head_content,
                 deletion_date: docDetails.deletion_date,
                 site_title: docDetails.site_title,
                 site_path_root: docDetails.site_path_root,

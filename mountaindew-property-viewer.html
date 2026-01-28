@@ -790,6 +790,66 @@
             height: 100% !important;
             border: 0;
         }
+
+        /* Salvation Army Background Color Classes */
+        .u-sa-whiteBg {
+            background-color: #ffffff !important;
+        }
+
+        .u-sa-blackBg {
+            background-color: #000000 !important;
+            color: #ffffff !important;
+        }
+
+        .u-sa-greyBg {
+            background-color: #5a5a5a !important;
+            color: #ffffff !important;
+        }
+
+        .u-sa-greyLightBg {
+            background-color: #cccccc !important;
+        }
+
+        .u-sa-greyVeryLightBg {
+            background-color: #f5f5f5 !important;
+        }
+
+        .u-sa-redBg {
+            background-color: #ed1b2e !important;
+            color: #ffffff !important;
+        }
+
+        .u-sa-orangeBg {
+            background-color: #f89728 !important;
+            color: #ffffff !important;
+        }
+
+        .u-sa-goldBg {
+            background-color: #f8b425 !important;
+        }
+
+        .u-sa-creamBg {
+            background-color: #f5f1e8 !important;
+        }
+
+        .u-sa-greenBg {
+            background-color: #00a651 !important;
+            color: #ffffff !important;
+        }
+
+        .u-sa-tealBg {
+            background-color: #00aeef !important;
+            color: #ffffff !important;
+        }
+
+        .u-sa-blueLightBg {
+            background-color: #5eb6e4 !important;
+        }
+
+        .u-sa-navyBg {
+            background-color: #002d5a !important;
+            color: #ffffff !important;
+        }
     </style>
 </head>
 <body>
@@ -1080,7 +1140,12 @@
                 if (Array.isArray(custom)) {
                     propsArr = custom;
                 } else if (custom && typeof custom === 'object') {
-                    let candidate = custom.properties || (custom.details && custom.details.properties);
+                    let candidate = custom.properties || 
+                                    (custom.details && custom.details.properties) || 
+                                    custom.items || 
+                                    (custom.details && custom.details.items) ||
+                                    custom.sections ||
+                                    custom.rows;
                     
                     if (Array.isArray(candidate)) {
                         propsArr = candidate;
@@ -1109,6 +1174,107 @@
             const entry = getManifestPropertyEntry(prop);
             if (!entry) return null;
             return (entry.details && entry.details.title) || entry.title || entry.label || null;
+        }
+
+        // Helper: directly extract an explicit anchorLink from the document.custom_head_content
+        // This bypasses any matching heuristics and looks up manifest entries by id or name.
+        function getAnchorFromDocumentManifest(prop) {
+            try {
+                const doc = window.selectedDocument || null;
+                if (!doc) {
+                    console.warn('getAnchorFromDocumentManifest: No selectedDocument');
+                    return null;
+                }
+                
+                // Debug: Log the document structure
+                console.log('Document keys:', Object.keys(doc));
+                console.log('custom_head_content exists?', !!doc.custom_head_content);
+                console.log('custom_head_content type:', typeof doc.custom_head_content);
+                if (doc.custom_head_content) {
+                    console.log('custom_head_content sample:', doc.custom_head_content.substring ? doc.custom_head_content.substring(0, 200) : doc.custom_head_content);
+                }
+                
+                const propsArr = getCustomPropertiesArray(doc);
+                console.log('getAnchorFromDocumentManifest: propsArr length:', propsArr ? propsArr.length : 'null');
+                if (!Array.isArray(propsArr)) {
+                    // Fallback: attempt to parse raw custom_head_content directly for stringified properties
+                    const raw = doc.custom_head_content || doc.customHeadContent || doc.custom || null;
+                    if (raw && typeof raw === 'string') {
+                        try {
+                            const parsed = JSON.parse(raw);
+                            if (parsed) {
+                                let candidate = parsed.properties || parsed.details?.properties || parsed.items || parsed.sections || parsed.rows || null;
+                                if (typeof candidate === 'string') {
+                                    try { propsArr = JSON.parse(candidate); } catch (e) { const mm = candidate.match(/\[.*\]/s); if (mm) try { propsArr = JSON.parse(mm[0]); } catch (e2) { } }
+                                } else if (Array.isArray(candidate)) {
+                                    propsArr = candidate;
+                                }
+                            }
+                        } catch (e) {
+                            // ignore
+                        }
+                    }
+                    if (!Array.isArray(propsArr)) return null;
+                }
+
+                const pid = String(prop.id || prop.idProperty || prop.propertyId || prop.key || '').toLowerCase();
+                const pname = String(prop.name || prop.manifest_title || prop.property_name || '').toLowerCase();
+
+                for (const raw of propsArr) {
+                    if (!raw) continue;
+                    let entry = raw;
+                    if (typeof raw === 'string') {
+                        try { entry = JSON.parse(raw); } catch (e) { entry = { name: raw }; }
+                    }
+
+                    const entryId = String(entry.id || entry.details?.id || entry.key || entry.slug || '').toLowerCase();
+                    const entryName = String(entry.name || entry.details?.name || entry.title || entry.details?.title || '').toLowerCase();
+
+                    if (pid && entryId && pid === entryId) {
+                        const foundAnchor = (entry.details && (entry.details.anchorLink || entry.details.anchor_link || entry.details.anchor)) || entry.anchorLink || entry.anchor_link || entry.anchor || null;
+                        console.log(`Found anchor by ID match (${pid}):`, foundAnchor, entry);
+                        return foundAnchor;
+                    }
+
+                    if (!pid && pname && entryName && pname === entryName) {
+                        const foundAnchor = (entry.details && (entry.details.anchorLink || entry.details.anchor_link || entry.details.anchor)) || entry.anchorLink || entry.anchor_link || entry.anchor || null;
+                        console.log(`Found anchor by name match (${pname}):`, foundAnchor, entry);
+                        return foundAnchor;
+                    }
+                }
+
+                return null;
+            } catch (e) {
+                console.warn('Error extracting anchor from manifest', e);
+                return null;
+            }
+        }
+
+        // Helper: get the anchor link (ID) for a property from the custom head content
+        function getCustomPropertyAnchor(prop) {
+            if (!prop) return null;
+            // Priority 0: Manifest explicit anchor stored in document.custom_head_content
+            const manifestAnchor = getAnchorFromDocumentManifest(prop);
+            if (manifestAnchor) return manifestAnchor;
+
+            // Priority 1: Frontend manifest match (fallback to server-cached manifest entry)
+            const entry = getManifestPropertyEntry(prop);
+            if (entry) {
+                const explicitAnchor = (entry.details && (entry.details.anchorLink || entry.details.anchor_link || entry.details.anchor)) ||
+                                       entry.anchorLink || entry.anchor_link || entry.anchor || null;
+                if (explicitAnchor) return explicitAnchor;
+
+                const idFallback = (entry.details && (entry.details.idProperty || entry.details.id_property || entry.details.id)) ||
+                                   entry.idProperty || entry.id_property || entry.id || entry.slug || entry.key || null;
+                if (idFallback) return idFallback;
+            }
+
+            // Priority 2: Check if the property object itself has the anchor data (flattened by server)
+            const propertyAnchor = prop.anchorLink || prop.anchor_link || prop.anchorId || prop.anchor_id ||
+                                  prop.manifest_anchor || prop.manifest_anchor_link || prop.manifest_anchorId || prop.anchor || null;
+            if (propertyAnchor) return propertyAnchor;
+
+            return null;
         }
 
         // Helper: determine if a property is actually visible based on manifest or database
@@ -1170,12 +1336,18 @@
 
         // Helper: get the full manifest entry for a property
         function getManifestPropertyEntry(prop) {
+            if (!prop) return null;
+            if (prop._manifestEntry !== undefined) return prop._manifestEntry;
+
             try {
                 const doc = window.selectedDocument || null;
                 if (!doc) return null;
 
                 const propsArr = getCustomPropertiesArray(doc);
-                if (!propsArr) return null;
+                if (!propsArr) {
+                    prop._manifestEntry = null;
+                    return null;
+                }
 
                 // Candidates for the property's ID
                 const propIdCandidates = [
@@ -1184,7 +1356,10 @@
                     prop.fkProperty,
                     prop.property_id,
                     prop.propertyId,
-                    prop.key
+                    prop.key,
+                    prop.anchorId,
+                    prop.anchor_id,
+                    prop.anchorLink
                 ].filter(Boolean).map(v => String(v).toLowerCase());
 
                 // Candidates for the property's Name
@@ -1193,7 +1368,9 @@
                     prop.property_name,
                     prop.propertyName,
                     prop.property_type,
-                    prop.propertyType
+                    prop.propertyType,
+                    prop.manifest_title,
+                    prop.db_name
                 ].filter(Boolean).map(v => String(v).toLowerCase());
 
                 // Normalize entries and compare against candidates
@@ -1207,15 +1384,19 @@
                     const entryIdCandidates = [
                         entry.id,
                         entry.details && entry.details.id,
-                        entry.details && entry.details.idProperty,
+                        entry.details && (entry.details.idProperty || entry.details.id_property || entry.details.fkProperty || entry.details.fk_property),
                         entry.idProperty,
+                        entry.id_property,
                         entry.property_id,
                         entry.propertyId,
                         entry.fkProperty,
-                        entry.details && entry.details.fkProperty,
+                        entry.fk_property,
                         entry.key,
                         entry.slug,
-                        entry.details && entry.details.anchorLink
+                        entry.details && (entry.details.anchorLink || entry.details.anchor_link || entry.details.anchor),
+                        entry.anchorLink,
+                        entry.anchor_link,
+                        entry.anchor
                     ].filter(Boolean).map(v => String(v).toLowerCase());
 
                     const entryNameCandidates = [
@@ -1223,12 +1404,18 @@
                         entry.details && entry.details.name,
                         entry.property_name,
                         entry.propertyName,
+                        entry.title,
+                        entry.details && entry.details.title,
+                        entry.label,
                         entry.key,
-                        entry.slug
+                        entry.slug,
+                        entry.property_type,
+                        entry.propertyType
                     ].filter(Boolean).map(v => String(v).toLowerCase());
 
                     // Try to match by any ID candidate
                     if (propIdCandidates.some(id => entryIdCandidates.includes(id))) {
+                        prop._manifestEntry = entry;
                         return entry;
                     }
 
@@ -1237,13 +1424,16 @@
                         if (!name || name.length < 3) return false;
                         return entryNameCandidates.includes(name);
                     })) {
+                        prop._manifestEntry = entry;
                         return entry;
                     }
                 }
 
+                prop._manifestEntry = null;
                 return null;
             } catch (e) {
-                console.warn('getManifestPropertyEntry failed', e);
+                console.warn('Error matching manifest entry', e);
+                prop._manifestEntry = null;
                 return null;
             }
         }
@@ -1986,6 +2176,21 @@
                 window.selectedSite = selectedSite || null;
                 window.selectedDocument = selectedDocument || null;
                 
+                // Debug: Log what we got
+                console.log('=== DOCUMENT LOADED ===');
+                console.log('Document has custom_head_content?', !!selectedDocument?.custom_head_content);
+                if (selectedDocument?.custom_head_content) {
+                    console.log('custom_head_content type:', typeof selectedDocument.custom_head_content);
+                    console.log('custom_head_content sample:', selectedDocument.custom_head_content.substring ? selectedDocument.custom_head_content.substring(0, 300) : selectedDocument.custom_head_content);
+                }
+
+                // Pre-map manifest entries to properties for faster lookup and consistency
+                if (window.selectedDocument && properties.length > 0) {
+                    properties.forEach(p => {
+                        getManifestPropertyEntry(p); 
+                    });
+                }
+                
                 // Update metadata section using the ACTUAL document/site info
                 updateMetadata(window.selectedSite, window.selectedDocument);
                 
@@ -2058,6 +2263,7 @@
                                         <th style="padding-left: 20px; width: 50px;">Pos</th>
                                         <th>Property Name / Title</th>
                                         <th>ID</th>
+                                        <th>Anchor</th>
                                         <th class="text-center">Visible?</th>
                                         <th class="text-center">In Combined HTML?</th>
                                         <th>Database Status</th>
@@ -2074,7 +2280,7 @@
                                         const isMinistries = String(p.property_type || '').toLowerCase().includes('ministr');
                                         // Exclude "See What's Happening" sections - comprehensive check
                                         const propDump = JSON.stringify(p).toLowerCase();
-                                        const isSeeWhatsHappening = String(p.property_type || '').toLowerCase().includes('freetextarea') &&
+                                        const isSeeWhatsHappening = (String(p.property_type || '').toLowerCase().includes('freetextarea') || String(p.property_type || '').toLowerCase().includes('slide') || String(p.property_type || '').toLowerCase().includes('carousel')) &&
                                             (propDump.includes('seewhatshappening') || (propDump.includes("see what's happening") && propDump.includes("action=")) || (propDump.includes('location-search') && propDump.includes('gdos')));
                                         const isGreatestNeed = propDump.includes('greatestneed');
                                         const isExcludedType = ['locationname', 'threeiconlinks', 'ourleader', 'contactinfo', 'mediaboxhalf', 'interactivestatemap', 'stories', 'mapcontrol', 'localsites'].some(t => String(p.property_type || '').toLowerCase().includes(t));
@@ -2098,6 +2304,7 @@
 
                                         const hasContent = !!(p.text_html || p.objects_array || p.value);
                                         const inTotalHtml = isVisible && hasContent && !isFormBuilder && !isMinistries && !isSeeWhatsHappening && !isGreatestNeed && !isExcludedType && !isHeroMode;
+                                        const anchorLink = getCustomPropertyAnchor(p);
                                         
                                         let statusColor = '#198754';
                                         let statusText = 'MATCHED';
@@ -2162,6 +2369,19 @@
                                                 <td class="text-monospace" style="font-size: 10px;">
                                                     <span title="Click to copy ID" style="cursor: pointer; color: #0066cc;" onclick="navigator.clipboard.writeText('${p.id}'); this.style.color='green'; setTimeout(()=>this.style.color='#0066cc',1000)">${p.id}</span>
                                                 </td>
+                                                        <td class="text-monospace" style="font-size: 10px; font-weight: 500;">
+                                                            ${(() => {
+                                                                // Get anchor directly from document.custom_head_content
+                                                                const anchor = getAnchorFromDocumentManifest(p) || getCustomPropertyAnchor(p);
+
+                                                                if (anchor) {
+                                                                    // Scroll directly to the anchor id if present, otherwise fall back to the property card
+                                                                    const target = anchor ? `document.getElementById('${escapeHtml(anchor)}')` : `document.getElementById('propertyCard-${p.id}')`;
+                                                                    return `<span title="Scroll to Property" style="cursor: pointer; text-decoration: underline; color: #6610f2;" onclick="( ${target} || document.getElementById('propertyCard-${p.id}') ).scrollIntoView({behavior: 'smooth'})">${escapeHtml(anchor)}</span>`;
+                                                                }
+                                                                return '<span style="color: #ccc;">-</span>';
+                                                            })()}
+                                                        </td>
                                                 <td class="text-center">
                                                     ${isVisible ? '<span style="color: #198754; font-weight: bold;">✓ Yes</span>' : '<span style="color: #dc3545;">✗ No</span>'}
                                                 </td>
@@ -2268,7 +2488,7 @@
                 // Exclude "See What's Happening" sections
                 // Case-insensitive check on entire property object
                 const propDump = JSON.stringify(prop).toLowerCase();
-                const isSeeWhatsHappening = String(prop.property_type || '').toLowerCase().includes('freetextarea') &&
+                const isSeeWhatsHappening = (String(prop.property_type || '').toLowerCase().includes('freetextarea') || String(prop.property_type || '').toLowerCase().includes('slide') || String(prop.property_type || '').toLowerCase().includes('carousel')) &&
                     (propDump.includes('seewhatshappening') || (propDump.includes("see what's happening") && propDump.includes("action=")) || (propDump.includes('location-search') && propDump.includes('gdos')));
 
                 // Slide/Hero Detection for combined HTML
@@ -2290,8 +2510,8 @@
                     let content = buildPropertySnapshotHtml(prop);
                     
                     if (content) {
-                        // Pass the full prop object as the 3rd argument to access raw JSON content for filtering
-                        content = transformFullHtml(content, prop.property_type);
+                        // Pass the full prop object to access manifest data (like anchors)
+                        content = transformFullHtml(content, prop);
                         
                         // Extract metadata title properly and store in a variable
                         const documentMetadataTitle = getCustomPropertyTitle(prop);
@@ -2381,7 +2601,7 @@
 
             // Exclude "See What's Happening" sections
             const propDump = JSON.stringify(prop).toLowerCase();
-            const isSeeWhatsHappening = String(prop.property_type || '').toLowerCase().includes('freetextarea') &&
+            const isSeeWhatsHappening = (String(prop.property_type || '').toLowerCase().includes('freetextarea') || String(prop.property_type || '').toLowerCase().includes('slide') || String(prop.property_type || '').toLowerCase().includes('carousel')) &&
                     (propDump.includes('seewhatshappening') || (propDump.includes("see what's happening") && propDump.includes("action=")) || (propDump.includes('location-search') && propDump.includes('gdos')));
             const isGreatestNeed = propDump.includes('greatestneed');
             const isMinistries = String(prop.property_type || '').toLowerCase().includes('ministr');
@@ -2393,8 +2613,10 @@
             
             // Collect visible text/html content (including complex types like slides/accordions)
             if (isActuallyVisible && !isSeeWhatsHappening && !isGreatestNeed && !isMinistries && !isExcludedType) {
-                const snapshot = buildPropertySnapshotHtml(prop);
+                let snapshot = buildPropertySnapshotHtml(prop);
                 if (snapshot) {
+                    // Apply common HTML transformations and anchor wrapping
+                    snapshot = transformFullHtml(snapshot, prop, false);
                     visibleContent.push(snapshot);
                 }
             }
@@ -2649,6 +2871,18 @@
                                     <span class="property-label">Visible:</span>
                                     <span class="property-value">${isActuallyVisible ? '✓ Yes' : '✗ No'}</span>
                                 </div>
+                                ${(() => {
+                                    const anchor = getCustomPropertyAnchor(prop);
+                                    if (anchor) {
+                                        return `
+                                            <div class="property-info-row">
+                                                <span class="property-label">Anchor:</span>
+                                                <span class="property-value" style="color: #6610f2; font-weight: 600;">#${escapeHtml(anchor)}</span>
+                                            </div>
+                                        `;
+                                    }
+                                    return '';
+                                })()}
                                 ${visibleContent.length > 0 && isManifestActive ? `
                                     <div style="padding: 3px 8px; background: #e8f5e9; border: 1px solid #4caf50; border-radius: 3px; color: #2e7d32; font-size: 10px; font-weight: 600; white-space: nowrap;">
                                         ✓ In combined view
@@ -2746,14 +2980,8 @@
                                             return `
                                             <div class="slide-item ministries${slide.isExpired ? ' expired' : ''}">
                                                 <div class="slide-media">
-                                                        ${slide.isVideo ? `
-                                                            <video class="slide-video" autoplay muted loop playsinline>
-                                                                <source src="${slide.imageUrl}" type="video/mp4">
-                                                            </video>
-                                                        ` : `
-                                                            <img class="slide-thumbnail" src="${slide.imageUrl}" alt="${escapeHtml(slide.title)}" loading="lazy" onerror="this.style.display='none'" />
-                                                        `}
-                                                    </div>
+                                                    ${renderSlideMedia(slide)}
+                                                </div>
                                                 <div class="slide-info">
                                                     <div class="slide-content">
                                                         <div class="slide-title" title="${escapeHtml(slide.title)}">${escapeHtml(slide.title)}</div>
@@ -2789,12 +3017,12 @@
                                                                 ${slide.secondaryButtonText ? ` <a class="btn-link secondary" href="${slide.secondaryButtonUrl || '#'}" target="_blank" ${!slide.secondaryButtonUrl ? 'onclick="return false;"' : ''}>${escapeHtml(slide.secondaryButtonText)}</a>` : ''}
                                                             </div>
                                                         ` : ''}
-                                                        ${slide.hasMobileImage ? `<div class="slide-mobile-indicator">📱 Has mobile version${slide.isMobileVideo ? ' (video)' : ''}</div>` : ''}
+                                                        ${slide.hasMobileImage ? `<div class="slide-mobile-indicator">📱 Has mobile version${slide.isMobileYoutube ? ' (YT)' : slide.isMobileVideo ? ' (video)' : ''}</div>` : ''}
                                                         ${slide.isExpired ? `<div style="font-size: 11px; color: #999; margin-top: 6px;">Expired: ${new Date(slide.endDate).toLocaleDateString()}</div>` : ''}
                                                     </div>
                                                     <div class="slide-actions">
-                                                        <button class="download-btn" onclick="downloadSlideImage('${prop.id}', ${globalIdx}, event, 'desktop')">⬇ ${slide.isVideo ? 'Video' : 'Image'}</button>
-                                                        ${slide.hasMobileImage ? `<button class="download-btn" onclick="downloadSlideImage('${prop.id}', ${globalIdx}, event, 'mobile')">⬇ Mobile ${slide.isMobileVideo ? 'Video' : 'Image'}</button>` : ''}
+                                                        <button class="download-btn" onclick="downloadSlideImage('${prop.id}', ${globalIdx}, event, 'desktop')">⬇ ${slide.isYoutube ? 'YT' : slide.isVideo ? 'Video' : 'Image'}</button>
+                                                        ${slide.hasMobileImage ? `<button class="download-btn" onclick="downloadSlideImage('${prop.id}', ${globalIdx}, event, 'mobile')">⬇ Mobile ${slide.isMobileYoutube ? 'YT' : slide.isMobileVideo ? 'Video' : 'Image'}</button>` : ''}
                                                         <button class="download-btn" style="background: #6c757d;" onclick="copySlideJson('${prop.id}', ${globalIdx}); this.textContent='Copied!'; setTimeout(() => this.textContent='Copy JSON', 1500);">Copy JSON</button>
                                                     </div>
                                                 </div>
@@ -2805,14 +3033,7 @@
                                         // Default layout (image first)
                                         return `
                                         <div class="slide-item${slide.isExpired ? ' expired' : ''}">
-                                            ${slide.isVideo ? `
-                                                <video class="slide-video" autoplay muted loop playsinline>
-                                                    <source src="${slide.imageUrl}" type="video/mp4">
-                                                    Your browser does not support the video tag.
-                                                </video>
-                                            ` : `
-                                                <img class="slide-thumbnail" src="${slide.imageUrl}" alt="${escapeHtml(slide.title)}" loading="lazy" onerror="this.style.display='none'" />
-                                            `}
+                                            ${renderSlideMedia(slide)}
                                             <div class="slide-info">
                                                 <div class="slide-content">
                                                     <div class="slide-title" title="${escapeHtml(slide.title)}">${escapeHtml(slide.title)}</div>
@@ -2833,12 +3054,12 @@
                                                             ${slide.secondaryButtonText ? `<li class="secondary"><a href="${slide.secondaryButtonUrl || '#'}" target="_blank" style="color: inherit; text-decoration: none;" ${!slide.secondaryButtonUrl ? 'onclick="return false;"' : ''}>${escapeHtml(slide.secondaryButtonText)}</a></li>` : ''}
                                                         </ul>
                                                     ` : ''}
-                                                    ${slide.hasMobileImage ? `<div class="slide-mobile-indicator">📱 Has mobile version${slide.isMobileVideo ? ' (video)' : ''}</div>` : ''}
+                                                    ${slide.hasMobileImage ? `<div class="slide-mobile-indicator">📱 Has mobile version${slide.isMobileYoutube ? ' (YT)' : slide.isMobileVideo ? ' (video)' : ''}</div>` : ''}
                                                     ${slide.isExpired ? `<div style="font-size: 9px; color: #999; margin-top: 4px;">Expired: ${new Date(slide.endDate).toLocaleDateString()}</div>` : ''}
                                                 </div>
                                                 <div class="slide-actions">
-                                                    <button class="download-btn" onclick="downloadSlideImage('${prop.id}', ${globalIdx}, event, 'desktop')">⬇ ${slide.isVideo ? 'Video' : 'Image'}</button>
-                                                    ${slide.hasMobileImage ? `<button class="download-btn" onclick="downloadSlideImage('${prop.id}', ${globalIdx}, event, 'mobile')">⬇ Mobile ${slide.isMobileVideo ? 'Video' : 'Image'}</button>` : ''}
+                                                    <button class="download-btn" onclick="downloadSlideImage('${prop.id}', ${globalIdx}, event, 'desktop')">⬇ ${slide.isYoutube ? 'YT' : slide.isVideo ? 'Video' : 'Image'}</button>
+                                                    ${slide.hasMobileImage ? `<button class="download-btn" onclick="downloadSlideImage('${prop.id}', ${globalIdx}, event, 'mobile')">⬇ Mobile ${slide.isMobileYoutube ? 'YT' : slide.isMobileVideo ? 'Video' : 'Image'}</button>` : ''}
                                                     <button class="download-btn" style="background: #6c757d;" onclick="copySlideJson('${prop.id}', ${globalIdx}); this.textContent='Copied!'; setTimeout(() => this.textContent='Copy JSON', 1500);">Copy JSON</button>
                                                 </div>
                                             </div>
@@ -2886,19 +3107,13 @@
                                                         <div style="font-size: 11px; color: #999; margin-top: 6px;">Expired: ${new Date(slide.endDate).toLocaleDateString()}</div>
                                                     </div>
                                                     <div class="slide-actions">
-                                                        <button class="download-btn" onclick="downloadSlideImage('${prop.id}', ${globalIdx}, event, 'desktop')">⬇ ${slide.isVideo ? 'Video' : 'Image'}</button>
-                                                        ${slide.hasMobileImage ? `<button class="download-btn" onclick="downloadSlideImage('${prop.id}', ${globalIdx}, event, 'mobile')">⬇ Mobile ${slide.isMobileVideo ? 'Video' : 'Image'}</button>` : ''}
+                                                        <button class="download-btn" onclick="downloadSlideImage('${prop.id}', ${globalIdx}, event, 'desktop')">⬇ ${slide.isYoutube ? 'YT' : slide.isVideo ? 'Video' : 'Image'}</button>
+                                                        ${slide.hasMobileImage ? `<button class="download-btn" onclick="downloadSlideImage('${prop.id}', ${globalIdx}, event, 'mobile')">⬇ Mobile ${slide.isMobileYoutube ? 'YT' : slide.isMobileVideo ? 'Video' : 'Image'}</button>` : ''}
                                                         <button class="download-btn" style="background: #6c757d;" onclick="copySlideJson('${prop.id}', ${globalIdx}); this.textContent='Copied!'; setTimeout(() => this.textContent='Copy JSON', 1500);">Copy JSON</button>
                                                     </div>
                                                 </div>
                                                 <div class="slide-media">
-                                                    ${slide.isVideo ? `
-                                                        <video class="slide-video" autoplay muted loop playsinline>
-                                                            <source src="${slide.imageUrl}" type="video/mp4">
-                                                        </video>
-                                                    ` : `
-                                                        <img class="slide-thumbnail" src="${slide.imageUrl}" alt="${escapeHtml(slide.title)}" loading="lazy" onerror="this.style.display='none'" />
-                                                    `}
+                                                    ${renderSlideMedia(slide)}
                                                 </div>
                                             </div>
                                         `;
@@ -2906,18 +3121,12 @@
 
                                         return `
                                         <div class="slide-item expired">
-                                            ${slide.isVideo ? `
-                                                <video class="slide-video" autoplay muted loop playsinline>
-                                                    <source src="${slide.imageUrl}" type="video/mp4">
-                                                </video>
-                                            ` : `
-                                                <img class="slide-thumbnail" src="${slide.imageUrl}" alt="${escapeHtml(slide.title)}" loading="lazy" onerror="this.style.display='none'" />
-                                            `}
+                                            ${renderSlideMedia(slide)}
                                             <div class="slide-info">
                                                 <div class="slide-title">${escapeHtml(slide.title)}</div>
                                                 <div class="slide-actions">
-                                                    <button class="download-btn" onclick="downloadSlideImage('${prop.id}', ${globalIdx}, event, 'desktop')">⬇ ${slide.isVideo ? 'Video' : 'Image'}</button>
-                                                    ${slide.hasMobileImage ? `<button class="download-btn" onclick="downloadSlideImage('${prop.id}', ${globalIdx}, event, 'mobile')">⬇ Mobile ${slide.isMobileVideo ? 'Video' : 'Image'}</button>` : ''}
+                                                    <button class="download-btn" onclick="downloadSlideImage('${prop.id}', ${globalIdx}, event, 'desktop')">⬇ ${slide.isYoutube ? 'YT' : slide.isVideo ? 'Video' : 'Image'}</button>
+                                                    ${slide.hasMobileImage ? `<button class="download-btn" onclick="downloadSlideImage('${prop.id}', ${globalIdx}, event, 'mobile')">⬇ Mobile ${slide.isMobileYoutube ? 'YT' : slide.isMobileVideo ? 'Video' : 'Image'}</button>` : ''}
                                                     <button class="download-btn" style="background: #6c757d;" onclick="copySlideJson('${prop.id}', ${globalIdx}); this.textContent='Copied!'; setTimeout(() => this.textContent='Copy JSON', 1500);">Copy JSON</button>
                                                 </div>
                                             </div>
@@ -3210,9 +3419,10 @@
             }
         }
 
-        function transformFullHtml(content, propType) {
+        function transformFullHtml(content, prop, forCombinedView = true) {
             if (!content) return content;
 
+            const propType = prop ? prop.property_type : null;
             const typeLower = String(propType || '').toLowerCase();
             let updated = applyBtgridResponsiveClasses(content);
             try {
@@ -3223,7 +3433,8 @@
                     const src = iframe.getAttribute('src') || '';
                     const isYoutube = src.includes('youtube.com') || src.includes('youtu.be');
                     const isVimeo = src.includes('vimeo.com') || src.includes('player.vimeo.com');
-                    const alreadyWrapped = iframe.closest('.wrapVideo');
+                    // Skip if already wrapped in our specific video container or structure
+                    const alreadyWrapped = iframe.closest('.wrapVideo') || iframe.closest('.slide-video-container') || iframe.closest('.video-background');
 
                     if ((isYoutube || isVimeo) && !alreadyWrapped) {
                         const container = doc.createElement('div');
@@ -3256,7 +3467,21 @@
                 // keep original content if parsing fails
             }
             // Apply transformations to Rich Text, Cards, Accordions, Tabs, Slides, and HTML blocks
-            if (typeLower.includes('freetextarea') || typeLower.includes('cards') || typeLower.includes('accordion') || typeLower.includes('tabs') || typeLower.includes('slides') || typeLower.includes('html')) {
+            // Inclusion list expanded for theaterSpace and freeText as requested
+            const isTransformable = (
+                typeLower.includes('freetext') || 
+                typeLower.includes('theaterspace') || 
+                typeLower.includes('cards') || 
+                typeLower.includes('accordion') || 
+                typeLower.includes('tabs') || 
+                typeLower.includes('slides') || 
+                typeLower.includes('html') ||
+                typeLower.includes('rich-text') ||
+                typeLower.includes('title') ||
+                typeLower.includes('whitetitle')
+            );
+
+            if (isTransformable) {
                 try {
                     const parser = new DOMParser();
                     const doc = parser.parseFromString(updated, 'text/html');
@@ -3283,26 +3508,101 @@
                     const solidBtns = Array.from(doc.body.querySelectorAll('.btn-solid'));
                     solidBtns.forEach(el => el.classList.remove('btn-solid'));
 
-                    // 0.5 REMOVE WHITE TEXT COLOR (Fixes invisibility on white backgrounds)
-                    // Select elements with "color" in style attribute (optimization)
-                    const elementsWithStyle = Array.from(doc.body.querySelectorAll('[style*="color"]'));
-                    elementsWithStyle.forEach(el => {
-                        const style = el.getAttribute('style');
-                        if (style) {
-                             // Remove white color definitions to prevent invisible text
-                             // Matches color: #ffffff, #fff, white, rgb(255,255,255) with optional !important and terminators
-                             const newStyle = style.replace(/(^|;)\s*color\s*:\s*(?:#ffffff|#fff|white|rgb\(\s*255\s*,\s*255\s*,\s*255\s*\))\s*(?:!important)?\s*(?:;|$)/gi, '$1');
-                             
-                             if (newStyle !== style) {
-                                 const trimmed = newStyle.trim();
-                                 if (!trimmed || trimmed === ';') {
-                                     el.removeAttribute('style');
-                                 } else {
-                                     el.setAttribute('style', newStyle);
-                                 }
-                             }
-                        }
+                    // 0.25 CONVERT SALVATION ARMY BACKGROUND COLOR CLASSES TO INLINE STYLES
+                    // Map of SA background classes to their colors and text colors
+                    const saBgClasses = {
+                        'u-sa-whiteBg': { bg: '#ffffff', color: null },
+                        'u-sa-blackBg': { bg: '#000000', color: '#ffffff' },
+                        'u-sa-greyBg': { bg: '#5a5a5a', color: '#ffffff' },
+                        'u-sa-greyLightBg': { bg: '#cccccc', color: null },
+                        'u-sa-greyVeryLightBg': { bg: '#f5f5f5', color: null },
+                        'u-sa-redBg': { bg: '#ed1b2e', color: '#ffffff' },
+                        'u-sa-orangeBg': { bg: '#f89728', color: '#ffffff' },
+                        'u-sa-goldBg': { bg: '#f8b425', color: null },
+                        'u-sa-creamBg': { bg: '#f5f1e8', color: null },
+                        'u-sa-greenBg': { bg: '#00a651', color: '#ffffff' },
+                        'u-sa-tealBg': { bg: '#00aeef', color: '#ffffff' },
+                        'u-sa-blueLightBg': { bg: '#5eb6e4', color: null },
+                        'u-sa-navyBg': { bg: '#002d5a', color: '#ffffff' }
+                    };
+
+                    // Find all elements with SA background classes and convert to inline styles
+                    Object.keys(saBgClasses).forEach(className => {
+                        const elements = Array.from(doc.body.querySelectorAll(`.${className}`));
+                        elements.forEach(el => {
+                            const colors = saBgClasses[className];
+                            const existingStyle = el.getAttribute('style') || '';
+                            
+                            // Add background color
+                            let newStyle = existingStyle;
+                            if (!newStyle.includes('background-color')) {
+                                newStyle += `${newStyle ? '; ' : ''}background-color: ${colors.bg}`;
+                            }
+                            
+                            // Add text color if specified
+                            if (colors.color && !newStyle.includes('color:')) {
+                                newStyle += `; color: ${colors.color}`;
+                            }
+                            
+                            el.setAttribute('style', newStyle);
+                            el.classList.remove(className); // Remove the class since we've inlined it
+                        });
                     });
+
+                    // 0.5 HANDLE WHITE TEXT COLOR
+                    // User Request: "update the headings and text inside free text area to use the color white if it is supplied"
+                    // We only remove white text if the parent DOES NOT have a background image or dark overlay.
+                    // If it DOES have a background, we preserve white and promote it to .text-white for cleaner output.
+                    
+                    const hasBackground = doc.body.querySelector('[style*="background-image"], [style*="background: url"]') !== null;
+                    const hasDarkSection = doc.body.querySelector('.text-white, .bg-dark, .bg-photo-overlay, .bg-primary, .bg-secondary, .bg-info, .bg-danger, .bg-warning, .bg-success') !== null;
+
+                    if (hasBackground || hasDarkSection) {
+                        // PROMOTE & PRESERVE: Move white color from spans/styles to Bootstrap classes
+                        const blocks = Array.from(doc.body.querySelectorAll('h1, h2, h3, h4, h5, h6, p, li'));
+                        blocks.forEach(block => {
+                            const whiteSpans = Array.from(block.querySelectorAll('span')).filter(s => {
+                                const st = s.getAttribute('style') || '';
+                                return /color\s*:\s*(?:#ffffff|#fff|white|rgb\(\s*255\s*,\s*255\s*,\s*255\s*\))/i.test(st);
+                            });
+
+                            const blockStyle = block.getAttribute('style') || '';
+                            const isBlockWhite = /color\s*:\s*(?:#ffffff|#fff|white|rgb\(\s*255\s*,\s*255\s*,\s*255\s*\))/i.test(blockStyle);
+
+                            if (isBlockWhite || whiteSpans.length > 0) {
+                                block.classList.add('text-white');
+                                
+                                // Clean up block inline white
+                                if (isBlockWhite) {
+                                    const newStyle = blockStyle.replace(/(^|;)\s*color\s*:\s*(?:#ffffff|#fff|white|rgb\(\s*255\s*,\s*255\s*,\s*255\s*\))\s*(?:!important)?\s*(?:;|$)/gi, '$1');
+                                    if (!newStyle.trim() || newStyle.trim() === ';') block.removeAttribute('style');
+                                    else block.setAttribute('style', newStyle);
+                                }
+
+                                // Clean up child spans white
+                                whiteSpans.forEach(s => {
+                                    const st = s.getAttribute('style');
+                                    const newSt = st.replace(/(^|;)\s*color\s*:\s*(?:#ffffff|#fff|white|rgb\(\s*255\s*,\s*255\s*,\s*255\s*\))\s*(?:!important)?\s*(?:;|$)/gi, '$1');
+                                    if (!newSt.trim() || newSt.trim() === ';') s.removeAttribute('style');
+                                    else s.setAttribute('style', newSt);
+                                });
+                            }
+                        });
+                    } else {
+                        // REMOVE: On white backgrounds, strip white text to ensure visibility
+                        const elementsWithStyle = Array.from(doc.body.querySelectorAll('[style*="color"]'));
+                        elementsWithStyle.forEach(el => {
+                            const style = el.getAttribute('style');
+                            if (style) {
+                                 const newStyle = style.replace(/(^|;)\s*color\s*:\s*(?:#ffffff|#fff|white|rgb\(\s*255\s*,\s*255\s*,\s*255\s*\))\s*(?:!important)?\s*(?:;|$)/gi, '$1');
+                                 if (newStyle !== style) {
+                                     const trimmed = newStyle.trim();
+                                     if (!trimmed || trimmed === ';') { el.removeAttribute('style'); }
+                                     else { el.setAttribute('style', newStyle); }
+                                 }
+                            }
+                        });
+                    }
 
                     // CLEANUP: Phantom links removal will happen AFTER button unwrapping now (see below)
 
@@ -3348,14 +3648,14 @@
                     // Check for cards with empty content or just whitespace/placeholders
                     const cards = Array.from(doc.body.querySelectorAll('.col.mb-4 .card'));
                     cards.forEach(card => {
-                        const title = card.querySelector('.card-title')?.textContent || '';
+                        const title = card.querySelector('.card-title')?.textContent?.trim() || '';
                         const textBody = card.querySelector('.card-text');
                         const text = textBody?.textContent?.replace(/\u00a0/g, ' ').trim() || '';
-                        const hasImg = textBody?.querySelector('img');
+                        const hasImg = card.querySelector('img'); // Look in the whole card, not just textBody
 
-                        // Condition: No image AND (no text OR text is just punctuation like ".")
-                        // Some placeholder cards have just a period "."
-                        if (!hasImg && (!text || text === '.' || text.length < 2)) {
+                        // Condition: No image AND no title AND (no text OR text is just punctuation like ".")
+                        // If it has an image, it's a gallery card. If it has a title, it's a valid card.
+                        if (!hasImg && !title && (!text || text === '.' || text.length < 2)) {
                              // Remove the column container
                              const col = card.closest('.col.mb-4');
                              if (col) col.remove();
@@ -3451,6 +3751,34 @@
                             img.style.marginLeft = '0';
                             img.style.marginRight = 'auto';
                         }
+                        
+                        // FIX: Remove fixed width/height to prevent mobile stretching/compression
+                        // If image has both width and height in inline styles, convert to responsive pattern
+                        const hasFixedWidth = img.style.width && /^\d+(\.\d+)?px$/.test(img.style.width);
+                        const hasFixedHeight = img.style.height && /^\d+(\.\d+)?px$/.test(img.style.height);
+                        
+                        if (hasFixedWidth || hasFixedHeight) {
+                            // Capture original height value before clearing
+                            const heightValue = hasFixedHeight ? parseFloat(img.style.height) : 0;
+                            
+                            // Replace with responsive pattern: max-width 100%, auto width, preserve aspect ratio
+                            img.style.maxWidth = '100%';
+                            img.style.width = 'auto';
+                            
+                            // Remove fixed height - let aspect ratio determine it naturally
+                            img.style.height = '';
+                            
+                            // Add max-height for very tall images to prevent excessive vertical space
+                            // Use the original height as a guide if available, but cap at reasonable value
+                            if (heightValue > 0) {
+                                img.style.maxHeight = `${Math.min(heightValue, 500)}px`;
+                            } else {
+                                img.style.maxHeight = '500px';
+                            }
+                            
+                            // Add object-fit to ensure proper scaling
+                            img.style.objectFit = 'contain';
+                        }
                     });
 
                     // Enforce single H1 rule: Keep first H1, convert subsequent H1s to H2s
@@ -3480,7 +3808,7 @@
                          // Map legacy classes to Material Symbols
                          const iconMap = {
                              'icon-center-heart': 'favorite',
-                             'icon-shelter': 'shelter',
+                             'icon-shelter': 'night_shelter',
                              'icon-assistpeople': 'handshake',
                              'icon-airline': 'flight',
                              'icon-planned-giving': 'volunteer_activism',
@@ -3492,7 +3820,8 @@
                              'icon-bar-chart': 'bar_chart',
                              'icon-history': 'history_edu',
                              'icon-laptop': 'laptop',
-                             'icon-mobile': 'smartphone'
+                             'icon-mobile': 'smartphone',
+                             'icon-car': 'directions_car'
                          };
                          materialName = iconMap[iconClass] || '';
                          
@@ -3541,6 +3870,22 @@
                              if (inCard && !span.classList.contains('mb-5')) {
                                  span.classList.add('mb-5');
                              }
+                        }
+                    });
+
+                    // Remove fixed heights from divs that can cause text overlap
+                    // These are often legacy layout helpers that restrict content flow
+                    const divsWithHeight = Array.from(doc.body.querySelectorAll('div[style*="height:"], div[style*="height :"]'));
+                    divsWithHeight.forEach(div => {
+                        const style = div.getAttribute('style') || '';
+                        // Only remove fixed pixel heights, not min-height or percentage heights
+                        if (/height\s*:\s*\d+px/i.test(style)) {
+                            const newStyle = style.replace(/height\s*:\s*\d+px\s*;?/gi, '').trim();
+                            if (newStyle) {
+                                div.setAttribute('style', newStyle);
+                            } else {
+                                div.removeAttribute('style');
+                            }
                         }
                     });
 
@@ -3666,7 +4011,7 @@
                             if (href.includes('give.') || href.includes('//give.') || href.includes('give/') || href.includes('donate')) {
                                 btn.classList.add('btn', 'btn-primary');
                             } else {
-                                btn.classList.add('btn-secondary');
+                                btn.classList.add('btn', 'btn-secondary');
                             }
                          }
                     });
@@ -3733,8 +4078,21 @@
                     // --- TRANSFORMATION: DEDUPLICATE CARD TITLES ---
                     // If a card-title text matches a heading inside card-body, remove the heading
                     doc.body.querySelectorAll('.card').forEach(card => {
+                        // Force card to always have h-100 for equal height
+                        card.classList.add('h-100');
                         const cardTitle = card.querySelector('.card-title');
                         const cardBody = card.querySelector('.card-body');
+                        // Force card-body to always have d-flex flex-column h-100 only
+                        if (cardBody) {
+                            cardBody.className = 'card-body d-flex flex-column h-100 p-5';
+                        }
+                        // Add h-100 to .flex-grow-1 and .rowTop, and set .rowTop to d-flex flex-column h-100 w-100 align-items-stretch
+                        if (cardBody) {
+                            const fg1 = cardBody.querySelector('.flex-grow-1');
+                            if (fg1) fg1.classList.add('h-100');
+                            const rowTop = cardBody.querySelector('.rowTop');
+                            if (rowTop) rowTop.classList.add('d-flex', 'flex-column', 'h-100', 'w-100', 'align-items-stretch');
+                        }
                         
                         if (cardTitle && cardBody) {
                              const titleText = cardTitle.textContent.trim();
@@ -3796,6 +4154,53 @@
                                      h.remove();
                                  }
                              });
+                        }
+
+                        // --- STRICT BUTTON ROW ALIGNMENT FIX ---
+                        // Remove align-items-center and text-center from card-body for button alignment
+                        // (already removed by above, but keep for safety)
+                        if (cardBody) cardBody.classList.remove('align-items-center', 'text-center');
+                        // Remove all legacy and Bootstrap 4 button width/align classes from all buttons
+                        const cardBtns = cardBody.querySelectorAll('a.btn, button.btn');
+                        if (cardBtns.length > 0) {
+                            // Remove all existing .rowBtn containers
+                            cardBody.querySelectorAll('.rowBtn').forEach(rb => rb.remove());
+                            // Remove btn-block, d-block, mt-auto, and any inline width from all buttons
+                            cardBtns.forEach(btn => {
+                                btn.classList.remove('btn-block', 'd-block', 'mt-auto', 'align-self-center', 'align-self-end', 'align-self-start');
+                                btn.style.width = '';
+                                btn.classList.add('w-100');
+                            });
+                            // Create a new .rowBtn
+                            const rowBtn = document.createElement('div');
+                            rowBtn.className = 'rowBtn mt-auto w-100 ' + (cardBtns.length > 1 ? 'd-flex' : 'd-block');
+                            // Move all buttons into rowBtn
+                            cardBtns.forEach(btn => {
+                                rowBtn.appendChild(btn);
+                            });
+                            // --- WRAP ALL NON-rowBtn CONTENT IN .flex-grow-1 ---
+                            // Collect all children except .rowBtn
+                            const nonBtnNodes = [];
+                            Array.from(cardBody.childNodes).forEach(node => {
+                                if (!(node.nodeType === 1 && node.classList.contains('rowBtn'))) {
+                                    nonBtnNodes.push(node);
+                                }
+                            });
+                            if (nonBtnNodes.length > 0) {
+                                const flexGrowDiv = document.createElement('div');
+                                flexGrowDiv.className = 'flex-grow-1 w-100';
+                                nonBtnNodes.forEach(node => flexGrowDiv.appendChild(node));
+                                // Remove all nonBtnNodes from cardBody
+                                nonBtnNodes.forEach(node => cardBody.removeChild(node));
+                                // Insert flexGrowDiv at the start
+                                cardBody.insertBefore(flexGrowDiv, cardBody.firstChild);
+                            }
+                            // Remove any trailing whitespace or empty nodes at the end
+                            while (cardBody.lastChild && (cardBody.lastChild.nodeType === 3 || (cardBody.lastChild.nodeType === 1 && cardBody.lastChild.textContent.trim() === ''))) {
+                                cardBody.removeChild(cardBody.lastChild);
+                            }
+                            // Append rowBtn as the last child
+                            cardBody.appendChild(rowBtn);
                         }
                     });
 
@@ -4248,6 +4653,61 @@
                     doc.body.querySelectorAll('i.icon').forEach(processIcon);
                     doc.body.querySelectorAll('i.fab, i.fas, i.far').forEach(processIcon); // Process fontawesome too
 
+                    // --- FIX: Bootstrap Grid Column Overflow ---
+                    // If a row has columns that exceed 12 units total, they will wrap.
+                    // This fixes cases where 5 columns each have col-md-3 (totaling 15 > 12).
+                    // Solution: Use auto-width columns (col-md) for equal distribution.
+                    const rows = doc.body.querySelectorAll('.row');
+                    rows.forEach(row => {
+                        // Get direct children that are columns
+                        const cols = Array.from(row.children).filter(el => {
+                            return Array.from(el.classList).some(cls => cls.startsWith('col-'));
+                        });
+                        
+                        if (cols.length === 0) return;
+                        
+                        // Calculate total column units for each breakpoint
+                        const breakpoints = ['', 'sm', 'md', 'lg', 'xl', 'xxl'];
+                        
+                        breakpoints.forEach(bp => {
+                            const regex = bp ? new RegExp(`col-${bp}-(\\d+)`) : /^col-(\d+)$/;
+                            let total = 0;
+                            let hasColumns = false;
+                            
+                            cols.forEach(col => {
+                                Array.from(col.classList).forEach(cls => {
+                                    const match = cls.match(regex);
+                                    if (match) {
+                                        total += parseInt(match[1]);
+                                        hasColumns = true;
+                                    }
+                                });
+                            });
+                            
+                            // If total exceeds 12, convert to auto-width columns
+                            if (hasColumns && total > 12) {
+                                cols.forEach(col => {
+                                    // Remove the oversized column class
+                                    Array.from(col.classList).forEach(cls => {
+                                        if (regex.test(cls)) {
+                                            col.classList.remove(cls);
+                                        }
+                                    });
+                                    
+                                    // Add auto-width column class for this breakpoint
+                                    if (bp) {
+                                        col.classList.add(`col-${bp}`);
+                                    } else {
+                                        // Base mobile should stay col-12 for stacking
+                                        if (!col.classList.contains('col-12')) {
+                                            col.classList.add('col-12');
+                                        }
+                                    }
+                                });
+                            }
+                        });
+                    });
+
                     updated = doc.body.innerHTML;
                 } catch (e) {
                     // keep original content if parsing fails
@@ -4255,9 +4715,78 @@
                 
                 // If this is a freetextarea with a background image, don't use horizontal margins (mx-2)
                 // so it can span as wide as possible within the container.
-                const isBgSection = typeLower.includes('freetextarea') && updated.includes('background-image');
-                const wrapperClass = isBgSection ? 'mb-5' : 'mb-5 mx-2';
-                updated = `<div class="${wrapperClass}">${updated}</div>`;
+                // Only check property-level background fields (not inline HTML content)
+                const hasBackgroundImage = prop && (prop.background || prop.background_image || prop.backgroundImage || prop.heroImage);
+                const isBgSection = typeLower.includes('freetextarea') && hasBackgroundImage;
+                let wrapperClass = isBgSection ? 'mb-5' : (forCombinedView ? 'mb-5 mx-2' : 'mb-3');
+                
+                // Add anchor ID if available from the property manifest (prefer document.custom_head_content)
+                let anchor = null;
+                if (prop) {
+                    // Priority 1: Direct extraction from document.custom_head_content
+                    anchor = getAnchorFromDocumentManifest(prop);
+                    
+                    // Priority 2: Fallback to cached manifest entry
+                    if (!anchor) {
+                        const entry = getManifestPropertyEntry(prop);
+                        if (entry) {
+                            anchor = (entry.details && (entry.details.anchorLink || entry.details.anchor_link || entry.details.anchor)) ||
+                                     entry.anchorLink || entry.anchor_link || entry.anchor || null;
+                        }
+                    }
+                    
+                    // Priority 3: Final fallback
+                    if (!anchor) {
+                        anchor = getCustomPropertyAnchor(prop);
+                    }
+                    
+                    // Debug logging
+                    if (anchor) {
+                        console.log(`Anchor for property ${prop.id || prop.name}: "${anchor}"`);
+                    } else {
+                        console.warn(`No anchor found for property:`, prop.id || prop.name, prop.property_type);
+                    }
+                }
+                const idAttr = anchor ? ` id="${escapeHtml(anchor)}"` : '';
+                
+                // Handle backgroundColor property field - convert SA background classes to inline styles
+                let styleAttr = '';
+                if (prop && prop.backgroundColor) {
+                    const saBgClasses = {
+                        'u-sa-whiteBg': { bg: '#ffffff', color: null },
+                        'u-sa-blackBg': { bg: '#000000', color: '#ffffff' },
+                        'u-sa-greyBg': { bg: '#5a5a5a', color: '#ffffff' },
+                        'u-sa-greyLightBg': { bg: '#cccccc', color: null },
+                        'u-sa-greyVeryLightBg': { bg: '#f5f5f5', color: null },
+                        'u-sa-redBg': { bg: '#ed1b2e', color: '#ffffff' },
+                        'u-sa-orangeBg': { bg: '#f89728', color: '#ffffff' },
+                        'u-sa-goldBg': { bg: '#f8b425', color: null },
+                        'u-sa-creamBg': { bg: '#f5f1e8', color: null },
+                        'u-sa-greenBg': { bg: '#00a651', color: '#ffffff' },
+                        'u-sa-tealBg': { bg: '#00aeef', color: '#ffffff' },
+                        'u-sa-blueLightBg': { bg: '#5eb6e4', color: null },
+                        'u-sa-navyBg': { bg: '#002d5a', color: '#ffffff' }
+                    };
+                    
+                    const bgClass = prop.backgroundColor;
+                    if (saBgClasses[bgClass]) {
+                        // Only apply backgroundColor styles if there's NO background image
+                        // Background image always takes precedence over backgroundColor
+                        if (!hasBackgroundImage) {
+                            const styles = [];
+                            styles.push(`background-color: ${saBgClasses[bgClass].bg}`);
+                            if (saBgClasses[bgClass].color) {
+                                styles.push(`color: ${saBgClasses[bgClass].color}`);
+                            }
+                            styleAttr = ` style="${styles.join('; ')}"`;
+                            
+                            // Add rounded + overflow-hidden + padding for consistency
+                            wrapperClass += ' rounded overflow-hidden p-4';
+                        }
+                    }
+                }
+                
+                updated = `<div${idAttr} class="${wrapperClass}"${styleAttr}>${updated}</div>`;
             }
             return updated;
         }
@@ -4497,10 +5026,10 @@
                                         // ---------------------------------------------------------
                                         // Always hidden on mobile (d-none d-md-block).
                                         const desktopClass = 'position-relative d-none d-md-block w-100';
-                                        const imgDesktop = '<img src="' + s.imageUrl + '" class="d-block w-100 h-100" alt="' + escapeHtml(altText) + '" style="object-fit: cover;">';
+                                        const mediaDesktop = renderSlideMedia(s, false);
                                         
                                         // aspect-ratio: 1300/508 ~= 2.559
-                                        const wrapperDesktop = '<div class="' + desktopClass + '" style="aspect-ratio: 1300/508; overflow: hidden;">' + imgDesktop + overlayHtml + '</div>';
+                                        const wrapperDesktop = '<div class="' + desktopClass + '" style="aspect-ratio: 1300/508; overflow: hidden;">' + mediaDesktop + overlayHtml + '</div>';
                                         
                                         // ---------------------------------------------------------
                                         // Mobile View Wrapper
@@ -4508,12 +5037,10 @@
                                         // Always shown on mobile (d-block d-md-none).
                                         // Ensures all slides have a 500/425 container on mobile.
                                         const mobileClass = 'position-relative d-block d-md-none w-100';
-                                        // Fallback to desktop image if no mobile image is provided for this specific slide
-                                        const imgSrc = s.hasMobileImage ? s.imageMobile : s.imageUrl;
+                                        const mediaMobile = renderSlideMedia(s, true);
                                         
-                                        const imgMobile = '<img src="' + imgSrc + '" class="d-block w-100 h-100" alt="' + escapeHtml(altText) + '" style="object-fit: cover;">';
                                         // aspect-ratio: 500/425 ~= 1.176
-                                        const wrapperMobile = ' <div class="' + mobileClass + '" style="aspect-ratio: 500/425; overflow: hidden;">' + imgMobile + overlayHtml + '</div>';
+                                        const wrapperMobile = ' <div class="' + mobileClass + '" style="aspect-ratio: 500/425; overflow: hidden;">' + mediaMobile + overlayHtml + '</div>';
 
                                         let innerContent = wrapperDesktop + wrapperMobile;
                                         
@@ -4578,6 +5105,7 @@
             ${slidesHtml}
           </div>
 
+          ${activeSlides.length > 1 ? `
           <!-- Custom Control Container: Overlaid at Bottom -->
           <div class="d-flex justify-content-center align-items-center w-100 pb-3" style="position: absolute; bottom: 0; left: 0; z-index: 10; pointer-events: none;">
               
@@ -4595,7 +5123,7 @@
               <button id="nextBtn-${prop.id}" class="btn btn-link link-light text-decoration-none p-0 mx-3 opacity-75 hover-opacity-100" type="button" data-bs-target="#${carouselId}" data-bs-slide="next" aria-label="Next" style="pointer-events: auto; background: transparent !important; border: 0;">
                 <span class="material-symbols-outlined fs-3" style="text-shadow: 0 0 2px rgba(0,0,0,0.6);">arrow_forward</span>
               </button>
-          </div>
+          </div>` : ''}
 
         </div>
       </div>
@@ -4616,8 +5144,8 @@
     if(nextBtn_${prop.id}) nextBtn_${prop.id}.style.display = 'none';
   });
 
-  // Show on hover
-  if(carousel_${prop.id}) {
+  // Show on hover (ONLY if more than 1 slide)
+  if(carousel_${prop.id} && ${activeSlides.length} > 1) {
       carousel_${prop.id}.addEventListener('mouseenter', () => {
         if(indicators_${prop.id}) indicators_${prop.id}.style.display = 'flex';
         if(prevBtn_${prop.id}) prevBtn_${prop.id}.style.display = 'flex';
@@ -4658,38 +5186,124 @@
                             const borderClass = hasOutline ? ' border' : '';
                             
                             const cardsCols = items.map(item => {
-                                const titleRaw = item.title || item.heading || 'Untitled';
-                                const title = escapeHtml(titleRaw);
+                                const titleRaw = item.title || item.heading || (item.image || item.imageUrl || item.backgroundImage ? '' : 'Untitled');
+                                const title = titleRaw ? escapeHtml(titleRaw) : '';
                                 let desc = item.text || item.description || item.html || '';
 
-                                // Deduplication of title/heading is handled more robustly by transformFullHtml 
-                                // (which uses fuzzy matching and DOM-aware cleaning).
+                                // Clean up empty space elements (e.g. <p>&nbsp;</p>) that are often used in legacy CMS 
+                                // to force height for background images. In our viewer, we use <img>, so these are redundant.
+                                if (desc) {
+                                    // Remove blocks that only contain whitespace, &nbsp;, or <br>
+                                    const cleanDesc = desc.replace(/<p[^>]*>\s*(&nbsp;|\s|(<br\s*\/?>))*\s*<\/p>/gi, '').trim();
+                                    if (!cleanDesc || cleanDesc === '&nbsp;') {
+                                        desc = '';
+                                    }
+                                    
+                                    // Remove duplicate heading that matches the title
+                                    // This handles cases where the title appears as an H1-H6 at the start of the description
+                                    if (title && desc) {
+                                        // Normalize strings for comparison (remove non-alphanumeric, lowercase)
+                                        const normalizeStr = (str) => str.replace(/[^a-z0-9]/gi, '').toLowerCase();
+                                        const normalizedTitle = normalizeStr(title);
+                                        
+                                        // Check if description starts with a heading that matches the title (with some flexibility)
+                                        const headingMatch = desc.match(/^\s*<h[1-6][^>]*>(.*?)<\/h[1-6]>/i);
+                                        if (headingMatch) {
+                                            const headingText = headingMatch[1].replace(/<[^>]+>/g, '').trim(); // Strip inner HTML tags
+                                            const normalizedHeading = normalizeStr(headingText);
+                                            
+                                            // If normalized strings are similar (allowing for minor typos/differences)
+                                            // Remove the heading if it's at least 70% similar
+                                            if (normalizedHeading.length > 0 && normalizedTitle.length > 0) {
+                                                const similarity = normalizedHeading === normalizedTitle || 
+                                                    (Math.abs(normalizedHeading.length - normalizedTitle.length) <= 2 && 
+                                                     normalizedTitle.includes(normalizedHeading.substring(0, Math.floor(normalizedHeading.length * 0.7))));
+                                                
+                                                if (similarity || normalizedHeading === normalizedTitle) {
+                                                    desc = desc.replace(/^\s*<h[1-6][^>]*>.*?<\/h[1-6]>\s*/i, '').trim();
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+
+                                const imgUrl = item.image || item.imageUrl || item.background || item.backgroundImage || item.background_image || item.src;
                                 
-                                const imgUrl = item.image || item.imageUrl || item.background;
+                                // Handle backgroundColor from individual card item
+                                const saBgClasses = {
+                                    'u-sa-whiteBg': { bg: '#ffffff', color: null },
+                                    'u-sa-blackBg': { bg: '#000000', color: '#ffffff' },
+                                    'u-sa-greyBg': { bg: '#5a5a5a', color: '#ffffff' },
+                                    'u-sa-greyLightBg': { bg: '#cccccc', color: null },
+                                    'u-sa-greyVeryLightBg': { bg: '#f5f5f5', color: null },
+                                    'u-sa-redBg': { bg: '#ed1b2e', color: '#ffffff' },
+                                    'u-sa-orangeBg': { bg: '#f89728', color: '#ffffff' },
+                                    'u-sa-goldBg': { bg: '#f8b425', color: null },
+                                    'u-sa-creamBg': { bg: '#f5f1e8', color: null },
+                                    'u-sa-greenBg': { bg: '#00a651', color: '#ffffff' },
+                                    'u-sa-tealBg': { bg: '#00aeef', color: '#ffffff' },
+                                    'u-sa-blueLightBg': { bg: '#5eb6e4', color: null },
+                                    'u-sa-navyBg': { bg: '#002d5a', color: '#ffffff' }
+                                };
+                                
+                                let bgStyle = '';
+                                let textColorClass = '';
+                                if (item.backgroundColor && saBgClasses[item.backgroundColor]) {
+                                    const colors = saBgClasses[item.backgroundColor];
+                                    bgStyle = `background-color: ${colors.bg};`;
+                                    if (colors.color) {
+                                        textColorClass = ' text-white';
+                                    }
+                                }
                                 
                                 // Determine buttons/links
                                 let buttonsHtml = '';
                                 if (item.link || item.url || item.buttonUrl) {
                                     const url = item.link || item.url || item.buttonUrl;
                                     const label = item.buttonText || 'Find Out More';
-                                    buttonsHtml = `<a href="${url}" class="btn btn-sm btn-secondary">${escapeHtml(label)}</a>`;
+                                    buttonsHtml = `<a href="${url}" class="btn btn-sm btn-secondary my-1 text-white shadow-sm" style="text-decoration:none;">${escapeHtml(label)}</a>`;
                                 }
                                 
-                                // Use div instead of p for card-text to allow block elements inside desc
+                                if (imgUrl) {
+                                    // MODERN OVERLAY CARD (Mosaic Style)
+                                    return `
+  <div class="col mb-2">
+    <div class="card h-100 border-0 rounded-3 shadow-sm overflow-hidden d-grid position-relative" style="grid-template-columns: 100%; min-height: 250px; background-color: #f8f9fa;">
+      <!-- Aspect Ratio Spacer (Gallery look) -->
+      <div style="grid-area: 1/1; width: 100%; aspect-ratio: 1 / 1; pointer-events: none;"></div>
+      
+      <!-- Background Image -->
+      <div style="grid-area: 1/1; background: url('${imgUrl}') no-repeat center center; background-size: cover; z-index: 1;"></div>
+      
+      <!-- Readable Gradient Overlay -->
+      <div class="position-absolute w-100 h-100" style="grid-area: 1/1; background: linear-gradient(180deg, rgba(0,0,0,0) 40%, rgba(0,0,0,0.8) 100%); z-index: 2;"></div>
+      
+      <!-- Content Overlay -->
+      <div class="d-flex align-items-end p-3 p-md-4" style="grid-area: 1/1; z-index: 3;">
+        <div class="w-100 text-white">
+          ${title ? `<h5 class="card-title fw-bold mb-1" style="text-shadow: 0 2px 4px rgba(0,0,0,0.8);">${title}</h5>` : ''}
+          ${desc ? `<div class="card-text small opacity-90 mb-2" style="text-shadow: 0 1px 2px rgba(0,0,0,0.6);">${desc}</div>` : ''}
+          ${buttonsHtml ? `<div class="d-flex flex-wrap gap-2 mt-2">${buttonsHtml}</div>` : ''}
+        </div>
+      </div>
+    </div>
+  </div>`;
+                                }
+
+                                // Standard Card Fallback
                                 return `
-  <div class="col mb-4">
-    <div class="card h-100${borderClass}">
-      ${imgUrl ? `<img src="${imgUrl}" class="card-img-top" alt="${title}">` : ''}
-      <div class="card-body">
-        <h5 class="card-title text-primary-emphasis">${title}</h5>
-        <div class="card-text">${desc}</div>
-        ${buttonsHtml}
+  <div class="col mb-2">
+    <div class="card h-100 border-0 shadow-sm rounded-3${textColorClass}" style="${bgStyle}">
+      <div class="card-body d-flex flex-column">
+        <h5 class="card-title${textColorClass ? '' : ' text-primary-emphasis'} fw-bold">${title}</h5>
+        ${desc ? `<div class="card-text${textColorClass ? '' : ' text-muted'}">${desc}</div>` : ''}
+        <div class="mt-auto pt-3 d-flex flex-wrap gap-2">${buttonsHtml}</div>
       </div>
     </div>
   </div>`;
                             }).join('\n');
                             
-                            content = (content ? content + '\n' : '') + `<div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-3 justify-content-center">\n${cardsCols}\n</div>`;
+                            content = (content ? content + '\n' : '') + `<div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4 justify-content-center">\n${cardsCols}\n</div>`;
                         }
                     }
 
@@ -4732,12 +5346,25 @@
                         // If a background image is found, wrap the content in a styled div
                         if (bgImage) {
                             let hasOverlay = false;
+                            
+                            // Check for white text in the content to determine if an overlay is needed for readability
+                            try {
+                                const parser = new DOMParser();
+                                const doc = parser.parseFromString(content, 'text/html');
+                                const hasWhiteText = Array.from(doc.body.querySelectorAll('*')).some(el => {
+                                    const style = el.getAttribute('style') || '';
+                                    return /color\s*:\s*(?:#ffffff|#fff|white|rgb\(\s*255\s*,\s*255\s*,\s*255\s*\))/i.test(style);
+                                });
+                                if (hasWhiteText) hasOverlay = true;
+                            } catch(e) {}
+
+                            // Manual override takes precedence
                             if (window.overlayOverrides && window.overlayOverrides.hasOwnProperty(prop.id)) {
                                  hasOverlay = window.overlayOverrides[prop.id];
                             }
 
                             const overlayHtml = hasOverlay ? `
-                                <div class="position-absolute inset-0 bg-dark opacity-50" style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; background-color: rgba(0,0,0,0.5); z-index: 2;"></div>
+                                <div class="position-absolute inset-0" style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; background-color: rgba(0,0,0,0.4); z-index: 2;"></div>
                             ` : '';
                             
                             const textColorClass = hasOverlay ? 'text-white' : '';
@@ -4748,10 +5375,12 @@
                                 const parser = new DOMParser();
                                 const doc = parser.parseFromString(content, 'text/html');
                                 
-                                // 1. Remove empty/whitespace-only paragraphs that take up vertical space
-                                doc.querySelectorAll('p').forEach(p => {
-                                    if (!p.textContent.trim() && !p.querySelector('img, iframe, video, .btn, a, button')) {
-                                        p.remove();
+                                // 1. Remove empty/whitespace-only blocks (p, h1-h6) that take up vertical space
+                                doc.querySelectorAll('p, h1, h2, h3, h4, h5, h6').forEach(el => {
+                                    // Replace non-breaking spaces with normal spaces for trimming check
+                                    const text = el.textContent.replace(/\u00a0/g, ' ').trim();
+                                    if (!text && !el.querySelector('img, iframe, video, .btn, a, button, span.material-symbols-outlined')) {
+                                        el.remove();
                                     }
                                 });
 
@@ -4891,7 +5520,7 @@
             if (Array.isArray(objectsArray)) {
                 objectsArray.forEach((item, index) => {
                     // Check for background image URL (desktop)
-                    const imageUrl = item.background || item.backgroundMobile || '';
+                    const imageUrl = item.background || item.backgroundImage || item.background_image || item.image || item.imageUrl || item.backgroundMobile || '';
                     
                     if (imageUrl) {
                         // Determine if slide is visible: Must be active and not expired
@@ -4915,25 +5544,48 @@
                         const urlParts = imageUrl.split('/');
                         const filename = urlParts[urlParts.length - 1];
                         
+                        // Handle YouTube backgrounds
+                        const isYoutube = item.backgroundType === 'video' && item.backgroundSource === 'youtube';
+                        const isMobileYoutube = item.backgroundTypeMobile === 'video' && item.backgroundSourceMobile === 'youtube';
+                        const youtubeId = isYoutube ? (item.background || '') : null;
+                        const youtubeIdMobile = isMobileYoutube ? (item.backgroundMobile || '') : null;
+                        
+                        // Construct display URL (thumbnail for youtube, direct for others)
+                        let displayImageUrl = imageUrl;
+                        if (isYoutube && youtubeId) {
+                            displayImageUrl = `https://img.youtube.com/vi/${youtubeId}/maxresdefault.jpg`;
+                        }
+                        
+                        let displayImageMobile = item.backgroundMobile || '';
+                        if (isMobileYoutube && youtubeIdMobile) {
+                            displayImageMobile = `https://img.youtube.com/vi/${youtubeIdMobile}/maxresdefault.jpg`;
+                        }
+
                         // Get mobile image filename
                         let mobileFilename = null;
                         if (item.backgroundMobile && item.backgroundMobile !== imageUrl) {
-                            const mobileUrlParts = item.backgroundMobile.split('/');
+                            const mobileUrlParts = (item.backgroundMobile || '').split('/');
                             mobileFilename = mobileUrlParts[mobileUrlParts.length - 1];
                         }
                         
                         slides.push({
-                            imageUrl: imageUrl,
-                            imageMobile: item.backgroundMobile || '',
+                            imageUrl: displayImageUrl,
+                            imageMobile: displayImageMobile,
+                            originalBackground: item.background || '',
+                            originalBackgroundMobile: item.backgroundMobile || '',
                             hasMobileImage: !!(item.backgroundMobile && item.backgroundMobile !== imageUrl),
-                            isVideo: isVideoUrl(imageUrl),
-                            isMobileVideo: isVideoUrl(item.backgroundMobile),
+                            isVideo: isVideoUrl(imageUrl) || isYoutube,
+                            isMobileVideo: isVideoUrl(item.backgroundMobile) || isMobileYoutube,
+                            isYoutube: isYoutube,
+                            isMobileYoutube: isMobileYoutube,
+                            youtubeId: youtubeId,
+                            youtubeIdMobile: youtubeIdMobile,
                             title: title,
                             altText: altText,
                             // Prefer explicit subtitle, otherwise fall back to description if present
-                            subtitle: item.subtitle || item.description || '',
+                            subtitle: (item.subtitle || item.description || '').replace(/<p[^>]*>\s*(&nbsp;|\s|(<br\s*\/?>))*\s*<\/p>/gi, '').trim(),
                             // Keep raw description and url on the slide object for templates
-                            description: item.description || '',
+                            description: (item.description || '').replace(/<p[^>]*>\s*(&nbsp;|\s|(<br\s*\/?>))*\s*<\/p>/gi, '').trim(),
                             url: item.url || '',
                             // Button mapping: prefer explicit buttonUrl, otherwise fall back to url
                             buttonText: item.buttonText || '',
@@ -4943,7 +5595,7 @@
                             theaterImageUrl: item.theaterImageUrl || '',
                             customHtml: item.customHtml || '',
                             // keep legacy/backwards keys in case other code expects them
-                            background: imageUrl,
+                            background: item.background || '',
                             backgroundMobile: item.backgroundMobile || '',
                             filename: filename,
                             mobileFilename: mobileFilename,
@@ -4961,6 +5613,35 @@
             }
             
             return slides;
+        }
+
+        function renderSlideMedia(slide, isMobile = false) {
+            // Determine which media set to use:
+            // "The youtube video background in the carousel and other carousel background types should always show on mobile 
+            // unless there is a distinct backgroundMobile specified"
+            const effectiveIsMobile = isMobile && slide.originalBackgroundMobile && (slide.originalBackgroundMobile !== slide.originalBackground);
+            
+            const isYoutube = effectiveIsMobile ? slide.isMobileYoutube : slide.isYoutube;
+            const youtubeId = effectiveIsMobile ? slide.youtubeIdMobile : slide.youtubeId;
+            const isVideo = effectiveIsMobile ? slide.isMobileVideo : slide.isVideo;
+            const imageUrl = effectiveIsMobile ? slide.imageMobile : slide.imageUrl;
+            
+            if (isYoutube && youtubeId) {
+                return `
+                    <div class="slide-video-container" style="position:relative; width:100%; height:100%; min-height:180px; overflow:hidden; background:#000;">
+                        <iframe src="https://www.youtube.com/embed/${youtubeId}?autoplay=0&mute=1&playlist=${youtubeId}&loop=1" 
+                                style="position:absolute; top:0; left:0; width:100%; height:100%; border:0;" 
+                                allow="autoplay; encrypted-media" allowfullscreen></iframe>
+                    </div>`;
+            } else if (isVideo && imageUrl) {
+                return `
+                    <video class="slide-video" autoplay muted loop playsinline style="width:100%; height:100%; object-fit:cover;">
+                        <source src="${imageUrl}" type="video/mp4">
+                        Your browser does not support the video tag.
+                    </video>`;
+            } else {
+                return `<img class="slide-thumbnail" src="${imageUrl}" alt="${escapeHtml(slide.altText)}" style="width:100%; height:100%; object-fit:cover;" loading="lazy" onerror="this.style.display='none'" />`;
+            }
         }
 
         function buildSlideContent(slide, index) {
@@ -5083,9 +5764,11 @@
              
              // We need to re-generate just the HTML for this property using the current logic
              // Ideally we'd extract the generation logic, but for now we can grab it from proper context or re-run buildPropertySnapshotHtml
-             const html = buildPropertySnapshotHtml(prop);
+             let html = buildPropertySnapshotHtml(prop);
              
              if (html) {
+                 // Ensure transformations (anchors, responsive classes) are applied
+                 html = transformFullHtml(html, prop, false);
                  navigator.clipboard.writeText(html).then(() => {
                     alert('Copied Carousel HTML to clipboard!');
                  });
