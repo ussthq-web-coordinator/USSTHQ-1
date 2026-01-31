@@ -270,6 +270,62 @@ html, body {
     align-items: center !important;
     width: 100%;
   }
+
+  /* Make overlay cards respect an edge gap on small screens so they don't
+     span the full viewport width and to match carousel behavior. */
+  .overlay-card-nsaw {
+    box-sizing: border-box;
+    width: calc(100% - 1rem);
+    max-width: calc(100% - 1rem);
+    margin: 0 auto;
+    padding-left: 0.75rem;
+    padding-right: 0.75rem;
+  }
+
+  /* Ensure text columns also respect the same edge gap so content and cards
+     don't touch the viewport edge on small screens. */
+  .text-col-nsaw {
+    box-sizing: border-box;
+    width: calc(100% - 1rem);
+    max-width: calc(100% - 1rem);
+    margin: 0 auto;
+    padding-left: 0.75rem;
+    padding-right: 0.75rem;
+  }
+
+  /* Ensure overlap containers (wrappers around the overlay card) also
+     respect the small-screen edge gap so the visual card doesn't touch
+     the viewport edges when stacked. */
+  .overlap-container-nsaw {
+    box-sizing: border-box;
+    width: calc(100% - 1rem);
+    max-width: calc(100% - 1rem);
+    margin: 0 auto;
+    padding-left: 0.5rem;
+    padding-right: 0.5rem;
+  }
+}
+
+/* Tighter edge gap on very small devices */
+@media (max-width: 420px) {
+  .overlay-card-nsaw {
+    width: calc(100% - 0.6rem);
+    max-width: calc(100% - 0.6rem);
+    padding-left: 0.5rem;
+    padding-right: 0.5rem;
+  }
+  .text-col-nsaw {
+    width: calc(100% - 0.6rem);
+    max-width: calc(100% - 0.6rem);
+    padding-left: 0.45rem;
+    padding-right: 0.45rem;
+  }
+  .overlap-container-nsaw {
+    width: calc(100% - 0.6rem);
+    max-width: calc(100% - 0.6rem);
+    padding-left: 0.4rem;
+    padding-right: 0.4rem;
+  }
 }
 
 .givingToolbar-toolbar,
@@ -649,6 +705,108 @@ input[type="checkbox"]:checked + .panel-content {
   /* Ensure sticky wrapper doesn't clip the scrolling */
   .tab-buttons-wrapper {
     overflow-x: auto !important;
+  }
+}
+
+/* Mobile-only card carousel: split long overlay-card content into horizontally-scrollable panels */
+@media (max-width: 1024px) {
+  .card-carousel {
+    display: flex;
+    gap: 1rem;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    /* reduce horizontal padding so the carousel fits better on narrow viewports */
+    padding: 0.5rem 0.5rem 0.9rem 0.5rem;
+    align-items: stretch;
+    /* when snapping, ensure the start aligns after the left padding */
+    scroll-padding-left: 0.5rem;
+  }
+
+  .card-panel {
+    /* slightly larger minimum width so panels feel less narrow */
+    flex: 0 0 70%;
+    min-width: 70%;
+    box-sizing: border-box;
+    background: inherit;
+    border-radius: 1rem;
+    padding: 1.25rem;
+    box-shadow: 0 0.5rem 1.25rem rgba(0,0,0,0.08);
+    color: inherit;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    /* ensure panels don't get clipped vertically inside small viewports */
+    min-height: 6rem;
+  }
+
+  /* snap panels into place for a cleaner swipe experience */
+  .card-carousel {
+    scroll-snap-type: x mandatory;
+  }
+  .card-panel {
+    scroll-snap-align: start;
+  }
+
+  .card-panel h4,
+  .card-panel p {
+    margin: 0 0 0.75rem 0;
+  }
+
+  /* Ensure buttons inside panels expand sensibly */
+  .card-panel .btn {
+    width: auto;
+    min-width: 140px;
+    align-self: center;
+    padding: 0.7rem 1.1rem;
+  }
+
+  /* Show a subtle gradient hint on carousel edges */
+  .card-carousel::before,
+  .card-carousel::after {
+    content: '';
+    position: sticky;
+    pointer-events: none;
+    height: 100%;
+    width: 2.5rem;
+    top: 0;
+    z-index: 1;
+  }
+
+  .card-carousel::before {
+    left: 0;
+    background: linear-gradient(90deg, rgba(245,246,242,1) 0%, rgba(245,246,242,0) 100%);
+  }
+
+  .card-carousel::after {
+    right: 0;
+    background: linear-gradient(270deg, rgba(245,246,242,1) 0%, rgba(245,246,242,0) 100%);
+  }
+
+  /* Shrink panels further on very small viewports so they don't feel too wide */
+  @media (max-width: 420px) {
+    .card-carousel {
+      gap: 0.5rem;
+      padding: 0.45rem 0.45rem 0.85rem 0.45rem;
+      scroll-padding-left: 0.45rem;
+    }
+    .card-panel {
+      flex: 0 0 calc(100% - 1rem);
+      min-width: calc(100% - 2rem);
+      padding: 1rem;
+    }
+  }
+
+  @media (max-width: 360px) {
+    .card-carousel {
+      gap: 0.4rem;
+      padding: 0.35rem 0.35rem 0.7rem 0.35rem;
+      scroll-padding-left: 0.35rem;
+    }
+    .card-panel {
+      flex: 0 0 calc(100% - 1rem);
+      min-width: calc(100% - 2rem);
+      padding: 0.85rem;
+    }
   }
 }
 

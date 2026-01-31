@@ -7,7 +7,7 @@
     <title>Bootstrap Boilerplate</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
 </head>
-    <link rel="stylesheet" href="an-army-for-others-s.css">
+    <link rel="stylesheet" href="an-army-for-others-t.css">
 </head>
 
 <body>
@@ -519,6 +519,126 @@
             });
         })();
         </script>
+                <script>
+                // On small screens, split long overlay cards into horizontally scrollable panels
+                (function(){
+                    function buildPanelsForCard(card, charLimit){
+                        // collect element children (heading, paragraphs, buttons, anchors)
+                        const children = Array.from(card.children);
+                        if (!children.length) return;
+
+                        // If already transformed, skip
+                        if (card.dataset.split === '1') return;
+
+                        const panels = [];
+                        let current = [];
+                        let count = 0;
+
+                        // Always include heading (if present) at start of first panel
+                        let i = 0;
+                        if (children[0] && /^H[1-6]$/.test(children[0].tagName)){
+                            current.push(children[0].cloneNode(true));
+                            i = 1;
+                        }
+
+                        // collect buttons to append to last panel
+                        const buttons = [];
+
+                        for (; i < children.length; i++){
+                            const el = children[i];
+                            const tag = el.tagName;
+                            if (tag === 'P'){
+                                const len = (el.textContent || '').trim().length;
+                                if (count + len > charLimit && current.length){
+                                    panels.push(current);
+                                    current = [];
+                                    count = 0;
+                                }
+                                current.push(el.cloneNode(true));
+                                count += len;
+                            } else if (tag === 'BUTTON' || (tag === 'A' && el.classList.contains('btn'))){
+                                buttons.push(el.cloneNode(true));
+                            } else {
+                                // other elements (links, small headings) — include if small
+                                current.push(el.cloneNode(true));
+                            }
+                        }
+
+                        if (current.length) panels.push(current);
+
+                        if (panels.length <= 1){
+                            // nothing to split — mark and exit
+                            card.dataset.split = '1';
+                            return;
+                        }
+
+                        // build carousel container
+                        const carousel = document.createElement('div');
+                        carousel.className = 'card-carousel';
+
+                        panels.forEach((nodes, idx) => {
+                            const panel = document.createElement('div');
+                            panel.className = 'card-panel';
+                            panel.tabIndex = 0;
+                            nodes.forEach(n => panel.appendChild(n));
+                            // append buttons to last panel only
+                            if (idx === panels.length - 1){
+                                    buttons.forEach(b => {
+                                        // ensure button grows and remains clickable
+                                        b.classList.add('d-inline-block');
+                                        // attach a click handler that activates the target tab
+                                        const target = b.getAttribute('data-tab');
+                                        if (target) {
+                                            b.addEventListener('click', function(ev){
+                                                ev.preventDefault();
+                                                // local activation: toggle active classes
+                                                const tabButtons = document.querySelectorAll('.tab-button');
+                                                const tabContents = document.querySelectorAll('.tab-content');
+                                                tabButtons.forEach(btn => btn.classList.toggle('active', btn.getAttribute('data-tab') === target));
+                                                tabContents.forEach(content => content.classList.toggle('active', content.id === target));
+                                            });
+                                        }
+                                        panel.appendChild(b);
+                                    });
+                            }
+                            carousel.appendChild(panel);
+                        });
+
+                        // Replace card's contents with carousel
+                        card.innerHTML = '';
+                        card.appendChild(carousel);
+                        card.dataset.split = '1';
+
+                        // Ensure the carousel starts scrolled to the very first panel so
+                        // the first card is fully visible (not partially clipped).
+                        // Defer slightly to allow layout to settle.
+                        setTimeout(function(){
+                            try{
+                                carousel.scrollLeft = 0;
+                                // also ensure first panel is snapped fully into view
+                                const first = carousel.querySelector('.card-panel');
+                                if (first && first.scrollIntoView) first.scrollIntoView({behavior: 'instant', block: 'nearest', inline: 'start'});
+                            }catch(e){/* no-op */}
+                        }, 50);
+                    }
+
+                    function initSplit(){
+                        if (window.innerWidth > 1024) return;
+                        const cards = document.querySelectorAll('.overlay-card-nsaw');
+                        cards.forEach(card => buildPanelsForCard(card, 360));
+                    }
+
+                    // run on load and on orientation/resize (debounced)
+                    let resizeTimer = null;
+                    window.addEventListener('DOMContentLoaded', initSplit);
+                    window.addEventListener('load', initSplit);
+                    window.addEventListener('orientationchange', function(){ setTimeout(initSplit, 300); });
+                    window.addEventListener('resize', function(){
+                        clearTimeout(resizeTimer);
+                        resizeTimer = setTimeout(initSplit, 250);
+                    });
+                })();
+                </script>
 </body>
 
 </html>
