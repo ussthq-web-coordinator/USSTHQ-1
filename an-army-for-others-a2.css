@@ -1199,4 +1199,18 @@ input[type="checkbox"]:checked + .panel-content {
   margin: 0.4rem auto 0;
 }
 
+/* Ensure header dropdowns remain interactive even if utility class 'pe-none' is present
+   (some templates add 'pe-none' to keep menus inert until open). Also keep dropdowns
+   above the sticky tab strip by giving them a high stacking context. */
+.dropdown-menu,
+.dropdown-menu.pe-none {
+  pointer-events: auto !important;
+  z-index: 3000 !important;
+}
+
+/* Mobile/full-page nav should be above other content when active */
+#navMenu {
+  z-index: 3000;
+}
+
 
