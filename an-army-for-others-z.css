@@ -417,7 +417,6 @@ html, body {
   width: 100%;
   height: 100%;
   border: none;
-  margin-bottom: -45px;
 }
 
 /* Ensure the video container is only visible when its tab is active */
@@ -526,14 +525,17 @@ input[type="checkbox"]:checked + .panel-content {
    preserves the content in the DOM so e-readers and accessibility tools
    can still access it while keeping the visual layout uncluttered. */
 .tab-content:not(.active) {
+  /* SR-only hiding: keep panels in DOM for screen readers/e-readers
+     while preventing layout overflow. */
   position: absolute !important;
-  left: -99999px !important;
-  top: auto !important;
   width: 1px !important;
   height: 1px !important;
+  margin: -1px !important;
+  padding: 0 !important;
   overflow: hidden !important;
-  clip: rect(1px, 1px, 1px, 1px) !important;
-  white-space: normal !important;
+  clip: rect(0 0 0 0) !important;
+  white-space: nowrap !important;
+  border: 0 !important;
 }
 
 /* Constrain and modernize image presentation to avoid elongation */

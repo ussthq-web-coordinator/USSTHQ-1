@@ -7,7 +7,7 @@
     <title>Bootstrap Boilerplate</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
 </head>
-    <link rel="stylesheet" href="an-army-for-others-y.css">
+    <link rel="stylesheet" href="an-army-for-others-z.css">
 </head>
 
 <body>
@@ -484,14 +484,9 @@
                     tabContents.forEach(content => {
                         const isActive = content.id === tabId;
                         content.classList.toggle('active', isActive);
-                        if (isActive) {
-                            try {
-                                content.setAttribute('tabindex', '0');
-                                content.focus({preventScroll: true});
-                            } catch (e) { /* ignore focus errors */ }
-                        } else {
-                            try { content.removeAttribute('tabindex'); } catch(e){}
-                        }
+                        // Keep panels present in the DOM for AT/e-readers.
+                        // Do not alter tabindex or programmatic focus to avoid
+                        // unexpected scrolling. Only update aria-selected on tabs.
                     });
 
                     centerActiveTab();
