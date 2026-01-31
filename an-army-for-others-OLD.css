@@ -392,15 +392,6 @@ input[type="checkbox"]:checked + .panel-content {
   padding-bottom: 56.25%;
 }
 
-/* Ensure the wrapper establishes positioning for the absolutely-positioned iframe
-   so the wrapper's padding-bottom produces the visible video box and content after
-   the wrapper (like the Introduction button) sits below it. */
-.video-wrapper-nsaw {
-  position: relative;
-  height: 0; /* height created by padding-bottom */
-  overflow: hidden;
-}
-
 /* Video tab: force intro above the video and make the video larger on all devices */
 #tab-video {
   display: flex;
@@ -477,7 +468,6 @@ input[type="checkbox"]:checked + .panel-content {
   max-width: 1200px !important;
 }
 
-
 #tab-video .video-wrapper-nsaw iframe {
   display: block !important;
   margin: 0 auto !important;
@@ -494,24 +484,13 @@ input[type="checkbox"]:checked + .panel-content {
   margin-top: 0;
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
-  scrollbar-width: auto;
-  -ms-overflow-style: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
   position: sticky;
   top: 0;
   z-index: 100;
   background: #fff;
   box-shadow: 0 2px 8px rgba(30,41,59,0.06);
-}
-
-/* Make horizontal panning explicit for touch devices and hint draggable behavior */
-.tab-buttons-wrapper,
-.tab-buttons {
-  touch-action: pan-x; /* allow horizontal touch scrolling */
-  -ms-touch-action: pan-x;
-}
-
-.tab-buttons {
-  cursor: grab; /* hint that the row can be dragged */
 }
 
 /* Wrap nav + content in .tabs-shell so background can extend behind content */
@@ -531,16 +510,7 @@ input[type="checkbox"]:checked + .panel-content {
 }
 
 .tab-buttons-wrapper::-webkit-scrollbar {
-  height: 10px;
-}
-
-.tab-buttons::-webkit-scrollbar {
-  height: 10px;
-}
-
-.tab-buttons::-webkit-scrollbar-thumb {
-  background: rgba(0,0,0,0.18);
-  border-radius: 8px;
+  display: none;
 }
 
   .btn.btn-outline-dark {
@@ -585,22 +555,15 @@ input[type="checkbox"]:checked + .panel-content {
   padding-top: 1rem !important; /* match bottom padding */
 }
 
-.tab-content:not(#tab1) {
-  padding-top: 1rem !important; /* ensure reduced-margin rule doesn't make top padding asymmetric */
-  margin-top: 0 !important;
-}
-
-/* Mobile: keep tabs on a single row and allow horizontal scroll (force no-wrap) */
+/* Mobile: keep tabs on a single row and allow horizontal scroll */
 @media (max-width: 1024px) {
   .tab-buttons {
-    display: flex !important;
     flex-wrap: nowrap !important;
     overflow-x: auto !important;
     -webkit-overflow-scrolling: touch;
     gap: 0.5rem !important;
     padding: 0.5rem !important;
-    white-space: nowrap !important;
-    justify-content: flex-start !important;
+    white-space: nowrap;
   }
 
   .tab-buttons::-webkit-scrollbar {
@@ -609,14 +572,53 @@ input[type="checkbox"]:checked + .panel-content {
 
   .tab-button {
     flex: 0 0 auto !important;
-    min-width: 10rem !important; /* ensure pill stays tappable */
+    min-width: 10.5rem; /* ensure pill stays tappable */
     padding: 0.6rem 1rem !important;
-    white-space: nowrap !important;
   }
 
   /* Ensure sticky wrapper doesn't clip the scrolling */
   .tab-buttons-wrapper {
     overflow-x: auto !important;
+  }
+}
+
+.tab-content:not(#tab1) {
+  padding-top: 1rem !important; /* ensure reduced-margin rule doesn't make top padding asymmetric */
+  margin-top: 0 !important;
+}
+
+/* Mobile: vertically center the text card in stacked layout */
+@media (max-width: 1024px) {
+  .row-flex-nsaw.active > .text-col-nsaw {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    padding: 0 1rem !important;
+    width: 100% !important;
+  }
+
+  .row-flex-nsaw.active > .text-col-nsaw .overlay-card-nsaw {
+    margin: 0 auto !important;
+    max-width: 95% !important;
+  }
+
+  /* Also center the image column when stacked */
+  .row-flex-nsaw.active > .image-col-nsaw {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    padding: 0 1rem !important;
+    width: 100% !important;
+  }
+
+  .row-flex-nsaw.active > .image-col-nsaw .image-section-nsaw {
+    margin: 0 auto !important;
+  }
+
+  /* Ensure the stacked row aligns its children centrally */
+  .row-flex-nsaw.active {
+    align-items: center !important;
+    justify-content: center !important;
   }
 }
 

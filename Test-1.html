@@ -52,6 +52,7 @@
                         title="Video for &quot;VYSV3118000H_SAL_Anthem_60_ENG_16x9_VO_EC_GENERIC_ProRes_Unslated_16x9.mov&quot;"
                         webkitallowfullscreen="webkitallowfullscreen"></iframe>
                 </div>
+                
             </div>
         </div>
         <!-- Tab Contents -->
@@ -75,8 +76,7 @@
                         <p>Since 1865, when William and Catherine Booth first preached the gospel in the streets of
                             London, The Salvation Army has been a movement for people. People in poverty. People in
                             crisis. People looking for purpose. People like you and me.</p>
-                        <button class="btn btn-outline-dark rounded-pill" data-tab="tab2"
-                            onclick="document.getElementById('tab2').scrollIntoView({ behavior: 'smooth' });">The
+                        <button class="btn btn-outline-dark rounded-pill" data-tab="tab2">The
                             Mission Continues</button>
                     </div>
                 </div>
@@ -103,8 +103,7 @@
                         <p>We&rsquo;re glad you asked.</p>
                         <p>Let us introduce you to the people behind the mission&mdash;the hands and hearts that carry
                             the message forward.</p>
-                        <button class="btn btn-outline-dark rounded-pill" data-tab="tab3"
-                            onclick="document.getElementById('tab3').scrollIntoView({ behavior: 'smooth' });">Become One
+                        <button class="btn btn-outline-dark rounded-pill" data-tab="tab3">Become One
                             of Us</button>
                     </div>
                 </div>
@@ -447,32 +446,79 @@
             document.addEventListener("DOMContentLoaded", function () {
                 const tabButtons = document.querySelectorAll('.tab-button');
                 const tabContents = document.querySelectorAll('.tab-content');
+                const tabTriggers = document.querySelectorAll('[data-tab]');
 
-                tabButtons.forEach(button => {
-                    button.addEventListener('click', function (event) {
+                function activateTab(tabId) {
+                    tabButtons.forEach(btn => btn.classList.toggle('active', btn.getAttribute('data-tab') === tabId));
+                    tabContents.forEach(content => content.classList.toggle('active', content.id === tabId));
+                }
+
+                tabTriggers.forEach(trigger => {
+                    trigger.addEventListener('click', function (event) {
                         event.preventDefault();
-                        const tabId = button.getAttribute('data-tab');
-                        tabButtons.forEach(btn => btn.classList.remove('active'));
-                        button.classList.add('active');
-
-                        tabContents.forEach(content => {
-                            content.classList.remove('active');
-                            if (content.id === tabId) {
-                                content.classList.add('active');
-                                setTimeout(() => {
-                                    content.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                                }, 100);
-                            }
-                        });
-
-                        // Scroll tab button into view
-                        button.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+                        const tabId = trigger.getAttribute('data-tab');
+                        activateTab(tabId);
                     });
                 });
+
+                // Initialize active tab from nav
+                const initial = document.querySelector('.tab-button.active');
+                if (initial) {
+                    activateTab(initial.getAttribute('data-tab'));
+                }
             });
         </script>
     </div>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+        <script>
+        // Enable horizontal scrolling of the tab strip by mouse wheel and pointer drag
+        (function(){
+            const wrappers = document.querySelectorAll('.tab-buttons-wrapper');
+            wrappers.forEach(wrapper => {
+                const inner = wrapper.querySelector('.tab-buttons') || wrapper;
+
+                // Wheel -> horizontal scroll (use passive:false so we can preventDefault)
+                wrapper.addEventListener('wheel', function(e){
+                    if (Math.abs(e.deltaY) > 0) {
+                        wrapper.scrollLeft += e.deltaY;
+                        e.preventDefault();
+                    }
+                }, { passive: false });
+
+                // Pointer drag to scroll
+                let isDown = false;
+                let startX = 0;
+                let startScroll = 0;
+
+                inner.addEventListener('pointerdown', function(e){
+                    // If the user pressed a tab button, don't treat it as a drag — allow the click
+                    if (e.target && e.target.closest && e.target.closest('.tab-button')) return;
+                    isDown = true;
+                    startX = e.clientX;
+                    startScroll = wrapper.scrollLeft;
+                    if (inner.setPointerCapture) inner.setPointerCapture(e.pointerId);
+                    inner.style.cursor = 'grabbing';
+                });
+
+                inner.addEventListener('pointermove', function(e){
+                    if (!isDown) return;
+                    const dx = e.clientX - startX;
+                    wrapper.scrollLeft = startScroll - dx;
+                });
+
+                function endDrag(e){
+                    if (!isDown) return;
+                    isDown = false;
+                    try { if (inner.releasePointerCapture) inner.releasePointerCapture(e.pointerId); } catch(err){}
+                    inner.style.cursor = 'grab';
+                }
+
+                inner.addEventListener('pointerup', endDrag);
+                inner.addEventListener('pointercancel', endDrag);
+                inner.addEventListener('pointerleave', endDrag);
+            });
+        })();
+        </script>
 </body>
 
 </html>
