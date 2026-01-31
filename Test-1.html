@@ -6,8 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Bootstrap Boilerplate</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="an-army-for-others-a8.css">
-    <!-- moved section styles into an-army-for-others-a4.css -->
+    <link rel="stylesheet" href="an-army-for-others-a9.css">
 </head>
 
 <body>
@@ -16,7 +15,7 @@
             <h1>An Army for Others</h1>
         </div>
         <!-- Tabs shell: groups nav + content so background can extend -->
-        <div class="tabs-shell">
+        <div class="nsaw-shell">
         <!-- Section Navigation: simple anchor links (replaces tabs) -->
                 <nav class="tab-buttons-wrapper sticky-top">
                         <div class="section-nav py-3" style="background-color: #F5F6F2; display:flex; gap:0.5rem; flex-wrap:wrap; justify-content:center;">
@@ -415,7 +414,7 @@
             </div>
         </div>
         </div>
-        <!-- end .tabs-shell -->
+        <!-- end .nsaw-shell -->
         </div>
         <div id="fb-root">&nbsp;</div>
         <div class="tp-panel">
@@ -677,9 +676,9 @@
                                     if (target) {
                                         b.addEventListener('click', function(ev){
                                             ev.preventDefault();
-                                            // Prefer operating within the nearest .tabs-shell to avoid
+                                            // Prefer operating within the nearest nsaw shell to avoid
                                             // touching unrelated header/menu elements elsewhere on the page.
-                                            const nearestShell = ev.target && ev.target.closest ? ev.target.closest('.tabs-shell') : null;
+                                            const nearestShell = ev.target && ev.target.closest ? ev.target.closest('.nsaw-shell') : null;
 
                                             // If a global helper exists and would affect this shell, use it.
                                             let usedHelper = false;
@@ -692,9 +691,9 @@
 
                                             if (!usedHelper) {
                                                 // Fallback: scope changes to the nearest shell (or first shell)
-                                                const scope = nearestShell || document.querySelector('.tabs-shell');
+                                                const scope = nearestShell || document.querySelector('.nsaw-shell');
                                                 if (scope) {
-                                                    const tabButtonsLocal = scope.querySelectorAll('.tab-button');
+                                                    const tabButtonsLocal = scope.querySelectorAll('.nsaw-tab-button');
                                                     const tabContentsLocal = scope.querySelectorAll('.section');
                                                     tabButtonsLocal.forEach(btn => btn.classList.toggle('active', btn.getAttribute('data-tab') === target));
                                                     tabContentsLocal.forEach(content => content.classList.toggle('active', content.id === target));
@@ -767,16 +766,16 @@
                 })();
                 </script>
     <script>
-    // Data-driven section navigation (scoped to .tabs-shell).
+    // Data-driven section navigation (scoped to nsaw shell).
     document.addEventListener('DOMContentLoaded', function(){
-        const shell = document.querySelector('.tabs-shell');
+        const shell = document.querySelector('.nsaw-shell');
         if (!shell) return;
 
         // support legacy .tab-content markers as well as new .section class
-        const sections = Array.from(shell.querySelectorAll('.section, .tab-content'));
+        const sections = Array.from(shell.querySelectorAll('.section, .nsaw-tab-panel'));
         if (!sections.length) return;
 
-        const navButtons = Array.from(shell.querySelectorAll('[data-tab].tab-button'));
+        const navButtons = Array.from(shell.querySelectorAll('[data-tab].nsaw-tab-button'));
         const select = shell.querySelector('.mobile-select');
 
         function showById(id){

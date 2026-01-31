@@ -9,14 +9,14 @@ html, body {
   box-sizing: inherit;
 @media (max-width: 1024px) {
   .section#tab-video.active,
-  .tab-content#tab-video.active {
+  .nsaw-tab-panel#tab-video.active {
     display: flex !important;
     flex-direction: column !important;
     align-items: center !important;
     justify-content: flex-start !important;
   }
   .section#tab-video.active > .image-col-nsaw,
-  .tab-content#tab-video.active > .image-col-nsaw {
+  .nsaw-tab-panel#tab-video.active > .image-col-nsaw {
     order: 1 !important;
     width: 100% !important;
     max-width: 100% !important;
@@ -26,7 +26,7 @@ html, body {
     padding: 0 1rem !important;
   }
   .section#tab-video.active > .text-col-nsaw,
-  .tab-content#tab-video.active > .text-col-nsaw {
+  .nsaw-tab-panel#tab-video.active > .text-col-nsaw {
     order: 2 !important;
     width: 100% !important;
     max-width: 100% !important;
@@ -34,7 +34,7 @@ html, body {
     padding: 0 1rem !important;
   }
   .section#tab-video.active .video-wrapper-nsaw,
-  .tab-content#tab-video.active .video-wrapper-nsaw {
+  .nsaw-tab-panel#tab-video.active .video-wrapper-nsaw {
     display: block !important;
     order: 1 !important;
     width: 100% !important;
@@ -500,20 +500,20 @@ html, body {
   border: none;
 }
 
-/* Ensure the video container is only visible when its tab is active */
-.tab-content:not(.active) .video-wrapper-nsaw,
-.tab-content:not(.active) .video-wrapper-nsaw iframe {
+/* Ensure the video container is only visible when its panel is active */
+.nsaw-tab-panel:not(.active) .video-wrapper-nsaw,
+.nsaw-tab-panel:not(.active) .video-wrapper-nsaw iframe {
   display: none !important;
 }
 
-/* Ensure the video heading/intro only shows with the video tab */
-.tab-content:not(.active) .video-intro {
+/* Ensure the video heading/intro only shows with the video panel */
+.nsaw-tab-panel:not(.active) .video-intro {
   display: none !important;
 }
 
-/* Reduce vertical gap between the nav buttons and the content for all tabs
+/* Reduce vertical gap between the nav buttons and the content for all panels
    except the content in #tab1 (preserve original spacing there). */
-.tab-content:not(#tab1) {
+.nsaw-tab-panel:not(#tab1) {
   padding-top: 0.25rem !important;
   margin-top: 0 !important;
 }
@@ -559,7 +559,7 @@ input[type="checkbox"]:checked + .panel-content {
 }
 
 /* === Pill Tabs === */
-.tab-buttons {
+.nsaw-tab-buttons {
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
@@ -568,7 +568,7 @@ input[type="checkbox"]:checked + .panel-content {
   padding: 0 1rem;
 }
 
-.tab-button {
+.nsaw-tab-button {
   background-color: #132230;
   color: white;
   border: none;
@@ -583,12 +583,12 @@ input[type="checkbox"]:checked + .panel-content {
   transition: background-color 0.3s ease, color 0.3s ease;
 }
 
-.tab-button.active {
+.nsaw-tab-button.active {
   background-color: #EF3E42;
   color: #fff;
 }
 
-.tab-content {
+.nsaw-tab-panel {
   /* Keep tab panels present in the DOM for e-readers and AT.
      We'll visually hide inactive panels off-screen rather than using
      `display: none` which removes them from many accessibility parsers. */
@@ -601,7 +601,7 @@ input[type="checkbox"]:checked + .panel-content {
   position: relative;
 }
 
-.tab-content.active {
+.nsaw-tab-panel.active {
   display: flex;
   position: relative;
 }
@@ -609,7 +609,7 @@ input[type="checkbox"]:checked + .panel-content {
 /* Visually hide inactive tab panels by moving them off-screen. This
    preserves the content in the DOM so e-readers and accessibility tools
    can still access it while keeping the visual layout uncluttered. */
-.tab-content:not(.active) {
+.nsaw-tab-panel:not(.active) {
   /* SR-only hiding: keep panels in DOM for screen readers/e-readers
      while preventing layout overflow. */
   position: absolute !important;
@@ -762,16 +762,13 @@ input[type="checkbox"]:checked + .panel-content {
   overflow: hidden;
 }
 
-/* Video tab: force the video to appear above the intro on mobile (only when
-   the video tab is active) so the media is presented first without occupying
-   space on other tabs. */
-.tab-content#tab-video.active {
+.nsaw-tab-panel#tab-video.active {
   display: flex !important;
   flex-direction: column !important;
   align-items: center !important;
   justify-content: flex-start !important;
 }
-.tab-content#tab-video.active > .image-col-nsaw {
+.nsaw-tab-panel#tab-video.active > .image-col-nsaw {
   width: 100% !important;
   max-width: 100% !important;
   display: flex !important;
@@ -780,14 +777,14 @@ input[type="checkbox"]:checked + .panel-content {
   padding: 0 1rem !important;
   order: 1 !important; /* ensure video sits above heading/text */
 }
-.tab-content#tab-video.active > .text-col-nsaw {
+.nsaw-tab-panel#tab-video.active > .text-col-nsaw {
   width: 100% !important;
   order: 2 !important;
   max-width: 100% !important;
   display: block !important;
   padding: 0 1rem !important;
 }
-.tab-content#tab-video.active .video-wrapper-nsaw {
+.nsaw-tab-panel#tab-video.active .video-wrapper-nsaw {
   max-width: 1200px;
   width: 100%;
   box-sizing: border-box;
@@ -796,13 +793,13 @@ input[type="checkbox"]:checked + .panel-content {
   display: block;
   order: 1 !important; /* keep the media at the top of the stacked flow */
 }
-.tab-content#tab-video.active .video-wrapper-nsaw iframe {
+.nsaw-tab-panel#tab-video.active .video-wrapper-nsaw iframe {
   display: block !important;
   margin: 0 auto !important;
   width: 100% !important;
   height: 100% !important;
 }
-.tab-content#tab-video.active .video-intro {
+.nsaw-tab-panel#tab-video.active .video-intro {
   margin-bottom: 1rem;
   text-align: center;
   order: 2 !important; /* intro follows the video */
@@ -841,8 +838,8 @@ input[type="checkbox"]:checked + .panel-content {
   cursor: grab; /* hint that the row can be dragged */
 }
 
-/* Wrap nav + content in .tabs-shell so background can extend behind content */
-.tabs-shell {
+.tabs-shell,
+.nsaw-shell {
   --tab-bg: #F5F6F2; /* swapped: tabs now use the light color */
   background: var(--tab-bg);
   position: relative;
@@ -851,7 +848,7 @@ input[type="checkbox"]:checked + .panel-content {
   margin-bottom: 1rem;
 }
 
-/* ensure sticky nav sits inside the shell */
+.nsaw-shell .tab-buttons-wrapper,
 .tabs-shell .tab-buttons-wrapper {
   background: transparent;
   box-shadow: none;
@@ -879,6 +876,7 @@ input[type="checkbox"]:checked + .panel-content {
 }
 
 @media (max-width: 768px) {
+  .section-nav .nsaw-tab-button,
   .section-nav .tab-button {
     display: none !important;
   }
@@ -963,14 +961,17 @@ input[type="checkbox"]:checked + .panel-content {
 }
 
 /* Override adjustments: remove extra nav bottom margin and ensure symmetric top padding */
+.nsaw-tab-buttons,
 .tab-buttons {
   margin-bottom: 0 !important;
 }
 
+.nsaw-tab-panel,
 .tab-content {
   padding-top: 1rem !important; /* match bottom padding */
 }
 
+.nsaw-tab-panel:not(#tab1),
 .tab-content:not(#tab1) {
   padding-top: 1rem !important; /* ensure reduced-margin rule doesn't make top padding asymmetric */
   margin-top: 0 !important;
@@ -993,6 +994,7 @@ input[type="checkbox"]:checked + .panel-content {
     display: none;
   }
 
+  .nsaw-tab-button,
   .tab-button {
     flex: 0 0 auto !important;
     min-width: 10rem !important; /* ensure pill stays tappable */
@@ -1473,38 +1475,54 @@ header, .site-header, .navbar, .nav, .flyoutNav {
 
 /* Make the tabs-shell non-blocking so page header/flyouts can receive clicks.
    Interactive elements inside the shell remain clickable via explicit override. */
-.tabs-shell {
+.tabs-shell,
+.nsaw-shell {
   pointer-events: none;
 }
 
 .tabs-shell .tab-buttons,
+.nsaw-shell .nsaw-tab-buttons,
 .tabs-shell .tab-button,
+.nsaw-shell .nsaw-tab-button,
 .tabs-shell .tab-buttons-wrapper,
+.nsaw-shell .tab-buttons-wrapper,
 .tabs-shell .overlay-card-nsaw,
+.nsaw-shell .overlay-card-nsaw,
 .tabs-shell .overlay-card-nsaw a,
+.nsaw-shell .overlay-card-nsaw a,
 .tabs-shell .overlay-card-nsaw button,
+.nsaw-shell .overlay-card-nsaw button,
 .tabs-shell .card-panel,
+.nsaw-shell .card-panel,
 .tabs-shell .card-panel a,
-.tabs-shell .card-panel button {
+.nsaw-shell .card-panel a,
+.tabs-shell .card-panel button,
+.nsaw-shell .card-panel button {
   pointer-events: auto;
 }
 
 /* Ensure video container and iframe are interactable even though .tabs-shell
    uses pointer-events:none to avoid blocking header flyouts. */
 .tabs-shell .video-wrapper-nsaw,
+.nsaw-shell .video-wrapper-nsaw,
 .tabs-shell .video-wrapper-nsaw iframe,
+.nsaw-shell .video-wrapper-nsaw iframe,
 .tabs-shell .image-col-nsaw,
-.tabs-shell .image-section-nsaw {
+.nsaw-shell .image-col-nsaw,
+.tabs-shell .image-section-nsaw,
+.nsaw-shell .image-section-nsaw {
   pointer-events: auto !important;
 }
 
 /* Small top margin for overlay text cards to give breathing room above them */
-.tabs-shell .overlay-card-nsaw {
+.tabs-shell .overlay-card-nsaw,
+.nsaw-shell .overlay-card-nsaw {
   margin-top: 1rem !important;
 }
 
 @media (max-width: 1024px) {
-  .tabs-shell .overlay-card-nsaw {
+  .tabs-shell .overlay-card-nsaw,
+  .nsaw-shell .overlay-card-nsaw {
     margin-top: 0.5rem !important;
   }
 }
