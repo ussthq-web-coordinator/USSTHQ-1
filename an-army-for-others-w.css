@@ -738,6 +738,37 @@ input[type="checkbox"]:checked + .panel-content {
   }
 }
 
+/* Make the video larger on narrow viewports so media is more prominent.
+   Increase the wrapper aspect (taller) and allow a larger max-width. */
+@media (max-width: 768px) {
+  .tab-content#tab-video.active .video-wrapper-nsaw {
+    padding-bottom: 70% !important; /* taller than 16:9 for better presence */
+    max-width: calc(100% - 1rem) !important;
+    width: calc(100% - 1rem) !important;
+    min-height: 260px !important;
+    margin: 0.8rem auto !important;
+    border-radius: 1rem !important;
+    box-shadow: 0 1rem 2rem rgba(30,41,59,0.25) !important;
+  }
+
+  .tab-content#tab-video.active .video-wrapper-nsaw iframe {
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
+  }
+
+  /* Ensure the surrounding columns collapse to single-column sizing */
+  .tab-content#tab-video.active > .image-col-nsaw,
+  .tab-content#tab-video.active > .text-col-nsaw {
+    width: calc(100% - 1rem) !important;
+    max-width: calc(100% - 1rem) !important;
+    padding-left: 0.5rem !important;
+    padding-right: 0.5rem !important;
+  }
+}
+
 /* Strong mobile override: ensure the video tab stacks to a single column
    (media first, then intro/text) on narrow viewports. This counters any
    competing desktop rules and forces full-width columns for the video tab. */
