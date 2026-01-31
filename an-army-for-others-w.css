@@ -948,6 +948,52 @@ input[type="checkbox"]:checked + .panel-content {
   }
 }
 
+/* Mobile compacting: reduce padding/margins so content has more horizontal space */
+@media (max-width: 1024px) {
+  .tabs-shell {
+    padding: 0.6rem 0.5rem !important;
+    margin-bottom: 0.6rem !important;
+    border-radius: 0.8rem !important;
+  }
+
+  .tab-content {
+    padding-top: 0.5rem !important;
+    padding-left: 0.4rem !important;
+    padding-right: 0.4rem !important;
+  }
+
+  .overlay-card-nsaw {
+    padding: 1rem !important;
+    width: calc(100% - 0.6rem) !important;
+    max-width: calc(100% - 0.6rem) !important;
+    margin: 0.25rem auto 0 auto !important;
+  }
+
+  .card-panel {
+    padding: 0.9rem !important;
+  }
+
+  .image-section-nsaw {
+    margin-left: 0.5rem !important;
+    margin-right: 0.5rem !important;
+    max-width: calc(100% - 1rem) !important;
+  }
+
+  .text-col-nsaw,
+  .overlap-container-nsaw {
+    padding-left: 0.5rem !important;
+    padding-right: 0.5rem !important;
+    width: calc(100% - 0.6rem) !important;
+    max-width: calc(100% - 0.6rem) !important;
+  }
+
+  /* Slightly reduce tab button padding to free space while keeping tappable area */
+  .tab-button {
+    padding: 0.45rem 0.85rem !important;
+    min-width: 9rem !important;
+  }
+}
+
   /* Strong override: ensure buttons inside overlay cards and generated
      panels are block-level and centered on small screens, overriding
      Bootstrap display utilities (which use !important). */

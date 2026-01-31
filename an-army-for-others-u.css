@@ -368,9 +368,9 @@ html, body {
     box-sizing: border-box;
     width: calc(100% - 1rem);
     max-width: calc(100% - 1rem);
-    margin: 0.25rem auto; /* reduced vertical margin on mobile */
-    padding-left: 0.6rem;
-    padding-right: 0.6rem;
+    margin: 0 auto; /* remove extra vertical gap */
+    padding-left: 0.2rem;
+    padding-right: 0.2rem;
   }
 
   /* Allow card buttons to wrap and shrink to avoid overflowing their panel */
@@ -398,9 +398,9 @@ html, body {
     box-sizing: border-box;
     width: calc(100% - 1rem);
     max-width: calc(100% - 1rem);
-    margin: 0.2rem auto; /* reduced margin for tighter stack on mobile */
-    padding-left: 0.5rem;
-    padding-right: 0.5rem;
+    margin: 0 auto; /* remove extra vertical gap */
+    padding-left: 0.15rem;
+    padding-right: 0.15rem;
   }
 
   /* Ensure overlap containers (wrappers around the overlay card) also
@@ -410,9 +410,9 @@ html, body {
     box-sizing: border-box;
     width: calc(100% - 1rem);
     max-width: calc(100% - 1rem);
-    margin: 0.15rem auto; /* tighten spacing above/below the card */
-    padding-left: 0.35rem;
-    padding-right: 0.35rem;
+    margin: 0 auto; /* remove extra vertical gap */
+    padding-left: 0.15rem;
+    padding-right: 0.15rem;
   }
 }
 
@@ -421,20 +421,20 @@ html, body {
   .overlay-card-nsaw {
     width: calc(100% - 0.6rem);
     max-width: calc(100% - 0.6rem);
-    padding-left: 0.5rem;
-    padding-right: 0.5rem;
+    padding-left: 0.2rem;
+    padding-right: 0.2rem;
   }
   .text-col-nsaw {
     width: calc(100% - 0.6rem);
     max-width: calc(100% - 0.6rem);
-    padding-left: 0.45rem;
-    padding-right: 0.45rem;
+    padding-left: 0.15rem;
+    padding-right: 0.15rem;
   }
   .overlap-container-nsaw {
     width: calc(100% - 0.6rem);
     max-width: calc(100% - 0.6rem);
-    padding-left: 0.4rem;
-    padding-right: 0.4rem;
+    padding-left: 0.15rem;
+    padding-right: 0.15rem;
   }
 }
 
@@ -883,7 +883,6 @@ input[type="checkbox"]:checked + .panel-content {
   .desktop-only { display:block !important; }
 }
 
-/* Dark/navy variant for generated mobile carousels */
 /* Dark/navy variant for generated carousels (mobile-specific classname or general) */
 .card-carousel-mobile.card-dark-mobile .card-panel,
 .card-carousel.card-dark-mobile .card-panel {
