@@ -3504,6 +3504,55 @@
                          }
                     });
 
+                    // Special handling: when a freeTextArea or element includes `rowDonate`,
+                    // convert its contents to use inline Bootstrap classes (centered, small amount links, primary CTA).
+                    const rowDonateEls = Array.from(doc.body.querySelectorAll('.rowDonate, .freeTextArea.rowDonate'));
+                    rowDonateEls.forEach(container => {
+                        // center the section
+                        if (!container.classList.contains('text-center')) container.classList.add('text-center');
+
+                        // If there's a designated buttons wrapper, make it a flex-centered row
+                        const btnWrapper = container.querySelector('.rowDonate-buttons') || container.querySelector('.rowDonate-btns') || null;
+                        if (btnWrapper) {
+                            btnWrapper.classList.add('d-flex', 'justify-content-center', 'flex-wrap', 'gap-2');
+                        }
+
+                        // Process anchors/buttons inside the donate container
+                        const anchors = Array.from(container.querySelectorAll('a'));
+                        anchors.forEach(a => {
+                            // Normalize existing button classes
+                            a.classList.remove('btn-secondary', 'btn-danger', 'btn-info', 'btn-outline-secondary');
+
+                            const txt = (a.textContent || '').trim().toLowerCase();
+                            const href = (a.getAttribute('href') || '').toLowerCase();
+
+                            // Mark amount links (starting with $ or containing only a currency/number)
+                            const isAmount = /^\s*\$?\d+[\d,\.]*\s*$/.test(a.textContent.replace(/\u00a0/g, '')) || txt.startsWith('$');
+
+                            // Detect primary donate CTA by class or text/href
+                            const isPrimary = a.classList.contains('rowDonate-submit') || a.classList.contains('rowDonate-cta') || txt.includes('donate') || href.includes('give.') || href.includes('donate');
+
+                            if (isPrimary) {
+                                a.classList.add('btn', 'btn-primary');
+                                // ensure it's a regular size CTA (not small)
+                                a.classList.remove('btn-sm');
+                                a.classList.add('mt-2');
+                            } else if (isAmount || a.classList.contains('rowDonate-btn')) {
+                                a.classList.add('btn', 'btn-sm', 'btn-primary');
+                                a.classList.add('mx-1');
+                            } else {
+                                // Fallback: small link style
+                                a.classList.add('btn', 'btn-sm', 'btn-primary', 'mx-1');
+                            }
+
+                            // Ensure links open safely in new tab where appropriate
+                            if (href && (href.includes('give.') || href.startsWith('http') || href.includes('donate'))) {
+                                a.setAttribute('target', '_blank');
+                                a.setAttribute('rel', 'noopener noreferrer');
+                            }
+                        });
+                    });
+
                     // Remove .btn-solid (legacy/redundant)
                     const solidBtns = Array.from(doc.body.querySelectorAll('.btn-solid'));
                     solidBtns.forEach(el => el.classList.remove('btn-solid'));

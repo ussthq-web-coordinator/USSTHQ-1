@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>GDOS Zesty Location Comparison</title>
+  <style>
+    body{font-family:Arial,Helvetica,sans-serif;margin:20px;color:#222}
+    h1{font-size:20px;margin-bottom:6px}
+    .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-top:12px}
+    .card{padding:12px;border:1px solid #ddd;border-radius:6px;background:#fafafa}
+    table{width:100%;border-collapse:collapse}
+    th,td{padding:6px 8px;border-bottom:1px solid #eee;text-align:left}
+    .small{font-size:13px;color:#555}
+    pre{background:#111;color:#fff;padding:12px;border-radius:6px;overflow:auto}
+  </style>
+</head>
+<body>
+  <h1>GDOS Zesty Location Comparison</h1>
+  <p class="small">This page loads the GDOS territory files and the Zesty Locations file and shows simple numeric differences.</p>
+
+  <div id="status" class="small">Loading data...</div>
+
+  <div class="grid" id="summary" style="display:none;margin-top:12px">
+    <div class="card"><strong>Total Zesty locations</strong><div id="zestyCount">—</div></div>
+    <div class="card"><strong>Total GDOS records</strong><div id="gdosCount">—</div></div>
+    <div class="card"><strong>Matched by GDOS ID</strong><div id="matchedCount">—</div></div>
+    <div class="card"><strong>Zesty only</strong><div id="zestyOnly">—</div></div>
+    <div class="card"><strong>GDOS only</strong><div id="gdosOnly">—</div></div>
+    <div class="card"><strong>Records with any field mismatch</strong><div id="anyMismatch">—</div></div>
+  </div>
+
+  <h3 style="margin-top:18px">Field mismatch counts</h3>
+  <div id="fieldTableContainer" style="display:none">
+    <table id="fieldTable"><thead><tr><th>Field</th><th>Mismatch Count</th></tr></thead><tbody></tbody></table>
+  </div>
+
+  <h3 style="margin-top:18px">Sample mismatches (first 20)</h3>
+  <div id="samples" style="display:none"></div>
+
+  <script>
+    (function(){
+      const gdosFiles = [
+        'GDOS-01-26-29-19-07-USW.json',
+        'GDOS-01-29-26-19-02-USS.json',
+        'GDOS-01-29-26-19-05-USC.json',
+        'GDOS-01-29-26-18-44-USE.json'
+      ];
+
+      function text(s){ return String(s==null?'':s).trim(); }
+      function normString(s){ return text(s).toLowerCase(); }
+      function almostEqualLatLon(a,b){
+        const na = parseFloat(a); const nb = parseFloat(b);
+        if (!isFinite(na) || !isFinite(nb)) return false;
+        return Math.abs(na-nb) < 0.0005; // small tolerance
+      }
+
+      async function fetchJsonSafe(url){
+        try {
+          const res = await fetch(url + (url.includes('?')? '&v=' + Date.now() : ''));
+          if (!res.ok) return [];
+          return await res.json();
+        } catch (e){ return [] }
+      }
+
+      async function load(){
+        document.getElementById('status').textContent = 'Loading GDOS files...';
+        const gdosArrays = await Promise.all(gdosFiles.map(f => fetchJsonSafe(f)));
+        const gdosData = [].concat(...gdosArrays.filter(a=>Array.isArray(a)?a:[]));
+
+        document.getElementById('status').textContent = 'Loading Zesty Locations...';
+        let locations = await fetchJsonSafe('LocationsData.json');
+        if (!locations || !locations.data) {
+          // fallback to older filename used elsewhere
+          locations = await fetchJsonSafe('LocationsData-12-10.json');
+        }
+        if (!locations) locations = { data: [] };
+        const zestyArr = Array.isArray(locations.data) ? locations.data : (Array.isArray(locations)? locations : []);
+
+        // Build GDOS map by id (string keys)
+        const gdosMap = new Map();
+        gdosData.forEach(g=>{ if (g && (g.id||g.id===0)) gdosMap.set(String(g.id), g); });
+
+        // Build zesty map by gdos id found in Column1.content.gdos_id
+        const zestyMap = new Map();
+        zestyArr.forEach(loc => {
+          const gdosId = loc && (loc['Column1.content.gdos_id'] ?? loc['gdos_id'] ?? (loc.Column1 && loc.Column1.content && loc.Column1.content.gdos_id));
+          if (gdosId || gdosId === 0) zestyMap.set(String(gdosId), loc);
+        });
+
+        // Compute basics
+        const zestyCount = zestyArr.length;
+        const gdosCount = gdosData.length;
+        const matchedIds = Array.from(zestyMap.keys()).filter(id => gdosMap.has(id));
+        const matchedCount = matchedIds.length;
+        const zestyOnly = zestyCount - matchedCount;
+        const gdosOnly = gdosCount - matchedCount;
+
+        // Fields to compare
+        const fields = [
+          { name: 'name', gdosPath: 'name', zestyPath: loc => loc['Column1.content.name'] },
+          { name: 'address', gdosPath: 'address1', zestyPath: loc => loc['Column1.content.address'] },
+          { name: 'zipcode', gdosPath: 'zip.zipcode', zestyPath: loc => loc['Column1.content.zipcode'] },
+          { name: 'phone', gdosPath: 'phone.phoneNumber', zestyPath: loc => loc['Column1.content.phoneNumber'] },
+          { name: 'latitude', gdosPath: 'location.latitude', zestyPath: loc => loc['Column1.content.latitude'] },
+          { name: 'longitude', gdosPath: 'location.longitude', zestyPath: loc => loc['Column1.content.longitude'] }
+        ];
+
+        const mismatchCounts = {};
+        fields.forEach(f=> mismatchCounts[f.name]=0);
+        let recordsWithAnyMismatch = 0;
+        const sampleMismatches = [];
+
+        matchedIds.forEach(id => {
+          const g = gdosMap.get(id);
+          const z = zestyMap.get(id);
+          let any = false;
+          fields.forEach(f => {
+            let gv = null;
+            try { gv = f.gdosPath.split('.').reduce((c,k)=>c&&c[k], g); } catch(e) { gv = null }
+            const zv = f.zestyPath(z);
+            let diff = false;
+            if (f.name === 'latitude' || f.name === 'longitude') {
+              diff = !almostEqualLatLon(gv, zv);
+            } else {
+              diff = normString(gv) !== normString(zv);
+            }
+            if (diff) { mismatchCounts[f.name]++; any = true; }
+          });
+          if (any) {
+            recordsWithAnyMismatch++;
+            if (sampleMismatches.length < 20) sampleMismatches.push({ gdos_id: id, name: g && g.name, zesty: z, gdos: g });
+          }
+        });
+
+        // Render summary
+        document.getElementById('zestyCount').textContent = zestyCount;
+        document.getElementById('gdosCount').textContent = gdosCount;
+        document.getElementById('matchedCount').textContent = matchedCount;
+        document.getElementById('zestyOnly').textContent = Math.max(0,zestyOnly);
+        document.getElementById('gdosOnly').textContent = Math.max(0,gdosOnly);
+        document.getElementById('anyMismatch').textContent = recordsWithAnyMismatch;
+        document.getElementById('summary').style.display = 'grid';
+
+        // field table
+        const tbody = document.querySelector('#fieldTable tbody');
+        Object.keys(mismatchCounts).forEach(k => {
+          const tr = document.createElement('tr');
+          const td1 = document.createElement('td'); td1.textContent = k; const td2 = document.createElement('td'); td2.textContent = mismatchCounts[k];
+          tr.appendChild(td1); tr.appendChild(td2); tbody.appendChild(tr);
+        });
+        document.getElementById('fieldTableContainer').style.display = '';
+
+        // samples
+        const samplesDiv = document.getElementById('samples');
+        if (sampleMismatches.length === 0) {
+          samplesDiv.textContent = 'No sample mismatches (first 20)';
+        } else {
+          sampleMismatches.forEach(s => {
+            const pre = document.createElement('pre');
+            pre.textContent = JSON.stringify(s, null, 2);
+            samplesDiv.appendChild(pre);
+          });
+        }
+        samplesDiv.style.display = '';
+
+        document.getElementById('status').textContent = 'Comparison complete.';
+      }
+
+      load().catch(e=>{
+        document.getElementById('status').textContent = 'Error: ' + (e && e.message || e);
+        console.error(e);
+      });
+    })();
+  </script>
+</body>
+</html>

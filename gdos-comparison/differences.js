@@ -38,7 +38,7 @@ let duplicateMap = new Map();
 let duplicateCheckRecords = [];
 // October data for change tracking
 let octoberGdosMap = new Map();
-const GDOS_DATA_VERSION = 'December 10, 2024';
+const GDOS_DATA_VERSION = 'January 29, 2026';
 // Polling/adaptive sync configuration
 let pollIntervalMsDefault = 10000; // normal short poll
 let pollIntervalMs = pollIntervalMsDefault;
@@ -503,20 +503,20 @@ function shouldIgnoreField(field, zestyValue) {
 
 // Load JSON data from both territories and locations
 Promise.all([
-    // December 2024 GDOS data (current/latest)
-    fetch('GDOS-12-10-18-11-USW.json').then(response => {
+    // Latest GDOS data (current/latest) - per-territory files
+    fetch('GDOS-01-26-29-19-07-USW.json').then(response => {
         if (!response.ok) throw new Error('USW file not found');
         return response.json();
     }),
-    fetch('GDOS-12-10-18-09-USS.json').then(response => {
+    fetch('GDOS-01-29-26-19-02-USS.json').then(response => {
         if (!response.ok) throw new Error('USS file not found');
         return response.json();
     }),
-    fetch('GDOS-12-10-18-14-USC.json').then(response => {
+    fetch('GDOS-01-29-26-19-05-USC.json').then(response => {
         if (!response.ok) throw new Error('USC file not found');
         return response.json();
     }),
-    fetch('GDOS-12-10-18-16-USE.json').then(response => {
+    fetch('GDOS-01-29-26-18-44-USE.json').then(response => {
         if (!response.ok) throw new Error('USE file not found');
         return response.json();
     }),
@@ -537,7 +537,7 @@ Promise.all([
         if (!response.ok) { console.warn('October USE file not found'); return []; }
         return response.json();
     }),
-    fetch('LocationsData-12-10.json?v=' + Date.now()).then(response => {
+    fetch('LocationsData-01-29-26.json?v=' + Date.now()).then(response => {
         if (!response.ok) throw new Error('LocationsData file not found');
         return response.json();
     }),
@@ -3054,32 +3054,91 @@ function exportTransactionsXlsx() {
             return;
         }
 
+        // Helpers
+        const colLetter = (n) => {
+            let s = '';
+            while (n > 0) {
+                const m = (n - 1) % 26;
+                s = String.fromCharCode(65 + m) + s;
+                n = Math.floor((n - 1) / 26);
+            }
+            return s;
+        };
+
+        const safeSheetName = (name) => {
+            if (!name) return 'Sheet';
+            // Remove invalid chars and trim to 31
+            return name.replace(/[\\\/\?\*\[\]:]/g, '_').substr(0, 31);
+        };
+
         // Build transaction rows from differencesData
         const txRowsByTerritory = new Map();
+        const syntheticRowsByTerritory = new Map();
+        const doNotImportMap = new Map();
 
         differencesData.forEach(r => {
             if (!r || !r.gdos_id) return;
 
+            const territory = r.territory || 'Unknown';
+
             // Determine final value (user-finalized or zesty)
             let finalVal = (r.final_value !== undefined && r.final_value !== null && String(r.final_value).trim() !== '') ? r.final_value : (r.zesty_value !== undefined && r.zesty_value !== null ? r.zesty_value : '');
 
-            // Normalize and decide if this row represents a change/transaction
             const fieldName = String(r.field || '').toLowerCase();
             const normalizedFinal = normalizeValue(finalVal, fieldName) || '';
             const normalizedGdos = normalizeValue(r.gdos_value, fieldName) || '';
 
-            // Include only when the chosen correction comes from Zesty (we are adjusting GDOS to match Zesty)
-            // Accept any correction whose label starts with 'Zesty' (e.g., 'Zesty' or 'Zesty Name to Site Title')
             const correctionStr = (r.correct || '').toString();
             const isFromZesty = correctionStr.toLowerCase().startsWith('zesty');
-            // For staging fields (siteTitle/openHours), only include when a final value exists and it was chosen from Zesty
             const isStagingWithFinal = (fieldName === 'sitetitle' || /openhours/i.test(fieldName)) && String(finalVal).trim() !== '' && isFromZesty;
+
+            // Mark do-not-import candidates (either explicit flag or duplicate)
+            const isDup = String(r.duplicate || '').toLowerCase() === '1' || String(r.duplicate || '').toLowerCase() === 'true';
+            const isDoNot = String(r.doNotImport || '').toLowerCase() === 'true' || String(r.doNotImport || '').toLowerCase() === '1';
+            if (isDup || isDoNot) {
+                const key = String(r.gdos_id);
+                if (!doNotImportMap.has(key)) {
+                    doNotImportMap.set(key, {
+                        Territory: territory,
+                        Division: r.division || '',
+                        GDOS_ID: r.gdos_id,
+                        Name: r.name || '',
+                        Address: r.address1 || '',
+                        Phone: r.phoneNumber || '',
+                        Zip: r.zip || '',
+                        Duplicate: isDup ? 'True' : 'False',
+                        DoNotImport: isDoNot ? 'True' : 'False',
+                        Reason: isDup ? 'Marked as duplicate location' : 'Marked do not import'
+                    });
+                }
+            }
+
+            // If synthetic, collect separately
+            if (r.synthetic) {
+                if (!syntheticRowsByTerritory.has(territory)) syntheticRowsByTerritory.set(territory, []);
+                syntheticRowsByTerritory.get(territory).push({
+                    Territory: territory,
+                    Division: r.division || '',
+                    GDOS_ID: r.gdos_id,
+                    Name: r.name || '',
+                    Field: r.field || '',
+                    GDOS_Value: r.gdos_value === undefined || r.gdos_value === null ? '' : String(r.gdos_value),
+                    Zesty_Value: r.zesty_value === undefined || r.zesty_value === null ? '' : String(r.zesty_value),
+                    Final_Value: finalVal === undefined || finalVal === null ? '' : String(finalVal),
+                    Correct: r.correct || '',
+                    Synthetic: 'True',
+                    Duplicate: r.duplicate || '0',
+                    DoNotImport: r.doNotImport || 'False',
+                    UpdatedSinceOct: r.updatedSinceOct ? 'True' : 'False'
+                });
+                return; // synthetic rows are not part of main transactions
+            }
+
+            // Include only when the chosen correction comes from Zesty (we are adjusting GDOS to match Zesty)
             if (!isFromZesty && !isStagingWithFinal) return;
             if (normalizedFinal === normalizedGdos) return; // no effective change
 
-            const territory = r.territory || 'Unknown';
             if (!txRowsByTerritory.has(territory)) txRowsByTerritory.set(territory, []);
-
             txRowsByTerritory.get(territory).push({
                 Territory: territory,
                 Division: r.division || '',
@@ -3090,36 +3149,125 @@ function exportTransactionsXlsx() {
                 Zesty_Value: r.zesty_value === undefined || r.zesty_value === null ? '' : String(r.zesty_value),
                 Final_Value: finalVal === undefined || finalVal === null ? '' : String(finalVal),
                 Correct: r.correct || '',
-                Synthetic: r.synthetic ? 'True' : 'False',
+                Synthetic: 'False',
                 Duplicate: r.duplicate || '0',
                 DoNotImport: r.doNotImport || 'False',
                 UpdatedSinceOct: r.updatedSinceOct ? 'True' : 'False'
             });
         });
 
-        if (txRowsByTerritory.size === 0) {
+        if (txRowsByTerritory.size === 0 && syntheticRowsByTerritory.size === 0 && doNotImportMap.size === 0) {
             alert('No transactions found to export.');
             return;
         }
 
         const wb = XLSX.utils.book_new();
 
-        // Create a sheet for each territory
+        // For each territory create two sheets: Transactions and Synthetic (if present)
+        const header = ['Territory','Division','GDOS_ID','Name','Field','GDOS_Value','Zesty_Value','Final_Value','Correct','Synthetic','Duplicate','DoNotImport','UpdatedSinceOct'];
+
         txRowsByTerritory.forEach((rows, territory) => {
-            const header = ['Territory','Division','GDOS_ID','Name','Field','GDOS_Value','Zesty_Value','Final_Value','Correct','Synthetic','Duplicate','DoNotImport','UpdatedSinceOct'];
+            const safeName = safeSheetName((territory || 'Territory') + '_Transactions');
             const aoa = [header];
-            rows.forEach(r => {
-                aoa.push([r.Territory, r.Division, r.GDOS_ID, r.Name, r.Field, r.GDOS_Value, r.Zesty_Value, r.Final_Value, r.Correct, r.Synthetic, r.Duplicate, r.DoNotImport, r.UpdatedSinceOct]);
-            });
+            rows.forEach(r => aoa.push([r.Territory, r.Division, r.GDOS_ID, r.Name, r.Field, r.GDOS_Value, r.Zesty_Value, r.Final_Value, r.Correct, r.Synthetic, r.Duplicate, r.DoNotImport, r.UpdatedSinceOct]));
             const ws = XLSX.utils.aoa_to_sheet(aoa);
-            // sanitize sheet name length
-            const safeName = (territory || 'Sheet').toString().substr(0,31);
+            const lastRow = aoa.length;
+            const lastCol = header.length;
+            const rangeRef = `'${safeName}'!$A$1:$${colLetter(lastCol)}$${lastRow}`;
+            ws['!autofilter'] = { ref: `A1:${colLetter(lastCol)}${lastRow}` };
             XLSX.utils.book_append_sheet(wb, ws, safeName);
+            // Add named range for the table so Excel can reference it by name
+            wb.Workbook = wb.Workbook || {};
+            wb.Workbook.Names = wb.Workbook.Names || [];
+            const tableName = `Table_${safeName.replace(/[^A-Za-z0-9_]/g,'_')}`;
+            wb.Workbook.Names.push({ Name: tableName, Ref: rangeRef });
         });
 
+        syntheticRowsByTerritory.forEach((rows, territory) => {
+            const safeName = safeSheetName((territory || 'Territory') + '_Synthetic');
+            const aoa = [header];
+            rows.forEach(r => aoa.push([r.Territory, r.Division, r.GDOS_ID, r.Name, r.Field, r.GDOS_Value, r.Zesty_Value, r.Final_Value, r.Correct, r.Synthetic, r.Duplicate, r.DoNotImport, r.UpdatedSinceOct]));
+            const ws = XLSX.utils.aoa_to_sheet(aoa);
+            const lastRow = aoa.length;
+            const lastCol = header.length;
+            ws['!autofilter'] = { ref: `A1:${colLetter(lastCol)}${lastRow}` };
+            XLSX.utils.book_append_sheet(wb, ws, safeName);
+            wb.Workbook = wb.Workbook || {};
+            wb.Workbook.Names = wb.Workbook.Names || [];
+            const tableName = `Table_${safeName.replace(/[^A-Za-z0-9_]/g,'_')}`;
+            wb.Workbook.Names.push({ Name: tableName, Ref: `'${safeName}'!$A$1:$${colLetter(lastCol)}$${lastRow}` });
+        });
+
+        // Add Do Not Import sheet containing the sync block list
+        if (doNotImportMap.size > 0) {
+            const dnHeader = ['Territory','Division','GDOS_ID','Name','Address','Phone','Zip','Duplicate','DoNotImport','Reason'];
+            const aoa = [dnHeader];
+            doNotImportMap.forEach(v => {
+                aoa.push([v.Territory, v.Division, v.GDOS_ID, v.Name, v.Address, v.Phone, v.Zip, v.Duplicate, v.DoNotImport, v.Reason]);
+            });
+            const safeName = safeSheetName('Do_Not_Import');
+            const ws = XLSX.utils.aoa_to_sheet(aoa);
+            const lastRow = aoa.length;
+            const lastCol = dnHeader.length;
+            ws['!autofilter'] = { ref: `A1:${colLetter(lastCol)}${lastRow}` };
+            XLSX.utils.book_append_sheet(wb, ws, safeName);
+            wb.Workbook = wb.Workbook || {};
+            wb.Workbook.Names = wb.Workbook.Names || [];
+            wb.Workbook.Names.push({ Name: 'Table_Do_Not_Import', Ref: `'${safeName}'!$A$1:$${colLetter(lastCol)}$${lastRow}` });
+        }
+
+        // Build Services list: unique by category id + service id
+        const servicesMap = new Map();
+        try {
+            // services are stored on the GDOS records; iterate gdosData (full GDOS dataset)
+            (typeof gdosData !== 'undefined' && Array.isArray(gdosData) ? gdosData : []).forEach(r => {
+                if (!r || !r.services || !Array.isArray(r.services)) return;
+                r.services.forEach(s => {
+                    try {
+                        const catId = (s.category && (s.category.id || s.categoryId)) ? String(s.category.id || s.categoryId) : '';
+                        const catName = (s.category && s.category.name) ? String(s.category.name) : '';
+                        const svcId = s.id ? String(s.id) : '';
+                        const svcName = s.name ? String(s.name) : '';
+                        const key = `${catId}|${svcId}|${svcName}`;
+                        if (!servicesMap.has(key)) {
+                            servicesMap.set(key, { categoryName: catName, categoryId: catId, serviceName: svcName, serviceId: svcId });
+                        }
+                    } catch (e) { /* ignore malformed service */ }
+                });
+            });
+        } catch (e) {
+            console.warn('Failed to build services list', e);
+        }
+
+        // Add Services sheet (unique service names only)
+        if (servicesMap.size > 0) {
+            const svcHeader = ['Service Category Name','Service Category ID','Service Name','Service ID'];
+            const svcAoa = [svcHeader];
+            servicesMap.forEach(v => svcAoa.push([v.categoryName, v.categoryId, v.serviceName, v.serviceId]));
+            const svcSafe = safeSheetName('Services');
+            const svcWs = XLSX.utils.aoa_to_sheet(svcAoa);
+            svcWs['!autofilter'] = { ref: `A1:D${svcAoa.length}` };
+            XLSX.utils.book_append_sheet(wb, svcWs, svcSafe);
+            wb.Workbook = wb.Workbook || {};
+            wb.Workbook.Names = wb.Workbook.Names || [];
+            wb.Workbook.Names.push({ Name: 'Table_Services', Ref: `'${svcSafe}'!$A$1:$D$${svcAoa.length}` });
+        }
+
+        // Add explanatory notes sheet describing synthetic rows and sync behavior
+        const notes = [
+            ['Notes'],
+            ['Synthetic rows'],
+            ['Synthetic rows shown in *_Synthetic tabs are generated for display and may be controlled by another system (for example: DSS).'],
+            ['These synthetic rows are NOT intended to be included in GDOS Syncs and will be ignored by future automated GDOS synchronization.'],
+            ['Do Not Import list'],
+            ['The Do_Not_Import tab contains units flagged as duplicate or explicitly marked DoNotImport; this is a sync-block list containing territory/division and basic metadata.']
+        ];
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(notes), 'Notes');
+
         // Also add a summary sheet with counts
-        const summary = [['Territory','Transactions']];
-        txRowsByTerritory.forEach((rows, territory) => summary.push([territory, rows.length]));
+        const summary = [['Territory','Transactions','Synthetic']];
+        const allTerritories = new Set([...txRowsByTerritory.keys(), ...syntheticRowsByTerritory.keys()]);
+        allTerritories.forEach(t => summary.push([t, (txRowsByTerritory.get(t) || []).length, (syntheticRowsByTerritory.get(t) || []).length]));
         XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(summary), 'Summary');
 
         const wbout = XLSX.write(wb, {bookType:'xlsx', type:'array'});
@@ -3237,6 +3385,105 @@ function downloadDoNotImportCsv() {
     } catch (e) {
         console.error('downloadDoNotImportCsv failed', e);
         alert('Export failed: ' + (e && e.message ? e.message : e));
+    }
+}
+
+// Export a deduplicated Services CSV built from all GDOS units across territories
+function downloadServicesCsv() {
+    try {
+        const servicesMap = new Map();
+        const allGdos = (typeof gdosData !== 'undefined' && Array.isArray(gdosData)) ? gdosData : [];
+        allGdos.forEach(r => {
+            if (!r || !r.services || !Array.isArray(r.services)) return;
+            r.services.forEach(s => {
+                try {
+                    const catId = (s.category && (s.category.id || s.categoryId)) ? String(s.category.id || s.categoryId) : '';
+                    const catName = (s.category && s.category.name) ? String(s.category.name) : '';
+                    const svcId = s.id ? String(s.id) : '';
+                    const svcName = s.name ? String(s.name) : '';
+                    const key = `${catId}|${svcId}|${svcName}`;
+                    if (!servicesMap.has(key)) {
+                        servicesMap.set(key, { categoryName: catName, categoryId: catId, serviceName: svcName, serviceId: svcId });
+                    }
+                } catch (e) { /* ignore malformed service */ }
+            });
+        });
+
+        if (servicesMap.size === 0) {
+            alert('No services found across GDOS data');
+            return;
+        }
+
+        function escapeCsvField(val) {
+            if (val === null || val === undefined) return '';
+            let s = String(val);
+            if (s.indexOf('"') !== -1) s = s.replace(/"/g, '""');
+            if (/[",\r\n]/.test(s)) return '"' + s + '"';
+            return s;
+        }
+
+        const header = ['Service Category Name','Service Category ID','Service Name','Service ID'];
+        const rows = [header.map(escapeCsvField).join(',')];
+        servicesMap.forEach(v => {
+            rows.push([v.categoryName, v.categoryId, v.serviceName, v.serviceId].map(escapeCsvField).join(','));
+        });
+
+        const csvContent = '\ufeff' + rows.join('\r\n') + '\r\n';
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'gdos_services.csv';
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+    } catch (e) {
+        console.warn('downloadServicesCsv failed', e);
+        alert('Failed to export services CSV');
+    }
+}
+
+// Export the deduplicated Services list as JSON
+function downloadServicesJson() {
+    try {
+        const servicesMap = new Map();
+        const allGdos = (typeof gdosData !== 'undefined' && Array.isArray(gdosData)) ? gdosData : [];
+        allGdos.forEach(r => {
+            if (!r || !r.services || !Array.isArray(r.services)) return;
+            r.services.forEach(s => {
+                try {
+                    const catId = (s.category && (s.category.id || s.categoryId)) ? String(s.category.id || s.categoryId) : '';
+                    const catName = (s.category && s.category.name) ? String(s.category.name) : '';
+                    const svcId = s.id ? String(s.id) : '';
+                    const svcName = s.name ? String(s.name) : '';
+                    const key = `${catId}|${svcId}|${svcName}`;
+                    if (!servicesMap.has(key)) {
+                        servicesMap.set(key, { categoryName: catName, categoryId: catId, serviceName: svcName, serviceId: svcId });
+                    }
+                } catch (e) { /* ignore malformed service */ }
+            });
+        });
+
+        const services = Array.from(servicesMap.values());
+        if (services.length === 0) {
+            alert('No services found to export');
+            return;
+        }
+
+        const json = JSON.stringify(services, null, 2);
+        const blob = new Blob([json], { type: 'application/json;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'gdos_services.json';
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+    } catch (e) {
+        console.warn('downloadServicesJson failed', e);
+        alert('Failed to export services JSON');
     }
 }
 

@@ -1,0 +1,1127 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Location Comparison</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    body{font-family:Arial,Helvetica,sans-serif;margin:20px;color:#222}
+    h1{font-size:20px;margin-bottom:6px}
+    .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-top:12px}
+    .card{padding:12px;border:1px solid #ddd;border-radius:6px;background:#fafafa}
+    table{width:100%;border-collapse:collapse}
+    th,td{padding:6px 8px;border-bottom:1px solid #eee;text-align:left}
+    .small{font-size:13px;color:#555}
+    pre{background:#111;color:#fff;padding:12px;border-radius:6px;overflow:auto}
+
+    /* layout rules copied from differences.html to keep header/cards full width */
+    #summary { clear: both; margin-top: 0.75rem; }
+    .filters-container { display: block; width: 100%; }
+    #controlsSection { display:block; width:100%; margin-bottom:0.5rem; }
+    #tableSection { display:block; width:100%; clear:both; }
+  </style>
+</head>
+<body>
+  <div class="container-fluid my-3">
+    <nav class="navbar navbar-expand-lg navbar-light bg-light shadow-sm">
+      <div class="container-fluid">
+        <span class="navbar-brand mb-0 h1">Location Comparison
+          <span id="dataVersionBadge" class="badge bg-info ms-2" style="font-size:0.6em;">Loading...</span>
+        </span>
+        <div class="me-3">
+          <span id="syncStatus" class="small text-muted">● Synced</span>
+        </div>
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNavLC" aria-controls="navbarNavLC" aria-expanded="false" aria-label="Toggle navigation">
+          <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="navbarNavLC">
+          <ul class="navbar-nav ms-auto">
+            <li class="nav-item"><a class="nav-link" href="index.html">Back to Dashboard</a></li>
+          </ul>
+        </div>
+      </div>
+    </nav>
+
+    <section id="controlsSection" class="mb-3">
+      <div class="d-flex justify-content-between align-items-center mb-3 filters-container">
+        <div id="differencesSummary" class="text-muted me-3">Loading differences...</div>
+        <div class="d-flex align-items-center gap-3 w-100">
+          <div class="w-100">
+            <div class="row gx-2 gy-1 align-items-end w-100">
+              <div class="col-12 col-sm-auto">
+                <label for="globalTerritoryFilter" class="form-label small text-muted mb-1">Territory</label>
+                <select id="globalTerritoryFilter" class="form-select form-select-sm"><option value="all">All</option></select>
+              </div>
+              <div class="col-12 col-sm-auto">
+                <label for="globalDivisionFilter" class="form-label small text-muted mb-1">Division</label>
+                <select id="globalDivisionFilter" class="form-select form-select-sm"><option value="all">All</option></select>
+              </div>
+              <div class="col-12 col-sm-auto">
+                <label for="globalCorrectFilter" class="form-label small text-muted mb-1">Correct Value</label>
+                <select id="globalCorrectFilter" class="form-select form-select-sm">
+                  <option value="all">All</option>
+                  <option value="GDOS">GDOS</option>
+                  <option value="Zesty">Zesty</option>
+                  <option value="Zesty Name to Site Title">Zesty Name to Site Title</option>
+                </select>
+              </div>
+              <div class="col-12 col-sm-auto">
+                <label for="globalFieldFilter" class="form-label small text-muted mb-1">Field</label>
+                <select id="globalFieldFilter" class="form-select form-select-sm"><option value="all">All</option></select>
+              </div>
+              <div class="col-12 col-sm-auto">
+                <label for="showSiteTitleFilter" class="form-label small text-muted mb-1">Site Title</label>
+                <select id="showSiteTitleFilter" class="form-select form-select-sm">
+                  <option value="all">Show All</option>
+                  <option value="show">Show Only</option>
+                  <option value="hide">Hide</option>
+                </select>
+              </div>
+              <div class="col-12 col-sm-auto">
+                <label for="showOpenHoursFilter" class="form-label small text-muted mb-1">Open Hours</label>
+                <select id="showOpenHoursFilter" class="form-select form-select-sm">
+                  <option value="all">Show All</option>
+                  <option value="show">Show Only</option>
+                  <option value="hide">Hide</option>
+                </select>
+              </div>
+              <div class="col-12 col-sm-auto">
+                <label for="showDoNotImportFilter" class="form-label small text-muted mb-1">Do Not Import (includes Duplicates)</label>
+                <select id="showDoNotImportFilter" class="form-select form-select-sm">
+                  <option value="all">Show All</option>
+                  <option value="show">Show Only</option>
+                  <option value="hide">Hide</option>
+                </select>
+              </div>
+              <div class="col-12 col-sm-auto">
+                <label for="gdosValueBlankFilter" class="form-label small text-muted mb-1">GDOS Value</label>
+                <select id="gdosValueBlankFilter" class="form-select form-select-sm"><option value="all">All</option><option value="blank">Blank Only</option><option value="notblank">Not Blank Only</option></select>
+              </div>
+              <div class="col-12 col-sm-auto">
+                <label for="zestyValueBlankFilter" class="form-label small text-muted mb-1">Zesty Value</label>
+                <select id="zestyValueBlankFilter" class="form-select form-select-sm"><option value="all">All</option><option value="blank">Blank Only</option><option value="notblank">Not Blank Only</option></select>
+              </div>
+              <div class="col-12 col-sm-auto">
+                <button type="button" class="btn btn-outline-secondary btn-sm" onclick="clearFilters()">Clear Filters</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div id="differencesMetrics" class="row g-2 mt-3 mb-3">
+        <div class="col-auto"><div class="card p-1" style="min-width:120px;"><div class="small text-muted">Total Differences</div><div id="metricTotal" class="h6 mb-0">0</div></div></div>
+        <div class="col-auto"><div class="card p-1" style="min-width:120px;"><div class="small text-muted">Correct = GDOS</div><div id="metricGdos" class="h6 mb-0">0</div></div></div>
+        <div class="col-auto"><div class="card p-1" style="min-width:160px;"><div class="small text-muted">Correct = Zesty</div><div id="metricZesty" class="h6 mb-0">0</div></div></div>
+        <div class="col-auto"><div class="card p-1" style="min-width:120px;"><div class="small text-muted">Field Totals</div><div id="metricFieldTotals" class="small mb-0 text-muted">-</div></div></div>
+        <div class="col-auto"><div class="card p-1" style="min-width:140px;"><div class="small text-muted">Excluded</div><div id="metricExcluded" class="h6 mb-0">0</div></div></div>
+      </div>
+    </section>
+
+    <section id="tableSection">
+      <div class="row mt-3"><div class="col-12">
+        <!-- Existing comparison UI -->
+        <h1>Location Comparison</h1>
+        <p class="small">This page loads the GDOS territory files and the Zesty Locations file and shows simple numeric differences.</p>
+
+        <div id="status" class="small">Loading data...</div>
+
+        <div class="grid" id="summary" style="display:none;margin-top:12px">
+          <div class="card"><strong>Total Zesty locations</strong><div id="zestyCount">—</div></div>
+          <div class="card"><strong>Total GDOS records</strong><div id="gdosCount">—</div></div>
+          <div class="card"><strong title="Number of Zesty locations whose Column1.content.gdos_id matches a GDOS record id. Initially equals the size of the intersection (Zesty ∩ GDOS). After applying filters this shows the number of comparison records currently displayed.">Matched by GDOS ID</strong><div id="matchedCount">—</div></div>
+          <div class="card"><strong>Zesty only</strong><div id="zestyOnly">—</div></div>
+          <div class="card"><strong>GDOS only</strong><div id="gdosOnly">—</div></div>
+          <div class="card"><strong>Records with any field mismatch</strong><div id="anyMismatch">—</div></div>
+        </div>
+
+        <h3 style="margin-top:18px">Field mismatch counts</h3>
+        <div id="fieldTableContainer" style="display:none">
+          <table id="fieldTable"><thead><tr><th>Field</th><th>Mismatch Count</th></tr></thead><tbody></tbody></table>
+        </div>
+
+        <div class="d-flex align-items-center justify-content-between" style="margin-top:18px">
+          <div>
+            <div class="btn-group" role="group" aria-label="view-toggle">
+              <button id="viewMismatchesBtn" type="button" class="btn btn-sm btn-primary" onclick="showMismatchesView()">Mismatches</button>
+              <button id="viewDoNotImportBtn" type="button" class="btn btn-sm btn-outline-secondary" onclick="showDoNotImportView()">Do Not Import</button>
+            </div>
+          </div>
+          <div class="small text-muted">Mismatches (<span id="mismatchesCount">0</span>)</div>
+        </div>
+        <div id="excludedInfo" class="small text-muted" style="margin-bottom:8px;display:none"></div>
+        <div id="samples" style="display:none"></div>
+
+        <div id="doNotImportContainer" style="display:none;margin-top:12px">
+          <h3 class="small">Do Not Import Records (<span id="doNotCount">0</span>)</h3>
+          <div id="doNotTable" style="margin-top:8px"></div>
+        </div>
+      </div></div>
+    </section>
+  </div>
+
+    <script>
+    (function(){
+      // Suppress noisy extension errors (e.g. content.bundle.js "auth required")
+      // These come from a browser extension injecting scripts into the page and
+      // are not errors in this app. Prefer disabling the extension for testing.
+      window.addEventListener('unhandledrejection', function (e) {
+        try {
+          const reason = e && e.reason;
+          const msg = (typeof reason === 'string') ? reason : (reason && reason.message) || '';
+          const stack = reason && reason.stack || '';
+          if ((msg && msg.toLowerCase().includes('auth required')) || (stack && stack.includes('content.bundle.js'))) {
+            console.warn('Suppressed extension unhandled rejection:', msg || stack);
+            e.preventDefault();
+            return;
+          }
+        } catch (err) {
+          // ignore handler errors
+        }
+      });
+      const gdosFiles = [
+        'GDOS-01-26-29-19-07-USW.json',
+        'GDOS-01-29-26-19-02-USS.json',
+        'GDOS-01-29-26-19-05-USC.json',
+        'GDOS-01-29-26-18-44-USE.json'
+      ];
+
+      function text(s){ return String(s==null?'':s).trim(); }
+      function normString(s){ return text(s).toLowerCase(); }
+      // Toggle verbose logging during development
+      const DEBUG = false;
+      function almostEqualLatLon(a,b){
+        const na = parseFloat(a); const nb = parseFloat(b);
+        if (!isFinite(na) || !isFinite(nb)) return false;
+        return Math.abs(na-nb) < 0.0005; // small tolerance
+      }
+
+      async function fetchJsonSafe(url){
+        try {
+          const res = await fetch(url + (url.includes('?')? '&v=' + Date.now() : ''));
+          if (!res.ok) return [];
+          return await res.json();
+        } catch (e){ return [] }
+      }
+
+      async function load(){
+        try {
+        document.getElementById('status').textContent = 'Loading GDOS files...';
+        if (DEBUG) console.log('location-comparison: starting load()');
+        const gdosArrays = await Promise.all(gdosFiles.map(f => fetchJsonSafe(f)));
+        // Tag each GDOS array with its territory code (order matches gdosFiles)
+        const territoryCodes = ['USW','USS','USC','USE'];
+        const gdosData = [].concat(...gdosArrays.map((arr, idx) => Array.isArray(arr) ? arr.map(item => Object.assign({}, item, { territory: territoryCodes[idx] || (item && item.territory) || 'Unknown' })) : []));
+
+        document.getElementById('status').textContent = 'Loading Zesty Locations, duplicates and hours...';
+        if (DEBUG) console.log('location-comparison: fetched GDOS arrays, lengths=', gdosArrays.map(a=>Array.isArray(a)?a.length:0));
+        // Prefer the latest Zesty export; fall back to older filenames if not present
+        let locations = await fetchJsonSafe('LocationsData-01-29-26.json');
+        if (!locations || !locations.data) {
+          locations = await fetchJsonSafe('LocationsData.json');
+        }
+        if (!locations || !locations.data) {
+          // fallback to older filename used elsewhere
+          locations = await fetchJsonSafe('LocationsData-12-10.json');
+        }
+        if (!locations) locations = { data: [] };
+        const zestyArr = Array.isArray(locations.data) ? locations.data : (Array.isArray(locations)? locations : []);
+
+        // Load duplicate/doNotImport metadata and hours.json so filters can use them
+        const duplicateCheck = await fetchJsonSafe('./DuplicateLocationCheck.json?v=' + Date.now());
+        const duplicateRecords = Array.isArray(duplicateCheck && duplicateCheck.data) ? duplicateCheck.data : (Array.isArray(duplicateCheck) ? duplicateCheck : []);
+        const hoursData = await fetchJsonSafe('./hours.json?v=' + Date.now());
+        const hoursMapByGdosId = new Map();
+        if (Array.isArray(hoursData)) {
+          hoursData.forEach(hr => { if (hr && (hr.gdos_id || hr.gdos_id === 0) && hr.hours_of_operation) hoursMapByGdosId.set(String(hr.gdos_id), hr.hours_of_operation); });
+        }
+
+        // Build GDOS map by id (string keys)
+        const gdosMap = new Map();
+        gdosData.forEach(g=>{ if (g && (g.id||g.id===0)) gdosMap.set(String(g.id), g); });
+
+        if (DEBUG) console.log('location-comparison: gdosMap size=', gdosMap.size);
+
+        // Build zesty map by gdos id found in Column1.content.gdos_id
+        const zestyMap = new Map();
+        zestyArr.forEach(loc => {
+          const gdosId = loc && (loc['Column1.content.gdos_id'] ?? loc['gdos_id'] ?? (loc.Column1 && loc.Column1.content && loc.Column1.content.gdos_id));
+          if (gdosId || gdosId === 0) zestyMap.set(String(gdosId), loc);
+        });
+
+        // Build duplicate map for doNotImport/duplicate flags
+        const duplicateMap = new Map();
+        if (Array.isArray(duplicateRecords)) {
+          duplicateRecords.forEach(r => {
+            const gdosId = r && (r.gdosid ?? r.gdos_id ?? r.gdosId ?? r['gdos id'] ?? (r.gdos && r.gdos.id));
+            if (gdosId || gdosId === 0) duplicateMap.set(String(gdosId), r);
+          });
+        }
+
+        
+        // Compute basics
+        const zestyCount = zestyArr.length;
+        const gdosCount = gdosData.length;
+        const matchedIds = Array.from(zestyMap.keys()).filter(id => gdosMap.has(id));
+        const matchedCount = matchedIds.length;
+        const zestyOnly = zestyCount - matchedCount;
+        const gdosOnly = gdosCount - matchedCount;
+
+        // Fields to compare
+        const fields = [
+          'name','address','zipcode','phone','latitude','longitude','siteTitle','openHoursText'
+        ];
+
+        // Build comparisonRecords array for easier filtering/rendering
+        const comparisonRecords = [];
+        matchedIds.forEach(id => {
+          const g = gdosMap.get(id);
+          const z = zestyMap.get(id);
+          const rec = { gdos_id: id, territory: g && g.territory ? g.territory : 'Unknown', division: getNested(g,'location.division.name') || 'Unknown', name: g && g.name, gdos: g, zesty: z, mismatches: [], hasOpenHours: false, hasSiteTitleDiff: false, duplicate: false, doNotImport: false };
+
+          // check duplicate/doNotImport
+          const dup = duplicateMap.get(String(id));
+          if (dup) {
+            rec.duplicate = dup.duplicate === '1' || String(dup.duplicate) === '1';
+            rec.doNotImport = dup.doNotImport === true || String(dup.doNotImport).toLowerCase() === 'true' || String(dup.doNotImport) === 'True';
+          }
+
+          // openHours from hoursMapByGdosId
+          const hrs = hoursMapByGdosId.get(String(id));
+          if (hrs) rec.hasOpenHours = true;
+
+          // compare fields using the same normalization/ignore rules as differences.js
+          try {
+              const compareFields = ['name','address','zipcode','phone','latitude','longitude','siteTitle','openHoursText'];
+            compareFields.forEach(field => {
+              try {
+                // zesty value: use Zesty general hours (do not override with hours.json)
+                let zVal = getZestyFieldValue(rec, field);
+                // apply encoding fixes
+                if (typeof zVal === 'string') zVal = fixEncodingIssues(zVal);
+                let gVal = getGdosFieldValue(rec, field);
+                if (typeof gVal === 'string') gVal = fixEncodingIssues(gVal);
+
+                // If Zesty has no value for this field, do not treat it as a mismatch
+                if (String(zVal||'').trim() === '') return;
+
+                if (shouldIgnoreField(field, zVal)) return; // skip this field
+
+                if (field === 'latitude' || field === 'longitude') {
+                  if (!almostEqualLatLon(gVal, zVal)) rec.mismatches.push(field);
+                  return;
+                }
+
+                const ng = normalizeValue(gVal, field);
+                const nz = normalizeValue(zVal, field);
+                if (ng !== nz) {
+                  rec.mismatches.push(field);
+                  if (field === 'siteTitle') rec.hasSiteTitleDiff = true;
+                }
+              } catch (e) { /* ignore per-field errors */ }
+            });
+          } catch (e) { /* ignore per-row errors */ }
+
+          // If this record is marked doNotImport in the duplicate check, record it separately and skip
+          const dupRec = duplicateMap.get(String(id));
+          const doNotImportFlag = dupRec && (dupRec.doNotImport === 'True' || dupRec.doNotImport === true || String(dupRec.doNotImport).toLowerCase() === 'true');
+          // Only treat as excluded if the original GDOS record is currently published
+          if (doNotImportFlag && g && g.published) {
+            if (!window._excludedDoNotImport) window._excludedDoNotImport = [];
+            const reason = dupRec && (dupRec.reason || dupRec.Reason || dupRec.note || dupRec.notes || dupRec['reason'] || (dupRec.duplicate === '1' ? 'duplicate' : 'doNotImport'));
+            window._excludedDoNotImport.push({ gdos_id: id, territory: rec.territory, division: rec.division, name: (g && (g.name || '')) || (z && (z['Column1.content.name'] || z.name || '')), reason: reason || 'doNotImport' });
+            // skip adding to comparisonRecords so it won't appear in the main mismatches
+          } else {
+            comparisonRecords.push(rec);
+          }
+        });
+
+        // Save globals for filtering and rendering
+        window._comparisonRecords = comparisonRecords;
+        window._gdosMap = gdosMap;
+        window._zestyMap = zestyMap;
+        window._duplicateMap = duplicateMap;
+        window._hoursMap = hoursMapByGdosId;
+        // Track user-marked corrections where Zesty is considered correct: Map<gdosId, Set<field>>
+        if (!window._zestyCorrections) window._zestyCorrections = new Map();
+
+        // Also capture doNotImport / duplicate entries for published GDOS records that have no Zesty match
+        if (!window._excludedDoNotImport) window._excludedDoNotImport = [];
+        try {
+          // matchedIds contains GDOS IDs that had Zesty matches
+          const matchedSet = new Set(matchedIds.map(String));
+          (gdosData || []).forEach(g => {
+            try {
+              const gid = g && (g.id || g.id === 0) ? String(g.id) : null;
+              if (!gid) return;
+              // only consider published GDOS records
+              if (!g.published) return;
+              if (matchedSet.has(gid)) return; // already handled earlier
+
+              // Look up duplicate/doNotImport entry
+              const dup = duplicateMap.get(gid);
+              // fallback scan if missing
+              let dupRec = dup;
+              if (!dupRec && Array.isArray(duplicateRecords)) {
+                dupRec = duplicateRecords.find(r => {
+                  if (!r) return false;
+                  const candidate = r.gdosid ?? r.gdos_id ?? r.gdosId ?? r['gdos id'] ?? (r.gdos && r.gdos.id);
+                  return String(candidate) === gid;
+                }) || null;
+              }
+
+              const isDuplicate = dupRec && dupRec.duplicate === '1';
+              const doNotImportFlag = dupRec && (dupRec.doNotImport === 'True' || dupRec.doNotImport === true || String(dupRec.doNotImport).toLowerCase() === 'true');
+              if (isDuplicate || doNotImportFlag) {
+                const existing = window._excludedDoNotImport.find(e => String(e.gdos_id) === gid);
+                if (!existing) {
+                  const reason = dupRec && (dupRec.reason || dupRec.Reason || dupRec.note || dupRec.notes || dupRec['reason'] || (isDuplicate ? 'duplicate' : 'doNotImport'));
+                  window._excludedDoNotImport.push({ gdos_id: gid, territory: g.territory || '', division: getNested(g,'location.division.name') || '', name: g.name || '', reason: reason || (isDuplicate ? 'duplicate' : 'doNotImport') });
+                }
+              }
+            } catch (e) { /* per-row ignore */ }
+          });
+        } catch (e) { /* ignore */ }
+
+        // Load existing corrections from differences.html storage so pre-marked Zesty corrections are shown
+        await loadCorrectionsFromDifferencesStorage();
+        // Populate filter options and render initial view
+        populateFilters();
+        renderFiltered();
+        // Ensure initial view is set to mismatches (and Do Not Import table available)
+        try { showMismatchesView(); } catch(e){}
+        document.getElementById('status').textContent = 'Comparison complete.';
+        if (DEBUG) console.log('location-comparison: load() complete');
+
+        } catch (err) {
+          console.error('location-comparison load error:', err);
+          try { document.getElementById('status').textContent = 'Error loading data: ' + (err && err.message ? err.message : String(err)); } catch(e){}
+        }
+      }
+
+      // Helper: safe nested getter
+      function getNested(obj, path) {
+        if (!obj || !path) return undefined;
+        return path.split('.').reduce((s, p) => (s && s[p] != null) ? s[p] : undefined, obj);
+      }
+
+      // Fix common encoding issues (same as differences.js)
+      function fixEncodingIssues(str) {
+        if (str == null) return str;
+        let fixed = String(str);
+
+        // Remove BOM and control characters
+        fixed = fixed.replace(/\uFEFF/g, '');
+        fixed = fixed.replace(/[\x00-\x1F\x7F]/g, ' ');
+
+        // Replacement character (� / U+FFFD) often indicates encoding glitches — replace with hyphen
+        fixed = fixed.replace(/\uFFFD/g, '-');
+
+        // Normalize various dash/minus characters (and all Unicode dash punctuation) to hyphen-minus
+        try {
+          fixed = fixed.replace(/\p{Pd}/gu, '-');
+        } catch (e) {
+          // Fallback for engines without Unicode property escapes
+          fixed = fixed.replace(/[\u2010\u2011\u2012\u2013\u2014\u2015\u2212]/g, '-');
+        }
+
+        // Normalize non-breaking and other unusual spaces to normal space
+        fixed = fixed.replace(/[\u00A0\u2000-\u200B\u202F\u205F]/g, ' ');
+
+        // Ensure space around hyphens
+        fixed = fixed.replace(/\s*-\s*/g, ' - ');
+
+        // Ensure a space before AM/PM and normalize to uppercase
+        fixed = fixed.replace(/(\d)(?=\s*(am|pm)\b)/ig, '$1 ');
+        fixed = fixed.replace(/\b(am|pm)\b/ig, function(m){ return m.toUpperCase(); });
+
+        // Remove stray zero-width chars
+        fixed = fixed.replace(/[\u200C\u200D\uFEFF]/g, '');
+
+        // Collapse line breaks and multiple spaces to single space
+        fixed = fixed.replace(/[\r\n]+/g, ' ');
+        fixed = fixed.replace(/\s+/g, ' ');
+
+        fixed = fixed.trim();
+
+        if (fixed !== String(str)) {
+          if (DEBUG) console.log('Fixed encoding/spacing in text (location-comparison):', { original_preview: String(str).substring(0,50), fixed_preview: fixed.substring(0,50) });
+        }
+        return fixed;
+      }
+
+      // Normalization function (mirrors differences.js)
+      function normalizeValue(value, field) {
+        if (value == null) return null;
+        let normalized = String(value).toLowerCase().trim();
+        if (field === 'openHoursText') {
+          normalized = normalized.replace(/[\r\n]+/g, ' ');
+        }
+        normalized = normalized.replace(/^http:\/\//, 'https://');
+        if (field === 'name') {
+          normalized = normalized.replace(/\bFamily\b/gi, 'Thrift');
+        }
+        return normalized;
+      }
+
+      function shouldIgnoreField(field, zestyValue) {
+        if (field === 'primaryWebsite' && zestyValue && String(zestyValue).toLowerCase() === 'https://satruck.org/') return true;
+        if (field === 'latitude' || field === 'longitude') return true;
+        return false;
+      }
+
+      // Helper: map field name to GDOS value
+      function getGdosFieldValue(rec, field) {
+        const g = rec && rec.gdos;
+        if (!g) return '';
+        switch(field) {
+          case 'name': return g.name || '';
+          case 'address': return g.address1 || '';
+          case 'zipcode': return getNested(g,'zip.zipcode') || '';
+          case 'phone': return getNested(g,'phone.phoneNumber') || '';
+          case 'latitude': return getNested(g,'location.latitude');
+          case 'longitude': return getNested(g,'location.longitude');
+          case 'siteTitle': return getNested(g,'wm4SiteTitle') || getNested(g,'name') || '';
+          case 'openHoursText': return getNested(g,'openHoursText') || '';
+          default: return '';
+        }
+      }
+
+      // Helper: map field name to Zesty value
+      function getZestyFieldValue(rec, field) {
+        const z = rec && rec.zesty;
+        if (!z) return '';
+        switch(field) {
+          case 'name': return z['Column1.content.name'] || '';
+          case 'address': return z['Column1.content.address'] || '';
+          case 'zipcode': return z['Column1.content.zipcode'] || '';
+          case 'phone': return z['Column1.content.phoneNumber'] || '';
+          case 'latitude': return z['Column1.content.latitude'];
+          case 'longitude': return z['Column1.content.longitude'];
+          case 'siteTitle': return z['Column1.content.siteTitle'] || '';
+          // Zesty general/open hours field (hours_of_operation used in differences.js)
+          case 'openHoursText': return z['Column1.content.hours_of_operation'] || z['Column1.content.openHoursText'] || z['Column1.content.openHours'] || '';
+          default: return '';
+        }
+      }
+
+      // Track active view: 'mismatches' or 'doNotImport'
+      if (!window._activeView) window._activeView = 'mismatches';
+
+      // Populate filter dropdowns and wire listeners
+      function populateFilters(){
+        // Preserve current filter values so toggling views doesn't clear user selections
+        const prev = {};
+        ['globalTerritoryFilter','globalDivisionFilter','globalCorrectFilter','globalFieldFilter','showSiteTitleFilter','showOpenHoursFilter','showDoNotImportFilter','gdosValueBlankFilter','zestyValueBlankFilter'].forEach(id=>{
+          const el = document.getElementById(id);
+          prev[id] = el ? el.value : 'all';
+        });
+
+        // Choose records source based on active view so filters reflect the active table
+        const recs = (window._activeView === 'doNotImport') ? (window._excludedDoNotImport || []) : (window._comparisonRecords || []);
+        const territories = Array.from(new Set(recs.map(r=>r.territory||'Unknown'))).sort();
+        const tSel = document.getElementById('globalTerritoryFilter');
+        // clear existing except 'all'
+        if (tSel){
+          tSel.querySelectorAll('option:not([value="all"])').forEach(o=>o.remove());
+          territories.forEach(t => { const o = document.createElement('option'); o.value = t; o.textContent = t; tSel.appendChild(o); });
+          // restore previous selection if still present
+          if (prev.globalTerritoryFilter && tSel.querySelector(`option[value="${prev.globalTerritoryFilter}"]`)) tSel.value = prev.globalTerritoryFilter; else tSel.value = 'all';
+        }
+
+        const fieldSel = document.getElementById('globalFieldFilter');
+        if (fieldSel){
+          fieldSel.querySelectorAll('option:not([value="all"])').forEach(o=>o.remove());
+          const fields = ['name','address','zipcode','phone','latitude','longitude','siteTitle','openHoursText'];
+          fields.forEach(f=>{ const o=document.createElement('option'); o.value=f; o.textContent=f; fieldSel.appendChild(o); });
+          if (prev.globalFieldFilter && fieldSel.querySelector(`option[value="${prev.globalFieldFilter}"]`)) fieldSel.value = prev.globalFieldFilter; else fieldSel.value = 'all';
+        }
+
+        // Populate divisions
+        const divisionSel = document.getElementById('globalDivisionFilter');
+        if (divisionSel){
+          // Build a map of divisions per territory so we can filter divisions by territory selection
+          divisionSel.querySelectorAll('option:not([value="all"])').forEach(o=>o.remove());
+          const divisionsByTerritory = recs.reduce((m,r)=>{
+            const t = r.territory || 'Unknown';
+            const d = r.division || 'Unknown';
+            if (!m[t]) m[t] = new Set();
+            m[t].add(d);
+            return m;
+          }, {});
+
+          // Helper to populate division options based on selected territory
+          function populateDivisionOptions(selectedTerr){
+            // clear existing (except 'all')
+            divisionSel.querySelectorAll('option:not([value="all"])').forEach(o=>o.remove());
+            let divisionsToShow = [];
+            if (selectedTerr && selectedTerr !== 'all') {
+              divisionsToShow = Array.from(divisionsByTerritory[selectedTerr] || []);
+            } else {
+              divisionsToShow = Array.from(new Set(recs.map(r=>r.division||'Unknown')));
+            }
+            divisionsToShow.sort();
+            divisionsToShow.forEach(d=>{ const o=document.createElement('option'); o.value=d; o.textContent=d; divisionSel.appendChild(o); });
+          }
+
+          // Initially populate divisions according to current (preserved) territory selection
+          const currentTerr = (tSel && tSel.value) || (prev.globalTerritoryFilter || 'all');
+          populateDivisionOptions(currentTerr);
+          // restore previous division selection if still exists
+          if (prev.globalDivisionFilter && divisionSel.querySelector(`option[value="${prev.globalDivisionFilter}"]`)) divisionSel.value = prev.globalDivisionFilter; else divisionSel.value = 'all';
+
+          // When territory changes, update divisions shown for the active view
+          const tSelLocal = document.getElementById('globalTerritoryFilter');
+          if (tSelLocal && !tSelLocal.dataset.divisionListenerAttached) {
+            tSelLocal.addEventListener('change', function(){
+              // repopulate division options based on the currently selected view's data
+              populateDivisionOptions(this.value);
+              // reset division filter to 'all' when territory changes
+              if (divisionSel) divisionSel.value = 'all';
+              // re-render after filter change
+              renderFiltered();
+            });
+            tSelLocal.dataset.divisionListenerAttached = '1';
+          }
+        }
+
+        // Wire change handlers (avoid attaching duplicates by using a dataset flag)
+        ['globalTerritoryFilter','globalDivisionFilter','globalCorrectFilter','globalFieldFilter','showSiteTitleFilter','showOpenHoursFilter','showDoNotImportFilter','gdosValueBlankFilter','zestyValueBlankFilter'].forEach(id=>{
+          const el = document.getElementById(id);
+          if (!el) return;
+          if (!el.dataset.listenerAttached) {
+            el.addEventListener('change', renderFiltered);
+            el.dataset.listenerAttached = '1';
+          }
+          // restore preserved value (for ones we didn't already set above)
+          if (prev[id] && el.querySelector && el.querySelector(`option[value="${prev[id]}"]`)) el.value = prev[id];
+        });
+      }
+
+      // Clear filters back to defaults
+      function clearFilters(){
+        ['globalTerritoryFilter','globalDivisionFilter','globalCorrectFilter','globalFieldFilter','showSiteTitleFilter','showOpenHoursFilter','showDoNotImportFilter','gdosValueBlankFilter','zestyValueBlankFilter'].forEach(id=>{
+          const el = document.getElementById(id); if (el) el.value='all';
+        });
+        renderFiltered();
+      }
+
+      // Parse a differences.js-style correction key into {territory,id,field}
+      function parseCorrectionKeySimple(key){
+        const parts = String(key||'').split('-');
+        if (parts.length >= 3){
+          const territory = parts[0];
+          const field = parts.slice(parts.length - 1).join('-');
+          const id = parts.slice(1, parts.length - 1).join('-');
+          return { territory, id, field };
+        } else if (parts.length === 2){
+          return { territory: null, id: parts[0], field: parts[1] };
+        }
+        return { territory: null, id: key, field: null };
+      }
+
+      const SHARED_STORAGE_URL = 'https://gdos-corrections-worker.uss-thq-cloudflare-account.workers.dev/';
+
+      // Load corrections from shared key-value storage (Cloudflare Worker) and fallback to localStorage
+      async function loadCorrectionsFromDifferencesStorage(){
+        let correctionsObj = null;
+        try {
+          const res = await fetch(SHARED_STORAGE_URL, { method: 'GET' });
+          if (res.ok) {
+            const body = await res.json();
+            correctionsObj = (body && body.current) ? body.current : body;
+          }
+        } catch (e) {
+          console.warn('Shared storage GET failed, falling back to localStorage', e);
+        }
+
+        if (!correctionsObj) {
+          try {
+            const raw = localStorage.getItem('gdosLocalCorrections');
+            if (raw) correctionsObj = JSON.parse(raw);
+          } catch (e) { console.warn('Failed to parse localStorage gdosLocalCorrections', e); }
+        }
+
+        if (!correctionsObj || typeof correctionsObj !== 'object') return;
+        const map = window._zestyCorrections || new Map();
+        Object.entries(correctionsObj).forEach(([key, entry]) => {
+          if (!entry) return; // deleted/null
+          if (!entry.correct) return;
+          if (String(entry.correct).toLowerCase().startsWith('zesty')){
+            const pk = parseCorrectionKeySimple(key);
+            const id = String(pk.id);
+            const field = pk.field;
+            if (!field) return;
+            if (!map.has(id)) map.set(id, new Set());
+            map.get(id).add(field);
+          }
+        });
+        window._zestyCorrections = map;
+      }
+
+      // Toggle Zesty-correct marking for a given record field
+      function toggleZestyCorrect(gdosId, field, checked, territory, zestyValue){
+        const map = window._zestyCorrections || new Map();
+        const key = String(gdosId);
+        if (checked){
+          if (!map.has(key)) map.set(key, new Set());
+          map.get(key).add(field);
+        } else {
+          if (map.has(key)){
+            map.get(key).delete(field);
+            if (map.get(key).size===0) map.delete(key);
+          }
+        }
+        window._zestyCorrections = map;
+
+        // Persist to localStorage in the same format differences.js uses
+        try {
+          // update local copy for resilience
+          let store = {};
+          const raw = localStorage.getItem('gdosLocalCorrections');
+          if (raw) store = JSON.parse(raw) || {};
+          const storageKey = `${territory||''}-${gdosId}-${field}`;
+          if (checked){
+            store[storageKey] = { correct: 'Zesty' };
+            if (zestyValue !== undefined && String(zestyValue).trim() !== '') store[storageKey].value = zestyValue;
+          } else {
+            store[storageKey] = null;
+          }
+          localStorage.setItem('gdosLocalCorrections', JSON.stringify(store));
+
+          // Fire a PATCH to shared storage to persist the single change (differences.js expects a PATCH of the delta)
+          const delta = {};
+          delta[storageKey] = checked ? store[storageKey] : null;
+          fetch(SHARED_STORAGE_URL, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(delta)
+          }).then(res => {
+            if (!res.ok) console.warn('Shared storage PATCH failed', res.status);
+          }).catch(e => console.warn('Shared storage PATCH error', e));
+
+        } catch (e){ console.warn('Failed to persist correction to localStorage or shared storage', e); }
+
+        // re-render to update metric and row highlight
+        renderFiltered();
+      }
+
+      // Render filtered summary, field totals and samples
+      function renderFiltered(){
+        const recs = (window._comparisonRecords||[]).slice();
+        // Do-not-import records are kept separate and shown in the Do Not Import view
+        const excludedDoNotList = window._excludedDoNotImport || [];
+        const activeView = window._activeView || 'mismatches';
+        const allRecs = recs; // only comparison records (matched IDs)
+        // If Do Not Import view is active, filter and render that table and update counts accordingly
+        if (activeView === 'doNotImport') {
+          const tVal2 = (document.getElementById('globalTerritoryFilter') && document.getElementById('globalTerritoryFilter').value) || 'all';
+          const dVal2 = (document.getElementById('globalDivisionFilter') && document.getElementById('globalDivisionFilter').value) || 'all';
+          const filteredDoNot = (excludedDoNotList || []).filter(e => {
+            if (tVal2 && tVal2!=='all' && (e.territory||'Unknown') !== tVal2) return false;
+            if (dVal2 && dVal2!=='all' && (e.division||'Unknown') !== dVal2) return false;
+            return true;
+          });
+
+          // Update summary cards to reflect active do-not-import view counts where reasonable
+          document.getElementById('summary').style.display = filteredDoNot.length? 'grid':'none';
+          document.getElementById('fieldTableContainer').style.display = 'none';
+          // Compute counts filtered by territory/division so header metrics respond to filters
+          const gdosCount = Array.from(window._gdosMap ? window._gdosMap.values() : []).filter(g => {
+            if (!g) return false;
+            const ter = g.territory || 'Unknown';
+            const div = getNested(g,'location.division.name') || 'Unknown';
+            if (tVal2 && tVal2!=='all' && ter !== tVal2) return false;
+            if (dVal2 && dVal2!=='all' && div !== dVal2) return false;
+            return true;
+          }).length;
+
+          const zestyCount = Array.from(window._zestyMap ? window._zestyMap.keys() : []).filter(id => {
+            // if Zesty links to a GDOS record, only count it when that GDOS record matches filters
+            if (window._gdosMap && window._gdosMap.has(String(id))) {
+              const g = window._gdosMap.get(String(id));
+              const ter = g && g.territory ? g.territory : 'Unknown';
+              const div = getNested(g,'location.division.name') || 'Unknown';
+              if (tVal2 && tVal2!=='all' && ter !== tVal2) return false;
+              if (dVal2 && dVal2!=='all' && div !== dVal2) return false;
+              return true;
+            }
+            // Zesty-only entries have no territory — include them only when no territory/division filter is active
+            if ((tVal2 && tVal2!=='all') || (dVal2 && dVal2!=='all')) return false;
+            return true;
+          }).length;
+
+          document.getElementById('zestyCount').textContent = zestyCount;
+          document.getElementById('gdosCount').textContent = gdosCount;
+          document.getElementById('matchedCount').textContent = String(filteredDoNot.length || 0);
+          document.getElementById('zestyOnly').textContent = Math.max(0, zestyCount - filteredDoNot.length);
+          document.getElementById('gdosOnly').textContent = Math.max(0, gdosCount - filteredDoNot.length);
+          document.getElementById('anyMismatch').textContent = '—';
+
+          // update metrics header
+          document.getElementById('metricTotal').textContent = '—';
+          document.getElementById('metricFieldTotals').textContent = '-';
+
+          // Render the Do Not Import table for the active filters
+          try {
+            renderDoNotImportTable(filteredDoNot, tVal2, dVal2);
+          } catch (e) { console.warn('Failed rendering Do Not Import table', e); }
+
+          // Update top-level mismatches count shown near the view toggle
+          const countEl = document.getElementById('mismatchesCount'); if (countEl) countEl.textContent = String(filteredDoNot.length || 0);
+
+          // Hide mismatches samples area
+          const samplesDiv = document.getElementById('samples'); if (samplesDiv) samplesDiv.style.display = 'none';
+
+          // Update excluded metric
+          const exclEl = document.getElementById('metricExcluded'); if (exclEl) exclEl.textContent = String((filteredDoNot||[]).length || 0);
+
+          return; // done for do-not-import view
+        }
+        const tVal = document.getElementById('globalTerritoryFilter').value;
+        const dVal = (document.getElementById('globalDivisionFilter') && document.getElementById('globalDivisionFilter').value) || 'all';
+        const fieldVal = document.getElementById('globalFieldFilter').value;
+        const siteTitleFilter = document.getElementById('showSiteTitleFilter').value;
+        const openHoursFilter = document.getElementById('showOpenHoursFilter').value;
+        const doNotImportFilter = document.getElementById('showDoNotImportFilter').value;
+        const gdosBlank = document.getElementById('gdosValueBlankFilter').value;
+        const zestyBlank = document.getElementById('zestyValueBlankFilter').value;
+
+        let filtered = allRecs.filter(r=>{
+          if (tVal && tVal!=='all' && (r.territory||'Unknown') !== tVal) return false;
+          if (siteTitleFilter==='show' && !r.hasSiteTitleDiff) return false;
+          if (siteTitleFilter==='hide' && r.hasSiteTitleDiff) return false;
+          if (dVal && dVal!=='all' && (r.division||'Unknown') !== dVal) return false;
+          if (openHoursFilter==='show' && !r.hasOpenHours) return false;
+          if (openHoursFilter==='hide' && r.hasOpenHours) return false;
+          if (doNotImportFilter==='show' && !r.doNotImport) return false;
+          if (doNotImportFilter==='hide' && r.doNotImport) return false;
+          if (fieldVal && fieldVal!=='all'){
+            // if field filter active, only keep records with that field in mismatches
+            if (!r.mismatches || r.mismatches.indexOf(fieldVal)===-1) return false;
+          }
+          if (gdosBlank!=='all'){
+            if (fieldVal && fieldVal!=='all'){
+              const gv = getGdosFieldValue(r, fieldVal);
+              const isBlank = String(gv||'').trim()==='';
+              if (gdosBlank==='blank' && !isBlank) return false;
+              if (gdosBlank==='notblank' && isBlank) return false;
+            }
+          }
+          if (zestyBlank!=='all'){
+            if (fieldVal && fieldVal!=='all'){
+              const zv = getZestyFieldValue(r, fieldVal);
+              const isBlankZ = String(zv||'').trim()==='';
+              if (zestyBlank==='blank' && !isBlankZ) return false;
+              if (zestyBlank==='notblank' && isBlankZ) return false;
+            }
+          }
+          return true;
+        });
+
+        // Summary cards
+        document.getElementById('summary').style.display = filtered.length? 'grid':'none';
+        document.getElementById('fieldTableContainer').style.display = filtered.length? 'block':'none';
+
+        // Compute header counts filtered by current territory/division selection
+        const gdosCount = Array.from(window._gdosMap ? window._gdosMap.values() : []).filter(g => {
+          if (!g) return false;
+          const ter = g.territory || 'Unknown';
+          const div = getNested(g,'location.division.name') || 'Unknown';
+          if (tVal && tVal!=='all' && ter !== tVal) return false;
+          if (dVal && dVal!=='all' && div !== dVal) return false;
+          return true;
+        }).length;
+
+        const zestyCount = Array.from(window._zestyMap ? window._zestyMap.keys() : []).filter(id => {
+          if (window._gdosMap && window._gdosMap.has(String(id))) {
+            const g = window._gdosMap.get(String(id));
+            const ter = g && g.territory ? g.territory : 'Unknown';
+            const div = getNested(g,'location.division.name') || 'Unknown';
+            if (tVal && tVal!=='all' && ter !== tVal) return false;
+            if (dVal && dVal!=='all' && div !== dVal) return false;
+            return true;
+          }
+          // Zesty-only entries: include only when no territory/division filter is active
+          if ((tVal && tVal!=='all') || (dVal && dVal!=='all')) return false;
+          return true;
+        }).length;
+
+        const matchedCount = filtered.length;
+        const zestyOnly = Math.max(0, zestyCount - matchedCount);
+        const gdosOnly = Math.max(0, gdosCount - matchedCount);
+        const anyMismatch = filtered.filter(r=>r.mismatches && r.mismatches.length>0).length;
+
+        document.getElementById('zestyCount').textContent = zestyCount;
+        document.getElementById('gdosCount').textContent = gdosCount;
+        document.getElementById('matchedCount').textContent = matchedCount;
+        document.getElementById('zestyOnly').textContent = zestyOnly;
+        document.getElementById('gdosOnly').textContent = gdosOnly;
+        document.getElementById('anyMismatch').textContent = anyMismatch;
+
+        // Field totals
+        const fieldList = ['name','address','zipcode','phone','latitude','longitude','siteTitle','openHoursText'];
+        const counts = {};
+        fieldList.forEach(f=>counts[f]=0);
+        filtered.forEach(r=>{ (r.mismatches||[]).forEach(m=>{ if (counts[m]!==undefined) counts[m]++; }); });
+        const tbody = document.querySelector('#fieldTable tbody'); tbody.innerHTML = '';
+        fieldList.forEach(f=>{ const tr = document.createElement('tr'); const td1=document.createElement('td'); td1.textContent=f; const td2=document.createElement('td'); td2.textContent=counts[f]||0; tr.appendChild(td1); tr.appendChild(td2); tbody.appendChild(tr); });
+
+        // Metrics header
+        const totalDiffs = Object.values(counts).reduce((s,n)=>s+(n||0),0);
+        document.getElementById('metricTotal').textContent = totalDiffs;
+        document.getElementById('metricFieldTotals').textContent = Object.entries(counts).filter(([k,v])=>v>0).map(([k,v])=>k+":"+v).slice(0,4).join(', ');
+
+        // Build mismatches table grouped by record (show first 100 rows)
+        const samplesDiv = document.getElementById('samples');
+        samplesDiv.innerHTML = '';
+        const table = document.createElement('table'); table.className = 'table table-sm table-striped';
+        const thead = document.createElement('thead'); thead.innerHTML = '<tr><th>GDOS ID</th><th>Territory</th><th>Field</th><th>GDOS Value</th><th>Zesty Value</th><th>Zesty Correct</th></tr>';
+        table.appendChild(thead);
+        const tb = document.createElement('tbody');
+
+        const rows = [];
+        const selectedField = (document.getElementById('globalFieldFilter') && document.getElementById('globalFieldFilter').value) || 'all';
+        const correctFilter = (document.getElementById('globalCorrectFilter') && document.getElementById('globalCorrectFilter').value) || 'all';
+        const correctionsMap = window._zestyCorrections || new Map();
+        const excludedCounts = {};
+        let excludedTotal = 0;
+        filtered.forEach(r=>{
+          const mm = r.mismatches || [];
+          mm.forEach(f=>{
+            // honor the field filter: if a specific field is selected, only include that field
+            if (selectedField && selectedField !== 'all' && f !== selectedField) return;
+
+            // zesty value for this field (use Zesty general hours for openHoursText)
+            let zVal = getZestyFieldValue(r, f);
+            if (typeof zVal === 'string') zVal = fixEncodingIssues(zVal);
+            const zNotBlank = String(zVal||'').trim() !== '';
+
+            // track excluded rows (we exclude rows with empty Zesty values)
+            // Allow synthetic doNotImport 'published' rows through even though they have no Zesty value
+            if (!zNotBlank) {
+              if (!(r.synthetic && r.doNotImport && f === 'published')) {
+                excludedTotal++;
+                excludedCounts['Zesty blank'] = (excludedCounts['Zesty blank'] || 0) + 1;
+                return; // skip this row entirely
+              }
+              // else: continue and render the synthetic published row (zesty is intentionally blank)
+            }
+
+            // whether user marked this field as Zesty-correct
+            const marked = correctionsMap.has(String(r.gdos_id)) && correctionsMap.get(String(r.gdos_id)).has(f);
+
+            // apply correct filter: if 'Zesty' selected, require marked===true; if 'GDOS' selected require marked===false
+            if (correctFilter === 'Zesty' && !marked) return;
+            if (correctFilter === 'GDOS' && marked) return;
+
+            // only include rows where Zesty has a value (we're focused on values present in Zesty)
+            if (zNotBlank) rows.push({ rec: r, field: f });
+          });
+        });
+
+        // sort rows by GDOS ID (ascending) before rendering
+        try {
+          rows.sort((a,b) => {
+            const A = String(a && a.rec && a.rec.gdos_id != null ? a.rec.gdos_id : '');
+            const B = String(b && b.rec && b.rec.gdos_id != null ? b.rec.gdos_id : '');
+            const na = parseFloat(A); const nb = parseFloat(B);
+            if (isFinite(na) && isFinite(nb)) return na - nb;
+            return A.localeCompare(B);
+          });
+        } catch (e) { /* noop if sort fails */ }
+
+        // update dynamic count for the active table (mismatches OR do-not-import)
+        const countEl = document.getElementById('mismatchesCount');
+        try {
+          if (countEl) {
+            if (activeView === 'doNotImport') {
+              // When Do Not Import view is active show count for filtered do-not-import rows
+              const tVal2 = (document.getElementById('globalTerritoryFilter') && document.getElementById('globalTerritoryFilter').value) || 'all';
+              const dVal2 = (document.getElementById('globalDivisionFilter') && document.getElementById('globalDivisionFilter').value) || 'all';
+              const filteredDoNot = (excludedDoNotList || []).filter(e => {
+                if (tVal2 && tVal2!=='all' && (e.territory||'Unknown') !== tVal2) return false;
+                if (dVal2 && dVal2!=='all' && (e.division||'Unknown') !== dVal2) return false;
+                return true;
+              });
+              countEl.textContent = String(filteredDoNot.length || 0);
+            } else {
+              // default: mismatches view
+              countEl.textContent = String(rows.length || 0);
+            }
+          }
+        } catch (e) { if (countEl) countEl.textContent = String(rows.length || 0); }
+
+        // update excluded metric and details (combine Zesty-blank exclusions with doNotImport exclusions)
+        const exclEl = document.getElementById('metricExcluded');
+        const exclInfoEl = document.getElementById('excludedInfo');
+        // Respect current territory/division filters for Do Not Import counts
+        const filteredDoNot = (excludedDoNotList || []).filter(e => {
+          if (tVal && tVal!=='all' && (e.territory||'Unknown') !== tVal) return false;
+          if (dVal && dVal!=='all' && (e.division||'Unknown') !== dVal) return false;
+          return true;
+        });
+        const doNotCount = filteredDoNot.length || 0;
+        // Count duplicates among the filtered do-not-imports (reason includes 'duplicate' or exact)
+        const duplicateCount = filteredDoNot.reduce((s,e)=> s + (String(e.reason||'').toLowerCase().includes('duplicate') ? 1 : 0), 0);
+        const totalExcluded = (excludedTotal || 0) + doNotCount;
+        if (exclEl) exclEl.textContent = String(totalExcluded || 0);
+
+        // build parts for the excluded info string
+        const parts = [];
+        Object.entries(excludedCounts).forEach(([k,v])=> parts.push(`${k}: ${v}`));
+        if (doNotCount > 0) {
+          // summarize reasons for the filtered do-not-imports; normalize 'duplicate' label to 'duplicates'
+          const reasonCounts = {};
+          filteredDoNot.forEach(e => { const r = e.reason || 'doNotImport'; reasonCounts[r] = (reasonCounts[r]||0)+1; });
+          Object.entries(reasonCounts).forEach(([k,v])=>{
+            const label = String(k).toLowerCase() === 'duplicate' ? 'duplicates' : k;
+            parts.push(`${label}: ${v}`);
+          });
+        }
+        if (exclInfoEl) {
+          if (totalExcluded > 0) {
+            exclInfoEl.textContent = `Excluded ${totalExcluded} — ${parts.join(', ')}`;
+            exclInfoEl.style.display = 'block';
+          } else {
+            exclInfoEl.style.display = 'none';
+            exclInfoEl.textContent = '';
+          }
+        }
+
+        // Note: excluded doNotImport entries are now rendered inline in the main mismatches table (as synthetic 'published' rows)
+
+        // show all rows
+        rows.forEach(({rec, field})=>{
+          const tr = document.createElement('tr');
+          const gd = document.createElement('td'); gd.textContent = rec.gdos_id;
+          const ter = document.createElement('td'); ter.textContent = rec.territory || '';
+          const fd = document.createElement('td'); fd.textContent = field;
+
+          // Special-case synthetic 'published' rows: show GDOS published status and allow row even without Zesty
+          let gvalRaw, zvalRaw;
+          if (field === 'published' && rec.synthetic) {
+            gvalRaw = (rec.gdos && (rec.gdos.published ? 'published' : 'unpublished')) || '';
+            zvalRaw = '';
+          } else {
+            gvalRaw = getGdosFieldValue(rec, field);
+            zvalRaw = getZestyFieldValue(rec, field);
+          }
+
+          const gval = (typeof gvalRaw === 'string') ? fixEncodingIssues(gvalRaw) : gvalRaw;
+          const zval = (typeof zvalRaw === 'string') ? fixEncodingIssues(zvalRaw) : zvalRaw;
+          const gdv = document.createElement('td'); gdv.textContent = gval || '';
+          const zv = document.createElement('td'); zv.textContent = zval || '';
+          const chkTd = document.createElement('td');
+          const chk = document.createElement('input'); chk.type='checkbox'; chk.className='form-check-input';
+          // checked if user previously marked, or heuristic: GDOS blank and Zesty not blank
+          const corrections = window._zestyCorrections || new Map();
+          const checkedPreviously = corrections.has(String(rec.gdos_id)) && corrections.get(String(rec.gdos_id)).has(field);
+          const heuristic = (String(gval||'').trim()==='' && String(zval||'').trim()!=='');
+          chk.checked = checkedPreviously || heuristic;
+          // style highlight when checked
+          if (chk.checked) tr.style.backgroundColor = '#eef9ee';
+          chk.addEventListener('change', function(){ toggleZestyCorrect(String(rec.gdos_id), field, chk.checked, rec.territory, zval); });
+          chkTd.appendChild(chk);
+
+          tr.appendChild(gd); tr.appendChild(ter); tr.appendChild(fd); tr.appendChild(gdv); tr.appendChild(zv); tr.appendChild(chkTd);
+          tb.appendChild(tr);
+        });
+
+        table.appendChild(tb);
+        samplesDiv.appendChild(table);
+        // show samples table if we have rows
+        samplesDiv.style.display = rows.length ? 'block' : 'none';
+
+        // Render Do Not Import table separately (honor territory/division filters)
+        try {
+          renderDoNotImportTable(excludedDoNotList, tVal, dVal);
+        } catch (e) { console.warn('Failed rendering Do Not Import table', e); }
+
+        // update metricZesty based on current corrections map
+        const corr = window._zestyCorrections || new Map();
+        let zCount = 0; for (const s of corr.values()) zCount += s.size;
+        document.getElementById('metricZesty').textContent = zCount;
+      }
+
+      // Render a Do Not Import table honoring current territory/division filters
+      function renderDoNotImportTable(excludedList, territoryFilter, divisionFilter){
+        const container = document.getElementById('doNotTable');
+        const countEl = document.getElementById('doNotCount');
+        if (!container) return;
+        container.innerHTML = '';
+        const rows = (excludedList || []).filter(e => {
+          if (territoryFilter && territoryFilter !== 'all' && (e.territory||'Unknown') !== territoryFilter) return false;
+          if (divisionFilter && divisionFilter !== 'all' && (e.division||'Unknown') !== divisionFilter) return false;
+          return true;
+        });
+        if (countEl) countEl.textContent = String(rows.length || 0);
+
+        if (!rows.length){ container.innerHTML = '<div class="small text-muted">No Do Not Import records for current filters.</div>'; return; }
+
+        const table = document.createElement('table'); table.className = 'table table-sm table-striped';
+        const thead = document.createElement('thead'); thead.innerHTML = '<tr><th>GDOS ID</th><th>Territory</th><th>Division</th><th>Name</th><th>Reason</th></tr>';
+        table.appendChild(thead);
+        const tb = document.createElement('tbody');
+        rows.forEach(r => {
+          const tr = document.createElement('tr');
+          const c1 = document.createElement('td'); c1.textContent = String(r.gdos_id || '');
+          const c2 = document.createElement('td'); c2.textContent = r.territory || '';
+          const c3 = document.createElement('td'); c3.textContent = r.division || '';
+          const c4 = document.createElement('td'); c4.textContent = r.name || '';
+          const c5 = document.createElement('td'); c5.textContent = r.reason || '';
+          tr.appendChild(c1); tr.appendChild(c2); tr.appendChild(c3); tr.appendChild(c4); tr.appendChild(c5);
+          tb.appendChild(tr);
+        });
+        table.appendChild(tb);
+        container.appendChild(table);
+      }
+
+      // View toggle helpers
+      function showMismatchesView(){
+        window._activeView = 'mismatches';
+        const samples = document.getElementById('samples');
+        const container = document.getElementById('doNotImportContainer');
+        if (samples) samples.style.display = 'block';
+        if (container) container.style.display = 'none';
+        const mb = document.getElementById('viewMismatchesBtn');
+        const db = document.getElementById('viewDoNotImportBtn');
+        if (mb) { mb.classList.add('btn-primary'); mb.classList.remove('btn-outline-secondary'); }
+        if (db) { db.classList.remove('btn-primary'); db.classList.add('btn-outline-secondary'); }
+        // Rebuild filters for this view and re-render counts/table
+        try { populateFilters(); renderFiltered(); } catch(e){}
+      }
+      function showDoNotImportView(){
+        window._activeView = 'doNotImport';
+        const samples = document.getElementById('samples');
+        const container = document.getElementById('doNotImportContainer');
+        if (samples) samples.style.display = 'none';
+        if (container) container.style.display = 'block';
+        const mb = document.getElementById('viewMismatchesBtn');
+        const db = document.getElementById('viewDoNotImportBtn');
+        if (db) { db.classList.add('btn-primary'); db.classList.remove('btn-outline-secondary'); }
+        if (mb) { mb.classList.remove('btn-primary'); mb.classList.add('btn-outline-secondary'); }
+
+        // Rebuild filters for this view and ensure the Do Not Import table is rendered with current filters
+        try { populateFilters(); const tVal = (document.getElementById('globalTerritoryFilter') && document.getElementById('globalTerritoryFilter').value) || 'all'; const dVal = (document.getElementById('globalDivisionFilter') && document.getElementById('globalDivisionFilter').value) || 'all'; renderDoNotImportTable(window._excludedDoNotImport || [], tVal, dVal); renderFiltered(); } catch (e) { console.warn('Error rendering Do Not Import table on toggle', e); }
+      }
+
+      // Export handlers referenced by inline `onclick` attributes so they are available globally
+      try {
+        window.showMismatchesView = showMismatchesView;
+        window.showDoNotImportView = showDoNotImportView;
+        window.clearFilters = clearFilters;
+      } catch (e) { /* ignore in restrictive environments */ }
+
+      // Start
+      document.addEventListener('DOMContentLoaded', function(){
+        // set data version badge
+        const badge = document.getElementById('dataVersionBadge'); if (badge) badge.textContent = 'January 29, 2026';
+        load();
+      });
+
+    })();
+  </script>
+ </body>
+ </html>
