@@ -7,10 +7,29 @@
     <title>Bootstrap Boilerplate</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
 </head>
-    <link rel="stylesheet" href="an-army-for-others-t.css">
+    <link rel="stylesheet" href="an-army-for-others-v.css">
 </head>
 
 <body>
+    <style>
+        /* Center only the action buttons inside overlay cards and panels without
+           changing paragraph text alignment. Make them block-level and use
+           auto horizontal margins so they center reliably. */
+        .overlay-card-nsaw .btn,
+        .overlay-card-nsaw a.btn,
+        .card-panel .btn,
+        .card-panel a.btn {
+            display: block;
+            margin: 0.6rem auto 0;
+            width: auto;
+        }
+        /* Keep small buttons visually compact but centered */
+        .overlay-card-nsaw a.btn.btn-sm,
+        .card-panel a.btn.btn-sm {
+            display: inline-block;
+            margin: 0.4rem auto 0;
+        }
+    </style>
     <div class="container">
         <div style="text-align: center;">
             <h1>An Army for Others</h1>
@@ -466,6 +485,20 @@
                 if (initial) {
                     activateTab(initial.getAttribute('data-tab'));
                 }
+                // Attach click handlers to overlay-card buttons (in-content buttons)
+                // so they activate the target tab and scroll the page to the tabs shell.
+                const overlayButtons = document.querySelectorAll('.overlay-card-nsaw button[data-tab], .overlay-card-nsaw a.btn[data-tab]');
+                overlayButtons.forEach(btn => {
+                    btn.addEventListener('click', function(e){
+                        e.preventDefault();
+                        const tabId = btn.getAttribute('data-tab');
+                        if (!tabId) return;
+                        activateTab(tabId);
+                        const tabsShell = document.querySelector('.tabs-shell');
+                        if (tabsShell && tabsShell.scrollIntoView) tabsShell.scrollIntoView({behavior: 'smooth', block: 'start'});
+                        else window.scrollTo({top:0, behavior:'smooth'});
+                    });
+                });
             });
         </script>
     </div>
@@ -740,7 +773,6 @@
                             // append buttons to last panel only
                             if (idx === panels.length - 1){
                                 buttons.forEach(b => {
-                                    b.classList.add('d-inline-block');
                                     const target = b.getAttribute('data-tab');
                                     if (target) {
                                         b.addEventListener('click', function(ev){
@@ -749,6 +781,10 @@
                                             const tabContents = document.querySelectorAll('.tab-content');
                                             tabButtons.forEach(btn => btn.classList.toggle('active', btn.getAttribute('data-tab') === target));
                                             tabContents.forEach(content => content.classList.toggle('active', content.id === target));
+                                            // scroll the tabs shell into view so the activated content is visible
+                                            const tabsShell = document.querySelector('.tabs-shell');
+                                            if (tabsShell && tabsShell.scrollIntoView) tabsShell.scrollIntoView({behavior: 'smooth', block: 'start'});
+                                            else window.scrollTo({top:0, behavior:'smooth'});
                                         });
                                     }
                                     panel.appendChild(b);
@@ -757,7 +793,18 @@
                             carousel.appendChild(panel);
                         });
 
-                        // Replace card's contents with carousel
+                        // Replace card's contents with the generated carousel (desktop and mobile
+                        // will use the same panels). If the original card is a dark/navy variant,
+                        // transfer that marker to the carousel so styles apply.
+                        // For mobile theming: mark carousels that originated from
+                        // navy/dark cards so we can give them the beige mobile
+                        // treatment. Beige-origin cards will receive the navy
+                        // background via CSS on small screens.
+                        if (card.classList && card.classList.contains('card-dark-nsaw')) {
+                            carousel.classList.add('card-dark-mobile');
+                        }
+
+                        // Replace card's contents with the carousel
                         card.innerHTML = '';
                         card.appendChild(carousel);
                         card.dataset.split = '1';

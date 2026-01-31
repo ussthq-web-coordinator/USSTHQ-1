@@ -139,10 +139,24 @@ html, body {
   object-fit: cover;
 }
 
-/* Card styling with max width 95%, padding, border radius */
+/* Align specific tab images: tab7 bottom-aligned; others top-aligned */
+#tab7 .image-section-nsaw {
+  background-position: bottom center !important;
+  background-size: cover !important;
+}
+
+#tab8 .image-section-nsaw,
+#tab9 .image-section-nsaw,
+#tab12 .image-section-nsaw {
+  background-position: top center !important;
+  background-size: cover !important;
+}
+
+/* Overlay card defaults: show navy overlay by default; navy-origin cards
+   (marked with `card-dark-nsaw`) will flip to beige. */
 .overlay-card-nsaw {
-  background-color: #f1ebde; /* swapped: content uses beige */
-  color: #111;
+  background-color: #132230; /* navy by default */
+  color: #f1f5f9;
   border-radius: 1rem;
   box-shadow: 0 1rem 2rem rgba(239, 62, 66, 0.2);
   padding: 2rem;
@@ -155,22 +169,42 @@ html, body {
   z-index: 3;
 }
 
-/* Dark card variant */
+/* Navy-origin marker now indicates the overlay should be beige. */
+.overlay-card-nsaw.card-dark-nsaw,
 .card-dark-nsaw {
-  background-color: #132230;
-  color: #f1f5f9;
+  background-color: #F1E8DC; /* beige */
+  color: #111;
   border-radius: 1rem;
   box-shadow: 0 1rem 2rem rgba(239, 62, 66, 0.2);
 }
 
-.card-dark-nsaw .btn {
+/* Button contrast for overlays */
+.overlay-card-nsaw .btn,
+.overlay-card-nsaw a.btn {
   border-color: #f1f5f9;
   color: #f1f5f9;
 }
 
-.card-dark-nsaw .btn:hover {
+.overlay-card-nsaw .btn:hover,
+.overlay-card-nsaw a.btn:hover {
   background-color: #f1f5f9;
-  color: #1e293b;
+  color: #132230;
+}
+
+.overlay-card-nsaw.card-dark-nsaw .btn,
+.overlay-card-nsaw.card-dark-nsaw a.btn,
+.card-dark-nsaw .btn,
+.card-dark-nsaw a.btn {
+  border-color: #111;
+  color: #111;
+}
+
+.overlay-card-nsaw.card-dark-nsaw .btn:hover,
+.overlay-card-nsaw.card-dark-nsaw a.btn:hover,
+.card-dark-nsaw .btn:hover,
+.card-dark-nsaw a.btn:hover {
+  background-color: #111;
+  color: #F1E8DC;
 }
 
 /* Alternate row background colors for visible rows */
@@ -181,34 +215,45 @@ html, body {
 }
 
 .row-flex-nsaw.active:nth-child(even) {
-  background-color: #f1ebde; /* swapped: content uses beige */
+  background-color: #F1E8DC; /* swapped: content uses beige */
   padding: 2rem 0;
   border-radius: 1rem;
   color: #111;
 }
 
-.row-flex-nsaw.active:nth-child(even) .overlay-card-nsaw {
-  background-color: #f1ebde;
-  color: #111;
-  box-shadow: 0 1rem 2rem rgba(239, 62, 66, 0.2);
-}
-
 .row-flex-nsaw.active:nth-child(odd) .overlay-card-nsaw {
-  background-color: #132230;
-  color: #f1f5f9;
-  /* apply the same subtle red glow used for light cards, plus the darker base shadow */
+  /* Row background is navy; show beige overlay on top */
+  background-color: #F1E8DC;
+  color: #111;
   box-shadow: 0 1rem 2rem rgba(239, 62, 66, 0.18), 0 1rem 2rem rgba(19, 34, 48, 0.36);
 }
 
-/* Ensure buttons in cards adjust colors accordingly */
+.row-flex-nsaw.active:nth-child(even) .overlay-card-nsaw {
+  /* Row background is beige; show navy overlay on top */
+  background-color: #132230;
+  color: #f1f5f9;
+  box-shadow: 0 1rem 2rem rgba(239, 62, 66, 0.2);
+}
+
+/* Ensure buttons in cards adjust colors according to the swapped backgrounds */
+/* Odd rows: row background is navy, overlay is beige -> buttons should be dark */
 .row-flex-nsaw.active:nth-child(odd) .btn {
+  border-color: #111;
+  color: #111;
+}
+.row-flex-nsaw.active:nth-child(odd) .btn:hover {
+  background-color: #111;
+  color: #F1E8DC;
+}
+
+/* Even rows: row background is beige, overlay is navy -> buttons should be light */
+.row-flex-nsaw.active:nth-child(even) .btn {
   border-color: #f1f5f9;
   color: #f1f5f9;
 }
-
-.row-flex-nsaw.active:nth-child(odd) .btn:hover {
+.row-flex-nsaw.active:nth-child(even) .btn:hover {
   background-color: #f1f5f9;
-  color: #1e293b;
+  color: #132230;
 }
 
 /* === Safari/Apple Specific Fix (Force stacking order) === */
@@ -508,88 +553,53 @@ input[type="checkbox"]:checked + .panel-content {
   overflow: hidden;
 }
 
-/* Video tab: force intro above the video and make the video larger on all devices */
-#tab-video {
-  display: flex;
-  flex-direction: column !important;
-  align-items: center !important;
-}
-#tab-video > .image-col-nsaw {
-  width: 100% !important;
-  max-width: 100% !important;
-  display: flex !important;
-  justify-content: center !important;
-  align-items: center !important;
-  padding: 0 1rem !important;
-}
-#tab-video > .text-col-nsaw {
-  width: 100% !important;
-  order: 1 !important;
-  max-width: 100% !important;
-  display: block !important;
-  padding: 0 1rem !important;
-}
-#tab-video > .image-col-nsaw {
-  order: 2 !important; /* ensure video sits below heading/text */
-}
-#tab-video .video-wrapper-nsaw {
-  max-width: 1200px;
-  width: 100%;
-  box-sizing: border-box;
-  margin: 0.5rem auto 1.5rem auto;
-  padding-bottom: 56.25%; /* 16:9 */
-}
-#tab-video .video-wrapper-nsaw {
-  display: block;
-}
-#tab-video .video-wrapper-nsaw iframe {
-  display: block;
-  margin: 0 auto;
-}
-#tab-video .video-intro {
-  margin-bottom: 1rem;
-  text-align: center;
-}
-
-/* Strong overrides to ensure the intro stacks above the video and is centered */
-#tab-video {
+/* Video tab: force intro above the video and make the video larger on all devices
+   —only apply when the video tab is active so it doesn't take up space on other tabs. */
+.tab-content#tab-video.active {
   display: flex !important;
   flex-direction: column !important;
   align-items: center !important;
   justify-content: flex-start !important;
 }
-
-#tab-video .image-col-nsaw {
+.tab-content#tab-video.active > .image-col-nsaw {
   width: 100% !important;
   max-width: 100% !important;
   display: flex !important;
-  flex-direction: column !important;
-  align-items: center !important;
   justify-content: center !important;
+  align-items: center !important;
+  padding: 0 1rem !important;
+  order: 2 !important; /* ensure video sits below heading/text */
+}
+.tab-content#tab-video.active > .text-col-nsaw {
+  width: 100% !important;
+  order: 1 !important;
+  max-width: 100% !important;
+  display: block !important;
   padding: 0 1rem !important;
 }
-
-#tab-video .video-intro {
+.tab-content#tab-video.active .video-wrapper-nsaw {
+  max-width: 1200px;
+  width: 100%;
+  box-sizing: border-box;
+  margin: 0.5rem auto 1.5rem auto;
+  padding-bottom: 56.25%; /* 16:9 */
+  display: block;
+  order: 2 !important;
+}
+.tab-content#tab-video.active .video-wrapper-nsaw iframe {
+  display: block !important;
+  margin: 0 auto !important;
+  width: 100% !important;
+  height: 100% !important;
+}
+.tab-content#tab-video.active .video-intro {
+  margin-bottom: 1rem;
+  text-align: center;
   order: 1 !important;
   width: 100% !important;
   max-width: 900px !important;
   margin: 0 0 1rem 0 !important;
   text-align: center !important;
-}
-
-#tab-video .video-wrapper-nsaw {
-  order: 2 !important;
-  margin: 0.5rem auto 1.5rem auto !important;
-  width: 100% !important;
-  max-width: 1200px !important;
-}
-
-
-#tab-video .video-wrapper-nsaw iframe {
-  display: block !important;
-  margin: 0 auto !important;
-  width: 100% !important;
-  height: 100% !important;
 }
 
 @keyframes fadeIn {
@@ -814,6 +824,148 @@ input[type="checkbox"]:checked + .panel-content {
       min-width: 85%;
       padding: 1rem;
     }
+  }
+
+/* Mobile-only carousel: show on small screens, hide on desktop */
+@media (max-width: 1024px) {
+  .card-carousel-mobile { display:flex; gap:0.75rem; overflow-x:auto; -webkit-overflow-scrolling: touch; padding:0.5rem; }
+  .card-carousel-mobile .card-panel { scroll-snap-align: start; }
+  .desktop-only { display:none !important; }
+}
+@media (min-width: 1025px) {
+  .card-carousel-mobile { display:none !important; }
+  .desktop-only { display:block !important; }
+}
+
+/* Dark/navy variant for generated carousels (mobile-specific classname or general) */
+.card-carousel-mobile.card-dark-mobile .card-panel,
+.card-carousel.card-dark-mobile .card-panel {
+  background-color: #132230 !important;
+  color: #f1f5f9 !important;
+}
+.card-carousel-mobile.card-dark-mobile .card-panel .btn,
+.card-carousel.card-dark-mobile .card-panel .btn,
+.card-carousel-mobile.card-dark-mobile .card-panel a.btn,
+.card-carousel.card-dark-mobile .card-panel a.btn {
+  border-color: #f1f5f9 !important;
+  color: #f1f5f9 !important;
+}
+.card-carousel-mobile.card-dark-mobile .card-panel .btn:hover,
+.card-carousel.card-dark-mobile .card-panel .btn:hover,
+.card-carousel-mobile.card-dark-mobile .card-panel a.btn:hover,
+.card-carousel.card-dark-mobile .card-panel a.btn:hover {
+  background-color: #f1f5f9 !important;
+  color: #132230 !important;
+}
+
+/* Force high-contrast text for all descendants inside dark mobile panels */
+/* Force high-contrast text for all descendants inside dark carousels */
+.card-carousel-mobile.card-dark-mobile .card-panel,
+.card-carousel.card-dark-mobile .card-panel,
+.card-carousel-mobile.card-dark-mobile .card-panel h1,
+.card-carousel.card-dark-mobile .card-panel h1,
+.card-carousel-mobile.card-dark-mobile .card-panel h2,
+.card-carousel.card-dark-mobile .card-panel h2,
+.card-carousel-mobile.card-dark-mobile .card-panel h3,
+.card-carousel.card-dark-mobile .card-panel h3,
+.card-carousel-mobile.card-dark-mobile .card-panel h4,
+.card-carousel.card-dark-mobile .card-panel h4,
+.card-carousel-mobile.card-dark-mobile .card-panel h5,
+.card-carousel.card-dark-mobile .card-panel h5,
+.card-carousel-mobile.card-dark-mobile .card-panel p,
+.card-carousel.card-dark-mobile .card-panel p,
+.card-carousel-mobile.card-dark-mobile .card-panel span,
+.card-carousel.card-dark-mobile .card-panel span,
+.card-carousel-mobile.card-dark-mobile .card-panel a,
+.card-carousel.card-dark-mobile .card-panel a,
+.card-carousel-mobile.card-dark-mobile .card-panel strong,
+.card-carousel.card-dark-mobile .card-panel strong,
+.card-carousel-mobile.card-dark-mobile .card-panel em,
+.card-carousel.card-dark-mobile .card-panel em {
+  color: #f1f5f9 !important;
+  opacity: 1 !important;
+}
+
+/* Mobile override: for dark/navy source cards, use a light card (#FFF3CD)
+   with dark text on mobile so content is readable on small screens. */
+@media (max-width: 1024px) {
+  /* Default: on mobile, swap themes — make all generated panels use the
+     navy background by default (this applies to beige-origin cards). */
+  .card-carousel .card-panel {
+    background-color: #132230 !important;
+    color: #f1f5f9 !important;
+  }
+  .card-carousel .card-panel .btn,
+  .card-carousel .card-panel a.btn {
+    border-color: #f1f5f9 !important;
+    color: #f1f5f9 !important;
+    background: transparent !important;
+  }
+  .card-carousel .card-panel .btn:hover,
+  .card-carousel .card-panel a.btn:hover {
+    background-color: #f1f5f9 !important;
+    color: #132230 !important;
+  }
+
+  /* But carousels that originated from navy cards (marked with
+     `card-dark-mobile`) should instead use the beige card background. */
+  .card-carousel.card-dark-mobile .card-panel {
+    background-color: #F1E8DC !important;
+    color: #111 !important;
+  }
+  .card-carousel.card-dark-mobile .card-panel h1,
+  .card-carousel.card-dark-mobile .card-panel h2,
+  .card-carousel.card-dark-mobile .card-panel h3,
+  .card-carousel.card-dark-mobile .card-panel h4,
+  .card-carousel.card-dark-mobile .card-panel h5,
+  .card-carousel.card-dark-mobile .card-panel p,
+  .card-carousel.card-dark-mobile .card-panel span,
+  .card-carousel.card-dark-mobile .card-panel a,
+  .card-carousel.card-dark-mobile .card-panel strong,
+  .card-carousel.card-dark-mobile .card-panel em {
+    color: #111 !important;
+    opacity: 1 !important;
+  }
+  .card-carousel.card-dark-mobile .card-panel .btn,
+  .card-carousel.card-dark-mobile .card-panel a.btn {
+    border-color: #111 !important;
+    color: #111 !important;
+    background: transparent !important;
+  }
+  .card-carousel.card-dark-mobile .card-panel .btn:hover,
+  .card-carousel.card-dark-mobile .card-panel a.btn:hover {
+    background-color: #111 !important;
+    color: #F1E8DC !important;
+  }
+}
+
+/* Mobile: add lateral breathing room for images so they don't touch edges */
+@media (max-width: 1024px) {
+  .image-section-nsaw {
+    margin-left: 1rem !important;
+    margin-right: 1rem !important;
+    max-width: calc(100% - 2rem) !important;
+  }
+}
+
+  /* Strong override: ensure buttons inside overlay cards and generated
+     panels are block-level and centered on small screens, overriding
+     Bootstrap display utilities (which use !important). */
+  .overlay-card-nsaw .btn,
+  .overlay-card-nsaw a.btn,
+  .card-panel .btn,
+  .card-panel a.btn {
+    display: block !important;
+    margin: 0.6rem auto 0 !important;
+    min-width: 0 !important;
+    text-align: center !important;
+  }
+
+  /* Keep small variant compact but centered */
+  .overlay-card-nsaw .btn.btn-sm,
+  .card-panel a.btn.btn-sm {
+    display: inline-block !important;
+    margin: 0.4rem auto 0 !important;
   }
 
   @media (max-width: 360px) {
