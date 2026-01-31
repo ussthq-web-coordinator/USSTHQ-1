@@ -553,9 +553,8 @@ input[type="checkbox"]:checked + .panel-content {
   overflow: hidden;
 }
 
-/* Video tab: force the video to appear above the intro on mobile (only when
-   the video tab is active) so the media is presented first without occupying
-   space on other tabs. */
+/* Video tab: force intro above the video and make the video larger on all devices
+   —only apply when the video tab is active so it doesn't take up space on other tabs. */
 .tab-content#tab-video.active {
   display: flex !important;
   flex-direction: column !important;
@@ -569,11 +568,11 @@ input[type="checkbox"]:checked + .panel-content {
   justify-content: center !important;
   align-items: center !important;
   padding: 0 1rem !important;
-  order: 1 !important; /* ensure video sits above heading/text */
+  order: 2 !important; /* ensure video sits below heading/text */
 }
 .tab-content#tab-video.active > .text-col-nsaw {
   width: 100% !important;
-  order: 2 !important;
+  order: 1 !important;
   max-width: 100% !important;
   display: block !important;
   padding: 0 1rem !important;
@@ -585,7 +584,7 @@ input[type="checkbox"]:checked + .panel-content {
   margin: 0.5rem auto 1.5rem auto;
   padding-bottom: 56.25%; /* 16:9 */
   display: block;
-  order: 1 !important; /* keep the media at the top of the stacked flow */
+  order: 2 !important;
 }
 .tab-content#tab-video.active .video-wrapper-nsaw iframe {
   display: block !important;
@@ -596,7 +595,7 @@ input[type="checkbox"]:checked + .panel-content {
 .tab-content#tab-video.active .video-intro {
   margin-bottom: 1rem;
   text-align: center;
-  order: 2 !important; /* intro follows the video */
+  order: 1 !important;
   width: 100% !important;
   max-width: 900px !important;
   margin: 0 0 1rem 0 !important;
@@ -735,52 +734,6 @@ input[type="checkbox"]:checked + .panel-content {
   /* Ensure sticky wrapper doesn't clip the scrolling */
   .tab-buttons-wrapper {
     overflow-x: auto !important;
-  }
-}
-
-/* Strong mobile override: ensure the video tab stacks to a single column
-   (media first, then intro/text) on narrow viewports. This counters any
-   competing desktop rules and forces full-width columns for the video tab. */
-@media (max-width: 1024px) {
-  .tab-content#tab-video.active {
-    display: flex !important;
-    flex-direction: column !important;
-    align-items: center !important;
-    gap: 0.75rem !important;
-    padding-left: 0.5rem !important;
-    padding-right: 0.5rem !important;
-  }
-
-  .tab-content#tab-video.active > .image-col-nsaw,
-  .tab-content#tab-video.active > .text-col-nsaw {
-    width: calc(100% - 1rem) !important;
-    max-width: calc(100% - 1rem) !important;
-    display: block !important;
-    padding-left: 0.5rem !important;
-    padding-right: 0.5rem !important;
-    order: unset !important;
-  }
-
-  .tab-content#tab-video.active > .image-col-nsaw {
-    order: 1 !important; /* video/media first */
-  }
-  .tab-content#tab-video.active > .text-col-nsaw {
-    order: 2 !important; /* intro/text follows */
-  }
-
-  .tab-content#tab-video.active .video-wrapper-nsaw {
-    order: 1 !important;
-    width: 100% !important;
-    max-width: 100% !important;
-    margin: 0.5rem auto !important;
-    padding-bottom: 56.25% !important;
-    display: block !important;
-  }
-
-  .tab-content#tab-video.active .video-intro {
-    order: 2 !important;
-    width: calc(100% - 1rem) !important;
-    max-width: calc(100% - 1rem) !important;
   }
 }
 
@@ -995,6 +948,44 @@ input[type="checkbox"]:checked + .panel-content {
   }
 }
 
+/* On small screens, show the video before the intro text so the video appears large */
+@media (max-width: 1024px) {
+  .tab-content#tab-video.active > .image-col-nsaw {
+    display: flex !important;
+    flex-direction: column !important;
+    order: 1 !important;
+  }
+  .tab-content#tab-video.active .video-wrapper-nsaw {
+    order: 1 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+  .tab-content#tab-video.active .video-intro {
+    order: 2 !important;
+    margin-top: 0.75rem !important;
+    margin-bottom: 0.25rem !important;
+  }
+}
+
+/* Force the video tab to stack single-column on small screens (defensive) */
+@media (max-width: 1024px) {
+  .tab-content#tab-video.active {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: stretch !important;
+  }
+  .tab-content#tab-video.active > .image-col-nsaw,
+  .tab-content#tab-video.active > .text-col-nsaw {
+    width: 100% !important;
+    max-width: 100% !important;
+    padding: 0 !important;
+    margin: 0 auto !important;
+  }
+  /* make sure intro and video are full-width and stacked in correct order */
+  .tab-content#tab-video.active .video-wrapper-nsaw { order: 1 !important; }
+  .tab-content#tab-video.active .video-intro { order: 2 !important; }
+}
+
 /* Mobile compacting: reduce padding/margins so content has more horizontal space */
 @media (max-width: 1024px) {
   .tabs-shell {
@@ -1073,21 +1064,6 @@ input[type="checkbox"]:checked + .panel-content {
       min-width: 90%;
       padding: 0.85rem;
     }
-  }
-
-  /* Make the "Read the Introduction" button inside the video intro use
-     black text and a black border so it reads clearly. Use !important to
-     override mobile/utility button rules. */
-  .video-intro button[data-tab="tab1"],
-  .video-intro .btn[data-tab="tab1"] {
-    color: #000 !important;
-    border-color: #000 !important;
-    background: transparent !important;
-  }
-  .video-intro button[data-tab="tab1"]:hover,
-  .video-intro .btn[data-tab="tab1"]:hover {
-    background: #000 !important;
-    color: #fff !important;
   }
 }
 

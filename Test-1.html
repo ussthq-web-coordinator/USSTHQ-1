@@ -61,6 +61,7 @@
                     <h3 class="fw-bold">Loving All Who Feel Lost</h3>
                     <p>Learn how we come alongside others to love, serve, and disciple—bringing practical help and
                         spiritual care so no one walks alone.</p>
+                    <p><button class="btn btn-outline-dark rounded-pill mt-2" data-tab="tab1">Read the Introduction</button></p>
                 </div>
                 <div class="video-wrapper-nsaw">
                     <iframe
@@ -467,9 +468,34 @@
                 const tabContents = document.querySelectorAll('.tab-content');
                 const tabTriggers = document.querySelectorAll('[data-tab]');
 
+                // Center the active tab pill inside the scrollable tab strip (smooth)
+                function centerActiveTab() {
+                    try {
+                        const activeBtn = document.querySelector('.tab-button.active');
+                        if (!activeBtn) return;
+
+                        // Prefer the inner scroll container if present
+                        let scrollEl = document.querySelector('.tab-buttons');
+                        if (!scrollEl || scrollEl.scrollWidth <= scrollEl.clientWidth) {
+                            const wrapper = document.querySelector('.tab-buttons-wrapper');
+                            if (wrapper && wrapper.scrollWidth > wrapper.clientWidth) scrollEl = wrapper;
+                        }
+
+                        if (scrollEl && scrollEl.scrollWidth > scrollEl.clientWidth) {
+                            const left = activeBtn.offsetLeft - (scrollEl.clientWidth / 2) + (activeBtn.offsetWidth / 2);
+                            scrollEl.scrollTo({ left: Math.max(0, left), behavior: 'smooth' });
+                        } else if (activeBtn.scrollIntoView) {
+                            activeBtn.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+                        }
+                    } catch (err) {
+                        // ignore
+                    }
+                }
+
                 function activateTab(tabId) {
                     tabButtons.forEach(btn => btn.classList.toggle('active', btn.getAttribute('data-tab') === tabId));
                     tabContents.forEach(content => content.classList.toggle('active', content.id === tabId));
+                    centerActiveTab();
                 }
 
                 tabTriggers.forEach(trigger => {
@@ -494,11 +520,15 @@
                         const tabId = btn.getAttribute('data-tab');
                         if (!tabId) return;
                         activateTab(tabId);
+                        // ensure the tab strip recenters on the active pill
+                        if (typeof centerActiveTab === 'function') centerActiveTab();
                         const tabsShell = document.querySelector('.tabs-shell');
                         if (tabsShell && tabsShell.scrollIntoView) tabsShell.scrollIntoView({behavior: 'smooth', block: 'start'});
                         else window.scrollTo({top:0, behavior:'smooth'});
                     });
                 });
+                // Expose helpers for other scripts that add buttons dynamically
+                try { window.activateTab = activateTab; window.centerActiveTab = centerActiveTab; } catch(e){}
             });
         </script>
     </div>
@@ -777,10 +807,18 @@
                                     if (target) {
                                         b.addEventListener('click', function(ev){
                                             ev.preventDefault();
-                                            const tabButtons = document.querySelectorAll('.tab-button');
-                                            const tabContents = document.querySelectorAll('.tab-content');
-                                            tabButtons.forEach(btn => btn.classList.toggle('active', btn.getAttribute('data-tab') === target));
-                                            tabContents.forEach(content => content.classList.toggle('active', content.id === target));
+                                            // Use the globally-exposed activate/center helpers if available
+                                            if (window && typeof window.activateTab === 'function') {
+                                                window.activateTab(target);
+                                            } else {
+                                                const tabButtons = document.querySelectorAll('.tab-button');
+                                                const tabContents = document.querySelectorAll('.tab-content');
+                                                tabButtons.forEach(btn => btn.classList.toggle('active', btn.getAttribute('data-tab') === target));
+                                                tabContents.forEach(content => content.classList.toggle('active', content.id === target));
+                                            }
+                                            if (window && typeof window.centerActiveTab === 'function') {
+                                                window.centerActiveTab();
+                                            }
                                             // scroll the tabs shell into view so the activated content is visible
                                             const tabsShell = document.querySelector('.tabs-shell');
                                             if (tabsShell && tabsShell.scrollIntoView) tabsShell.scrollIntoView({behavior: 'smooth', block: 'start'});
