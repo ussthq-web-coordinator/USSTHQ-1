@@ -1089,6 +1089,31 @@ input[type="checkbox"]:checked + .panel-content {
     background: #000 !important;
     color: #fff !important;
   }
+
+  /* Desktop-specific override: ensure the video-intro 'Read the Introduction'
+     button is black on larger viewports where other button utilities may win. */
+  @media (min-width: 1025px) {
+    .tabs-shell .tab-content#tab-video .video-intro button[data-tab="tab1"],
+    .tabs-shell .tab-content#tab-video .video-intro .btn[data-tab="tab1"],
+    .tab-content#tab-video .video-intro button[data-tab="tab1"],
+    .tab-content#tab-video .video-intro .btn[data-tab="tab1"],
+    .video-intro button[data-tab="tab1"],
+    .video-intro .btn[data-tab="tab1"] {
+      color: #000 !important;
+      border-color: #000 !important;
+      background: transparent !important;
+    }
+
+    .tabs-shell .tab-content#tab-video .video-intro button[data-tab="tab1"]:hover,
+    .tabs-shell .tab-content#tab-video .video-intro .btn[data-tab="tab1"]:hover,
+    .tab-content#tab-video .video-intro button[data-tab="tab1"]:hover,
+    .tab-content#tab-video .video-intro .btn[data-tab="tab1"]:hover,
+    .video-intro button[data-tab="tab1"]:hover,
+    .video-intro .btn[data-tab="tab1"]:hover {
+      background: #000 !important;
+      color: #fff !important;
+    }
+  }
 }
 
 
