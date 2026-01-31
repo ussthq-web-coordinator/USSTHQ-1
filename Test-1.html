@@ -478,9 +478,11 @@
                 const inner = wrapper.querySelector('.tab-buttons') || wrapper;
 
                 // Wheel -> horizontal scroll (use passive:false so we can preventDefault)
+                // Scroll the actual scrollable element (`inner`) so desktop wheels work.
+                const scrollTarget = inner;
                 wrapper.addEventListener('wheel', function(e){
                     if (Math.abs(e.deltaY) > 0) {
-                        wrapper.scrollLeft += e.deltaY;
+                        scrollTarget.scrollLeft += e.deltaY;
                         e.preventDefault();
                     }
                 }, { passive: false });
@@ -495,7 +497,7 @@
                     if (e.target && e.target.closest && e.target.closest('.tab-button')) return;
                     isDown = true;
                     startX = e.clientX;
-                    startScroll = wrapper.scrollLeft;
+                    startScroll = scrollTarget.scrollLeft;
                     if (inner.setPointerCapture) inner.setPointerCapture(e.pointerId);
                     inner.style.cursor = 'grabbing';
                 });
@@ -503,7 +505,7 @@
                 inner.addEventListener('pointermove', function(e){
                     if (!isDown) return;
                     const dx = e.clientX - startX;
-                    wrapper.scrollLeft = startScroll - dx;
+                    scrollTarget.scrollLeft = startScroll - dx;
                 });
 
                 function endDrag(e){
@@ -522,52 +524,206 @@
                 <script>
                 // On small screens, split long overlay cards into horizontally scrollable panels
                 (function(){
-                    function buildPanelsForCard(card, charLimit){
-                        // collect element children (heading, paragraphs, buttons, anchors)
-                        const children = Array.from(card.children);
-                        if (!children.length) return;
+                    function buildPanelsForCard(card, charLimit, options){
+                        options = options || {};
+                        const allowMidParagraph = !!options.allowMidParagraph;
+                        // If the card already contains generated panels, extract their
+                        // content so we can re-split with a smaller charLimit.
+                        let sourceNodes = [];
+                        const buttons = [];
 
-                        // If already transformed, skip
-                        if (card.dataset.split === '1') return;
+                        const existingPanels = card.querySelectorAll && card.querySelectorAll('.card-panel');
+                        if (existingPanels && existingPanels.length > 0){
+                            existingPanels.forEach(p => {
+                                Array.from(p.children).forEach(ch => {
+                                    const t = ch.tagName;
+                                    if (t === 'BUTTON' || (t === 'A' && ch.classList && ch.classList.contains('btn'))){
+                                        buttons.push(ch.cloneNode(true));
+                                    } else {
+                                        sourceNodes.push(ch.cloneNode(true));
+                                    }
+                                });
+                            });
+                        } else {
+                            // Not previously transformed: take original children
+                            sourceNodes = Array.from(card.children).map(n => n.cloneNode(true));
+                        }
+
+                        if (!sourceNodes.length) return;
 
                         const panels = [];
                         let current = [];
                         let count = 0;
 
-                        // Always include heading (if present) at start of first panel
+                        // If first node is a heading, capture it but defer inserting when
+                        // we're doing the even-split (allowMidParagraph) to avoid duplication
                         let i = 0;
-                        if (children[0] && /^H[1-6]$/.test(children[0].tagName)){
-                            current.push(children[0].cloneNode(true));
+                        let headingEl = null;
+                        if (sourceNodes[0] && /^H[1-6]$/.test(sourceNodes[0].tagName)){
+                            headingEl = sourceNodes[0].cloneNode(true);
                             i = 1;
                         }
 
-                        // collect buttons to append to last panel
-                        const buttons = [];
-
-                        for (; i < children.length; i++){
-                            const el = children[i];
-                            const tag = el.tagName;
-                            if (tag === 'P'){
-                                const len = (el.textContent || '').trim().length;
-                                if (count + len > charLimit && current.length){
-                                    panels.push(current);
-                                    current = [];
-                                    count = 0;
+                        // Pre-extract any buttons from sourceNodes so they are preserved
+                        // and not treated as text content during splitting. This extracts
+                        // both top-level and descendant buttons/anchors so inline
+                        // controls (e.g. links inside <p>) are not lost when we
+                        // re-create text-only panels.
+                        for (let k = sourceNodes.length - 1; k >= 0; k--) {
+                            const nd = sourceNodes[k];
+                            const t = nd.tagName;
+                            if (t === 'BUTTON' || (t === 'A' && nd.classList && nd.classList.contains('btn'))){
+                                buttons.push(nd.cloneNode(true));
+                                sourceNodes.splice(k, 1);
+                                continue;
+                            }
+                            // extract descendant buttons/anchors from cloned nodes
+                            try {
+                                if (nd.querySelectorAll) {
+                                    const found = nd.querySelectorAll('button, a.btn');
+                                    if (found && found.length) {
+                                        Array.from(found).forEach(f => {
+                                            buttons.push(f.cloneNode(true));
+                                            if (f.parentNode) f.parentNode.removeChild(f);
+                                        });
+                                    }
                                 }
-                                current.push(el.cloneNode(true));
-                                count += len;
-                            } else if (tag === 'BUTTON' || (tag === 'A' && el.classList.contains('btn'))){
-                                buttons.push(el.cloneNode(true));
-                            } else {
-                                // other elements (links, small headings) — include if small
-                                current.push(el.cloneNode(true));
+                            } catch(e) { /* ignore DOM issues on clones */ }
+                        }
+
+                        if (!allowMidParagraph){
+                            // When not allowing mid-paragraph splitting, if we captured a heading
+                            // put it into the current panel now.
+                            if (headingEl) {
+                                current.push(headingEl.cloneNode(true));
+                            }
+                            for (; i < sourceNodes.length; i++){
+                                const el = sourceNodes[i];
+                                const tag = el.tagName;
+                                if (tag === 'P'){
+                                    const text = (el.textContent || '').trim();
+                                    const len = text.length;
+                                    if (count + len > charLimit && current.length){
+                                        panels.push(current);
+                                        current = [];
+                                        count = 0;
+                                    }
+                                    current.push(el.cloneNode(true));
+                                    count += len;
+                                } else if (tag === 'BUTTON' || (tag === 'A' && el.classList && el.classList.contains('btn'))){
+                                    buttons.push(el.cloneNode(true));
+                                } else {
+                                    current.push(el.cloneNode(true));
+                                }
+                            }
+                        } else {
+                            // For even-split mode prefer splitting on sentence boundaries
+                            // (after normalizing missing spaces such as "sentence.Another").
+                            current = [];
+                            count = 0;
+                            const PLACEHOLDER = '<<SALVATION_ARMY>>';
+                            const headingEl = (sourceNodes[0] && /^H[1-6]$/.test(sourceNodes[0].tagName)) ? sourceNodes[0].cloneNode(true) : null;
+                            const startIdx = headingEl ? 1 : 0;
+
+                            // Build an array of text "units" where each unit is a sentence
+                            // when possible, otherwise a short chunk. We will not split words.
+                            const units = [];
+                            for (let j = startIdx; j < sourceNodes.length; j++){
+                                const node = sourceNodes[j];
+                                const tag = node.tagName;
+                                if (tag === 'BUTTON' || (tag === 'A' && node.classList && node.classList.contains('btn'))){
+                                    continue;
+                                }
+                                let txt = (node.textContent || '')
+                                    .replace(/The Salvation Army/g, PLACEHOLDER)
+                                    // insert a space after punctuation if it's missing (fixes <br> runs)
+                                    .replace(/([.?!])([A-Z0-9"'\(\[])/g, '$1 $2')
+                                    .replace(/\s+/g, ' ')
+                                    .trim();
+                                if (!txt) continue;
+
+                                // Split into sentences when possible
+                                const sents = txt.match(/[^.!?]+[.!?]+["')\]]*|[^.!?]+$/g);
+                                if (sents && sents.length > 1){
+                                    sents.forEach(s => {
+                                        const v = s.trim();
+                                        if (v) units.push(v);
+                                    });
+                                } else {
+                                    // Single long paragraph — keep as one unit but allow later
+                                    units.push(txt);
+                                }
+                            }
+
+                            if (!units.length){
+                                card.dataset.split = '1';
+                                return;
+                            }
+
+                            // If any unit is longer than charLimit, break it into word-safe subunits
+                            const expanded = [];
+                            units.forEach(u => {
+                                if (u.length <= charLimit) {
+                                    expanded.push(u);
+                                } else {
+                                    const ws = u.split(/\s+/).filter(Boolean);
+                                    let buf = [];
+                                    let bufLen = 0;
+                                    ws.forEach(w => {
+                                        if (bufLen + w.length + (buf.length?1:0) > charLimit && buf.length){
+                                            expanded.push(buf.join(' '));
+                                            buf = [w];
+                                            bufLen = w.length;
+                                        } else {
+                                            buf.push(w);
+                                            bufLen += (bufLen?1:0) + w.length;
+                                        }
+                                    });
+                                    if (buf.length) expanded.push(buf.join(' '));
+                                }
+                            });
+
+                            const totalChars = expanded.reduce((s,u) => s + u.length + 1, 0);
+                            const panelsCount = Math.max(1, Math.ceil(totalChars / charLimit));
+                            const target = Math.ceil(totalChars / panelsCount);
+
+                            // Build panels by accumulating units until reaching target size
+                            let cur = [];
+                            let curLen = 0;
+                            for (let ui = 0; ui < expanded.length; ui++){
+                                const u = expanded[ui];
+                                cur.push(u);
+                                curLen += u.length + 1;
+                                // create a panel when we reach target and still have panels to fill
+                                if (curLen >= target && panels.length < panelsCount - 1){
+                                    const text = cur.join(' ').replace(new RegExp(PLACEHOLDER, 'g'), 'The Salvation Army');
+                                    const p = document.createElement('p');
+                                    p.textContent = text;
+                                    const nodes = [];
+                                    if (headingEl && panels.length === 0) nodes.push(headingEl.cloneNode(true));
+                                    nodes.push(p);
+                                    panels.push(nodes);
+                                    cur = [];
+                                    curLen = 0;
+                                }
+                            }
+
+                            // remaining
+                            if (cur.length){
+                                const text = cur.join(' ').replace(new RegExp(PLACEHOLDER, 'g'), 'The Salvation Army');
+                                const p = document.createElement('p');
+                                p.textContent = text;
+                                const nodes = [];
+                                if (headingEl && panels.length === 0) nodes.push(headingEl.cloneNode(true));
+                                nodes.push(p);
+                                panels.push(nodes);
                             }
                         }
 
                         if (current.length) panels.push(current);
 
                         if (panels.length <= 1){
-                            // nothing to split — mark and exit
+                            // nothing to split — still mark as split to avoid repeated work
                             card.dataset.split = '1';
                             return;
                         }
@@ -583,23 +739,20 @@
                             nodes.forEach(n => panel.appendChild(n));
                             // append buttons to last panel only
                             if (idx === panels.length - 1){
-                                    buttons.forEach(b => {
-                                        // ensure button grows and remains clickable
-                                        b.classList.add('d-inline-block');
-                                        // attach a click handler that activates the target tab
-                                        const target = b.getAttribute('data-tab');
-                                        if (target) {
-                                            b.addEventListener('click', function(ev){
-                                                ev.preventDefault();
-                                                // local activation: toggle active classes
-                                                const tabButtons = document.querySelectorAll('.tab-button');
-                                                const tabContents = document.querySelectorAll('.tab-content');
-                                                tabButtons.forEach(btn => btn.classList.toggle('active', btn.getAttribute('data-tab') === target));
-                                                tabContents.forEach(content => content.classList.toggle('active', content.id === target));
-                                            });
-                                        }
-                                        panel.appendChild(b);
-                                    });
+                                buttons.forEach(b => {
+                                    b.classList.add('d-inline-block');
+                                    const target = b.getAttribute('data-tab');
+                                    if (target) {
+                                        b.addEventListener('click', function(ev){
+                                            ev.preventDefault();
+                                            const tabButtons = document.querySelectorAll('.tab-button');
+                                            const tabContents = document.querySelectorAll('.tab-content');
+                                            tabButtons.forEach(btn => btn.classList.toggle('active', btn.getAttribute('data-tab') === target));
+                                            tabContents.forEach(content => content.classList.toggle('active', content.id === target));
+                                        });
+                                    }
+                                    panel.appendChild(b);
+                                });
                             }
                             carousel.appendChild(panel);
                         });
@@ -609,13 +762,10 @@
                         card.appendChild(carousel);
                         card.dataset.split = '1';
 
-                        // Ensure the carousel starts scrolled to the very first panel so
-                        // the first card is fully visible (not partially clipped).
-                        // Defer slightly to allow layout to settle.
+                        // Ensure the carousel starts scrolled to the very first panel
                         setTimeout(function(){
                             try{
                                 carousel.scrollLeft = 0;
-                                // also ensure first panel is snapped fully into view
                                 const first = carousel.querySelector('.card-panel');
                                 if (first && first.scrollIntoView) first.scrollIntoView({behavior: 'instant', block: 'nearest', inline: 'start'});
                             }catch(e){/* no-op */}
@@ -625,7 +775,15 @@
                     function initSplit(){
                         if (window.innerWidth > 1024) return;
                         const cards = document.querySelectorAll('.overlay-card-nsaw');
-                        cards.forEach(card => buildPanelsForCard(card, 360));
+                        // Apply tight splitting to all tabs for mobile optimization
+                        const tightLimit = 100; // characters per panel
+                        cards.forEach(card => {
+                            // Force a re-split even if the card was processed before
+                            try { delete card.dataset.split; } catch(e) { card.dataset.split = ''; }
+                            const usedLimit = tightLimit;
+                            const opts = { allowMidParagraph: true };
+                            buildPanelsForCard(card, usedLimit, opts);
+                        });
                     }
 
                     // run on load and on orientation/resize (debounced)
@@ -637,6 +795,8 @@
                         clearTimeout(resizeTimer);
                         resizeTimer = setTimeout(initSplit, 250);
                     });
+                    // Run once immediately to ensure edits take effect in an open page
+                    try { setTimeout(initSplit, 100); } catch(e) {/* ignore */}
                 })();
                 </script>
 </body>
