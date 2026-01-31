@@ -1446,4 +1446,15 @@ header, .site-header, .navbar, .nav, .flyoutNav {
   pointer-events: auto;
 }
 
+/* Small top margin for overlay text cards to give breathing room above them */
+.tabs-shell .overlay-card-nsaw {
+  margin-top: 1rem !important;
+}
+
+@media (max-width: 1024px) {
+  .tabs-shell .overlay-card-nsaw {
+    margin-top: 0.5rem !important;
+  }
+}
+
 
