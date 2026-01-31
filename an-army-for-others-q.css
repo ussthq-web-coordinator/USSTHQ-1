@@ -49,7 +49,7 @@ html, body {
   .row-flex-nsaw.active > .text-col-nsaw,
   .flex-md-row-reverse.active > .image-col-nsaw,
   .flex-md-row-reverse.active > .text-col-nsaw {
-    width: 95% !important;
+    width: 98% !important;
     max-width: none !important;
     display: flex !important;
     justify-content: center;
@@ -375,12 +375,14 @@ input[type="checkbox"]:checked + .panel-content {
   border-radius: 1rem;
 }
 
-/* Make cards scroll internally if content is long */
+/* Make cards flow naturally (no internal scrolling) */
 .overlay-card-nsaw {
   margin: 0;
-  max-height: calc(100vh - 240px);
-  overflow-y: auto;
+  max-height: none;
+  overflow: visible;
   padding: 1.5rem;
+  width: 100%;
+  max-width: 100%;
 }
 
 /* Reduce video wrapper vertical footprint */
