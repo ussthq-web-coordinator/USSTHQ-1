@@ -239,6 +239,39 @@ html, body {
   background-color: #333333;
 }
 
+/* Small-screen: increase button padding and spacing inside overlay cards */
+@media (max-width: 1024px) {
+  .overlay-card-nsaw .btn {
+    display: inline-block !important;
+    padding: 0.75rem 1.25rem !important;
+    margin: 0.6rem auto !important;
+    min-width: 180px !important;
+    box-sizing: border-box !important;
+  }
+
+  .overlay-card-nsaw .btn.btn-sm {
+    padding: 0.5rem 0.9rem !important;
+    min-width: 140px !important;
+  }
+
+  /* Stack multiple buttons vertically and center them */
+  .overlay-card-nsaw .btn + .btn {
+    display: block !important;
+    margin-left: 0 !important;
+    margin-top: 0.6rem !important;
+  }
+
+  /* If there are inline groups, make them stack on small screens */
+  .overlay-card-nsaw .btn-group,
+  .overlay-card-nsaw .btn-row {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 0.6rem !important;
+    align-items: center !important;
+    width: 100%;
+  }
+}
+
 .givingToolbar-toolbar,
 .flyoutNav {
   background: #122231;
@@ -497,7 +530,7 @@ input[type="checkbox"]:checked + .panel-content {
   -ms-overflow-style: auto;
   position: sticky;
   top: 0;
-  z-index: 100;
+  z-index: 10; /* lowered so global menu flyouts can appear above the tabs */
   background: #fff;
   box-shadow: 0 2px 8px rgba(30,41,59,0.06);
 }
