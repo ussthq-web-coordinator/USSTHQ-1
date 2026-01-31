@@ -738,6 +738,19 @@ input[type="checkbox"]:checked + .panel-content {
   }
 }
 
+/* Remove side margins/padding from the page container on narrow viewports
+   so the layout can use the full viewport width (mobile edge-to-edge). */
+@media (max-width: 1024px) {
+  .container {
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+}
+
 /* Make the video larger on narrow viewports so media is more prominent.
    Increase the wrapper aspect (taller) and allow a larger max-width. */
 @media (max-width: 768px) {
