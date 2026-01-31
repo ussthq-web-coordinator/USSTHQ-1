@@ -505,16 +505,35 @@ input[type="checkbox"]:checked + .panel-content {
 }
 
 .tab-content {
-  display: none;
+  /* Keep tab panels present in the DOM for e-readers and AT.
+     We'll visually hide inactive panels off-screen rather than using
+     `display: none` which removes them from many accessibility parsers. */
+  display: block;
   animation: fadeIn 0.6s ease;
   align-items: flex-start;
   justify-content: center;
   padding-top: 1rem;
   padding-bottom: 1rem;
+  position: relative;
 }
 
 .tab-content.active {
   display: flex;
+  position: relative;
+}
+
+/* Visually hide inactive tab panels by moving them off-screen. This
+   preserves the content in the DOM so e-readers and accessibility tools
+   can still access it while keeping the visual layout uncluttered. */
+.tab-content:not(.active) {
+  position: absolute !important;
+  left: -99999px !important;
+  top: auto !important;
+  width: 1px !important;
+  height: 1px !important;
+  overflow: hidden !important;
+  clip: rect(1px, 1px, 1px, 1px) !important;
+  white-space: normal !important;
 }
 
 /* Constrain and modernize image presentation to avoid elongation */
@@ -1158,6 +1177,24 @@ input[type="checkbox"]:checked + .panel-content {
       color: #fff !important;
     }
   }
+}
+
+/* Styles moved from inline <style> in Test-1.html to improve separation
+   of concerns and ensure all styles live in the stylesheet. These rules
+   center action buttons inside overlay cards and card panels. */
+.overlay-card-nsaw .btn,
+.overlay-card-nsaw a.btn,
+.card-panel .btn,
+.card-panel a.btn {
+  display: block;
+  margin: 0.6rem auto 0;
+  width: auto;
+}
+
+.overlay-card-nsaw a.btn.btn-sm,
+.card-panel a.btn.btn-sm {
+  display: inline-block;
+  margin: 0.4rem auto 0;
 }
 
 

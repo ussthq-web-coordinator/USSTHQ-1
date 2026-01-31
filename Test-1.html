@@ -7,69 +7,51 @@
     <title>Bootstrap Boilerplate</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
 </head>
-    <link rel="stylesheet" href="an-army-for-others-x.css">
+    <link rel="stylesheet" href="an-army-for-others-y.css">
 </head>
 
 <body>
-    <style>
-        /* Center only the action buttons inside overlay cards and panels without
-           changing paragraph text alignment. Make them block-level and use
-           auto horizontal margins so they center reliably. */
-        .overlay-card-nsaw .btn,
-        .overlay-card-nsaw a.btn,
-        .card-panel .btn,
-        .card-panel a.btn {
-            display: block;
-            margin: 0.6rem auto 0;
-            width: auto;
-        }
-        /* Keep small buttons visually compact but centered */
-        .overlay-card-nsaw a.btn.btn-sm,
-        .card-panel a.btn.btn-sm {
-            display: inline-block;
-            margin: 0.4rem auto 0;
-        }
-    </style>
     <div class="container">
-        <div style="text-align: center;">
+        <div class="text-center">
             <h1>An Army for Others</h1>
         </div>
         <!-- Tabs shell: groups nav + content so background can extend -->
         <div class="tabs-shell">
         <!-- Modern Tab Navigation at Top -->
         <nav class="tab-buttons-wrapper sticky-top">
-            <div class="tab-buttons py-3" style="background-color: #F5F6F2;">
-                <button class="tab-button active" data-tab="tab-video">Watch Video</button>
-                <button class="tab-button" data-tab="tab1">Introduction</button>
-                <button class="tab-button" data-tab="tab2">The Mission Continues</button>
-                <button class="tab-button" data-tab="tab3">Friends</button>
-                <button class="tab-button" data-tab="tab4">Partners</button>
-                <button class="tab-button" data-tab="tab5">Program Participants</button>
-                <button class="tab-button" data-tab="tab6">Volunteers</button>
-                <button class="tab-button" data-tab="tab7">Members &amp; Adherents</button>
-                <button class="tab-button" data-tab="tab8">Soldiers</button>
-                <button class="tab-button" data-tab="tab9">Employees</button>
-                <button class="tab-button" data-tab="tab10">Officers</button>
-                <button class="tab-button" data-tab="tab11">Why The Uniform</button>
-                <button class="tab-button" data-tab="tab12">A Mission For You</button>
+            <div class="tab-buttons py-3" role="tablist" aria-orientation="horizontal" style="background-color: #F5F6F2;">
+                <button id="tab-btn-tab-video" class="tab-button active" role="tab" aria-controls="tab-video" aria-selected="true" data-tab="tab-video">Watch Video</button>
+                <button id="tab-btn-tab1" class="tab-button" role="tab" aria-controls="tab1" aria-selected="false" data-tab="tab1">Introduction</button>
+                <button id="tab-btn-tab2" class="tab-button" role="tab" aria-controls="tab2" aria-selected="false" data-tab="tab2">The Mission Continues</button>
+                <button id="tab-btn-tab3" class="tab-button" role="tab" aria-controls="tab3" aria-selected="false" data-tab="tab3">Friends</button>
+                <button id="tab-btn-tab4" class="tab-button" role="tab" aria-controls="tab4" aria-selected="false" data-tab="tab4">Partners</button>
+                <button id="tab-btn-tab5" class="tab-button" role="tab" aria-controls="tab5" aria-selected="false" data-tab="tab5">Program Participants</button>
+                <button id="tab-btn-tab6" class="tab-button" role="tab" aria-controls="tab6" aria-selected="false" data-tab="tab6">Volunteers</button>
+                <button id="tab-btn-tab7" class="tab-button" role="tab" aria-controls="tab7" aria-selected="false" data-tab="tab7">Members &amp; Adherents</button>
+                <button id="tab-btn-tab8" class="tab-button" role="tab" aria-controls="tab8" aria-selected="false" data-tab="tab8">Soldiers</button>
+                <button id="tab-btn-tab9" class="tab-button" role="tab" aria-controls="tab9" aria-selected="false" data-tab="tab9">Employees</button>
+                <button id="tab-btn-tab10" class="tab-button" role="tab" aria-controls="tab10" aria-selected="false" data-tab="tab10">Officers</button>
+                <button id="tab-btn-tab11" class="tab-button" role="tab" aria-controls="tab11" aria-selected="false" data-tab="tab11">Why The Uniform</button>
+                <button id="tab-btn-tab12" class="tab-button" role="tab" aria-controls="tab12" aria-selected="false" data-tab="tab12">A Mission For You</button>
             </div>
         </nav>
         <!-- Tab Contents: Video First -->
-        <div id="tab-video" class="row-flex-nsaw tab-content active pt-2">
+        <div id="tab-video" class="row-flex-nsaw tab-content active pt-2" role="tabpanel" aria-labelledby="tab-btn-tab-video" tabindex="0">
             <div class="image-col-nsaw" style="width:100%; justify-content:center;">
-                <div class="video-intro text-center mb-3" style="max-width:900px; margin:0 auto;">
-                    <h3 class="fw-bold">Loving All Who Feel Lost</h3>
+                <div class="video-intro text-center" style="max-width:900px; margin:0 auto;">
+                    <h3 class="fw-bold">Loving All For Jesus</h3>
                     <p>Learn how we come alongside others to love, serve, and disciple—bringing practical help and
                         spiritual care so no one walks alone.</p>
+                        <p>With your help, we will never stop!</p>
                     <p><button class="btn rounded-pill mt-2 intro-cta" data-tab="tab1" style="color:#000;border:1px solid #000;background:transparent">Read the Introduction</button></p>
                 </div>
-                <div class="video-wrapper-nsaw">
+                <div class="video-wrapper-nsaw mt-4">
                     <iframe
                         style="position: absolute; top: 0; left: 0; width: 100%; height: 100%;"
                         allowfullscreen="allowfullscreen" allowtransparency="true" frameborder="0"
                         mozallowfullscreen="mozallowfullscreen" scrolling="no"
                         src="https://salvationarmysouth.widen.net/view/video/qxt01z7p31/VYSV3118000H_SAL_Anthem_60_ENG_16x9_VO_EC_GENERIC_ProRes_Unslated_16x9.mp4?t.download=true&amp;u=ukifzm"
-                        title="Video for &quot;VYSV3118000H_SAL_Anthem_60_ENG_16x9_VO_EC_GENERIC_ProRes_Unslated_16x9.mov&quot;"
+                        title="Video for &quot;Anthem from The Salvation Army&quot;"
                         webkitallowfullscreen="webkitallowfullscreen"></iframe>
                 </div>
                 
@@ -77,7 +59,7 @@
         </div>
         <!-- Tab Contents -->
         <!-- Your first row -->
-        <div id="tab1" class="row-flex-nsaw tab-content pt-2">
+        <div id="tab1" class="row-flex-nsaw tab-content pt-2" role="tabpanel" aria-labelledby="tab-btn-tab1" tabindex="0">
             <p></p>
             <div class="image-col-nsaw">
                 <div class="image-section-nsaw"
@@ -103,7 +85,7 @@
             </div>
         </div>
         <!-- Your second row -->
-        <div id="tab2" class="row-flex-nsaw tab-content">
+        <div id="tab2" class="row-flex-nsaw tab-content" role="tabpanel" aria-labelledby="tab-btn-tab2" tabindex="0">
             <div class="image-col-nsaw">
                 <div class="image-section-nsaw"
                     style="background-image: url('https://s3.amazonaws.com/uss-cache.salvationarmy.org/a6d25d20-613d-4cb1-960f-c74deff90df4_Helene_Augusta_Villalta_volunteerpreparingfood.jpg');">
@@ -130,7 +112,7 @@
             </div>
         </div>
         <!-- Row 3 -->
-        <div id="tab3" class="row-flex-nsaw tab-content">
+        <div id="tab3" class="row-flex-nsaw tab-content" role="tabpanel" aria-labelledby="tab-btn-tab3" tabindex="0">
             <div class="image-col-nsaw">
                 <div class="image-section-nsaw"
                     style="background-image: url('https://s3.amazonaws.com/uss-cache.salvationarmy.org/525ed166-4c3f-4887-b81d-9221802052a1_Large-Studio+Session-391-Square.jpg');">
@@ -158,7 +140,7 @@
             </div>
         </div>
         <!-- Row 4 -->
-        <div id="tab4" class="row-flex-nsaw tab-content">
+        <div id="tab4" class="row-flex-nsaw tab-content" role="tabpanel" aria-labelledby="tab-btn-tab4" tabindex="0">
             <div class="image-col-nsaw">
                 <div class="image-section-nsaw"
                     style="background-image: url('https://s3.amazonaws.com/uss-cache.salvationarmy.org/86eda31e-bc20-4be4-ab41-197ad251fd58_Large-DSC07440.jpg');">
@@ -190,7 +172,7 @@
             </div>
         </div>
         <!-- Row 5 -->
-        <div id="tab5" class="row-flex-nsaw tab-content">
+        <div id="tab5" class="row-flex-nsaw tab-content" role="tabpanel" aria-labelledby="tab-btn-tab5" tabindex="0">
             <div class="image-col-nsaw">
                 <div class="image-section-nsaw"
                     style="background-image: url('https://s3.amazonaws.com/uss-cache.salvationarmy.org/da087bdb-c5cd-4027-8ed8-edd58f418bd2_Large-_SLV8155fs.jpg');">
@@ -220,7 +202,7 @@
             </div>
         </div>
         <!-- Row 6 -->
-        <div id="tab6" class="row-flex-nsaw tab-content">
+        <div id="tab6" class="row-flex-nsaw tab-content" role="tabpanel" aria-labelledby="tab-btn-tab6" tabindex="0">
             <div class="image-col-nsaw">
                 <div class="image-section-nsaw"
                     style="background-image: url('https://s3.amazonaws.com/uss-cache.salvationarmy.org/9c54785f-1042-4123-b3cd-a530c2db959f_conway-volunteers-smiling-florence.jpg');">
@@ -251,7 +233,7 @@
             </div>
         </div>
         <!-- Row 7 -->
-        <div id="tab7" class="row-flex-nsaw tab-content">
+        <div id="tab7" class="row-flex-nsaw tab-content" role="tabpanel" aria-labelledby="tab-btn-tab7" tabindex="0">
             <div class="image-col-nsaw">
                 <div class="image-section-nsaw"
                     style="background-image: url('https://s3.amazonaws.com/uss-cache.salvationarmy.org/4516d5fc-669f-4623-9112-4b5fc654414e_Church+members+discussing+the+bible+Square.jpg');">
@@ -280,7 +262,7 @@
             </div>
         </div>
         <!-- Row 8 -->
-        <div id="tab8" class="row-flex-nsaw tab-content">
+        <div id="tab8" class="row-flex-nsaw tab-content" role="tabpanel" aria-labelledby="tab-btn-tab8" tabindex="0">
             <div class="image-col-nsaw">
                 <div class="image-section-nsaw"
                     style="background-image: url('https://s3.amazonaws.com/uss-cache.salvationarmy.org/45d52e9d-08e0-45e4-8a43-9a3fbb543721_Soldiers+and+Youth+Volunteers+in+Uniform.jpg');">
@@ -309,7 +291,7 @@
             </div>
         </div>
         <!-- Row 9 -->
-        <div id="tab9" class="row-flex-nsaw tab-content">
+        <div id="tab9" class="row-flex-nsaw tab-content" role="tabpanel" aria-labelledby="tab-btn-tab9" tabindex="0">
             <div class="image-col-nsaw">
                 <div class="image-section-nsaw"
                     style="background-image: url('https://s3.amazonaws.com/uss-cache.salvationarmy.org/38de5d77-4faf-4c14-92d8-77bdb5368890_Large-Caseworker.jpg');">
@@ -343,7 +325,7 @@
             </div>
         </div>
         <!-- Row 10 -->
-        <div id="tab10" class="row-flex-nsaw tab-content">
+        <div id="tab10" class="row-flex-nsaw tab-content" role="tabpanel" aria-labelledby="tab-btn-tab10" tabindex="0">
             <div class="image-col-nsaw">
                 <div class="image-section-nsaw"
                     style="background-image: url('https://s3.amazonaws.com/uss-cache.salvationarmy.org/2898b1fc-8bbf-45ca-a4c3-580f3d32ee2b_Large-Officers_Corps.jpg');">
@@ -375,7 +357,7 @@
             </div>
         </div>
         <!-- Row 11 -->
-        <div id="tab11" class="row-flex-nsaw tab-content">
+        <div id="tab11" class="row-flex-nsaw tab-content" role="tabpanel" aria-labelledby="tab-btn-tab11" tabindex="0">
             <div class="image-col-nsaw">
                 <div class="image-section-nsaw"
                     style="background-image: url('https://s3.amazonaws.com/uss-cache.salvationarmy.org/850c067d-0a6d-4cd1-ba19-1e554e369998_OneRace_DFelice-238.jpg');">
@@ -400,7 +382,7 @@
             </div>
         </div>
         <!-- Row 12 -->
-        <div id="tab12" class="row-flex-nsaw tab-content">
+        <div id="tab12" class="row-flex-nsaw tab-content" role="tabpanel" aria-labelledby="tab-btn-tab12" tabindex="0">
             <div class="image-col-nsaw">
                 <div class="image-section-nsaw"
                     style="background-image: url('https://s3.amazonaws.com/uss-cache.salvationarmy.org/86825e6c-899c-47c7-b5e8-3bcd59970ca6_Large-28627_Tuscon_School_Children_Smiling_2.jpg');">
@@ -493,8 +475,25 @@
                 }
 
                 function activateTab(tabId) {
-                    tabButtons.forEach(btn => btn.classList.toggle('active', btn.getAttribute('data-tab') === tabId));
-                    tabContents.forEach(content => content.classList.toggle('active', content.id === tabId));
+                    tabButtons.forEach(btn => {
+                        const isActive = btn.getAttribute('data-tab') === tabId;
+                        btn.classList.toggle('active', isActive);
+                        try { btn.setAttribute('aria-selected', isActive ? 'true' : 'false'); } catch(e){}
+                    });
+
+                    tabContents.forEach(content => {
+                        const isActive = content.id === tabId;
+                        content.classList.toggle('active', isActive);
+                        if (isActive) {
+                            try {
+                                content.setAttribute('tabindex', '0');
+                                content.focus({preventScroll: true});
+                            } catch (e) { /* ignore focus errors */ }
+                        } else {
+                            try { content.removeAttribute('tabindex'); } catch(e){}
+                        }
+                    });
+
                     centerActiveTab();
                 }
 
