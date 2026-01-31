@@ -1213,4 +1213,15 @@ input[type="checkbox"]:checked + .panel-content {
   z-index: 3000;
 }
 
+/* Ensure site header / nav sit above content overlays and tab panels */
+header, .site-header, .navbar, .nav, .flyoutNav {
+  z-index: 3500 !important;
+  position: relative;
+}
+
+/* If a template adds 'pe-none' to header containers, allow pointer events */
+.site-header.pe-none, header.pe-none, .navbar.pe-none, .flyoutNav.pe-none {
+  pointer-events: auto !important;
+}
+
 
