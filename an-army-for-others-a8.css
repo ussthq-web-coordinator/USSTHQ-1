@@ -7,6 +7,42 @@ html, body {
 
 *, *::before, *::after {
   box-sizing: inherit;
+@media (max-width: 1024px) {
+  .section#tab-video.active,
+  .tab-content#tab-video.active {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: flex-start !important;
+  }
+  .section#tab-video.active > .image-col-nsaw,
+  .tab-content#tab-video.active > .image-col-nsaw {
+    order: 1 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    display: flex !important;
+    justify-content: center !important;
+    align-items: center !important;
+    padding: 0 1rem !important;
+  }
+  .section#tab-video.active > .text-col-nsaw,
+  .tab-content#tab-video.active > .text-col-nsaw {
+    order: 2 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    display: block !important;
+    padding: 0 1rem !important;
+  }
+  .section#tab-video.active .video-wrapper-nsaw,
+  .tab-content#tab-video.active .video-wrapper-nsaw {
+    display: block !important;
+    order: 1 !important;
+    width: 100% !important;
+    max-width: 1200px !important;
+    margin: 0.5rem auto 1.5rem auto !important;
+    padding-bottom: 56.25% !important;
+  }
+}
 }
 
 /* === Global Container Safeguards === */
@@ -859,6 +895,13 @@ input[type="checkbox"]:checked + .panel-content {
     -webkit-appearance: none !important;
     appearance: none !important;
     text-align: center;
+    /* add a chevron to indicate it's a dropdown */
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><polyline points='6 9 12 15 18 9' stroke='%23fff' stroke-width='2' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>");
+    background-repeat: no-repeat;
+    background-position: right 1rem center;
+    background-size: 1.25rem 1.25rem;
+    padding-right: 2.25rem !important;
+    cursor: pointer;
   }
   .section-nav .mobile-select option {
     color: #fff !important;
@@ -1446,6 +1489,15 @@ header, .site-header, .navbar, .nav, .flyoutNav {
   pointer-events: auto;
 }
 
+/* Ensure video container and iframe are interactable even though .tabs-shell
+   uses pointer-events:none to avoid blocking header flyouts. */
+.tabs-shell .video-wrapper-nsaw,
+.tabs-shell .video-wrapper-nsaw iframe,
+.tabs-shell .image-col-nsaw,
+.tabs-shell .image-section-nsaw {
+  pointer-events: auto !important;
+}
+
 /* Small top margin for overlay text cards to give breathing room above them */
 .tabs-shell .overlay-card-nsaw {
   margin-top: 1rem !important;
@@ -1470,7 +1522,14 @@ header, .site-header, .navbar, .nav, .flyoutNav {
   font-weight: 600 !important;
   -webkit-appearance: none !important;
   appearance: none !important;
-  text-align: center;
+    text-align: center;
+    /* chevron indicator for the select */
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><polyline points='6 9 12 15 18 9' stroke='%23fff' stroke-width='2' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>");
+    background-repeat: no-repeat;
+    background-position: right 1rem center;
+    background-size: 1.25rem 1.25rem;
+    padding-right: 2.25rem !important;
+    cursor: pointer;
 }
 .section-nav .mobile-select option {
   color: #fff !important;
