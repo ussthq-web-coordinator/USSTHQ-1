@@ -139,12 +139,47 @@ html, body {
     margin: 0;
   }
 
+  /* Desktop: keep overlay card beside the image without overlapping it */
+  .row-flex-nsaw.active > .text-col-nsaw .overlay-card-nsaw {
+    margin: 0; /* remove negative overlap on desktop */
+    max-width: 100%;
+    text-align: left; /* align copy to the left for desktop */
+    padding: 2.25rem; /* keep generous padding */
+    box-shadow: 0 1rem 2rem rgba(239,62,66,0.18);
+    position: relative;
+    transform: none;
+  }
+
+  /* Ensure image column aligns visually with the overlay card height */
+  .row-flex-nsaw.active > .image-col-nsaw {
+    align-items: center;
+    padding: 0 1rem 0 0;
+  }
+
   /* Alternating order: even rows place image on the right */
   .row-flex-nsaw.active:nth-child(even) > .image-col-nsaw {
     order: 2;
   }
   .row-flex-nsaw.active:nth-child(even) > .text-col-nsaw {
     order: 1;
+  }
+
+  /* Enforce desktop flex layout explicitly to avoid stacking caused by
+     competing rules or accidental display overrides from templates. */
+  .nsaw-shell .row-flex-nsaw.active,
+  .nsaw-shell .section.active {
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: stretch !important; /* keep columns top-aligned and equal height */
+    gap: 1rem !important;
+  }
+
+  /* Ensure overlay-card doesn't overlap the image on desktop */
+  .nsaw-shell .overlay-container-fix .overlay-card-nsaw,
+  .nsaw-shell .row-flex-nsaw.active > .text-col-nsaw .overlay-card-nsaw {
+    margin: 0 !important;
+    transform: none !important;
+    position: relative !important;
   }
 
   /* Make overlay card sit naturally inside text column */
@@ -735,6 +770,129 @@ input[type="checkbox"]:checked + .panel-content {
   max-width: 900px !important;
   margin: 0 0 1rem 0 !important;
   text-align: center !important;
+}
+
+/* --- Explicit mobile ordering: ensure video-intro sits under video even when
+   the intro markup appears before the iframe in the DOM. --- */
+@media (max-width: 1024px) {
+  .section#tab-video.active > .image-col-nsaw,
+  .nsaw-tab-panel#tab-video.active > .image-col-nsaw {
+    display: flex !important;
+    flex-direction: column !important; /* stack video-wrapper then intro */
+    align-items: center !important;
+  }
+
+  .section#tab-video.active .video-wrapper-nsaw,
+  .nsaw-tab-panel#tab-video.active .video-wrapper-nsaw {
+    order: 1 !important;
+    width: 100% !important;
+  }
+
+  .section#tab-video.active .video-intro,
+  .nsaw-tab-panel#tab-video.active .video-intro {
+    order: 2 !important;
+    width: 100% !important;
+  }
+}
+
+/* --- Desktop: enforce explicit left/right column ordering to avoid nth-child
+   surprises from other sibling elements (nav, panels). These rules override
+   any alternating nth-child rules so each row consistently shows image + text. */
+@media (min-width: 1025px) {
+  .row-flex-nsaw.active > .image-col-nsaw { order: 1 !important; }
+  .row-flex-nsaw.active > .text-col-nsaw  { order: 2 !important; }
+
+  /* If a row needs to flip the columns, add `flex-md-row-reverse` to the row.
+     That class continues to work, but explicit orders here provide a predictable baseline. */
+  .flex-md-row-reverse.active > .image-col-nsaw { order: 2 !important; }
+  .flex-md-row-reverse.active > .text-col-nsaw  { order: 1 !important; }
+
+  /* Ensure image and text column widths are enforced after order resets */
+  .row-flex-nsaw.active > .image-col-nsaw,
+  .flex-md-row-reverse.active > .image-col-nsaw {
+    width: 45% !important;
+    max-width: 45% !important;
+  }
+  .row-flex-nsaw.active > .text-col-nsaw,
+  .flex-md-row-reverse.active > .text-col-nsaw {
+    width: 55% !important;
+    max-width: 55% !important;
+  }
+
+  /* Explicitly apply two-column layout for tab1..tab12 on desktop. This
+     ensures those sections render side-by-side regardless of DOM ordering
+     or other template styles. */
+  .section#tab1.active,
+  .section#tab2.active,
+  .section#tab3.active,
+  .section#tab4.active,
+  .section#tab5.active,
+  .section#tab6.active,
+  .section#tab7.active,
+  .section#tab8.active,
+  .section#tab9.active,
+  .section#tab10.active,
+  .section#tab11.active,
+  .section#tab12.active {
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    gap: 1rem !important;
+  }
+
+  .section#tab1.active > .image-col-nsaw,
+  .section#tab2.active > .image-col-nsaw,
+  .section#tab3.active > .image-col-nsaw,
+  .section#tab4.active > .image-col-nsaw,
+  .section#tab5.active > .image-col-nsaw,
+  .section#tab6.active > .image-col-nsaw,
+  .section#tab7.active > .image-col-nsaw,
+  .section#tab8.active > .image-col-nsaw,
+  .section#tab9.active > .image-col-nsaw,
+  .section#tab10.active > .image-col-nsaw,
+  .section#tab11.active > .image-col-nsaw,
+  .section#tab12.active > .image-col-nsaw {
+    width: 45% !important;
+    max-width: 45% !important;
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: center !important;
+  }
+
+  .section#tab1.active > .text-col-nsaw,
+  .section#tab2.active > .text-col-nsaw,
+  .section#tab3.active > .text-col-nsaw,
+  .section#tab4.active > .text-col-nsaw,
+  .section#tab5.active > .text-col-nsaw,
+  .section#tab6.active > .text-col-nsaw,
+  .section#tab7.active > .text-col-nsaw,
+  .section#tab8.active > .text-col-nsaw,
+  .section#tab9.active > .text-col-nsaw,
+  .section#tab10.active > .text-col-nsaw,
+  .section#tab11.active > .text-col-nsaw,
+  .section#tab12.active > .text-col-nsaw {
+    width: 55% !important;
+    max-width: 55% !important;
+    display: flex !important;
+    align-items: center !important;
+    padding: 0 1rem !important;
+  }
+
+  /* Add breathing room above the overlay card for these sections on desktop */
+  .section#tab1.active > .text-col-nsaw .overlay-card-nsaw,
+  .section#tab2.active > .text-col-nsaw .overlay-card-nsaw,
+  .section#tab3.active > .text-col-nsaw .overlay-card-nsaw,
+  .section#tab4.active > .text-col-nsaw .overlay-card-nsaw,
+  .section#tab5.active > .text-col-nsaw .overlay-card-nsaw,
+  .section#tab6.active > .text-col-nsaw .overlay-card-nsaw,
+  .section#tab7.active > .text-col-nsaw .overlay-card-nsaw,
+  .section#tab8.active > .text-col-nsaw .overlay-card-nsaw,
+  .section#tab9.active > .text-col-nsaw .overlay-card-nsaw,
+  .section#tab10.active > .text-col-nsaw .overlay-card-nsaw,
+  .section#tab11.active > .text-col-nsaw .overlay-card-nsaw,
+  .section#tab12.active > .text-col-nsaw .overlay-card-nsaw {
+    margin-top: 2rem !important;
+  }
 }
 
 /* Make cards flow naturally (no internal scrolling) */
@@ -1560,11 +1718,69 @@ header, .site-header, .navbar, .nav, .flyoutNav {
   color: #fff !important;
 }
 
+/* Desktop: make image column match the text card height and center the image
+   so the visual weight is balanced. This forces equal-height columns and
+   prevents the overlay card from visually overlapping the image. */
+@media (min-width: 1025px) {
+  .row-flex-nsaw.active,
+  .nsaw-shell .section.active {
+    align-items: stretch !important; /* make columns equal-height */
+  }
+
+  .row-flex-nsaw.active > .image-col-nsaw,
+  .row-flex-nsaw.active > .text-col-nsaw,
+  .flex-md-row-reverse.active > .image-col-nsaw,
+  .flex-md-row-reverse.active > .text-col-nsaw {
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: center !important;
+    padding: 1rem !important;
+    box-sizing: border-box !important;
+  }
+
+  /* Let the image element grow to fill the column height and crop via cover */
+  .row-flex-nsaw.active > .image-col-nsaw .image-section-nsaw,
+  .flex-md-row-reverse.active > .image-col-nsaw .image-section-nsaw {
+    flex: 1 1 auto !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    height: 100% !important;
+    object-fit: cover !important;
+    background-size: cover !important;
+    background-position: center !important;
+  }
+
+  /* Ensure overlay card doesn't use negative margins that cause overlap */
+  .row-flex-nsaw.active > .text-col-nsaw .overlay-card-nsaw,
+  .row-flex-nsaw.active .overlay-card-nsaw {
+    margin: 0 !important;
+    transform: none !important;
+    position: relative !important;
+  }
+
+  /* Tighten image padding so the image visually matches the card sizing */
+  .row-flex-nsaw.active > .image-col-nsaw {
+    padding-top: 1.25rem !important;
+    padding-bottom: 1.25rem !important;
+  }
+}
+
 /* Ensure the video intro's CTA (and similar inline CTAs) receive pointer events */
 .tabs-shell .video-intro a,
 .tabs-shell .video-intro button,
 .tabs-shell .video-intro [data-tab] {
   pointer-events: auto;
 }
+
+/* --- Tab controls: JS-driven selection using a single <select> control --- */
+/* Hide non-active sections by default; show the active section via .active */
+.nsaw-shell .section { display: none; }
+.nsaw-shell .section.active { display: flex !important; flex-direction: column !important; }
+
+/* Keep a small styling surface for potential JS-set button states */
+.nsaw-tab-button { cursor: pointer; display: inline-block; padding: 0.35rem 0.75rem; border-radius: 999px; border: 1px solid #000; background: transparent; margin: 0.15rem; }
+.nsaw-tab-button[aria-pressed="true"], .nsaw-tab-button.active { background: #000; color: #fff; }
+
+/* If legacy dropdown/pill rules remain elsewhere, they won't interfere — we rely on .section.active now. */
 
 
