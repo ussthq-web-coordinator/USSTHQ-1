@@ -354,9 +354,6 @@ input[type="checkbox"]:checked + .panel-content {
 .tab-content {
   display: none;
   animation: fadeIn 0.6s ease;
-  /* keep content view from forcing page height; allow internal scrolling */
-  max-height: calc(100vh - 140px);
-  overflow-y: auto;
   align-items: flex-start;
   justify-content: center;
   padding-top: 1rem;
