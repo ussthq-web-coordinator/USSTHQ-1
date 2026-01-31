@@ -1457,4 +1457,37 @@ header, .site-header, .navbar, .nav, .flyoutNav {
   }
 }
 
+/* Show the dropdown on all screen sizes (dropdown-only navigation) */
+.section-nav .mobile-select {
+  display: block !important;
+  width: 100% !important;
+  max-width: 640px !important;
+  margin: 0.25rem auto !important;
+  padding: 0.5rem 0.75rem !important;
+  border-radius: 9999px !important;
+  background: #132230 !important;
+  color: #fff !important;
+  font-weight: 600 !important;
+  -webkit-appearance: none !important;
+  appearance: none !important;
+  text-align: center;
+}
+.section-nav .mobile-select option {
+  color: #fff !important;
+  background: #132230 !important;
+  text-align: center;
+}
+.section-nav .mobile-select option:checked,
+.section-nav .mobile-select option[selected] {
+  background: #EF3E42 !important;
+  color: #fff !important;
+}
+
+/* Ensure the video intro's CTA (and similar inline CTAs) receive pointer events */
+.tabs-shell .video-intro a,
+.tabs-shell .video-intro button,
+.tabs-shell .video-intro [data-tab] {
+  pointer-events: auto;
+}
+
 
