@@ -530,7 +530,7 @@ input[type="checkbox"]:checked + .panel-content {
   -ms-overflow-style: auto;
   position: sticky;
   top: 0;
-  z-index: 10; /* lowered so global menu flyouts can appear above the tabs */
+  z-index: 8; /* lowered so global menu flyouts can appear above the tabs */
   background: #fff;
   box-shadow: 0 2px 8px rgba(30,41,59,0.06);
 }
