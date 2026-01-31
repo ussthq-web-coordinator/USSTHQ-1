@@ -113,7 +113,7 @@ html, body {
 
   /* Make overlay card sit naturally inside text column */
   .overlay-card-nsaw {
-    margin: 0;
+    margin: 1.25rem auto 0; /* add more top breathing room on desktop */
   }
 
   /* Make image fill its column with a widescreen aspect */
@@ -137,6 +137,51 @@ html, body {
   border-radius: 1rem;
   box-shadow: 0 0.25rem 1rem rgba(0,0,0,0.15);
   object-fit: cover;
+}
+
+/* Desktop: ensure the image column centers content and images are centered
+   horizontally with a consistent small top gap. Override earlier width hints
+   so images visually align in the middle of the column. */
+.image-col-nsaw {
+  display: flex !important;
+  justify-content: center !important;
+  align-items: flex-start !important;
+}
+.image-col-nsaw .image-section-nsaw {
+  display: block !important;
+  margin: 0.5rem auto 0 auto !important; /* consistent top gap for most tabs */
+  max-width: 70% !important; /* keep within a comfortable column width */
+  width: 100% !important; /* ensure the element fills the image column so aspect-ratio produces visible height */
+}
+
+/* Larger images on wider viewports */
+@media (min-width: 1025px) {
+  .image-col-nsaw .image-section-nsaw {
+    max-width: 90% !important; /* let image occupy more of the column */
+    max-height: 540px !important; /* allow taller visible media */
+    width: 100% !important;
+  }
+}
+
+@media (min-width: 1400px) {
+  .image-col-nsaw .image-section-nsaw {
+    max-width: 100% !important; /* full column width on very large screens */
+    max-height: 720px !important;
+  }
+}
+
+/* Tab 1 uses a tighter top gap (less vertical space above the image) */
+#tab1 .image-section-nsaw {
+  margin-top: 0 !important;
+  
+  /* Mobile override: make images larger and more prominent on small viewports */
+  .image-col-nsaw .image-section-nsaw {
+    max-width: 100% !important;
+    width: 100% !important;
+    aspect-ratio: 16 / 9 !important;
+    max-height: 520px !important;
+    margin-top: 0.5rem !important;
+  }
 }
 
 /* Align specific tab images: tab7 bottom-aligned; others top-aligned */
@@ -495,6 +540,10 @@ input[type="checkbox"]:checked + .panel-content {
   border-radius: 9999px;
   cursor: pointer;
   font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
   transition: background-color 0.3s ease, color 0.3s ease;
 }
 
@@ -547,6 +596,109 @@ input[type="checkbox"]:checked + .panel-content {
   background-size: cover;
   background-position: center;
   border-radius: 1rem;
+}
+
+/* Ensure image column centers the media horizontally and all sections
+   use a consistent top margin so images align the same across tabs. */
+.image-col-nsaw {
+  display: flex;
+  justify-content: center; /* center horizontally */
+  align-items: flex-start; /* keep image top-aligned inside column */
+}
+
+.image-col-nsaw .image-section-nsaw {
+  margin-left: auto;
+  margin-right: auto;
+  margin-top: 1rem; /* consistent top gap across all sections */
+}
+
+/* For the video and other sections that may have been forced to full-width,
+   ensure the image remains centered within its column on larger viewports. */
+@media (min-width: 1025px) {
+  .row-flex-nsaw.active > .image-col-nsaw,
+  .section.active > .image-col-nsaw {
+    justify-content: center;
+  }
+}
+
+/* Compatibility: mirror important tab-content selectors for .section
+   (we replaced .tab-content with .section in the markup). This keeps
+   the original video layout and visibility rules working. */
+.section {
+  display: block;
+  animation: fadeIn 0.6s ease;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 1rem;
+  padding-bottom: 1rem;
+  position: relative;
+}
+.section.active {
+  display: flex;
+  position: relative;
+}
+
+/* Hide video wrapper and intro when a section is not active (accessibility-preserving) */
+.section:not(.active) .video-wrapper-nsaw,
+.section:not(.active) .video-wrapper-nsaw iframe {
+  display: none !important;
+}
+.section:not(.active) .video-intro {
+  display: none !important;
+}
+
+/* Preserve reduced top padding for non-first sections */
+.section:not(#tab1) {
+  padding-top: 0.25rem !important;
+  margin-top: 0 !important;
+}
+
+/* Video-specific layout when video section is active: stack media first */
+.section#tab-video.active {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+}
+.section#tab-video.active > .image-col-nsaw {
+  width: 100% !important;
+  max-width: 100% !important;
+  display: flex !important;
+  justify-content: center !important;
+  align-items: center !important;
+  padding: 0 1rem !important;
+  order: 1 !important; /* ensure video sits above heading/text */
+}
+.section#tab-video.active > .text-col-nsaw {
+  width: 100% !important;
+  order: 2 !important;
+  max-width: 100% !important;
+  display: block !important;
+  padding: 0 1rem !important;
+}
+.section#tab-video.active .video-wrapper-nsaw {
+  max-width: 1200px;
+  width: 100%;
+  box-sizing: border-box;
+  margin: 0.5rem auto 1.5rem auto;
+  padding-bottom: 56.25%; /* 16:9 */
+  display: block;
+  order: 1 !important; /* keep the media at the top of the stacked flow */
+}
+.section#tab-video.active .video-wrapper-nsaw iframe {
+  display: block !important;
+  margin: 0 auto !important;
+  width: 100% !important;
+  height: 100% !important;
+}
+.section#tab-video.active .video-intro {
+  margin-bottom: 1rem;
+  text-align: center;
+  order: 2 !important; /* intro follows the video */
+  width: 100% !important;
+  max-width: 900px !important;
+  margin: 0 0 1rem 0 !important;
+  text-align: center !important;
 }
 
 /* Make cards flow naturally (no internal scrolling) */
@@ -667,6 +819,58 @@ input[type="checkbox"]:checked + .panel-content {
 .tabs-shell .tab-buttons-wrapper {
   background: transparent;
   box-shadow: none;
+}
+
+/* Section nav: keep non-active .section elements in the DOM but visually hidden
+   for accessibility parity. Active section receives normal flow. */
+.section:not(.active) {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  margin: -1px !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+  clip: rect(0 0 0 0) !important;
+  white-space: nowrap !important;
+  border: 0 !important;
+}
+.section.active { display: flex !important; position: relative !important; }
+.section-nav a.active, .section-nav a:hover { text-decoration: none; }
+
+/* Mobile: replace pill nav with a compact dropdown to save vertical space */
+.mobile-select {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .section-nav .tab-button {
+    display: none !important;
+  }
+  .section-nav .mobile-select {
+    display: block !important;
+    width: 100% !important;
+    max-width: 640px !important;
+    margin: 0.25rem auto !important;
+    padding: 0.5rem 0.75rem !important;
+    border-radius: 9999px !important;
+    background: #132230 !important;
+    color: #fff !important;
+    font-weight: 600 !important;
+    -webkit-appearance: none !important;
+    appearance: none !important;
+    text-align: center;
+  }
+  .section-nav .mobile-select option {
+    color: #fff !important;
+    background: #132230 !important;
+    text-align: center;
+  }
+  /* Ensure the highlighted/selected option is readable */
+  .section-nav .mobile-select option:checked,
+  .section-nav .mobile-select option[selected] {
+    background: #EF3E42 !important;
+    color: #fff !important;
+  }
 }
 
 .tab-buttons-wrapper::-webkit-scrollbar {

@@ -6,7 +6,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Bootstrap Boilerplate</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="an-army-for-others-a4.css">
+    <link rel="stylesheet" href="an-army-for-others-a5.css">
+    <!-- moved section styles into an-army-for-others-a4.css -->
 </head>
 
 <body>
@@ -16,33 +17,49 @@
         </div>
         <!-- Tabs shell: groups nav + content so background can extend -->
         <div class="tabs-shell">
-        <!-- Modern Tab Navigation at Top -->
+        <!-- Section Navigation: simple anchor links (replaces tabs) -->
         <nav class="tab-buttons-wrapper sticky-top">
-            <div class="tab-buttons py-3" role="tablist" aria-orientation="horizontal" style="background-color: #F5F6F2;">
-                <button id="tab-btn-tab-video" class="tab-button active" role="tab" aria-controls="tab-video" aria-selected="true" data-tab="tab-video">Watch Video</button>
-                <button id="tab-btn-tab1" class="tab-button" role="tab" aria-controls="tab1" aria-selected="false" data-tab="tab1">Introduction</button>
-                <button id="tab-btn-tab2" class="tab-button" role="tab" aria-controls="tab2" aria-selected="false" data-tab="tab2">The Mission Continues</button>
-                <button id="tab-btn-tab3" class="tab-button" role="tab" aria-controls="tab3" aria-selected="false" data-tab="tab3">Friends</button>
-                <button id="tab-btn-tab4" class="tab-button" role="tab" aria-controls="tab4" aria-selected="false" data-tab="tab4">Partners</button>
-                <button id="tab-btn-tab5" class="tab-button" role="tab" aria-controls="tab5" aria-selected="false" data-tab="tab5">Program Participants</button>
-                <button id="tab-btn-tab6" class="tab-button" role="tab" aria-controls="tab6" aria-selected="false" data-tab="tab6">Volunteers</button>
-                <button id="tab-btn-tab7" class="tab-button" role="tab" aria-controls="tab7" aria-selected="false" data-tab="tab7">Members &amp; Adherents</button>
-                <button id="tab-btn-tab8" class="tab-button" role="tab" aria-controls="tab8" aria-selected="false" data-tab="tab8">Soldiers</button>
-                <button id="tab-btn-tab9" class="tab-button" role="tab" aria-controls="tab9" aria-selected="false" data-tab="tab9">Employees</button>
-                <button id="tab-btn-tab10" class="tab-button" role="tab" aria-controls="tab10" aria-selected="false" data-tab="tab10">Officers</button>
-                <button id="tab-btn-tab11" class="tab-button" role="tab" aria-controls="tab11" aria-selected="false" data-tab="tab11">Why The Uniform</button>
-                <button id="tab-btn-tab12" class="tab-button" role="tab" aria-controls="tab12" aria-selected="false" data-tab="tab12">A Mission For You</button>
+                        <div class="section-nav py-3" style="background-color: #F5F6F2; display:flex; gap:0.5rem; flex-wrap:wrap; justify-content:center;">
+                                <!-- Mobile dropdown (hidden on desktop) -->
+                                <select class="mobile-select" aria-label="Select section">
+                                    <option value="#tab-video">Watch Video</option>
+                                    <option value="#tab1">Introduction</option>
+                                    <option value="#tab2">The Mission Continues</option>
+                                    <option value="#tab3">Friends</option>
+                                    <option value="#tab4">Partners</option>
+                                    <option value="#tab5">Program Participants</option>
+                                    <option value="#tab6">Volunteers</option>
+                                    <option value="#tab7">Members &amp; Adherents</option>
+                                    <option value="#tab8">Soldiers</option>
+                                    <option value="#tab9">Employees</option>
+                                    <option value="#tab10">Officers</option>
+                                    <option value="#tab11">Why The Uniform</option>
+                                    <option value="#tab12">A Mission For You</option>
+                                </select>
+                                <a href="#tab-video" class="tab-button active">Watch Video</a>
+                <a href="#tab1" class="tab-button">Introduction</a>
+                <a href="#tab2" class="tab-button">The Mission Continues</a>
+                <a href="#tab3" class="tab-button">Friends</a>
+                <a href="#tab4" class="tab-button">Partners</a>
+                <a href="#tab5" class="tab-button">Program Participants</a>
+                <a href="#tab6" class="tab-button">Volunteers</a>
+                <a href="#tab7" class="tab-button">Members &amp; Adherents</a>
+                <a href="#tab8" class="tab-button">Soldiers</a>
+                <a href="#tab9" class="tab-button">Employees</a>
+                <a href="#tab10" class="tab-button">Officers</a>
+                <a href="#tab11" class="tab-button">Why The Uniform</a>
+                <a href="#tab12" class="tab-button">A Mission For You</a>
             </div>
         </nav>
         <!-- Tab Contents: Video First -->
-        <div id="tab-video" class="row-flex-nsaw tab-content active pt-2" role="tabpanel" aria-labelledby="tab-btn-tab-video" tabindex="0">
+        <div id="tab-video" class="row-flex-nsaw section active pt-2" tabindex="0">
             <div class="image-col-nsaw" style="width:100%; justify-content:center;">
                 <div class="video-intro text-center" style="max-width:900px; margin:0 auto;">
                     <h3 class="fw-bold">Loving All For Jesus</h3>
                     <p>Learn how we come alongside others to love, serve, and disciple—bringing practical help and
                         spiritual care so no one walks alone.</p>
                         <p>With your help, we will never stop!</p>
-                    <p><button class="btn rounded-pill mt-2 intro-cta" data-tab="tab1" style="color:#000;border:1px solid #000;background:transparent">Read the Introduction</button></p>
+                    <p><a class="btn rounded-pill mt-2 intro-cta" data-tab="tab1" href="#tab1" style="color:#000;border:1px solid #000;background:transparent">Read the Introduction</a></p>
                 </div>
                 <div class="video-wrapper-nsaw mt-4">
                     <iframe
@@ -58,8 +75,7 @@
         </div>
         <!-- Tab Contents -->
         <!-- Your first row -->
-        <div id="tab1" class="row-flex-nsaw tab-content pt-2" role="tabpanel" aria-labelledby="tab-btn-tab1" tabindex="0">
-            <p></p>
+        <div id="tab1" class="row-flex-nsaw section pt-2" tabindex="0">
             <div class="image-col-nsaw">
                 <div class="image-section-nsaw"
                     style="background-image: url('https://s3.amazonaws.com/uss-cache.salvationarmy.org/f6ce32e4-ce2b-46be-b703-d65388a37c2b_Large-_SLV8264.jpg');">
@@ -77,41 +93,41 @@
                         <p>Since 1865, when William and Catherine Booth first preached the gospel in the streets of
                             London, The Salvation Army has been a movement for people. People in poverty. People in
                             crisis. People looking for purpose. People like you and me.</p>
-                        <button class="btn btn-outline-dark rounded-pill" data-tab="tab2">The
-                            Mission Continues</button>
+                        <a class="btn btn-outline-dark rounded-pill" data-tab="tab2" href="#tab2">The
+                            Mission Continues</a>
                     </div>
                 </div>
             </div>
         </div>
         <!-- Your second row -->
-        <div id="tab2" class="row-flex-nsaw tab-content" role="tabpanel" aria-labelledby="tab-btn-tab2" tabindex="0">
-            <div class="image-col-nsaw">
-                <div class="image-section-nsaw"
-                    style="background-image: url('https://s3.amazonaws.com/uss-cache.salvationarmy.org/a6d25d20-613d-4cb1-960f-c74deff90df4_Helene_Augusta_Villalta_volunteerpreparingfood.jpg');">
+        <div id="tab2" class="row-flex-nsaw section" role="tabpanel" aria-labelledby="tab-btn-tab2" tabindex="0">
+                <div class="image-col-nsaw">
+                    <div class="image-section-nsaw"
+                        style="background-image: url('https://s3.amazonaws.com/uss-cache.salvationarmy.org/a6d25d20-613d-4cb1-960f-c74deff90df4_Helene_Augusta_Villalta_volunteerpreparingfood.jpg');">
+                    </div>
                 </div>
-            </div>
-            <div class="text-col-nsaw">
-                <div class="overlap-container-nsaw overlap-right-nsaw">
-                    <div class="overlay-card-nsaw card-dark-nsaw">
-                        <h4 class="fw-bold">Today, that same mission continues:</h4>
-                        <p><em><b>To preach the gospel of Jesus Christ and to meet human needs in His name without
-                                    discrimination.</b></em></p>
-                        <p>We&rsquo;re not just an army of uniforms.<br>We&rsquo;re an army of compassion.<br>Of cooks,
-                            counselors, preachers, mentors, donors, students, social workers, neighbors, volunteers, and
-                            believers.<br>We&rsquo;re an Army for Others.</p>
-                        <p>And there&rsquo;s a place for you here.</p>
-                        <p><b>So who <i>is</i> the Army?</b></p>
-                        <p>We&rsquo;re glad you asked.</p>
-                        <p>Let us introduce you to the people behind the mission&mdash;the hands and hearts that carry
-                            the message forward.</p>
-                        <button class="btn btn-outline-dark rounded-pill" data-tab="tab3">Become One
-                            of Us</button>
+                <div class="text-col-nsaw">
+                    <div class="overlap-container-nsaw overlap-right-nsaw">
+                        <div class="overlay-card-nsaw card-dark-nsaw">
+                            <h4 class="fw-bold">Today, that same mission continues:</h4>
+                            <p><em><b>To preach the gospel of Jesus Christ and to meet human needs in His name without
+                                        discrimination.</b></em></p>
+                            <p>We&rsquo;re not just an army of uniforms.<br>We&rsquo;re an army of compassion.<br>Of cooks,
+                                counselors, preachers, mentors, donors, students, social workers, neighbors, volunteers, and
+                                believers.<br>We&rsquo;re an Army for Others.</p>
+                            <p>And there&rsquo;s a place for you here.</p>
+                            <p><b>So who <i>is</i> the Army?</b></p>
+                            <p>We&rsquo;re glad you asked.</p>
+                            <p>Let us introduce you to the people behind the mission&mdash;the hands and hearts that carry
+                                the message forward.</p>
+                            <a class="btn btn-outline-dark rounded-pill" data-tab="tab3" href="#tab3">Become One
+                                of Us</a>
                     </div>
                 </div>
             </div>
         </div>
         <!-- Row 3 -->
-        <div id="tab3" class="row-flex-nsaw tab-content" role="tabpanel" aria-labelledby="tab-btn-tab3" tabindex="0">
+        <div id="tab3" class="row-flex-nsaw section" tabindex="0">
             <div class="image-col-nsaw">
                 <div class="image-section-nsaw"
                     style="background-image: url('https://s3.amazonaws.com/uss-cache.salvationarmy.org/525ed166-4c3f-4887-b81d-9221802052a1_Large-Studio+Session-391-Square.jpg');">
@@ -133,13 +149,13 @@
                         <p>God uses ordinary people to do extraordinary things.<br><strong>And with friends like you,
                                 this Army shows up</strong>&mdash;not just with resources, but with hope, faith, and the
                             love of Christ in action.</p>
-                        <button class="btn btn-outline-dark rounded-pill" data-tab="tab4">Unite in Mission</button>
+                        <a class="btn btn-outline-dark rounded-pill" data-tab="tab4" href="#tab4">Unite in Mission</a>
                     </div>
                 </div>
             </div>
         </div>
         <!-- Row 4 -->
-        <div id="tab4" class="row-flex-nsaw tab-content" role="tabpanel" aria-labelledby="tab-btn-tab4" tabindex="0">
+        <div id="tab4" class="row-flex-nsaw section" tabindex="0">
             <div class="image-col-nsaw">
                 <div class="image-section-nsaw"
                     style="background-image: url('https://s3.amazonaws.com/uss-cache.salvationarmy.org/86eda31e-bc20-4be4-ab41-197ad251fd58_Large-DSC07440.jpg');">
@@ -164,14 +180,14 @@
                                 partner</a>&nbsp;&nbsp;<a class="btn btn-outline-dark rounded-pill btn-sm"
                                 href="https://www.salvationarmyusa.org/about-us/annual-reports/" target="blank">See your
                                 impact</a></p>
-                        <button class="btn btn-outline-dark rounded-pill" data-tab="tab5">Discover Our
-                            Community</button>
+                        <a class="btn btn-outline-dark rounded-pill" data-tab="tab5" href="#tab5">Discover Our
+                            Community</a>
                     </div>
                 </div>
             </div>
         </div>
         <!-- Row 5 -->
-        <div id="tab5" class="row-flex-nsaw tab-content" role="tabpanel" aria-labelledby="tab-btn-tab5" tabindex="0">
+        <div id="tab5" class="row-flex-nsaw section" tabindex="0">
             <div class="image-col-nsaw">
                 <div class="image-section-nsaw"
                     style="background-image: url('https://s3.amazonaws.com/uss-cache.salvationarmy.org/da087bdb-c5cd-4027-8ed8-edd58f418bd2_Large-_SLV8155fs.jpg');">
@@ -195,13 +211,13 @@
                                 href="https://southernusa.salvationarmy.org/uss/how-we-help" target="blank">Explore
                                 programs</a>&nbsp;<a class="btn btn-outline-dark rounded-pill btn-sm"
                                 href="/location-finder/" target="blank">Find support near you</a>&nbsp;</p>
-                        <button class="btn btn-outline-dark rounded-pill" data-tab="tab6">See How You Can Help</button>
+                        <a class="btn btn-outline-dark rounded-pill" data-tab="tab6" href="#tab6">See How You Can Help</a>
                     </div>
                 </div>
             </div>
         </div>
         <!-- Row 6 -->
-        <div id="tab6" class="row-flex-nsaw tab-content" role="tabpanel" aria-labelledby="tab-btn-tab6" tabindex="0">
+        <div id="tab6" class="row-flex-nsaw section" tabindex="0">
             <div class="image-col-nsaw">
                 <div class="image-section-nsaw"
                     style="background-image: url('https://s3.amazonaws.com/uss-cache.salvationarmy.org/9c54785f-1042-4123-b3cd-a530c2db959f_conway-volunteers-smiling-florence.jpg');">
@@ -225,14 +241,14 @@
                         <p>No matter your schedule, there&rsquo;s a place for you.</p>
                         <p><a class="btn btn-outline-dark rounded-pill btn-sm" href="/usa-southern-territory/volunteer/"
                                 target="blank">Learn more about Volunteering</a></p>
-                        <p><button class="btn btn-outline-dark rounded-pill" data-tab="tab7">Join Our Church
-                                Family</button></p>
+                        <p><a class="btn btn-outline-dark rounded-pill" data-tab="tab7" href="#tab7">Join Our Church
+                            Family</a></p>
                     </div>
                 </div>
             </div>
         </div>
         <!-- Row 7 -->
-        <div id="tab7" class="row-flex-nsaw tab-content" role="tabpanel" aria-labelledby="tab-btn-tab7" tabindex="0">
+        <div id="tab7" class="row-flex-nsaw section" tabindex="0">
             <div class="image-col-nsaw">
                 <div class="image-section-nsaw"
                     style="background-image: url('https://s3.amazonaws.com/uss-cache.salvationarmy.org/4516d5fc-669f-4623-9112-4b5fc654414e_Church+members+discussing+the+bible+Square.jpg');">
@@ -254,14 +270,14 @@
                             consistency, and a desire to grow.</p>
                         <p><a class="btn btn-outline-dark rounded-pill btn-sm" href="/usa-southern-territory/our-faith/"
                                 target="blank">Find a worship community</a></p>
-                        <p><button class="btn btn-outline-dark rounded-pill mb-2" data-tab="tab8">Commit to the
-                                Mission</button></p>
+                        <p><a class="btn btn-outline-dark rounded-pill mb-2" data-tab="tab8" href="#tab8">Commit to the
+                            Mission</a></p>
                     </div>
                 </div>
             </div>
         </div>
         <!-- Row 8 -->
-        <div id="tab8" class="row-flex-nsaw tab-content" role="tabpanel" aria-labelledby="tab-btn-tab8" tabindex="0">
+        <div id="tab8" class="row-flex-nsaw section" tabindex="0">
             <div class="image-col-nsaw">
                 <div class="image-section-nsaw"
                     style="background-image: url('https://s3.amazonaws.com/uss-cache.salvationarmy.org/45d52e9d-08e0-45e4-8a43-9a3fbb543721_Soldiers+and+Youth+Volunteers+in+Uniform.jpg');">
@@ -283,14 +299,14 @@
                         <p><a class="btn btn-outline-dark rounded-pill btn-sm"
                                 href="https://www.thewarcry.org/articles/how-do-i-enlist-in-the-salvation-army/"
                                 target="blank">Learn more about becoming a Soldier</a></p>
-                        <p><button class="btn btn-outline-dark rounded-pill mb-2" data-tab="tab9">Mission
-                                Professionals</button></p>
+                        <p><a class="btn btn-outline-dark rounded-pill mb-2" data-tab="tab9" href="#tab9">Mission
+                            Professionals</a></p>
                     </div>
                 </div>
             </div>
         </div>
         <!-- Row 9 -->
-        <div id="tab9" class="row-flex-nsaw tab-content" role="tabpanel" aria-labelledby="tab-btn-tab9" tabindex="0">
+        <div id="tab9" class="row-flex-nsaw section" tabindex="0">
             <div class="image-col-nsaw">
                 <div class="image-section-nsaw"
                     style="background-image: url('https://s3.amazonaws.com/uss-cache.salvationarmy.org/38de5d77-4faf-4c14-92d8-77bdb5368890_Large-Caseworker.jpg');">
@@ -317,14 +333,14 @@
                         <p><a class="btn btn-outline-dark rounded-pill btn-sm"
                                 href="/usa-southern-territory/employment-opportunities/" target="blank">Join our
                                 team</a></p>
-                        <p><button class="btn btn-outline-dark rounded-pill" data-tab="tab10">Leadership In
-                                Action</button></p>
+                        <p><a class="btn btn-outline-dark rounded-pill" data-tab="tab10" href="#tab10">Leadership In
+                            Action</a></p>
                     </div>
                 </div>
             </div>
         </div>
         <!-- Row 10 -->
-        <div id="tab10" class="row-flex-nsaw tab-content" role="tabpanel" aria-labelledby="tab-btn-tab10" tabindex="0">
+        <div id="tab10" class="row-flex-nsaw section" tabindex="0">
             <div class="image-col-nsaw">
                 <div class="image-section-nsaw"
                     style="background-image: url('https://s3.amazonaws.com/uss-cache.salvationarmy.org/2898b1fc-8bbf-45ca-a4c3-580f3d32ee2b_Large-Officers_Corps.jpg');">
@@ -349,14 +365,14 @@
                         <p><a class="btn btn-outline-dark rounded-pill btn-sm"
                                 href="https://salarmy.us/Apply-Now-USS-Candidates" target="blank">Explore the
                                 calling</a></p>
-                        <p><button class="btn btn-outline-dark rounded-pill mb-2" data-tab="tab11">See What the Uniform
-                                Represents</button></p>
+                        <p><a class="btn btn-outline-dark rounded-pill mb-2" data-tab="tab11" href="#tab11">See What the Uniform
+                            Represents</a></p>
                     </div>
                 </div>
             </div>
         </div>
         <!-- Row 11 -->
-        <div id="tab11" class="row-flex-nsaw tab-content" role="tabpanel" aria-labelledby="tab-btn-tab11" tabindex="0">
+        <div id="tab11" class="row-flex-nsaw section" tabindex="0">
             <div class="image-col-nsaw">
                 <div class="image-section-nsaw"
                     style="background-image: url('https://s3.amazonaws.com/uss-cache.salvationarmy.org/850c067d-0a6d-4cd1-ba19-1e554e369998_OneRace_DFelice-238.jpg');">
@@ -375,13 +391,13 @@
                             God&mdash;the uniform says, <i>&ldquo;You are not alone.&rdquo;</i></p>
                         <p>But remember: <b>You don&rsquo;t need a uniform to be part of this mission.</b></p>
                         <p>Come as you are. We mean that.</p>
-                        <button class="btn btn-outline-dark rounded-pill" data-tab="tab12">March With Us</button>
+                        <a class="btn btn-outline-dark rounded-pill" data-tab="tab12" href="#tab12">March With Us</a>
                     </div>
                 </div>
             </div>
         </div>
         <!-- Row 12 -->
-        <div id="tab12" class="row-flex-nsaw tab-content" role="tabpanel" aria-labelledby="tab-btn-tab12" tabindex="0">
+        <div id="tab12" class="row-flex-nsaw section" tabindex="0">
             <div class="image-col-nsaw">
                 <div class="image-section-nsaw"
                     style="background-image: url('https://s3.amazonaws.com/uss-cache.salvationarmy.org/86825e6c-899c-47c7-b5e8-3bcd59970ca6_Large-28627_Tuscon_School_Children_Smiling_2.jpg');">
@@ -442,88 +458,7 @@
                 </div>
             </div>
         </div>
-        <!-- Modern Tab JavaScript -->
-        <script>
-            document.addEventListener("DOMContentLoaded", function () {
-                const tabButtons = document.querySelectorAll('.tab-button');
-                const tabContents = document.querySelectorAll('.tab-content');
-                const tabTriggers = document.querySelectorAll('[data-tab]');
-
-                // Center the active tab pill inside the scrollable tab strip (smooth)
-                function centerActiveTab() {
-                    try {
-                        const activeBtn = document.querySelector('.tab-button.active');
-                        if (!activeBtn) return;
-
-                        // Prefer the inner scroll container if present
-                        let scrollEl = document.querySelector('.tab-buttons');
-                        if (!scrollEl || scrollEl.scrollWidth <= scrollEl.clientWidth) {
-                            const wrapper = document.querySelector('.tab-buttons-wrapper');
-                            if (wrapper && wrapper.scrollWidth > wrapper.clientWidth) scrollEl = wrapper;
-                        }
-
-                        if (scrollEl && scrollEl.scrollWidth > scrollEl.clientWidth) {
-                            const left = activeBtn.offsetLeft - (scrollEl.clientWidth / 2) + (activeBtn.offsetWidth / 2);
-                            scrollEl.scrollTo({ left: Math.max(0, left), behavior: 'smooth' });
-                        } else if (activeBtn.scrollIntoView) {
-                            activeBtn.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
-                        }
-                    } catch (err) {
-                        // ignore
-                    }
-                }
-
-                function activateTab(tabId) {
-                    tabButtons.forEach(btn => {
-                        const isActive = btn.getAttribute('data-tab') === tabId;
-                        btn.classList.toggle('active', isActive);
-                        try { btn.setAttribute('aria-selected', isActive ? 'true' : 'false'); } catch(e){}
-                    });
-
-                    tabContents.forEach(content => {
-                        const isActive = content.id === tabId;
-                        content.classList.toggle('active', isActive);
-                        // Keep panels present in the DOM for AT/e-readers.
-                        // Do not alter tabindex or programmatic focus to avoid
-                        // unexpected scrolling. Only update aria-selected on tabs.
-                    });
-
-                    centerActiveTab();
-                }
-
-                tabTriggers.forEach(trigger => {
-                    trigger.addEventListener('click', function (event) {
-                        event.preventDefault();
-                        const tabId = trigger.getAttribute('data-tab');
-                        activateTab(tabId);
-                    });
-                });
-
-                // Initialize active tab from nav
-                const initial = document.querySelector('.tab-button.active');
-                if (initial) {
-                    activateTab(initial.getAttribute('data-tab'));
-                }
-                // Attach click handlers to overlay-card buttons (in-content buttons)
-                // so they activate the target tab and scroll the page to the tabs shell.
-                const overlayButtons = document.querySelectorAll('.overlay-card-nsaw button[data-tab], .overlay-card-nsaw a.btn[data-tab]');
-                overlayButtons.forEach(btn => {
-                    btn.addEventListener('click', function(e){
-                        e.preventDefault();
-                        const tabId = btn.getAttribute('data-tab');
-                        if (!tabId) return;
-                        activateTab(tabId);
-                        // ensure the tab strip recenters on the active pill
-                        if (typeof centerActiveTab === 'function') centerActiveTab();
-                        const tabsShell = document.querySelector('.tabs-shell');
-                        if (tabsShell && tabsShell.scrollIntoView) tabsShell.scrollIntoView({behavior: 'smooth', block: 'start'});
-                        else window.scrollTo({top:0, behavior:'smooth'});
-                    });
-                });
-                // Expose helpers for other scripts that add buttons dynamically
-                try { window.activateTab = activateTab; window.centerActiveTab = centerActiveTab; } catch(e){}
-            });
-        </script>
+        
     </div>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
         <script>
@@ -754,22 +689,34 @@
                                     if (target) {
                                         b.addEventListener('click', function(ev){
                                             ev.preventDefault();
-                                            // Use the globally-exposed activate/center helpers if available
-                                            if (window && typeof window.activateTab === 'function') {
-                                                window.activateTab(target);
-                                            } else {
-                                                const tabButtons = document.querySelectorAll('.tab-button');
-                                                const tabContents = document.querySelectorAll('.tab-content');
-                                                tabButtons.forEach(btn => btn.classList.toggle('active', btn.getAttribute('data-tab') === target));
-                                                tabContents.forEach(content => content.classList.toggle('active', content.id === target));
+                                            // Prefer operating within the nearest .tabs-shell to avoid
+                                            // touching unrelated header/menu elements elsewhere on the page.
+                                            const nearestShell = ev.target && ev.target.closest ? ev.target.closest('.tabs-shell') : null;
+
+                                            // If a global helper exists and would affect this shell, use it.
+                                            let usedHelper = false;
+                                            try {
+                                                if (window && typeof window.activateTab === 'function' && nearestShell && nearestShell.querySelector('#' + CSS.escape(target))) {
+                                                    window.activateTab(target);
+                                                    usedHelper = true;
+                                                }
+                                            } catch(e) { /* ignore */ }
+
+                                            if (!usedHelper) {
+                                                // Fallback: scope changes to the nearest shell (or first shell)
+                                                const scope = nearestShell || document.querySelector('.tabs-shell');
+                                                if (scope) {
+                                                    const tabButtonsLocal = scope.querySelectorAll('.tab-button');
+                                                    const tabContentsLocal = scope.querySelectorAll('.section');
+                                                    tabButtonsLocal.forEach(btn => btn.classList.toggle('active', btn.getAttribute('data-tab') === target));
+                                                    tabContentsLocal.forEach(content => content.classList.toggle('active', content.id === target));
+                                                }
                                             }
-                                            if (window && typeof window.centerActiveTab === 'function') {
-                                                window.centerActiveTab();
-                                            }
-                                            // scroll the tabs shell into view so the activated content is visible
-                                            const tabsShell = document.querySelector('.tabs-shell');
-                                            if (tabsShell && tabsShell.scrollIntoView) tabsShell.scrollIntoView({behavior: 'smooth', block: 'start'});
-                                            else window.scrollTo({top:0, behavior:'smooth'});
+
+                                            // Center the active pill within the scoped shell if a helper exists
+                                            // Activation only — do NOT perform centering or scrolling here
+                                            // to avoid interfering with header/menu interactions.
+                                            // (Activation already applied above.)
                                         });
                                     }
                                     panel.appendChild(b);
@@ -831,6 +778,74 @@
                     try { setTimeout(initSplit, 100); } catch(e) {/* ignore */}
                 })();
                 </script>
+    <script>
+    // Lightweight hash-based section navigation (scoped to .tabs-shell).
+        document.addEventListener('DOMContentLoaded', function(){
+        const shell = document.querySelector('.tabs-shell');
+        if (!shell) return;
+
+        // support legacy .tab-content markers as well as new .section class
+        const sections = Array.from(shell.querySelectorAll('.section, .tab-content'));
+        if (!sections.length) return;
+
+                function show(hash){
+                        const id = (hash || location.hash || '#tab-video').replace(/^#/, '');
+                        sections.forEach(s => s.classList.toggle('active', s.id === id));
+                        // update nav anchors inside shell
+                        const anchors = shell.querySelectorAll('a[href^="#"]');
+                        anchors.forEach(a => a.classList.toggle('active', (a.getAttribute('href') || '') === ('#' + id)));
+
+                        // Scroll to the top of the image for the active section (not the text card).
+                        // This ensures consistent alignment under any fixed header and the sticky tabs.
+                        try {
+                            const activeSection = sections.find(s => s.id === id);
+                            if (activeSection) {
+                                // Prefer the explicit image container; fall back to the image column.
+                                let imageEl = activeSection.querySelector('.image-section-nsaw') || activeSection.querySelector('.image-col-nsaw');
+                                // Also allow <img> fallback if used elsewhere
+                                if (!imageEl) imageEl = activeSection.querySelector('img');
+
+                                if (imageEl && imageEl.getBoundingClientRect) {
+                                    const rectTop = imageEl.getBoundingClientRect().top + window.scrollY;
+                                    const headerEl = document.querySelector('header') || document.querySelector('.site-header') || document.querySelector('.navbar');
+                                    const headerHeight = headerEl ? headerEl.getBoundingClientRect().height : 0;
+                                    const tabsWrapper = shell.querySelector('.tab-buttons-wrapper');
+                                    const tabsHeight = tabsWrapper ? tabsWrapper.getBoundingClientRect().height : 0;
+                                    const offset = (headerHeight || 0) + (tabsHeight || 0) + 8;
+                                    const top = Math.max(0, rectTop - offset);
+                                    window.scrollTo({ top: top, behavior: 'smooth' });
+                                }
+                            }
+                        } catch (e) { /* no-op */ }
+                }
+
+                // initial
+                show(location.hash || '#tab-video');
+
+                // sync dropdown (if present) with active section
+                const select = shell.querySelector('.mobile-select');
+                if (select) {
+                    // reflect initial state
+                    const active = sections.find(s => s.classList.contains('active'));
+                    if (active) select.value = '#' + active.id;
+                    // when user changes the select, update the hash (triggers show via hashchange)
+                    select.addEventListener('change', function(){
+                        if (this.value) location.hash = this.value;
+                    });
+                }
+
+        // respond to hash changes (browser back/forward)
+        window.addEventListener('hashchange', function(){ show(location.hash); });
+
+        // ensure anchor clicks inside the shell update active state (allow default hash navigation)
+        shell.addEventListener('click', function(e){
+            const a = e.target.closest('a[href^="#tab"]');
+            if (!a || !shell.contains(a)) return;
+            // allow the browser to update location.hash, then sync
+            setTimeout(() => show(a.getAttribute('href')), 0);
+        });
+    });
+    </script>
 </body>
 
 </html>
