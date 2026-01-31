@@ -1224,4 +1224,22 @@ header, .site-header, .navbar, .nav, .flyoutNav {
   pointer-events: auto !important;
 }
 
+/* Make the tabs-shell non-blocking so page header/flyouts can receive clicks.
+   Interactive elements inside the shell remain clickable via explicit override. */
+.tabs-shell {
+  pointer-events: none;
+}
+
+.tabs-shell .tab-buttons,
+.tabs-shell .tab-button,
+.tabs-shell .tab-buttons-wrapper,
+.tabs-shell .overlay-card-nsaw,
+.tabs-shell .overlay-card-nsaw a,
+.tabs-shell .overlay-card-nsaw button,
+.tabs-shell .card-panel,
+.tabs-shell .card-panel a,
+.tabs-shell .card-panel button {
+  pointer-events: auto;
+}
+
 

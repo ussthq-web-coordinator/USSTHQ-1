@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Bootstrap Boilerplate</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="an-army-for-others-a3.css">
+    <link rel="stylesheet" href="an-army-for-others-a4.css">
 </head>
 
 <body>
@@ -527,86 +527,9 @@
     </div>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
         <script>
-        // Enable horizontal scrolling of the tab strip by mouse wheel and pointer drag
-        (function(){
-            const wrappers = document.querySelectorAll('.tab-buttons-wrapper');
-            wrappers.forEach(wrapper => {
-                const inner = wrapper.querySelector('.tab-buttons') || wrapper;
-
-                // Wheel -> horizontal scroll, but only when wheel occurs over the tab row
-                // Use passive:false to allow preventing vertical-scroll hijack
-                const scrollTarget = inner;
-                if (inner) {
-                    inner.addEventListener('wheel', function(e){
-                        // Only handle when the event target is inside the tab-buttons area
-                        if (!e.target || !e.target.closest) return;
-                        if (!e.target.closest('.tab-buttons') && !e.target.closest('.tab-buttons-wrapper')) return;
-
-                        // Only hijack vertical wheel for horizontal scrolling when:
-                        // - the row is actually horizontally scrollable, AND
-                        // - the user explicitly indicates horizontal intent (horizontal delta),
-                        //   or they hold the Shift key (conventional desktop behavior).
-                        const canScrollHorizontally = scrollTarget.scrollWidth > scrollTarget.clientWidth;
-                        const horizontalIntent = Math.abs(e.deltaX) > Math.abs(e.deltaY);
-
-                        if (canScrollHorizontally && (e.shiftKey || horizontalIntent)) {
-                            // Prefer deltaX if present, otherwise fall back to deltaY (trackpads)
-                            const delta = e.deltaX || e.deltaY;
-                            scrollTarget.scrollLeft += delta;
-                            e.preventDefault();
-                        }
-                        // Otherwise, do nothing here and allow the browser to perform
-                        // the default vertical scroll so page scrolling still works.
-                    }, { passive: false });
-                }
-
-                // Pointer drag to scroll (only attach on touch-capable devices)
-                const supportsTouch = ('ontouchstart' in window) || (navigator.maxTouchPoints && navigator.maxTouchPoints > 0) || (navigator.msMaxTouchPoints && navigator.msMaxTouchPoints > 0);
-                if (supportsTouch) {
-                    let isDown = false;
-                    let startX = 0;
-                    let startScroll = 0;
-
-                    inner.addEventListener('pointerdown', function(e){
-                        // Only consider touch pointers here
-                        if (e.pointerType && e.pointerType !== 'touch') return;
-
-                        // Allow normal clicks on interactive controls to pass through
-                        if (e.target && e.target.closest && (
-                            e.target.closest('.tab-button') ||
-                            e.target.closest('a') ||
-                            e.target.closest('button') ||
-                            e.target.closest('input') ||
-                            e.target.closest('select') ||
-                            e.target.closest('textarea')
-                        )) return;
-
-                        isDown = true;
-                        startX = e.clientX;
-                        startScroll = scrollTarget.scrollLeft;
-                        try { if (inner.setPointerCapture) inner.setPointerCapture(e.pointerId); } catch(err){}
-                        inner.style.cursor = 'grabbing';
-                    });
-
-                    inner.addEventListener('pointermove', function(e){
-                        if (!isDown) return;
-                        const dx = e.clientX - startX;
-                        scrollTarget.scrollLeft = startScroll - dx;
-                    });
-
-                    function endDrag(e){
-                        if (!isDown) return;
-                        isDown = false;
-                        try { if (inner.releasePointerCapture) inner.releasePointerCapture(e.pointerId); } catch(err){}
-                        inner.style.cursor = 'grab';
-                    }
-
-                    inner.addEventListener('pointerup', endDrag);
-                    inner.addEventListener('pointercancel', endDrag);
-                    inner.addEventListener('pointerleave', endDrag);
-                }
-            });
-        })();
+        // Tab horizontal-scroll handlers removed to avoid interfering with site navigation menus.
+        // If horizontal scrolling of the tabs is required later, reintroduce a scoped
+        // implementation that only runs on touch devices and never captures mouse/pointer events.
         </script>
                 <script>
                 // On small screens, split long overlay cards into horizontally scrollable panels
