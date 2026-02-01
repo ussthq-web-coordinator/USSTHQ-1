@@ -1,0 +1,262 @@
+/* Minimal styles for Test-2 (no JS) — stacked sections with anchor navigation */
+:root{--max-width:1200px;--gap:1rem;--card-pad:1.25rem}
+*{box-sizing:border-box}
+body{font-family:system-ui,Segoe UI,Roboto,Arial,sans-serif;margin:0;color:#111;background:#fff}
+.container{max-width:var(--max-width);margin:0 auto;padding:1rem}
+.page-header{padding:1rem 0;text-align:center}
+.stack-nav{margin-bottom:1rem}
+/* mobile dropdown */
+.mobile-dropdown{display:block;margin-bottom:0.5rem}
+.mobile-dropdown summary{background:#132230;color:#fff;padding:.6rem .9rem;border-radius:999px;list-style:none;cursor:pointer}
+.mobile-dropdown ul{margin:0;padding:.5rem 0;border:1px solid #eee;border-radius:.5rem;background:#fff}
+.mobile-dropdown li{list-style:none;padding:.35rem .75rem}
+.mobile-dropdown a{color:#132230;text-decoration:none}
+/* wide links shown on larger screens */
+.wide-links{display:none;gap:.5rem;flex-wrap:wrap;justify-content:center;padding:0;margin:0;list-style:none}
+.wide-links li{display:inline}
+.wide-links a{display:inline-block;padding:.45rem .8rem;border-radius:999px;background:#f5f6f2;color:#111;text-decoration:none}
+@media(min-width:720px){
+  .mobile-dropdown{display:none}
+  .wide-links{display:flex}
+}
+
+/* Sections stacked — apply to .stack-section, existing .row-flex-nsaw and .section markup */
+.stack-section,
+.row-flex-nsaw,
+.section {
+  display:flex;
+  flex-direction:column;
+  gap:var(--gap);
+  margin:1.5rem 0;
+  padding:1rem;
+  border-radius:1rem;
+  /* Do not set a global background here — keep the original design's row backgrounds. */
+  background: transparent;
+}
+.stack-section .media,
+.row-flex-nsaw .media,
+.section .media{display:flex;flex-direction:column;gap:1rem}
+.video-wrapper{position:relative;padding-bottom:56.25%;height:0;overflow:hidden;border-radius:1rem}
+.video-wrapper iframe{position:absolute;inset:0;width:100%;height:100%;border:0}
+
+/* image + card pairs */
+.stack-section .image,
+.row-flex-nsaw .image,
+.section .image{width:100%;height:220px;background-size:cover;background-position:center;border-radius:1rem}
+.stack-section .card,
+.row-flex-nsaw .card,
+.section .card{padding:var(--card-pad);background:transparent}
+.stack-section .card h3,
+.row-flex-nsaw .card h3,
+.section .card h3{margin-top:0}
+.btn{display:inline-block;padding:.4rem .75rem;border:1px solid #132230;border-radius:.9rem;color:#132230;text-decoration:none}
+
+/* Overlay / card visuals (mobile first) */
+.stack-section .card{
+  background: #fff;
+  border-radius: 1rem;
+  box-shadow: 0 1rem 2rem rgba(0,0,0,0.12);
+  margin-top: -3rem; /* overlap image on small screens */
+  padding: 1.5rem;
+  max-width: 92%;
+  margin-left: auto;
+  margin-right: auto;
+  position: relative;
+  z-index: 2;
+}
+
+/* small vertical lift for better overlap rhythm */
+.stack-section:nth-of-type(odd) .card,
+.row-flex-nsaw:nth-of-type(odd) .card,
+.section:nth-of-type(odd) .card{ transform: translateY(-0.5rem); }
+.stack-section:nth-of-type(even) .card,
+.row-flex-nsaw:nth-of-type(even) .card,
+.section:nth-of-type(even) .card{ transform: translateY(-0.5rem); }
+
+/* nicer two-column on wide screens while still stacked in document flow */
+@media(min-width:1024px){
+  .stack-section,
+  .row-flex-nsaw,
+  .section{flex-direction:row;align-items:stretch}
+  .stack-section .image,
+  .row-flex-nsaw .image,
+  .section .image{width:45%;height:auto;min-height:320px}
+  .stack-section .card,
+  .row-flex-nsaw .card,
+  .section .card{width:55%;display:flex;flex-direction:column;justify-content:center;margin-top:0;transform:none;max-width:none}
+
+  /* Alternate image left/right by row for visual variety */
+  .stack-section:nth-of-type(even), .row-flex-nsaw:nth-of-type(even), .section:nth-of-type(even){ flex-direction:row-reverse }
+
+  /* Make card sit naturally beside the image (no overlap on desktop) */
+  .stack-section .card,
+  .row-flex-nsaw .card,
+  .section .card{
+    margin-top: 0;
+    box-shadow: 0 1rem 2rem rgba(239,62,66,0.12);
+    background: #fff;
+  }
+
+  /* Alternating row backgrounds (navy/beige) to match Test-1 */
+  /* Apply the alternating row backgrounds inside the tabs shell so stacked rows match Test-1 visuals */
+  .nsaw-shell > .row-flex-nsaw:nth-of-type(odd),
+  .nsaw-shell > .section:nth-of-type(odd) {
+    background-color: #132230;
+    color: #f1f5f9;
+    padding: 2rem 0;
+    border-radius: 1rem;
+  }
+  .nsaw-shell > .row-flex-nsaw:nth-of-type(even),
+  .nsaw-shell > .section:nth-of-type(even) {
+    background-color: #F1E8DC;
+    color: #111;
+    padding: 2rem 0;
+    border-radius: 1rem;
+  }
+
+  /* Overlay card color switching to contrast with row backgrounds */
+  .nsaw-shell > .row-flex-nsaw:nth-of-type(odd) .overlay-card-nsaw,
+  .nsaw-shell > .section:nth-of-type(odd) .overlay-card-nsaw {
+    background-color: #F1E8DC;
+    color: #111;
+  }
+  .nsaw-shell > .row-flex-nsaw:nth-of-type(even) .overlay-card-nsaw,
+  .nsaw-shell > .section:nth-of-type(even) .overlay-card-nsaw {
+    background-color: #132230;
+    color: #f1f5f9;
+  }
+
+  /* Ensure any styles in the original tab CSS that visually hide non-active sections are overridden
+     so all panels remain in the document flow for the stacked (no-JS) version. */
+  .nsaw-shell .section {
+    position: static !important;
+    width: auto !important;
+    height: auto !important;
+    margin: 1.5rem 0 !important;
+    padding: 1rem !important;
+    clip: auto !important;
+    overflow: visible !important;
+    white-space: normal !important;
+    display: flex !important;
+  }
+
+}
+
+/* Targeted image positioning tweaks copied from original layout */
+#tab7 .image{ background-position: bottom center !important }
+#tab8 .image, #tab9 .image, #tab12 .image { background-position: top center !important }
+
+/* focus + skip link enhancements */
+.stack-nav a:focus,.btn:focus{outline:3px solid #ffd54f;outline-offset:3px}
+
+/* small helper to ensure anchors don't sit behind a fixed header if present */
+:target{scroll-margin-top:80px}
+
+/* Strong resets to undo main stylesheet's "hide non-active panels" rules
+   Ensure stacked page shows all sections and media on all viewports. */
+.nsaw-shell .nsaw-tab-panel:not(.active),
+.nsaw-shell .section:not(.active),
+.nsaw-shell .row-flex-nsaw:not(.active) {
+  position: static !important;
+  width: auto !important;
+  height: auto !important;
+  margin: 1.5rem 0 !important;
+  padding: 1rem !important;
+  clip: auto !important;
+  overflow: visible !important;
+  white-space: normal !important;
+  display: block !important;
+}
+
+/* Make sure video and its intro are visible even when original CSS hides them */
+.nsaw-shell .section .video-wrapper-nsaw,
+.nsaw-shell .section .video-wrapper-nsaw iframe,
+.nsaw-shell .section .video-intro {
+  display: block !important;
+}
+
+/* Mobile-first: force stacked columns on small viewports to avoid layout breaks */
+@media (max-width: 1024px) {
+  .nsaw-shell .section,
+  .nsaw-shell .row-flex-nsaw {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: var(--gap) !important;
+    padding: 1rem !important;
+  }
+  .nsaw-shell .image-col-nsaw,
+  .nsaw-shell .text-col-nsaw {
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+  .nsaw-shell .overlay-card-nsaw { margin-top: -3rem !important; }
+}
+
+/* Ensure anchor navigation isn't hidden behind sticky header on mobile */
+.nsaw-shell [id] { scroll-margin-top: 88px; }
+
+/* Image helpers (from Test-1 styles) — support both .image and .image-section-nsaw */
+.image-section-nsaw,
+.stack-section .image {
+  width: 100%;
+  max-width: 100%;
+  aspect-ratio: 16 / 9;
+  /* allow images to grow; use min-height to ensure visible presence */
+  max-height: none;
+  min-height: 320px;
+  background-size: cover;
+  background-position: center;
+  border-radius: 1rem;
+  box-shadow: 0 0.25rem 1rem rgba(0,0,0,0.15);
+  object-fit: cover;
+  display: block;
+}
+
+.image-col-nsaw,
+.stack-section .image-col-nsaw { display:flex; justify-content:center; align-items:flex-start }
+.image-col-nsaw .image-section-nsaw,
+.stack-section .image-section-nsaw { display:block; margin:0.5rem auto 0 auto; max-width:90%; width:100% }
+
+/* Scale images up on larger viewports to match Test-1 visuals */
+@media (min-width:1024px) {
+  .nsaw-shell .image-col-nsaw .image-section-nsaw,
+  .nsaw-shell .stack-section .image-section-nsaw,
+  .nsaw-shell .section .image-section-nsaw {
+    max-width: 90% !important;
+    min-height: 420px !important;
+  }
+}
+
+@media (min-width:1400px) {
+  .nsaw-shell .image-col-nsaw .image-section-nsaw,
+  .nsaw-shell .stack-section .image-section-nsaw,
+  .nsaw-shell .section .image-section-nsaw {
+    max-width: 95% !important;
+    min-height: 540px !important;
+  }
+}
+
+/* Per-tab tweaks to match the Test-1 positions */
+#tab1 .image-section-nsaw,
+#tab1 .image { margin-top: 0 !important; }
+
+#tab3 .image-section-nsaw,
+#tab3 .image { background-position: top center !important; }
+
+#tab7 .image-section-nsaw,
+#tab7 .image { background-position: bottom center !important }
+
+#tab8 .image-section-nsaw,
+#tab9 .image-section-nsaw,
+#tab12 .image-section-nsaw,
+#tab8 .image, #tab9 .image, #tab12 .image { background-position: top center !important }
+
+/* Desktop two-column enforcement to mimic Test-1 behavior */
+@media(min-width:1024px){
+  .stack-section{flex-direction:row;align-items:stretch}
+  .stack-section .image{width:45%;height:auto;min-height:320px;background-size:cover}
+  .stack-section .card{width:55%;display:flex;flex-direction:column;justify-content:center;margin-top:0;transform:none;max-width:none}
+  .stack-section:nth-of-type(even){ flex-direction:row-reverse }
+  .stack-section .card{ margin-top:0; box-shadow: 0 1rem 2rem rgba(239,62,66,0.12); background:#fff }
+}

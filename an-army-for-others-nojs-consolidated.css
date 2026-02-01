@@ -1,0 +1,711 @@
+/* Consolidated CSS for Test-2.html (No-JS Stacked Version)
+   Combines essential layout rules from b1.css with no-JS stacking overrides */
+
+/* === Global Fixes === */
+html, body {
+  max-width: 100%;
+  overflow-x: hidden;
+  box-sizing: border-box;
+}
+
+*, *::before, *::after {
+  box-sizing: inherit;
+}
+
+/* === Global Container Safeguards === */
+.container,
+.row-flex-nsaw {
+  max-width: 100%;
+  overflow-x: hidden;
+  position: relative;
+  width: 100%;
+}
+
+/* === Core Layout: All sections visible and stacked on small screens === */
+.row-flex-nsaw,
+.section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.5rem;
+  margin: 1.5rem 0;
+  padding: 1rem;
+  box-sizing: border-box;
+  overflow-x: hidden;
+}
+
+/* Image and text column layout */
+.image-col-nsaw,
+.text-col-nsaw {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  width: 100%;
+}
+
+.image-col-nsaw {
+  justify-content: center;
+  align-items: flex-start;
+}
+
+.text-col-nsaw {
+  align-items: center;
+}
+
+/* === Other Unchanged Styles === */
+.eventDetails, .eventTitle, .padding-top-xl, .row.padding-top-xl {
+  display: none !important;
+}
+
+.mainImage {
+  padding-top: 5px;
+  padding-bottom: 15px;
+}
+
+.globalFooter {
+  background: #122231;
+}
+
+.globalFooter-input {
+  background-color: #333333;
+}
+
+.givingToolbar-toolbar,
+.flyoutNav {
+  background: #122231;
+}
+
+/* === Image Styling === */
+.image-section-nsaw {
+  width: 100%;
+  max-width: 90%;
+  aspect-ratio: 16 / 9;
+  background-size: cover;
+  background-position: center;
+  border-radius: 1rem;
+  box-shadow: 0 0.25rem 1rem rgba(0,0,0,0.15);
+  object-fit: cover;
+  display: block;
+  margin: 0.5rem auto 0 auto;
+}
+
+.image-col-nsaw .image-section-nsaw {
+  margin: 0.5rem auto 0 auto;
+  max-width: 70%;
+  width: 100%;
+}
+
+/* Larger images on wider viewports */
+@media (min-width: 1025px) {
+  .image-col-nsaw .image-section-nsaw {
+    max-width: 90%;
+    min-height: 420px;
+    width: 100%;
+  }
+}
+
+@media (min-width: 1400px) {
+  .image-col-nsaw .image-section-nsaw {
+    max-width: 95%;
+    min-height: 540px;
+  }
+}
+
+/* Per-tab image positioning */
+#tab1 .image-section-nsaw {
+  margin-top: 0 !important;
+}
+
+#tab3 .image-section-nsaw {
+  background-position: top center !important;
+}
+
+#tab7 .image-section-nsaw {
+  background-position: bottom center !important;
+}
+
+#tab8 .image-section-nsaw,
+#tab9 .image-section-nsaw,
+#tab12 .image-section-nsaw {
+  background-position: top center !important;
+}
+
+/* === Overlay Card Styling === */
+.overlay-card-nsaw {
+  background-color: #132230;
+  color: #f1f5f9;
+  border-radius: 1rem;
+  box-shadow: 0 1rem 2rem rgba(239, 62, 66, 0.2);
+  padding: 2rem;
+  width: 100%;
+  max-width: 95%;
+  text-align: center;
+  margin: -3rem auto 0 auto;
+  position: relative;
+  z-index: 3;
+}
+
+.overlay-card-nsaw.card-dark-nsaw {
+  background-color: #F1E8DC;
+  color: #111;
+}
+
+/* Button styling inside overlays */
+.overlay-card-nsaw .btn,
+.overlay-card-nsaw a.btn {
+  border-color: #f1f5f9;
+  color: #f1f5f9;
+  display: block;
+  margin: 0.6rem auto 0;
+}
+
+.overlay-card-nsaw .btn:hover,
+.overlay-card-nsaw a.btn:hover {
+  background-color: #f1f5f9;
+  color: #132230;
+}
+
+.overlay-card-nsaw.card-dark-nsaw .btn,
+.overlay-card-nsaw.card-dark-nsaw a.btn {
+  border-color: #111;
+  color: #111;
+}
+
+.overlay-card-nsaw.card-dark-nsaw .btn:hover,
+.overlay-card-nsaw.card-dark-nsaw a.btn:hover {
+  background-color: #111;
+  color: #F1E8DC;
+}
+
+/* Small button variant */
+.overlay-card-nsaw .btn.btn-sm,
+.overlay-card-nsaw a.btn.btn-sm {
+  display: inline-block;
+  margin: 0.4rem auto 0;
+}
+
+/* === Alternating Row Backgrounds === */
+.row-flex-nsaw:nth-child(odd),
+.section:nth-child(odd) {
+  background-color: #132230;
+  padding: 2rem 0;
+  border-radius: 1rem;
+  color: #f1f5f9;
+}
+
+.row-flex-nsaw:nth-child(even),
+.section:nth-child(even) {
+  background-color: #F1E8DC;
+  padding: 2rem 0;
+  border-radius: 1rem;
+  color: #111;
+}
+
+/* Overlay card color swapping based on row background */
+.row-flex-nsaw:nth-child(odd) .overlay-card-nsaw,
+.section:nth-child(odd) .overlay-card-nsaw {
+  background-color: #F1E8DC;
+  color: #111;
+  box-shadow: 0 1rem 2rem rgba(239, 62, 66, 0.18), 0 1rem 2rem rgba(19, 34, 48, 0.36);
+}
+
+.row-flex-nsaw:nth-child(even) .overlay-card-nsaw,
+.section:nth-child(even) .overlay-card-nsaw {
+  background-color: #132230;
+  color: #f1f5f9;
+}
+
+/* Button color adjustments per row background */
+.row-flex-nsaw:nth-child(odd) .btn,
+.section:nth-child(odd) .btn {
+  border-color: #111;
+  color: #111;
+}
+
+.row-flex-nsaw:nth-child(odd) .btn:hover,
+.section:nth-child(odd) .btn:hover {
+  background-color: #111;
+  color: #F1E8DC;
+}
+
+.row-flex-nsaw:nth-child(even) .btn,
+.section:nth-child(even) .btn {
+  border-color: #f1f5f9;
+  color: #f1f5f9;
+}
+
+.row-flex-nsaw:nth-child(even) .btn:hover,
+.section:nth-child(even) .btn:hover {
+  background-color: #f1f5f9;
+  color: #132230;
+}
+
+/* === Small Screen Button Styling === */
+@media (max-width: 1024px) {
+  .overlay-card-nsaw .btn {
+    display: inline-block !important;
+    padding: 0.75rem 1.25rem !important;
+    margin: 0.6rem auto !important;
+    min-width: 180px !important;
+    box-sizing: border-box !important;
+  }
+
+  .overlay-card-nsaw .btn.btn-sm {
+    padding: 0.5rem 0.9rem !important;
+    min-width: 140px !important;
+  }
+
+  .overlay-card-nsaw .btn + .btn {
+    display: block !important;
+    margin-left: 0 !important;
+    margin-top: 0.6rem !important;
+  }
+
+  .overlay-card-nsaw {
+    box-sizing: border-box;
+    width: calc(100% - 1rem);
+    max-width: calc(100% - 1rem);
+    margin: 0 auto;
+    padding-left: 0.2rem;
+    padding-right: 0.2rem;
+  }
+
+  .overlay-card-nsaw .btn,
+  .overlay-card-nsaw a.btn {
+    min-width: 0 !important;
+    display: inline-flex !important;
+    white-space: normal !important;
+    max-width: 100% !important;
+    padding: 0.55rem 0.9rem !important;
+    box-sizing: border-box !important;
+    word-break: break-word !important;
+    align-self: center !important;
+  }
+
+  .text-col-nsaw {
+    box-sizing: border-box;
+    width: calc(100% - 1rem);
+    max-width: calc(100% - 1rem);
+    margin: 0 auto;
+    padding-left: 0.15rem;
+    padding-right: 0.15rem;
+  }
+
+  .overlap-container-nsaw {
+    box-sizing: border-box;
+    width: calc(100% - 1rem);
+    max-width: calc(100% - 1rem);
+    margin: 0 auto;
+    padding-left: 0.15rem;
+    padding-right: 0.15rem;
+  }
+}
+
+/* Tighter edge gap on very small devices */
+@media (max-width: 420px) {
+  .overlay-card-nsaw {
+    width: calc(100% - 0.6rem);
+    max-width: calc(100% - 0.6rem);
+    padding-left: 0.2rem;
+    padding-right: 0.2rem;
+  }
+  .text-col-nsaw {
+    width: calc(100% - 0.6rem);
+    max-width: calc(100% - 0.6rem);
+    padding-left: 0.15rem;
+    padding-right: 0.15rem;
+  }
+  .overlap-container-nsaw {
+    width: calc(100% - 0.6rem);
+    max-width: calc(100% - 0.6rem);
+    padding-left: 0.15rem;
+    padding-right: 0.15rem;
+  }
+}
+
+/* === Video Styling === */
+.video-wrapper-nsaw {
+  position: relative;
+  width: 100%;
+  max-width: 1920px;
+  margin: 1rem auto 5rem auto;
+  height: 0;
+  padding-bottom: 56.25%;
+  border-radius: 1rem;
+  overflow: hidden;
+  animation: shadowPulse 6s infinite alternate ease-in-out;
+}
+
+.video-wrapper-nsaw iframe {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  border: none;
+}
+
+@keyframes shadowPulse {
+  0%   { box-shadow: 0 1rem 2rem rgba(30, 41, 59, 0.6); }
+  50%  { box-shadow: 0 1rem 2rem rgba(220, 38, 38, 0.6); }
+  100% { box-shadow: 0 1rem 2rem rgba(30, 41, 59, 0.6); }
+}
+
+/* Video section-specific layout */
+#tab-video.active,
+.section#tab-video.active {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  background: transparent !important;
+  padding: 0 !important;
+}
+
+#tab-video.active > .image-col-nsaw,
+.section#tab-video.active > .image-col-nsaw {
+  width: 100% !important;
+  max-width: 100% !important;
+  display: flex !important;
+  justify-content: center !important;
+  align-items: center !important;
+  padding: 0 1rem !important;
+  order: 1 !important;
+}
+
+#tab-video.active > .text-col-nsaw,
+.section#tab-video.active > .text-col-nsaw {
+  width: 100% !important;
+  order: 2 !important;
+  max-width: 100% !important;
+  display: block !important;
+  padding: 0 1rem !important;
+}
+
+#tab-video.active .video-wrapper-nsaw,
+.section#tab-video.active .video-wrapper-nsaw {
+  max-width: 1200px;
+  width: 100%;
+  box-sizing: border-box;
+  margin: 0.5rem auto 1.5rem auto;
+  padding-bottom: 56.25%;
+  display: block;
+  order: 1 !important;
+}
+
+#tab-video.active .video-wrapper-nsaw iframe,
+.section#tab-video.active .video-wrapper-nsaw iframe {
+  display: block !important;
+  width: 100% !important;
+  height: 100% !important;
+}
+
+#tab-video.active .video-intro,
+.section#tab-video.active .video-intro {
+  order: 2 !important;
+  width: 100% !important;
+  max-width: 900px !important;
+  text-align: center !important;
+  margin: 0 0 1rem 0 !important;
+}
+
+/* === Desktop Two-Column Layout === */
+@media (min-width: 1025px) {
+  /* Desktop layout: side-by-side for all tabs */
+  .row-flex-nsaw,
+  .section {
+    flex-direction: row;
+    align-items: stretch;
+    gap: 1rem;
+  }
+
+  .image-col-nsaw {
+    width: 45%;
+    max-width: 45%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    order: 1;
+  }
+
+  .text-col-nsaw {
+    width: 55%;
+    max-width: 55%;
+    display: flex;
+    align-items: center;
+    padding: 0 1rem;
+    order: 2;
+  }
+
+  /* Alternating row direction for image left/right alternation */
+  .row-flex-nsaw:nth-child(even),
+  .section:nth-child(even) {
+    flex-direction: row-reverse;
+  }
+
+  .row-flex-nsaw:nth-child(even) > .image-col-nsaw,
+  .section:nth-child(even) > .image-col-nsaw {
+    order: 2;
+  }
+
+  .row-flex-nsaw:nth-child(even) > .text-col-nsaw,
+  .section:nth-child(even) > .text-col-nsaw {
+    order: 1;
+  }
+
+  /* Overlay card styling on desktop */
+  .image-col-nsaw .image-section-nsaw {
+    width: 100%;
+    max-width: 100%;
+    aspect-ratio: 16 / 9;
+    height: auto;
+    border-radius: 1rem;
+  }
+
+  .text-col-nsaw .overlay-card-nsaw {
+    margin: 0;
+    max-width: 100%;
+    text-align: left;
+    padding: 2.25rem;
+    box-shadow: 0 1rem 2rem rgba(239, 62, 66, 0.18);
+    position: relative;
+    transform: none;
+  }
+
+  /* Ensure columns align vertically */
+  .row-flex-nsaw,
+  .section {
+    align-items: stretch;
+  }
+}
+
+/* === Navigation Styling === */
+.tab-buttons-wrapper {
+  margin-top: 0;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: auto;
+  -ms-overflow-style: auto;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: #fff;
+  box-shadow: 0 2px 8px rgba(30, 41, 59, 0.06);
+}
+
+.tab-buttons-wrapper,
+.tab-buttons {
+  touch-action: pan-x;
+  -ms-touch-action: pan-x;
+}
+
+.tab-buttons {
+  cursor: grab;
+}
+
+/* Mobile dropdown styles */
+.mobile-dropdown {
+  display: block;
+  margin-bottom: 0.5rem;
+}
+
+.mobile-dropdown summary {
+  background: #132230;
+  color: #fff;
+  padding: 0.6rem 0.9rem;
+  border-radius: 999px;
+  list-style: none;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.mobile-dropdown ul {
+  margin: 0;
+  padding: 0.5rem 0;
+  border: 1px solid #eee;
+  border-radius: 0.5rem;
+  background: #fff;
+}
+
+.mobile-dropdown li {
+  list-style: none;
+  padding: 0.35rem 0.75rem;
+}
+
+.mobile-dropdown a {
+  color: #132230;
+  text-decoration: none;
+}
+
+/* Wide links (desktop nav) */
+.wide-links {
+  display: none;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  justify-content: center;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.wide-links li {
+  display: inline;
+}
+
+.wide-links a {
+  display: inline-block;
+  padding: 0.45rem 0.8rem;
+  border-radius: 999px;
+  background: #f5f6f2;
+  color: #111;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+@media (min-width: 720px) {
+  .mobile-dropdown {
+    display: none;
+  }
+  .wide-links {
+    display: flex;
+  }
+}
+
+/* === Nsaw Shell Styling === */
+.nsaw-shell {
+  background: #F5F6F2;
+  position: relative;
+  padding: 1.25rem 1rem;
+  border-radius: 1rem;
+  margin-bottom: 1rem;
+}
+
+.nsaw-shell .tab-buttons-wrapper {
+  background: transparent;
+  box-shadow: none;
+}
+
+/* Hide non-active sections (for JS version) but show all on no-JS */
+.nsaw-shell .section {
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+/* Pointer events fix */
+.nsaw-shell {
+  pointer-events: none;
+}
+
+.nsaw-shell .tab-buttons,
+.nsaw-shell .nsaw-tab-buttons,
+.nsaw-shell .tab-button,
+.nsaw-shell .nsaw-tab-button,
+.nsaw-shell .tab-buttons-wrapper,
+.nsaw-shell .overlay-card-nsaw,
+.nsaw-shell .overlay-card-nsaw a,
+.nsaw-shell .overlay-card-nsaw button,
+.nsaw-shell .video-wrapper-nsaw,
+.nsaw-shell .video-wrapper-nsaw iframe,
+.nsaw-shell .image-col-nsaw,
+.nsaw-shell .image-section-nsaw {
+  pointer-events: auto;
+}
+
+/* Header positioning */
+header, .site-header, .navbar, .nav, .flyoutNav {
+  z-index: 3500 !important;
+  position: relative;
+}
+
+.site-header.pe-none, header.pe-none, .navbar.pe-none, .flyoutNav.pe-none {
+  pointer-events: auto !important;
+}
+
+/* Anchor scroll margin for sticky header */
+:target {
+  scroll-margin-top: 88px;
+}
+
+.nsaw-shell [id] {
+  scroll-margin-top: 88px;
+}
+
+/* === Additional Button Styling === */
+.btn.btn-outline-dark {
+  border: 1px solid #132230;
+  color: #132230;
+}
+
+/* "Read the Introduction" button white styling */
+.video-intro button[data-tab="tab1"],
+.video-intro .btn[data-tab="tab1"],
+.video-intro a.btn {
+  color: #000 !important;
+  border-color: #fff !important;
+  background: #fff !important;
+}
+
+.video-intro button[data-tab="tab1"]:hover,
+.video-intro .btn[data-tab="tab1"]:hover,
+.video-intro a.btn:hover {
+  background: #000 !important;
+  color: #fff !important;
+}
+
+/* === Safari/Apple Fix === */
+@supports (-webkit-touch-callout: none) {
+  .image-col-nsaw {
+    order: 1 !important;
+  }
+  .text-col-nsaw {
+    order: 2 !important;
+  }
+}
+
+/* === Dropdown Menu Positioning === */
+.dropdown-menu,
+.dropdown-menu.pe-none {
+  pointer-events: auto !important;
+  z-index: 3000 !important;
+}
+
+#navMenu {
+  z-index: 3000;
+}
+
+/* === Mobile Overrides === */
+@media (max-width: 1024px) {
+  .container {
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
+  .nsaw-shell .section,
+  .nsaw-shell .row-flex-nsaw {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 1.5rem !important;
+    padding: 1rem !important;
+  }
+
+  .nsaw-shell .image-col-nsaw,
+  .nsaw-shell .text-col-nsaw {
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
+  .nsaw-shell .overlay-card-nsaw {
+    margin-top: -3rem !important;
+  }
+
+  .image-section-nsaw {
+    margin-left: 1rem !important;
+    margin-right: 1rem !important;
+    max-width: calc(100% - 2rem) !important;
+  }
+}
