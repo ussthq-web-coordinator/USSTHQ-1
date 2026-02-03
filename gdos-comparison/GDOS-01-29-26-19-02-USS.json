@@ -770,16 +770,6 @@
         "name": "Casework Services"
       },
       {
-        "alias": "visitation",
-        "category": {
-          "id": "12",
-          "name": "Older Adult Services"
-        },
-        "description": "",
-        "id": "37",
-        "name": "Visitation Services"
-      },
-      {
         "alias": "christianEducation",
         "category": {
           "id": "13",
@@ -2541,7 +2531,7 @@
     "address1": "1284 Murray St",
     "address2": "",
     "city": "Alexandria",
-    "contactName": "Sergeants Daniel and Tammy Camarillo",
+    "contactName": "Majors Dan and Sheila New",
     "contactWebsite": "",
     "displayZip": "71301",
     "email": {
@@ -4030,16 +4020,6 @@
         "name": "Casework Services"
       },
       {
-        "alias": "shelter",
-        "category": {
-          "id": "11",
-          "name": "Housing/Residence Services"
-        },
-        "description": "",
-        "id": "33",
-        "name": "Emergency Shelter"
-      },
-      {
         "alias": "visitation",
         "category": {
           "id": "12",
@@ -4905,16 +4885,6 @@
         "name": "Worship Services - Youth Ministries"
       },
       {
-        "alias": "ChildrensTeenWorship",
-        "category": {
-          "id": "13",
-          "name": "Worship Center"
-        },
-        "description": "",
-        "id": "47",
-        "name": "Worship Services - Children's / Teen"
-      },
-      {
         "alias": "Church",
         "category": {
           "id": "13",
@@ -5393,6 +5363,16 @@
         "description": "",
         "id": "20",
         "name": "Disaster Services"
+      },
+      {
+        "alias": "casework",
+        "category": {
+          "id": "8",
+          "name": "Family Counseling Services"
+        },
+        "description": "",
+        "id": "26",
+        "name": "Casework Services"
       },
       {
         "alias": "visitation",
@@ -6295,6 +6275,16 @@
         "name": "Disaster Services"
       },
       {
+        "alias": "casework",
+        "category": {
+          "id": "8",
+          "name": "Family Counseling Services"
+        },
+        "description": "",
+        "id": "26",
+        "name": "Casework Services"
+      },
+      {
         "alias": "shelter",
         "category": {
           "id": "11",
@@ -6443,6 +6433,16 @@
         "description": "",
         "id": "60",
         "name": "Community Recreation Programs"
+      },
+      {
+        "alias": "foodPantry",
+        "category": {
+          "id": "7",
+          "name": "Emergency Assistance"
+        },
+        "description": "",
+        "id": "64",
+        "name": "Food Pantry"
       }
     ],
     "state": {
@@ -8775,16 +8775,6 @@
         "name": "Casework Services"
       },
       {
-        "alias": "homemaker",
-        "category": {
-          "id": "8",
-          "name": "Family Counseling Services"
-        },
-        "description": "",
-        "id": "28",
-        "name": "Homemaker Services"
-      },
-      {
         "alias": "shelter",
         "category": {
           "id": "11",
@@ -10419,16 +10409,6 @@
         "name": "Christian Education"
       },
       {
-        "alias": "womensMinistries",
-        "category": {
-          "id": "13",
-          "name": "Worship Center"
-        },
-        "description": "",
-        "id": "44",
-        "name": "Women's Ministries"
-      },
-      {
         "alias": "ChildrensTeenWorship",
         "category": {
           "id": "13",
@@ -10447,16 +10427,6 @@
         "description": "",
         "id": "49",
         "name": "Music & Arts Programs"
-      },
-      {
-        "alias": "mensMinistries",
-        "category": {
-          "id": "13",
-          "name": "Worship Center"
-        },
-        "description": "",
-        "id": "51",
-        "name": "Men's Ministries"
       },
       {
         "alias": "residentialCampingActivities",
@@ -15139,16 +15109,6 @@
         "description": "",
         "id": "59",
         "name": "Character Building Programs"
-      },
-      {
-        "alias": "communityRecreationPrograms",
-        "category": {
-          "id": "14",
-          "name": "Youth Services"
-        },
-        "description": "",
-        "id": "60",
-        "name": "Community Recreation Programs"
       }
     ],
     "state": {
@@ -15214,6 +15174,26 @@
         "description": "",
         "id": "20",
         "name": "Disaster Services"
+      },
+      {
+        "alias": "emergencyFinancial",
+        "category": {
+          "id": "7",
+          "name": "Emergency Assistance"
+        },
+        "description": "",
+        "id": "22",
+        "name": "Emergency Financial Assistance"
+      },
+      {
+        "alias": "casework",
+        "category": {
+          "id": "8",
+          "name": "Family Counseling Services"
+        },
+        "description": "",
+        "id": "26",
+        "name": "Casework Services"
       },
       {
         "alias": "christianEducation",
@@ -16764,6 +16744,16 @@
         "description": "",
         "id": "60",
         "name": "Community Recreation Programs"
+      },
+      {
+        "alias": "dropbox",
+        "category": {
+          "id": "15",
+          "name": "Donation Drop Off"
+        },
+        "description": "USC Drop Box",
+        "id": "65",
+        "name": "Drop Box"
       }
     ],
     "state": {
@@ -18656,7 +18646,7 @@
   {
     "address1": "223 W Stillwell Ave",
     "address2": "",
-    "city": "De Queen",
+    "city": "Dequeen",
     "contactName": "",
     "contactWebsite": "",
     "displayZip": "71832",
@@ -18685,16 +18675,6 @@
     "primaryWebsite": "https://southernusa.salvationarmy.org/arkansas-and-oklahoma/",
     "published": true,
     "services": [
-      {
-        "alias": "emergencyFinancial",
-        "category": {
-          "id": "7",
-          "name": "Emergency Assistance"
-        },
-        "description": "",
-        "id": "22",
-        "name": "Emergency Financial Assistance"
-      },
       {
         "alias": "casework",
         "category": {
@@ -27078,16 +27058,6 @@
         "name": "Worship Services - Sunday School"
       },
       {
-        "alias": "ChildrensTeenWorship",
-        "category": {
-          "id": "13",
-          "name": "Worship Center"
-        },
-        "description": "",
-        "id": "47",
-        "name": "Worship Services - Children's / Teen"
-      },
-      {
         "alias": "Church",
         "category": {
           "id": "13",
@@ -28108,26 +28078,6 @@
         "name": "Christian Education"
       },
       {
-        "alias": "Church",
-        "category": {
-          "id": "13",
-          "name": "Worship Center"
-        },
-        "description": "",
-        "id": "48",
-        "name": "Worship Services - Church"
-      },
-      {
-        "alias": "residentialCampingActivities",
-        "category": {
-          "id": "14",
-          "name": "Youth Services"
-        },
-        "description": "",
-        "id": "57",
-        "name": "Residential Camping Activities"
-      },
-      {
         "alias": "foodPantry",
         "category": {
           "id": "7",
@@ -28728,6 +28678,16 @@
         "name": "Christian Education"
       },
       {
+        "alias": "foodPantry",
+        "category": {
+          "id": "7",
+          "name": "Emergency Assistance"
+        },
+        "description": "",
+        "id": "64",
+        "name": "Food Pantry"
+      },
+      {
         "alias": "dropbox",
         "category": {
           "id": "15",
@@ -29031,7 +28991,7 @@
       "longitude": -81.274452
     },
     "lock": false,
-    "name": "Sanford FL Corps",
+    "name": "Seminole County Corps",
     "openHoursText": "Contact store for hours",
     "phoneNumber": "+1 (407)322-2642",
     "primaryWebsite": "https://www.salvationarmysanford.org",
@@ -29224,7 +29184,7 @@
       "shortCode": "FL"
     },
     "unitID": "376255c3-2709-4b35-a38f-8de86ff13b28",
-    "unitShortName": "Sanford FL Corps",
+    "unitShortName": "Seminole County Corps",
     "websiteTechnology": "",
     "wm4ModelName": {
       "id": "2",
@@ -29728,6 +29688,16 @@
         "name": "Casework Services"
       },
       {
+        "alias": "homemaker",
+        "category": {
+          "id": "8",
+          "name": "Family Counseling Services"
+        },
+        "description": "",
+        "id": "28",
+        "name": "Homemaker Services"
+      },
+      {
         "alias": "transitionalHousing",
         "category": {
           "id": "11",
@@ -29736,6 +29706,16 @@
         "description": "",
         "id": "34",
         "name": "Transitional Housing"
+      },
+      {
+        "alias": "visitation",
+        "category": {
+          "id": "12",
+          "name": "Older Adult Services"
+        },
+        "description": "",
+        "id": "37",
+        "name": "Visitation Services"
       },
       {
         "alias": "christianEducation",
@@ -36394,16 +36374,6 @@
         "description": "",
         "id": "47",
         "name": "Worship Services - Children's / Teen"
-      },
-      {
-        "alias": "musicArts",
-        "category": {
-          "id": "13",
-          "name": "Worship Center"
-        },
-        "description": "",
-        "id": "49",
-        "name": "Music & Arts Programs"
       }
     ],
     "state": {
@@ -41038,6 +41008,16 @@
         "name": "Disaster Services"
       },
       {
+        "alias": "emergencyFinancial",
+        "category": {
+          "id": "7",
+          "name": "Emergency Assistance"
+        },
+        "description": "",
+        "id": "22",
+        "name": "Emergency Financial Assistance"
+      },
+      {
         "alias": "christianEducation",
         "category": {
           "id": "13",
@@ -41106,6 +41086,16 @@
         "description": "",
         "id": "49",
         "name": "Music & Arts Programs"
+      },
+      {
+        "alias": "youngAdultWorship",
+        "category": {
+          "id": "13",
+          "name": "Worship Center"
+        },
+        "description": "",
+        "id": "50",
+        "name": "Worship Services - Young Adult"
       },
       {
         "alias": "mensMinistries",
@@ -42243,6 +42233,54 @@
     },
     "zip": {
       "zipcode": "39819"
+    }
+  },
+  {
+    "address1": "32 Camp Grandview Cir",
+    "address2": null,
+    "city": "Jasper",
+    "contactName": null,
+    "contactWebsite": null,
+    "displayZip": "30143",
+    "email": {
+      "address": "SharedGEODHQGeneral@uss.salvationarmy.org",
+      "id": "8a8280448db1c981018db1f0c2b00004"
+    },
+    "externalTerritoryId": null,
+    "id": "2c9f573c9bef9548019c1076e6e30046",
+    "licensed": null,
+    "location": {
+      "country": {
+        "iso": "US"
+      },
+      "division": {
+        "id": "163",
+        "name": "Georgia"
+      },
+      "latitude": 34.501296,
+      "longitude": -84.389686
+    },
+    "lock": false,
+    "name": "North Georgia Mission Station",
+    "openHoursText": null,
+    "phoneNumber": "+1 (706)692-6027",
+    "primaryWebsite": null,
+    "published": true,
+    "services": [],
+    "state": {
+      "id": "11",
+      "name": "Georgia",
+      "shortCode": "GA"
+    },
+    "unitID": "682b3343-c403-4b25-ab78-3f89d510992c",
+    "unitShortName": "North Georgia Mission Station",
+    "websiteTechnology": null,
+    "wm4ModelName": null,
+    "wm4SiteId": null,
+    "wm4SiteTitle": null,
+    "wm4SiteType": null,
+    "zip": {
+      "zipcode": "30143"
     }
   },
   {
@@ -49958,6 +49996,16 @@
     "published": true,
     "services": [
       {
+        "alias": "casework",
+        "category": {
+          "id": "8",
+          "name": "Family Counseling Services"
+        },
+        "description": "",
+        "id": "26",
+        "name": "Casework Services"
+      },
+      {
         "alias": "residentialCampingActivities",
         "category": {
           "id": "14",
@@ -55113,16 +55161,6 @@
         "name": "Visitation Services"
       },
       {
-        "alias": "christianEducation",
-        "category": {
-          "id": "13",
-          "name": "Worship Center"
-        },
-        "description": "",
-        "id": "43",
-        "name": "Christian Education"
-      },
-      {
         "alias": "womensMinistries",
         "category": {
           "id": "13",
@@ -55211,16 +55249,6 @@
         "description": "",
         "id": "52",
         "name": "Day Camp Activities"
-      },
-      {
-        "alias": "communityRecreationPrograms",
-        "category": {
-          "id": "14",
-          "name": "Youth Services"
-        },
-        "description": "",
-        "id": "60",
-        "name": "Community Recreation Programs"
       },
       {
         "alias": "foodPantry",
@@ -55521,16 +55549,6 @@
         "description": "",
         "id": "35",
         "name": "Group Homes"
-      },
-      {
-        "alias": "christianEducation",
-        "category": {
-          "id": "13",
-          "name": "Worship Center"
-        },
-        "description": "",
-        "id": "43",
-        "name": "Christian Education"
       },
       {
         "alias": "dayCare",
@@ -60233,16 +60251,6 @@
         "name": "Casework Services"
       },
       {
-        "alias": "shelter",
-        "category": {
-          "id": "11",
-          "name": "Housing/Residence Services"
-        },
-        "description": "",
-        "id": "33",
-        "name": "Emergency Shelter"
-      },
-      {
         "alias": "christianEducation",
         "category": {
           "id": "13",
@@ -63146,16 +63154,6 @@
         "description": "",
         "id": "20",
         "name": "Disaster Services"
-      },
-      {
-        "alias": "visitation",
-        "category": {
-          "id": "12",
-          "name": "Older Adult Services"
-        },
-        "description": "",
-        "id": "37",
-        "name": "Visitation Services"
       },
       {
         "alias": "christianEducation",
@@ -68282,16 +68280,6 @@
         "name": "Music & Arts Programs"
       },
       {
-        "alias": "youngAdultWorship",
-        "category": {
-          "id": "13",
-          "name": "Worship Center"
-        },
-        "description": "",
-        "id": "50",
-        "name": "Worship Services - Young Adult"
-      },
-      {
         "alias": "mensMinistries",
         "category": {
           "id": "13",
@@ -71490,6 +71478,16 @@
         "description": "",
         "id": "26",
         "name": "Casework Services"
+      },
+      {
+        "alias": "visitation",
+        "category": {
+          "id": "12",
+          "name": "Older Adult Services"
+        },
+        "description": "",
+        "id": "37",
+        "name": "Visitation Services"
       },
       {
         "alias": "christianEducation",
@@ -75925,16 +75923,6 @@
         "description": "",
         "id": "59",
         "name": "Character Building Programs"
-      },
-      {
-        "alias": "communityRecreationPrograms",
-        "category": {
-          "id": "14",
-          "name": "Youth Services"
-        },
-        "description": "",
-        "id": "60",
-        "name": "Community Recreation Programs"
       }
     ],
     "state": {
@@ -77177,16 +77165,6 @@
         "name": "Worship Services - Sunday School"
       },
       {
-        "alias": "ChildrensTeenWorship",
-        "category": {
-          "id": "13",
-          "name": "Worship Center"
-        },
-        "description": "",
-        "id": "47",
-        "name": "Worship Services - Children's / Teen"
-      },
-      {
         "alias": "Church",
         "category": {
           "id": "13",
@@ -78290,7 +78268,7 @@
     "openHoursText": null,
     "phoneNumber": "+1 (910)483-8119",
     "primaryWebsite": "https://southernusa.salvationarmy.org/sandhills",
-    "published": true,
+    "published": false,
     "services": [
       {
         "alias": "ChildrensTeenWorship",
@@ -79426,16 +79404,6 @@
         "description": "",
         "id": "28",
         "name": "Homemaker Services"
-      },
-      {
-        "alias": "shelter",
-        "category": {
-          "id": "11",
-          "name": "Housing/Residence Services"
-        },
-        "description": "",
-        "id": "33",
-        "name": "Emergency Shelter"
       },
       {
         "alias": "visitation",
@@ -80923,16 +80891,6 @@
         "name": "Emergency Shelter"
       },
       {
-        "alias": "transitionalHousing",
-        "category": {
-          "id": "11",
-          "name": "Housing/Residence Services"
-        },
-        "description": "",
-        "id": "34",
-        "name": "Transitional Housing"
-      },
-      {
         "alias": "groupHomes",
         "category": {
           "id": "11",
@@ -81120,7 +81078,7 @@
     "openHoursText": null,
     "phoneNumber": "+1 (336)881-5444",
     "primaryWebsite": "https://southernusa.salvationarmy.org/greensboro/red-shield-youth-centers",
-    "published": true,
+    "published": false,
     "services": [
       {
         "alias": "ChildrensTeenWorship",
@@ -82171,6 +82129,26 @@
         "name": "Disaster Services"
       },
       {
+        "alias": "emergencyFinancial",
+        "category": {
+          "id": "7",
+          "name": "Emergency Assistance"
+        },
+        "description": "",
+        "id": "22",
+        "name": "Emergency Financial Assistance"
+      },
+      {
+        "alias": "casework",
+        "category": {
+          "id": "8",
+          "name": "Family Counseling Services"
+        },
+        "description": "",
+        "id": "26",
+        "name": "Casework Services"
+      },
+      {
         "alias": "christianEducation",
         "category": {
           "id": "13",
@@ -82181,24 +82159,14 @@
         "name": "Christian Education"
       },
       {
-        "alias": "ChildrensTeenWorship",
+        "alias": "foodPantry",
         "category": {
-          "id": "13",
-          "name": "Worship Center"
+          "id": "7",
+          "name": "Emergency Assistance"
         },
         "description": "",
-        "id": "47",
-        "name": "Worship Services - Children's / Teen"
-      },
-      {
-        "alias": "communityRecreationPrograms",
-        "category": {
-          "id": "14",
-          "name": "Youth Services"
-        },
-        "description": "",
-        "id": "60",
-        "name": "Community Recreation Programs"
+        "id": "64",
+        "name": "Food Pantry"
       }
     ],
     "state": {
@@ -91672,6 +91640,16 @@
         "description": "",
         "id": "20",
         "name": "Disaster Services"
+      },
+      {
+        "alias": "casework",
+        "category": {
+          "id": "8",
+          "name": "Family Counseling Services"
+        },
+        "description": "",
+        "id": "26",
+        "name": "Casework Services"
       }
     ],
     "state": {
@@ -91942,16 +91920,6 @@
         "description": "",
         "id": "33",
         "name": "Emergency Shelter"
-      },
-      {
-        "alias": "visitation",
-        "category": {
-          "id": "12",
-          "name": "Older Adult Services"
-        },
-        "description": "",
-        "id": "37",
-        "name": "Visitation Services"
       },
       {
         "alias": "christianEducation",
@@ -95709,16 +95677,6 @@
         "name": "Visitation Services"
       },
       {
-        "alias": "christianEducation",
-        "category": {
-          "id": "13",
-          "name": "Worship Center"
-        },
-        "description": "",
-        "id": "43",
-        "name": "Christian Education"
-      },
-      {
         "alias": "womensMinistries",
         "category": {
           "id": "13",
@@ -96255,7 +96213,7 @@
     "address1": "2350 Interstate 10 E",
     "address2": "",
     "city": "Beaumont",
-    "contactName": "Majors Russell and Tracey Czajkowski",
+    "contactName": "Captain Kenny Jones",
     "contactWebsite": "",
     "displayZip": "77703",
     "email": {
@@ -118432,16 +118390,6 @@
         "name": "Military Personnel Assistance"
       },
       {
-        "alias": "emergencyFinancial",
-        "category": {
-          "id": "7",
-          "name": "Emergency Assistance"
-        },
-        "description": "",
-        "id": "22",
-        "name": "Emergency Financial Assistance"
-      },
-      {
         "alias": "casework",
         "category": {
           "id": "8",
@@ -119607,16 +119555,6 @@
         "description": "",
         "id": "64",
         "name": "Food Pantry"
-      },
-      {
-        "alias": "food",
-        "category": {
-          "id": "2",
-          "name": "Adult Program Services"
-        },
-        "description": "Services may include mass and congregate feeding, mobile meals, food pantries, voucher programs and commodities.",
-        "id": "9",
-        "name": "Food & Nutrition"
       }
     ],
     "state": {
@@ -120857,16 +120795,6 @@
         "description": "",
         "id": "47",
         "name": "Worship Services - Children's / Teen"
-      },
-      {
-        "alias": "communityRecreationPrograms",
-        "category": {
-          "id": "14",
-          "name": "Youth Services"
-        },
-        "description": "",
-        "id": "60",
-        "name": "Community Recreation Programs"
       }
     ],
     "state": {
@@ -123046,7 +122974,7 @@
     "openHoursText": null,
     "phoneNumber": null,
     "primaryWebsite": null,
-    "published": true,
+    "published": false,
     "services": [
       {
         "alias": "dropbox",
@@ -143766,16 +143694,6 @@
         "name": "Worship Services - Sunday School"
       },
       {
-        "alias": "youthMinistriesWorship",
-        "category": {
-          "id": "13",
-          "name": "Worship Center"
-        },
-        "description": "",
-        "id": "46",
-        "name": "Worship Services - Youth Ministries"
-      },
-      {
         "alias": "ChildrensTeenWorship",
         "category": {
           "id": "13",
@@ -145964,16 +145882,6 @@
         "description": "",
         "id": "28",
         "name": "Homemaker Services"
-      },
-      {
-        "alias": "visitation",
-        "category": {
-          "id": "12",
-          "name": "Older Adult Services"
-        },
-        "description": "",
-        "id": "37",
-        "name": "Visitation Services"
       },
       {
         "alias": "christianEducation",
@@ -151968,16 +151876,6 @@
         "description": "",
         "id": "34",
         "name": "Transitional Housing"
-      },
-      {
-        "alias": "christianEducation",
-        "category": {
-          "id": "13",
-          "name": "Worship Center"
-        },
-        "description": "",
-        "id": "43",
-        "name": "Christian Education"
       }
     ],
     "state": {
@@ -152655,16 +152553,6 @@
         "description": "",
         "id": "47",
         "name": "Worship Services - Children's / Teen"
-      },
-      {
-        "alias": "communityRecreationPrograms",
-        "category": {
-          "id": "14",
-          "name": "Youth Services"
-        },
-        "description": "",
-        "id": "60",
-        "name": "Community Recreation Programs"
       }
     ],
     "state": {
@@ -155690,6 +155578,16 @@
         "description": "",
         "id": "26",
         "name": "Casework Services"
+      },
+      {
+        "alias": "foodPantry",
+        "category": {
+          "id": "7",
+          "name": "Emergency Assistance"
+        },
+        "description": "",
+        "id": "64",
+        "name": "Food Pantry"
       }
     ],
     "state": {
