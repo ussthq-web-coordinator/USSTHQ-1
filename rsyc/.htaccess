@@ -1,0 +1,21 @@
+<IfModule mod_headers.c>
+  # Whitelist specific origins (exact-match). Adjust ports/origins as required.
+  SetEnvIf Origin "^http://localhost:8000$" CORS_ALLOW_ORIGIN=$0
+  SetEnvIf Origin "^http://localhost:3001$" CORS_ALLOW_ORIGIN=$0
+  SetEnvIf Origin "^https://hopewell.pages.dev$" CORS_ALLOW_ORIGIN=$0
+  SetEnvIf Origin "^https://southernusa.salvationarmy.org$" CORS_ALLOW_ORIGIN=$0
+
+  # Echo back the matched Origin only when it is in the whitelist
+  Header always set Access-Control-Allow-Origin "%{CORS_ALLOW_ORIGIN}e" env=CORS_ALLOW_ORIGIN
+  Header always set Access-Control-Allow-Methods "GET, OPTIONS"
+  Header always set Access-Control-Allow-Headers "Origin, X-Requested-With, Content-Type, Accept"
+  Header always set Access-Control-Max-Age "3600"
+  Header set Cache-Control "max-age=60, public"
+</IfModule>
+
+# Respond 200 to preflight OPTIONS requests
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteCond %{REQUEST_METHOD} OPTIONS
+  RewriteRule ^(.*)$ $1 [R=200,L]
+</IfModule>

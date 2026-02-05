@@ -16,7 +16,7 @@ class RSYCDataLoader {
         ];
         this.currentProxyIndex = 0;
         this.baseURL = 'https://thisishoperva.org/rsyc/';
-        this.useCorsProxy = false;          // Proxies often fail, rely on direct fetch
+        this.useCorsProxy = true;          // Enable proxy fallback for cross-origin requests
         this.tryDirectFirst = true;      // attempt direct fetch before using proxy
         
         this.cache = {
@@ -31,6 +31,101 @@ class RSYCDataLoader {
             lastUpdated: null
         };
         this.loading = false;
+    }
+
+    /**
+     * Load ONLY critical data (centers + hours) for fast initial render
+     */
+    async loadCriticalData() {
+        if (this.cache.centers && this.cache.hours) {
+            return; // Already loaded
+        }
+
+        try {
+            console.log('⚡ Loading critical data...');
+            
+            const [centers, hours] = await Promise.all([
+                this.fetchJSON('units-rsyc-profiles.json').catch(e => {
+                    console.error('Failed to load centers:', e.message);
+                    return [];
+                }),
+                this.fetchJSON('RSYCHours.json').catch(e => {
+                    console.warn('Hours data unavailable:', e.message);
+                    return [];
+                })
+            ]);
+
+            this.cache.centers = this.processCenters(centers);
+            this.cache.hours = this.processHours(hours);
+            this.cache.lastUpdated = new Date();
+
+            // Auto-populate CENTER_IDS from loaded data
+            if (typeof window.populateCenterIDs === 'function') {
+                window.populateCenterIDs(this.cache.centers);
+            }
+
+            console.log('⚡ Critical data loaded:', {
+                centers: this.cache.centers.length,
+                hours: this.cache.hours.length
+            });
+        } catch (error) {
+            console.error('❌ Error loading critical data:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * Load optional data (schedules, programs, staff, facilities, photos)
+     */
+    async loadOptionalData() {
+        // Skip if already loaded
+        if (this.cache.schedules && this.cache.schedules.length > 0) {
+            return;
+        }
+
+        try {
+            console.log('📦 Loading optional data...');
+            
+            const [schedules, leaders, facilities, featuredPrograms, photos] = await Promise.all([
+                this.fetchJSON('RSYCProgramSchedules.json').catch(e => {
+                    console.warn('Schedules data unavailable:', e.message);
+                    return [];
+                }),
+                this.fetchJSON('RSYCLeaders.json').catch(e => {
+                    console.warn('Leaders data unavailable:', e.message);
+                    return [];
+                }),
+                this.fetchJSON('RSYCFacilityFeatures.json').catch(e => {
+                    console.warn('Facilities data unavailable:', e.message);
+                    return [];
+                }),
+                this.fetchJSON('RSYCPrograms.json').catch(e => {
+                    console.warn('Programs data unavailable:', e.message);
+                    return [];
+                }),
+                this.fetchJSON('RSYCHomepagePhotos.json').catch(e => {
+                    console.warn('Photos unavailable, using defaults:', e.message);
+                    return [];
+                })
+            ]);
+
+            this.cache.schedules = this.processSchedules(schedules);
+            this.cache.leaders = this.processLeaders(leaders);
+            this.cache.facilities = this.processFacilities(facilities);
+            this.cache.featuredPrograms = this.processPrograms(featuredPrograms);
+            this.cache.photos = this.processPhotos(photos);
+
+            console.log('📦 Optional data loaded:', {
+                schedules: this.cache.schedules.length,
+                leaders: this.cache.leaders.length,
+                photos: this.cache.photos.length,
+                facilities: this.cache.facilities.length,
+                programs: this.cache.featuredPrograms.length
+            });
+        } catch (error) {
+            console.warn('⚠️ Error loading optional data:', error);
+            // Don't throw - optional data failing shouldn't break the profile
+        }
     }
 
     /**
@@ -171,9 +266,10 @@ class RSYCDataLoader {
             }
         }
 
-        // Try direct fetch
+        // Try direct fetch first, trying without CORS restrictions first
         if (this.tryDirectFirst) {
             try {
+                // Try with standard CORS
                 return await doFetch(directUrl, 'direct', false);
             } catch (err) {
                 console.warn(`⚠️ Direct fetch failed for ${filename}:`, err.message);
@@ -181,37 +277,25 @@ class RSYCDataLoader {
             }
         }
 
-        // If using cors proxy fallback is allowed, attempt multiple proxy services
+        // If direct failed, try with corsproxy.io which handles CORS
         if (this.useCorsProxy && this.corsProxies && this.corsProxies.length > 0) {
             for (let i = 0; i < this.corsProxies.length; i++) {
                 const corsProxy = this.corsProxies[i];
                 try {
-                    let proxied;
-                    // Handle different proxy formats
-                    if (corsProxy.includes('allorigins')) {
-                        // allorigins.win API format
-                        proxied = corsProxy + encodeURIComponent(directUrl);
-                    } else {
-                        // corsproxy.io and cors-anywhere format
-                        proxied = corsProxy + encodeURIComponent(directUrl);
-                    }
-                    
-                    console.log(`🔄 Trying proxy ${i + 1}/${this.corsProxies.length} for ${filename}`);
+                    let proxied = corsProxy + encodeURIComponent(directUrl);
+                    console.log(`🔄 Trying CORS proxy ${i + 1}/${this.corsProxies.length} for ${filename}`);
                     const result = await doFetch(proxied, `cors-proxy-${i + 1}`, true);
-                    console.log(`✅ Successfully fetched via proxy ${i + 1}`);
+                    console.log(`✅ Successfully fetched via CORS proxy ${i + 1}`);
                     return result;
                 } catch (err) {
-                    console.warn(`⚠️ Proxy ${i + 1} failed for ${filename}:`, err.message);
+                    console.warn(`⚠️ CORS proxy ${i + 1} failed for ${filename}:`, err.message);
                     // Continue to next proxy
                 }
             }
-            
-            // All proxies failed
-            throw new Error(`Failed to fetch ${filename}: all CORS proxies exhausted.`);
         }
 
-        // If proxy disabled and direct failed, surface error
-        throw new Error(`Failed to fetch ${filename}: direct fetch failed and proxy is disabled.`);
+        // If we get here, all methods failed
+        throw new Error(`Failed to fetch ${filename}: direct fetch blocked by CORS. Enable CORS headers on https://thisishoperva.org or configure a backend proxy.`);
     }
 
     /**
@@ -553,7 +637,9 @@ class RSYCDataLoader {
      * Get center by ID
      */
     getCenter(id) {
-        return this.cache.centers?.find(c => c.id === id);
+        // Handle both string and number IDs - convert to number for comparison
+        const numericId = Number(id);
+        return this.cache.centers?.find(c => c.id === numericId || c.Id === numericId);
     }
 
     /**
@@ -567,17 +653,22 @@ class RSYCDataLoader {
         console.log('🔍 Center found:', center.name, 'Center.id:', center.id, 'Center.sharePointId:', center.sharePointId);
 
         // Get facility features with their details (including biClass for icons)
-        const facilityFeatures = center.facilityFeatures.map(f => 
-            this.cache.facilities.find(facility => facility.id === f.id)
-        ).filter(Boolean).map(facility => ({
-            ...facility,
-            biClass: facility.iconClass || 'bi-check-circle'  // Map iconClass to biClass
-        }));
+        // Handle case where facilities data hasn't loaded yet (critical-data-only mode)
+        const facilityFeatures = (this.cache.facilities || []).length > 0
+            ? center.facilityFeatures.map(f => 
+                this.cache.facilities.find(facility => facility.id === f.id)
+              ).filter(Boolean).map(facility => ({
+                ...facility,
+                biClass: facility.iconClass || 'bi-check-circle'  // Map iconClass to biClass
+              }))
+            : [];
 
         // Get program details
-        const programDetails = center.featuredPrograms.map(p => 
-            this.cache.featuredPrograms.find(program => program.id === p.id)
-        ).filter(Boolean);
+        const programDetails = (this.cache.featuredPrograms || []).length > 0
+            ? center.featuredPrograms.map(p => 
+                this.cache.featuredPrograms.find(program => program.id === p.id)
+              ).filter(Boolean)
+            : [];
 
         // Find hours using SharePoint list item ID
         const hours = this.cache.hours.find(h => h.centerId == center.sharePointId);
@@ -656,8 +747,8 @@ class RSYCDataLoader {
         return {
             center,
             schedules: schedulesForCenter,
-            leaders: this.cache.leaders.filter(l => l.centerIds.includes(center.sharePointId)),
-            photos: this.cache.photos.filter(p => p.centerId === center.sharePointId),
+            leaders: (this.cache.leaders || []).filter(l => l.centerIds.includes(center.sharePointId)),
+            photos: (this.cache.photos || []).filter(p => p.centerId === center.sharePointId),
             hours,
             facilityFeatures,  // Use the mapped version with biClass
             facilityDetails: facilityFeatures,  // Alias for backward compatibility

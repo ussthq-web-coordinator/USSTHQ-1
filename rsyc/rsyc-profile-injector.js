@@ -9,12 +9,28 @@
     console.log('[RSYCProfileInjector] Initializing...');
 
     /**
-     * Load and render a profile into a container
+     * Show loading skeleton for faster perceived performance
+     */
+    function showLoadingSkeleton(targetElement, centerName) {
+        targetElement.innerHTML = `
+            <div style="padding: 24px; background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%); background-size: 200% 100%; animation: loading 1.5s infinite; border-radius: 8px; margin-bottom: 16px; height: 200px;"></div>
+            <style>
+                @keyframes loading {
+                    0% { background-position: 200% 0; }
+                    100% { background-position: -200% 0; }
+                }
+            </style>
+            <div style="padding: 0 4px; color: #999; font-size: 13px;">Loading ${centerName || 'profile'}...</div>
+        `;
+    }
+
+    /**
+     * Load and render a profile into a container (optimized)
      */
     async function loadProfile(centerId, targetElement) {
         try {
-            // Show loading state
-            targetElement.innerHTML = '<div style="padding: 40px; text-align: center; color: #999;">Loading profile...</div>';
+            // Show skeleton immediately for better perceived performance
+            showLoadingSkeleton(targetElement);
 
             // Load required scripts if not already loaded
             const baseUrl = window.location.hostname === 'localhost'
@@ -23,18 +39,18 @@
 
             console.log('[RSYCProfileInjector] Loading scripts from:', baseUrl);
             
-            // Load scripts in order - these must load before we use the classes
-            await loadScript(`${baseUrl}/rsyc/rsyc-staff-order.js`);
-            console.log('[RSYCProfileInjector] ✓ Loaded rsyc-staff-order.js');
+            // Load support scripts in parallel - rsyc-data can load in parallel with others
+            await Promise.all([
+                loadScript(`${baseUrl}/rsyc/rsyc-staff-order.js`),
+                loadScript(`${baseUrl}/rsyc/rsyc-data.js`),
+                loadScript(`${baseUrl}/rsyc/rsyc-templates.js`),
+            ]);
+            console.log('[RSYCProfileInjector] ✓ Loaded core scripts');
             
-            await loadScript(`${baseUrl}/rsyc/rsyc-data.js`);
-            console.log('[RSYCProfileInjector] ✓ Loaded rsyc-data.js');
-            
-            await loadScript(`${baseUrl}/rsyc/rsyc-templates.js`);
-            console.log('[RSYCProfileInjector] ✓ Loaded rsyc-templates.js');
-            
-            await loadScript(`${baseUrl}/rsyc/rsyc-tracker.js`);
-            console.log('[RSYCProfileInjector] ✓ Loaded rsyc-tracker.js');
+            // Load tracker in background after initial render
+            loadScript(`${baseUrl}/rsyc/rsyc-tracker.js`).catch(() => {
+                console.warn('[RSYCProfileInjector] Tracker script optional, continuing...');
+            });
 
             // Verify classes are available
             if (!window.RSYCDataLoader) {
@@ -48,12 +64,13 @@
 
             console.log('[RSYCProfileInjector] All classes loaded successfully');
 
-            // Initialize data loader
+            // Initialize data loader with cache
             const dataLoader = new window.RSYCDataLoader();
             console.log('[RSYCProfileInjector] Initializing data loader...');
             
-            await dataLoader.loadAll();
-            console.log('[RSYCProfileInjector] Data loaded');
+            // Load ONLY critical data first (centers + hours)
+            await dataLoader.loadCriticalData();
+            console.log('[RSYCProfileInjector] Critical data loaded');
 
             // Get center data
             const centerData = await dataLoader.getCenterData(centerId);
@@ -66,15 +83,16 @@
             }
 
             console.log('[RSYCProfileInjector] Center found:', centerData.center.name);
+            showLoadingSkeleton(targetElement, centerData.center.name);
 
             // Generate profile HTML using the template engine
             const templateEngine = new window.RSYCTemplates();
             
-            // Generate sections
-            const sections = ['schedules', 'hours', 'facilities', 'programs', 'staff', 'nearby', 'volunteer', 'footerPhoto', 'contact'];
+            // Generate CRITICAL sections first (hours, contact)
+            const criticalSections = ['hours', 'contact'];
             let html = '';
 
-            sections.forEach(sectionId => {
+            criticalSections.forEach(sectionId => {
                 try {
                     const sectionHTML = templateEngine.generateSection(sectionId, centerData);
                     if (sectionHTML) {
@@ -85,34 +103,67 @@
                 }
             });
 
-            if (!html) {
-                throw new Error('No sections generated');
-            }
-
-            console.log('[RSYCProfileInjector] Generated profile HTML');
-
-            // Create container with proper styling
+            // Render critical content immediately
             const container = document.createElement('div');
             container.className = 'rsyc-profile';
+            container.id = `rsyc-container-${centerId}`;
             container.innerHTML = `
                 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
                 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css">
                 ${html}
+                <div id="rsyc-deferred-${centerId}"></div>
             `;
 
             targetElement.innerHTML = '';
             targetElement.appendChild(container);
 
             // Load custom styles
-            await loadCustomStyles();
+            loadCustomStyles();
 
-            console.log(`[RSYCProfileInjector] ✅ Loaded profile: ${centerData.center.name}`);
+            console.log(`[RSYCProfileInjector] ✅ Rendered critical content: ${centerData.center.name}`);
+
+            // Load remaining sections in background (non-critical)
+            loadDeferredSections(centerId, centerData, templateEngine, dataLoader);
 
         } catch (error) {
             console.error('[RSYCProfileInjector] Error:', error);
             targetElement.innerHTML = `<div style="padding: 20px; background: #ffe6e6; color: #990000; border-radius: 8px; border: 1px solid #ffcccc;">
                 <strong>Error loading profile:</strong> ${error.message}
             </div>`;
+        }
+    }
+
+    /**
+     * Load remaining sections after critical content is rendered
+     */
+    async function loadDeferredSections(centerId, centerData, templateEngine, dataLoader) {
+        try {
+            // Load remaining non-critical data
+            await dataLoader.loadOptionalData();
+
+            // Generate remaining sections
+            const deferredSections = ['schedules', 'facilities', 'programs', 'staff', 'nearby', 'volunteer', 'footerPhoto'];
+            let html = '';
+
+            deferredSections.forEach(sectionId => {
+                try {
+                    const sectionHTML = templateEngine.generateSection(sectionId, centerData);
+                    if (sectionHTML) {
+                        html += sectionHTML + '\n\n';
+                    }
+                } catch (e) {
+                    console.warn(`[RSYCProfileInjector] Section ${sectionId} failed:`, e.message);
+                }
+            });
+
+            // Insert deferred sections
+            const deferredContainer = document.getElementById(`rsyc-deferred-${centerId}`);
+            if (deferredContainer) {
+                deferredContainer.innerHTML = html;
+                console.log('[RSYCProfileInjector] ✅ Loaded deferred sections');
+            }
+        } catch (error) {
+            console.warn('[RSYCProfileInjector] Deferred loading error:', error.message);
         }
     }
 
