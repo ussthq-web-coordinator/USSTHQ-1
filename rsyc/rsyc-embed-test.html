@@ -95,7 +95,7 @@
     <div class="container">
         <h1>✅ RSYC Client-Side Embed Test</h1>
         <p>Testing the three embed methods using client-side rendering (no API needed)</p>
-        <p><strong>Center ID for testing:</strong> <code>42b6bfb3-d0b4-4806-b38b-e700e747c5ff</code></p>
+        <p><strong>Center ID for testing:</strong> <code>1</code></p>
     </div>
 
     <!-- Test 1: iFrame Embed -->
@@ -103,7 +103,7 @@
         <div class="test-section">
             <h2>1. 🖼️ iFrame Embed</h2>
             <p>Loads profile in an isolated iframe</p>
-            <div class="test-code">&lt;iframe src="https://thisishoperva.org/rsyc/rsyc-profile-publisher.html?centerId=42b6bfb3-d0b4-4806-b38b-e700e747c5ff" width="100%" height="1200" frameborder="0" style="border: none; border-radius: 8px;"&gt;&lt;/iframe&gt;</div>
+            <div class="test-code" id="iframeCode">&lt;iframe src="https://thisishoperva.org/rsyc/rsyc-profile-publisher.html?centerId=1" width="100%" height="1200" frameborder="0" style="border: none; border-radius: 8px;"&gt;&lt;/iframe&gt;</div>
             <button onclick="testIframe()">Load iFrame Example</button>
             <div id="iframeContainer" style="margin-top: 20px;"></div>
         </div>
@@ -114,8 +114,8 @@
         <div class="test-section">
             <h2>2. 📦 Div Mount (Client-Side)</h2>
             <p>Loads profile directly into a div using client-side template engine</p>
-            <div class="test-code">&lt;div id="rsyc-profile-42b6bfb3-d0b4-4806-b38b-e700e747c5ff" style="width: 100%;"&gt;&lt;/div&gt;
-&lt;script src="https://thisishoperva.org/rsyc/rsyc-profile-injector.js" data-center-id="42b6bfb3-d0b4-4806-b38b-e700e747c5ff" data-element-id="rsyc-profile-42b6bfb3-d0b4-4806-b38b-e700e747c5ff"&gt;&lt;/script&gt;</div>
+            <div class="test-code" id="divMountCode">&lt;div id="rsyc-profile-1" style="width: 100%;"&gt;&lt;/div&gt;
+&lt;script src="https://thisishoperva.org/rsyc/rsyc-profile-injector.js" data-center-id="1" data-element-id="rsyc-profile-1"&gt;&lt;/script&gt;</div>
             <button onclick="testDivMount()">Load Div Mount Example</button>
             <div id="divMountContainer" class="profile-container" style="margin-top: 20px;"></div>
         </div>
@@ -126,10 +126,10 @@
         <div class="test-section">
             <h2>3. ⚡ Auto-Inject</h2>
             <p>Simplest method - just add a div with data attribute</p>
-            <div class="test-code">&lt;div data-rsyc-center-id="42b6bfb3-d0b4-4806-b38b-e700e747c5ff"&gt;&lt;/div&gt;
+            <div class="test-code" id="autoInjectCode">&lt;div data-rsyc-center-id="1"&gt;&lt;/div&gt;
 &lt;script src="https://thisishoperva.org/rsyc/rsyc-profile-injector.js"&gt;&lt;/script&gt;</div>
             <button onclick="testAutoInject()">Load Auto-Inject Example</button>
-            <div id="autoInjectContainer" data-rsyc-center-id="42b6bfb3-d0b4-4806-b38b-e700e747c5ff" class="profile-container" style="margin-top: 20px;"></div>
+            <div id="autoInjectContainer" data-rsyc-center-id="1" class="profile-container" style="margin-top: 20px;"></div>
         </div>
     </div>
 
@@ -140,7 +140,7 @@
 
     <script>
         const baseUrl = 'https://thisishoperva.org';
-        const testCenterId = '42b6bfb3-d0b4-4806-b38b-e700e747c5ff';
+        const testCenterId = '1';
 
         console.log('[RSYC Embed Test] Starting tests...');
 

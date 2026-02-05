@@ -58,7 +58,11 @@
             // Get center data
             const centerData = await dataLoader.getCenterData(centerId);
             if (!centerData || !centerData.center) {
-                throw new Error(`Center not found: ${centerId}`);
+                // Log available centers for debugging
+                const availableCenters = dataLoader.cache.centers.slice(0, 5).map(c => `${c.name} (${c.id})`).join(', ');
+                console.error('[RSYCProfileInjector] Available centers:', availableCenters);
+                console.error('[RSYCProfileInjector] Total centers loaded:', dataLoader.cache.centers.length);
+                throw new Error(`Center not found: ${centerId}. Check console for available centers.`);
             }
 
             console.log('[RSYCProfileInjector] Center found:', centerData.center.name);

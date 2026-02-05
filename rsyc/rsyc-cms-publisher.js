@@ -147,8 +147,8 @@
          */
         processCenters(data) {
             return data.map(center => ({
-                Id: center.field_0,
-                id: center.field_0,
+                Id: center.ID,
+                id: center.ID,
                 sharePointId: center.ID,
                 Title: center.Title,
                 name: center.field_1,

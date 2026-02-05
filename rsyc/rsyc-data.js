@@ -10,9 +10,13 @@ class RSYCDataLoader {
         // restrictions we fall back to the configured proxy. You can disable the
         // proxy by setting `useCorsProxy` to false (and make sure your server
         // sends Access-Control-Allow-Origin headers for the publisher origin).
-        this.corsProxy = 'https://corsproxy.io/?';
+        this.corsProxies = [
+            'https://corsproxy.io/?',
+            'https://api.allorigins.win/get?url='
+        ];
+        this.currentProxyIndex = 0;
         this.baseURL = 'https://thisishoperva.org/rsyc/';
-        this.useCorsProxy = false;         // set to false to never use corsproxy.io
+        this.useCorsProxy = false;          // Proxies often fail, rely on direct fetch
         this.tryDirectFirst = true;      // attempt direct fetch before using proxy
         
         this.cache = {
@@ -40,13 +44,32 @@ class RSYCDataLoader {
             console.log('🔄 Loading RSYC data...');
             
             // Load critical data first, then optional data
+            // Some files may be empty or missing - that's OK
             const [centers, schedules, leaders, hours, facilities, featuredPrograms] = await Promise.all([
-                this.fetchJSON('units-rsyc-profiles.json'),
-                this.fetchJSON('RSYCProgramSchedules.json'),
-                this.fetchJSON('RSYCLeaders.json'),
-                this.fetchJSON('RSYCHours.json'),
-                this.fetchJSON('RSYCFacilityFeatures.json'),
-                this.fetchJSON('RSYCPrograms.json')
+                this.fetchJSON('units-rsyc-profiles.json').catch(e => {
+                    console.error('Failed to load centers:', e.message);
+                    return [];
+                }),
+                this.fetchJSON('RSYCProgramSchedules.json').catch(e => {
+                    console.warn('Schedules data unavailable:', e.message);
+                    return [];
+                }),
+                this.fetchJSON('RSYCLeaders.json').catch(e => {
+                    console.warn('Leaders data unavailable:', e.message);
+                    return [];
+                }),
+                this.fetchJSON('RSYCHours.json').catch(e => {
+                    console.warn('Hours data unavailable:', e.message);
+                    return [];
+                }),
+                this.fetchJSON('RSYCFacilityFeatures.json').catch(e => {
+                    console.warn('Facilities data unavailable:', e.message);
+                    return [];
+                }),
+                this.fetchJSON('RSYCPrograms.json').catch(e => {
+                    console.warn('Programs data unavailable:', e.message);
+                    return [];
+                })
             ]);
 
             // Load photos separately with error handling (optional data)
@@ -67,6 +90,11 @@ class RSYCDataLoader {
             this.cache.facilities = this.processFacilities(facilities);
             this.cache.featuredPrograms = this.processPrograms(featuredPrograms);
             this.cache.lastUpdated = new Date();
+
+            // Auto-populate CENTER_IDS from loaded data
+            if (typeof window.populateCenterIDs === 'function') {
+                window.populateCenterIDs(this.cache.centers);
+            }
 
             console.log('✅ Data loaded successfully:', {
                 centers: this.cache.centers.length,
@@ -107,12 +135,24 @@ class RSYCDataLoader {
         const proxyUrl = isLocalhost ? `/api/cors-proxy?url=${encodeURIComponent(directUrl)}` : directUrl;
 
         // Helper to fetch and parse JSON, with nice error messages
-        const doFetch = async (url, label) => {
+        const doFetch = async (url, label, isProxy = false) => {
             try {
                 console.log(`📥 Fetching ${label}: ${filename} -> ${url}`);
                 const resp = await fetch(url, { mode: 'cors' });
                 if (!resp.ok) throw new Error(`HTTP ${resp.status}: ${resp.statusText}`);
-                const json = await resp.json();
+                
+                let json = await resp.json();
+                
+                // Handle allorigins.win response format (wraps content)
+                if (isProxy && json && json.contents) {
+                    // allorigins returns JSON as string in 'contents' property
+                    if (typeof json.contents === 'string') {
+                        json = JSON.parse(json.contents);
+                    } else {
+                        json = json.contents;
+                    }
+                }
+                
                 console.log(`✅ Loaded ${label}: ${filename}`);
                 return json;
             } catch (err) {
@@ -124,7 +164,7 @@ class RSYCDataLoader {
         // Try proxy first if on localhost
         if (isLocalhost) {
             try {
-                return await doFetch(proxyUrl, 'local-proxy');
+                return await doFetch(proxyUrl, 'local-proxy', true);
             } catch (err) {
                 console.warn(`⚠️ Local proxy fetch failed for ${filename}:`, err.message);
                 // fall through to direct
@@ -134,22 +174,40 @@ class RSYCDataLoader {
         // Try direct fetch
         if (this.tryDirectFirst) {
             try {
-                return await doFetch(directUrl, 'direct');
+                return await doFetch(directUrl, 'direct', false);
             } catch (err) {
                 console.warn(`⚠️ Direct fetch failed for ${filename}:`, err.message);
                 // fall through to proxy
             }
         }
 
-        // If using cors proxy fallback is allowed, attempt proxy fetch
-        if (this.useCorsProxy && this.corsProxy) {
-            const proxied = this.corsProxy + encodeURIComponent(directUrl);
-            try {
-                return await doFetch(proxied, 'via-cors-proxy');
-            } catch (err) {
-                console.error(`❌ Proxy fetch failed for ${filename}:`, err);
-                throw new Error(`Failed to fetch ${filename}: ${err.message}`);
+        // If using cors proxy fallback is allowed, attempt multiple proxy services
+        if (this.useCorsProxy && this.corsProxies && this.corsProxies.length > 0) {
+            for (let i = 0; i < this.corsProxies.length; i++) {
+                const corsProxy = this.corsProxies[i];
+                try {
+                    let proxied;
+                    // Handle different proxy formats
+                    if (corsProxy.includes('allorigins')) {
+                        // allorigins.win API format
+                        proxied = corsProxy + encodeURIComponent(directUrl);
+                    } else {
+                        // corsproxy.io and cors-anywhere format
+                        proxied = corsProxy + encodeURIComponent(directUrl);
+                    }
+                    
+                    console.log(`🔄 Trying proxy ${i + 1}/${this.corsProxies.length} for ${filename}`);
+                    const result = await doFetch(proxied, `cors-proxy-${i + 1}`, true);
+                    console.log(`✅ Successfully fetched via proxy ${i + 1}`);
+                    return result;
+                } catch (err) {
+                    console.warn(`⚠️ Proxy ${i + 1} failed for ${filename}:`, err.message);
+                    // Continue to next proxy
+                }
             }
+            
+            // All proxies failed
+            throw new Error(`Failed to fetch ${filename}: all CORS proxies exhausted.`);
         }
 
         // If proxy disabled and direct failed, surface error
@@ -161,8 +219,8 @@ class RSYCDataLoader {
      */
     processCenters(data) {
         return data.map(center => ({
-            Id: center.field_0,  // Main ID (GUID) - Add uppercase Id for V2 compatibility
-            id: center.field_0,  // Main ID (GUID)
+            Id: center.ID,  // Main ID (integer) - Use the numeric ID, not the GUID
+            id: center.ID,  // Main ID (integer)
             sharePointId: center.ID,  // SharePoint list item numeric ID for hours/schedules/photos lookup
             Title: center.Title,  // Add Title for V2 compatibility
             name: center.field_1,
