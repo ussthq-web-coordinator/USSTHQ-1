@@ -1982,5 +1982,8 @@ div #freeTextArea-0 {
     }
 }
 
+// Export class to global scope
+window.RSYCTemplates = RSYCTemplates;
+
 // Create global instance
 window.rsycTemplates = new RSYCTemplates();

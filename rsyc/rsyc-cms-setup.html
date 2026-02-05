@@ -601,17 +601,14 @@
                     ? 'http://localhost:3001'
                     : 'https://thisishoperva.org';
 
-                // iFrame embed - loads via rsyc-profile-publisher.html
+                // iFrame embed - uses rsyc-profile-publisher.html client-side rendering
                 const iframeCode = `<iframe src="${baseUrl}/rsyc/rsyc-profile-publisher.html?centerId=${centerId}" width="100%" height="1200" frameborder="0" style="border: none; border-radius: 8px;"></iframe>`;
 
-                // Div mount - loads via API + loader script
-                const divCode = `<div id="rsyc-profile-${centerId}"></div>
-<script src="${baseUrl}/rsyc/rsyc-profile-loader.js"><\/script>
-<script>
-  RSYCProfileLoader.load('${centerId}', 'rsyc-profile-${centerId}');
-<\/script>`;
+                // Div mount - inject profile-publisher content directly
+                const divCode = `<div id="rsyc-profile-${centerId}" style="width: 100%;"></div>
+<script src="${baseUrl}/rsyc/rsyc-profile-injector.js" data-center-id="${centerId}" data-element-id="rsyc-profile-${centerId}"><\/script>`;
 
-                // Script injection - auto-mounts to divs with data attribute
+                // Auto-Inject - simplest method using data attribute
                 const scriptCode = `<div data-rsyc-center-id="${centerId}"></div>
 <script src="${baseUrl}/rsyc/rsyc-profile-injector.js"><\/script>`;
 

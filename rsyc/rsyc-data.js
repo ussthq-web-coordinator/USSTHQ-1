@@ -621,5 +621,8 @@ class RSYCDataLoader {
     }
 }
 
+// Export class to global scope
+window.RSYCDataLoader = RSYCDataLoader;
+
 // Create global instance
 window.rsycData = new RSYCDataLoader();

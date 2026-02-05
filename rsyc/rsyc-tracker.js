@@ -240,5 +240,8 @@ class RSYCTracker {
     }
 }
 
+// Export class to global scope
+window.RSYCTracker = RSYCTracker;
+
 // Create global instance
 window.rsycTracker = new RSYCTracker();
