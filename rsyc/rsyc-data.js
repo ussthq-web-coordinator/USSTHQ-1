@@ -78,7 +78,16 @@ class RSYCDataLoader {
                 programs: this.cache.featuredPrograms.length
             });
 
-            return true;
+            return {
+                centers: this.cache.centers,
+                schedules: this.cache.schedules,
+                leaders: this.cache.leaders,
+                photos: this.cache.photos,
+                hours: this.cache.hours,
+                facilities: this.cache.facilities,
+                programs: this.cache.featuredPrograms,
+                lastUpdated: this.cache.lastUpdated
+            };
         } catch (error) {
             console.error('❌ Error loading data:', error);
             throw error;
@@ -92,6 +101,10 @@ class RSYCDataLoader {
      */
     async fetchJSON(filename) {
         const directUrl = this.baseURL + filename;
+        
+        // Use local proxy if we're running on localhost
+        const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+        const proxyUrl = isLocalhost ? `/api/cors-proxy?url=${encodeURIComponent(directUrl)}` : directUrl;
 
         // Helper to fetch and parse JSON, with nice error messages
         const doFetch = async (url, label) => {
@@ -108,7 +121,17 @@ class RSYCDataLoader {
             }
         };
 
-        // Try direct fetch first if configured
+        // Try proxy first if on localhost
+        if (isLocalhost) {
+            try {
+                return await doFetch(proxyUrl, 'local-proxy');
+            } catch (err) {
+                console.warn(`⚠️ Local proxy fetch failed for ${filename}:`, err.message);
+                // fall through to direct
+            }
+        }
+
+        // Try direct fetch
         if (this.tryDirectFirst) {
             try {
                 return await doFetch(directUrl, 'direct');
@@ -118,7 +141,7 @@ class RSYCDataLoader {
             }
         }
 
-        // If using proxy fallback is allowed, attempt proxy fetch
+        // If using cors proxy fallback is allowed, attempt proxy fetch
         if (this.useCorsProxy && this.corsProxy) {
             const proxied = this.corsProxy + encodeURIComponent(directUrl);
             try {
