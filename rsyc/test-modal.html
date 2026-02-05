@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RSYC Modal Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        
+        button {
+            padding: 10px 20px;
+            font-size: 14px;
+            cursor: pointer;
+            background: #1a4d7f;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            margin: 5px;
+        }
+        
+        button:hover {
+            background: #0d2f4f;
+        }
+        
+        .test-section {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        h1 {
+            color: #1a4d7f;
+        }
+        
+        h2 {
+            color: #17a2b8;
+            margin-top: 0;
+        }
+        
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+            background: #e3f2fd;
+            border-left: 4px solid #1a4d7f;
+        }
+        
+        .success {
+            background: #e8f5e9;
+            border-left-color: #4caf50;
+        }
+        
+        .error {
+            background: #ffebee;
+            border-left-color: #f44336;
+        }
+    </style>
+</head>
+<body>
+    <h1>✅ RSYC Modal System Test</h1>
+    
+    <div class="test-section">
+        <h2>Test 1: Modal Visibility on Load</h2>
+        <p>The modals below should NOT be visible when the page loads. They should only appear when you click the buttons.</p>
+        
+        <button onclick="window.showRSYCModal('testModal1')">Show Test Modal 1</button>
+        <button onclick="window.showRSYCModal('testModal2')">Show Test Modal 2</button>
+        
+        <div id="testModal1" class="rsyc-modal">
+            <div class="rsyc-modal-content">
+                <button class="rsyc-modal-close" onclick="window.closeRSYCModal('testModal1')">&times;</button>
+                <h2>Test Modal 1</h2>
+                <p>This modal should only appear when you click the button.</p>
+                <p>Click the X button above, click outside the modal, or press ESC to close.</p>
+            </div>
+        </div>
+        
+        <div id="testModal2" class="rsyc-modal">
+            <div class="rsyc-modal-content">
+                <button class="rsyc-modal-close" onclick="window.closeRSYCModal('testModal2')">&times;</button>
+                <h2>Test Modal 2</h2>
+                <p>Another test modal - should also be hidden on page load.</p>
+            </div>
+        </div>
+        
+        <div class="status" id="status1">
+            ⏳ Waiting for test...
+        </div>
+    </div>
+    
+    <div class="test-section">
+        <h2>Test 2: Modal Closing Methods</h2>
+        <p>Test that modals close properly using different methods.</p>
+        
+        <button onclick="testCloseViaBG()">Test Close via Background Click</button>
+        <button onclick="testCloseViaESC()">Test Close via ESC Key</button>
+        <button onclick="testCloseViaButton()">Test Close via Button</button>
+        
+        <div class="status">
+            <p>Try each closing method:</p>
+            <ul>
+                <li><strong>Background Click:</strong> Click the X button to show, then click the grey area</li>
+                <li><strong>ESC Key:</strong> Click the button to show, then press the ESC key</li>
+                <li><strong>Close Button:</strong> Click the button to show, then click the X button</li>
+            </ul>
+        </div>
+    </div>
+    
+    <div class="test-section">
+        <h2>✅ Results</h2>
+        <div id="results">
+            <p>Run the tests above to see results here.</p>
+        </div>
+    </div>
+    
+    <!-- Load the modal system from cms-publisher -->
+    <script src="/rsyc/rsyc-cms-publisher.js"></script>
+    
+    <script>
+        // Test functions
+        function testCloseViaBG() {
+            const modal = document.getElementById('testModal1');
+            if (!modal) {
+                console.error('Modal testModal1 not found');
+                return;
+            }
+            
+            window.showRSYCModal(modal);
+            const results = document.getElementById('results');
+            results.innerHTML = '<div class="status"><strong>Test: Close via Background</strong><p>✅ Modal should be visible. Click the grey area to close it and the test will pass.</p></div>';
+            
+            // Wait for click on backdrop
+            const checkClose = setInterval(() => {
+                if (!modal.classList.contains('active')) {
+                    clearInterval(checkClose);
+                    results.innerHTML += '<div class="status success"><strong>✅ PASS:</strong> Modal closed via background click</div>';
+                }
+            }, 100);
+        }
+        
+        function testCloseViaESC() {
+            const modal = document.getElementById('testModal2');
+            if (!modal) {
+                console.error('Modal testModal2 not found');
+                return;
+            }
+            
+            window.showRSYCModal(modal);
+            const results = document.getElementById('results');
+            results.innerHTML = '<div class="status"><strong>Test: Close via ESC Key</strong><p>✅ Modal should be visible. Press ESC to close it and the test will pass.</p></div>';
+            
+            // Wait for ESC
+            const checkClose = setInterval(() => {
+                if (!modal.classList.contains('active')) {
+                    clearInterval(checkClose);
+                    results.innerHTML += '<div class="status success"><strong>✅ PASS:</strong> Modal closed via ESC key</div>';
+                }
+            }, 100);
+        }
+        
+        function testCloseViaButton() {
+            const modal = document.getElementById('testModal1');
+            if (!modal) {
+                console.error('Modal testModal1 not found');
+                return;
+            }
+            
+            window.showRSYCModal(modal);
+            const results = document.getElementById('results');
+            results.innerHTML = '<div class="status"><strong>Test: Close via Button</strong><p>✅ Modal should be visible. Click the X button to close it and the test will pass.</p></div>';
+            
+            // Wait for button click
+            const checkClose = setInterval(() => {
+                if (!modal.classList.contains('active')) {
+                    clearInterval(checkClose);
+                    results.innerHTML += '<div class="status success"><strong>✅ PASS:</strong> Modal closed via close button</div>';
+                }
+            }, 100);
+        }
+        
+        // Auto-check on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            const modal1 = document.getElementById('testModal1');
+            const modal2 = document.getElementById('testModal2');
+            
+            if (!modal1 || !modal2) {
+                document.getElementById('status1').innerHTML = '<div class="status error"><strong>❌ ERROR:</strong> Modals not found in DOM</div>';
+                return;
+            }
+            
+            const isHidden1 = window.getComputedStyle(modal1).display === 'none';
+            const isHidden2 = window.getComputedStyle(modal2).display === 'none';
+            
+            console.log('Modal1 hidden:', isHidden1);
+            console.log('Modal2 hidden:', isHidden2);
+            console.log('Modal1 class:', modal1.className);
+            console.log('Modal2 class:', modal2.className);
+            
+            if (isHidden1 && isHidden2) {
+                document.getElementById('status1').innerHTML = '<div class="status success"><strong>✅ PASS:</strong> Both modals are hidden on page load</div>';
+            } else {
+                document.getElementById('status1').innerHTML = '<div class="status error"><strong>❌ FAIL:</strong> Modals are visible on page load (should be hidden)</div>';
+            }
+        });
+    </script>
+</body>
+</html>

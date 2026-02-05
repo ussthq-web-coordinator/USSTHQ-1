@@ -43,6 +43,7 @@
             await Promise.all([
                 loadScript(`${baseUrl}/rsyc/rsyc-staff-order.js`),
                 loadScript(`${baseUrl}/rsyc/rsyc-data.js`),
+                loadScript(`${baseUrl}/rsyc/rsyc-cms-publisher.js`),
                 loadScript(`${baseUrl}/rsyc/rsyc-templates.js`),
             ]);
             console.log('[RSYCProfileInjector] ✓ Loaded core scripts');
@@ -88,8 +89,10 @@
             // Generate profile HTML using the template engine
             const templateEngine = new window.RSYCTemplates();
             
-            // Generate CRITICAL sections first (hours, contact)
-            const criticalSections = ['hours', 'contact'];
+            // Generate CRITICAL sections first (from RSYCPublisher config - single source of truth)
+            const criticalSections = window.RSYCPublisher 
+                ? window.RSYCPublisher.SECTION_CONFIG.critical
+                : ['hours', 'contact'];
             let html = '';
 
             criticalSections.forEach(sectionId => {
@@ -141,8 +144,10 @@
             // Load remaining non-critical data
             await dataLoader.loadOptionalData();
 
-            // Generate remaining sections
-            const deferredSections = ['schedules', 'facilities', 'programs', 'staff', 'nearby', 'volunteer', 'footerPhoto'];
+            // Get deferred sections from RSYCPublisher config (single source of truth)
+            const deferredSections = window.RSYCPublisher 
+                ? window.RSYCPublisher.SECTION_CONFIG.deferred
+                : ['schedules', 'facilities', 'programs', 'staff', 'nearby', 'volunteer', 'footerPhoto'];
             let html = '';
 
             deferredSections.forEach(sectionId => {

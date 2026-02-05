@@ -23,6 +23,32 @@
         cache: {},
         
         /**
+         * UNIFIED SECTION CONFIGURATION
+         * Single source of truth for section ordering and selection.
+         * Used by both rsyc-cms-publisher.js and rsyc-profile-injector.js
+         * 
+         * To change sections:
+         *   - Edit 'default' to change which sections appear and their order
+         *   - Edit 'critical' to change which sections load immediately (fast path)
+         *   - Edit 'deferred' to change which sections load asynchronously
+         * 
+         * Changes here automatically update both the publisher and injector.
+         */
+        SECTION_CONFIG: {
+            // Default sections in order (used when no sections specified)
+            default: [
+                'schedules', 'hours', 'facilities', 'programs', 'staff', 
+                'nearby', 'parents', 'youth', 'volunteer', 'footerPhoto', 'contact'
+            ],
+            
+            // Sections that load immediately (critical path)
+            critical: ['hours', 'contact'],
+            
+            // Sections that load asynchronously (deferred path)
+            deferred: ['schedules', 'facilities', 'programs', 'staff', 'nearby', 'volunteer', 'footerPhoto']
+        },
+        
+        /**
          * Initialize and generate profile for a center
          */
         async generate(options = {}) {
@@ -178,12 +204,7 @@
          * Generate profile HTML
          */
         generateProfileHTML(center, data, selectedSections = null) {
-            const defaultSections = [
-                'schedules', 'hours', 'facilities', 'programs', 'staff', 
-                'nearby', 'parents', 'youth', 'volunteer', 'footerPhoto', 'contact'
-            ];
-            
-            const sections = selectedSections || defaultSections;
+            const sections = selectedSections || this.SECTION_CONFIG.default;
             let html = `<div class="rsyc-profile" data-center-id="${center.Id}">`;
 
             // Header
@@ -289,6 +310,130 @@
             // Add any event listeners or interactive functionality here
             // For now, this is a placeholder for future enhancements
         }
+    };
+
+    /**
+     * MODAL SYSTEM
+     * Global modal functions for showing/hiding modals
+     */
+    
+    // Inject modal styles into document
+    if (!document.getElementById('rsyc-modal-styles')) {
+        const modalStyles = document.createElement('style');
+        modalStyles.id = 'rsyc-modal-styles';
+        modalStyles.textContent = `
+            .rsyc-modal {
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background: rgba(0, 0, 0, 0.6);
+                display: none !important;
+                align-items: center;
+                justify-content: center;
+                z-index: 10000;
+                flex-direction: column;
+            }
+            
+            .rsyc-modal.active {
+                display: flex !important;
+            }
+            
+            .rsyc-modal-content {
+                background: white;
+                border-radius: 8px;
+                padding: 30px;
+                max-width: 600px;
+                width: 90%;
+                max-height: 80vh;
+                overflow-y: auto;
+                box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+                position: relative;
+            }
+            
+            .rsyc-modal-close {
+                position: absolute;
+                top: 10px;
+                right: 10px;
+                background: none;
+                border: none;
+                font-size: 24px;
+                cursor: pointer;
+                color: #666;
+                padding: 0;
+                width: 30px;
+                height: 30px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+            }
+            
+            .rsyc-modal-close:hover {
+                color: #333;
+            }
+        `;
+        document.head.appendChild(modalStyles);
+    }
+
+    /**
+     * Show a modal by ID or element
+     */
+    window.showRSYCModal = function(modalIdOrElement) {
+        const modal = typeof modalIdOrElement === 'string' 
+            ? document.getElementById(modalIdOrElement)
+            : modalIdOrElement;
+        
+        if (!modal) {
+            console.error('Modal not found:', modalIdOrElement);
+            return;
+        }
+        
+        modal.classList.add('active');
+    };
+
+    /**
+     * Close a modal by ID or element
+     */
+    window.closeRSYCModal = function(modalIdOrElement) {
+        const modal = typeof modalIdOrElement === 'string' 
+            ? document.getElementById(modalIdOrElement)
+            : modalIdOrElement;
+        
+        if (!modal) {
+            console.error('Modal not found:', modalIdOrElement);
+            return;
+        }
+        
+        modal.classList.remove('active');
+    };
+
+    /**
+     * Setup modal event listeners
+     */
+    window.setupRSYCModalListeners = function(modalElement) {
+        // Close on backdrop click
+        modalElement.addEventListener('click', (e) => {
+            if (e.target === modalElement) {
+                window.closeRSYCModal(modalElement);
+            }
+        });
+        
+        // Close on close button click
+        const closeBtn = modalElement.querySelector('.rsyc-modal-close');
+        if (closeBtn) {
+            closeBtn.addEventListener('click', () => {
+                window.closeRSYCModal(modalElement);
+            });
+        }
+        
+        // Close on Escape key
+        const handleEscape = (e) => {
+            if (e.key === 'Escape' && modalElement.classList.contains('active')) {
+                window.closeRSYCModal(modalElement);
+            }
+        };
+        document.addEventListener('keydown', handleEscape);
     };
 
     // Expose globally
