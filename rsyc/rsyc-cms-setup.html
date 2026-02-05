@@ -505,23 +505,24 @@
                 try {
                     this.updateStatus('previewStatus', 'Generating preview...');
 
-                    // Get center data (same as profile-publisher)
+                    // Ensure optional data is loaded for complete profiles
+                    if (!this.dataLoader.cache.featuredPrograms || this.dataLoader.cache.featuredPrograms.length === 0) {
+                        console.log('📥 Loading optional data for programs/facilities...');
+                        await this.dataLoader.loadOptionalData();
+                    }
+
+                    // Get center data - match generator approach
                     const centerData = await this.dataLoader.getCenterData(this.currentCenter.Id);
 
-                    // Generate HTML for all sections using templateEngine (same as profile-publisher)
-                    let html = '';
-                    const sections = ['schedules', 'hours', 'facilities', 'programs', 'staff', 'nearby', 'volunteer', 'footerPhoto', 'contact'];
-                    
-                    sections.forEach(sectionId => {
-                        try {
-                            const sectionHTML = this.templateEngine.generateSection(sectionId, centerData);
-                            if (sectionHTML) {
-                                html += sectionHTML + '\n\n';
-                            }
-                        } catch (e) {
-                            console.warn(`Error generating section ${sectionId}:`, e);
-                        }
+                    // Use same approach as rsyc-generator.js:
+                    // Get all available sections from templates (single source of truth)
+                    const allSections = this.templateEngine.getSections();
+                    const enabledSections = Object.keys(allSections).sort((a, b) => {
+                        return (allSections[a].order || 999) - (allSections[b].order || 999);
                     });
+
+                    // Generate profile using template's generateProfile method (same as generator)
+                    let html = this.templateEngine.generateProfile(centerData, enabledSections);
 
                     // Inject into preview
                     const preview = document.getElementById('livePreview');
