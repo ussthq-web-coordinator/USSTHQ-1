@@ -147,19 +147,19 @@
   .musical-guest-section {
     width: 100%;
     padding: 20px 50px;
-    color: white;
+    color: black; /* Text now stands out on the gradient */
     background: linear-gradient(270deg, 
-      #567395,
-    #4a98bd,   /* Original sky blue */
-      #b48ec7,   /* Soft lavender */
-      #e0a899,   /* Peachy rose */
-      #88c999,   /* Minty green */
-      #f2d479,   /* Warm pastel yellow */
-      #d28e77    /* Terracotta blush */
+        #D2B48C, /* Tan */
+        #F2D479, /* Warm pastel gold */
+        #E0A899, /* Soft coral/peach */
+        #C1B2D7, /* Muted lavender */
+        #3AAFA9, /* Teal */
+        #EDE3D5  /* Light cream */
     );
     background-size: 1200% 1200%;
     animation: gradientShift 45s ease infinite;
-  }
+}
+
   
   @keyframes gradientShift {
     0%   { background-position: 0% 50%; }
