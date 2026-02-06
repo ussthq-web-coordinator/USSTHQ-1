@@ -144,30 +144,42 @@
     color: black;
     padding: 20px 20px 20px 20px;
     }
-  .musical-guest-section {
-    width: 100%;
-    padding: 20px 50px;
-    color: black; /* Text now stands out on the gradient */
-    background: linear-gradient(270deg, 
-        #D2B48C, /* Tan */
-        #F2D479, /* Warm pastel gold */
-        #E0A899, /* Soft coral/peach */
-        #C1B2D7, /* Muted lavender */
-        #3AAFA9, /* Teal */
-        #EDE3D5  /* Light cream */
-    );
-    background-size: 1200% 1200%;
-    animation: gradientShift 45s ease infinite;
-}
-
   
-  @keyframes gradientShift {
-    0%   { background-position: 0% 50%; }
-    25%  { background-position: 50% 50%; }
-    50%  { background-position: 100% 50%; }
-    75%  { background-position: 50% 50%; }
-    100% { background-position: 0% 50%; }
+    .musical-guest-section {
+      width: 100%;
+      padding: 20px 50px;
+      color: black;
+      /* Geometric multi-angle layered gradient */
+      background: linear-gradient(45deg, 
+          #D2B48C 0%, 
+          #F2D479 20%, 
+          #E0A899 40%, 
+          #C1B2D7 60%, 
+          #3AAFA9 80%, 
+          #EDE3D5 100%);
+      background-size: 400% 400%;
+      animation: geometricShift 25s ease infinite;
   }
+
+  /* Geometric-style gradient animation */
+  @keyframes geometricShift {
+      0% {
+          background-position: 0% 0%;
+      }
+      25% {
+          background-position: 100% 0%;
+      }
+      50% {
+          background-position: 100% 100%;
+      }
+      75% {
+          background-position: 0% 100%;
+      }
+      100% {
+          background-position: 0% 0%;
+      }
+  }
+
   
   
       .livestream-section {
