@@ -419,8 +419,10 @@ let priorityChart = null;
 let pageTypeChart = null;
 let pubSymChart = null;
 let effortChart = null;
-// Status breakdown toggle state
+// Breakdown toggle states
 let showStatusBreakdown = false;
+let showHidden = false;
+let show100Only = false;
 // Helper: transform raw counts to visually compressed values for pie slices
 // while preserving raw counts for tooltips. Methods: 'sqrt' (default), 'log', or 'none'.
 function transformCountsForPie(rawCounts, method = 'sqrt'){
@@ -1647,7 +1649,7 @@ function renderBreakdown(data){
       }
 
       sectionHtml += `      
-        <div class="mb-1 ${hiddenClass} ${fullClass}" data-key="${encodeURIComponent(rawKey)}" style="display:${hiddenClass === 'hidden-group' ? 'none' : 'block'}">
+        <div class="mb-1 ${hiddenClass} ${fullClass}" data-key="${encodeURIComponent(rawKey)}" style="display:${((hiddenClass === 'hidden-group' && !showHidden) || (show100Only && hiddenClass === 'non-100-group')) ? 'none' : 'block'}">
           <strong>${display}</strong> <small class="text-muted">(${total} pages${siteCount ? ' across ' + siteCount + ' sites' : ''})</small>${progressHtml}
         </div>`;
     });
@@ -1659,8 +1661,6 @@ function renderBreakdown(data){
   // --- Toggle button logic for 0% and 100% bars ---
   const toggleBtn = document.getElementById('toggleHiddenGroups');
   const toggleFullBtn = document.getElementById('toggleFullGroups');
-  let showHidden = false;
-  let show100Only = false;
 
   function updateHiddenCount() {
     if (!toggleBtn) return;
@@ -1669,13 +1669,11 @@ function renderBreakdown(data){
 
     if(count === 0 || count <= 10){
       toggleBtn.style.display = 'none';
-      showHidden = true;
-      hiddenElems.forEach(e => e.style.display = 'block');
     } else {
       toggleBtn.style.display = 'inline-block';
-      hiddenElems.forEach(e => e.style.display = 'none');
-      showHidden = false;
-      toggleBtn.innerText = `Show 0% Groups (${count})`;
+      toggleBtn.innerText = showHidden 
+        ? `Hide 0% Groups (${count})` 
+        : `Show 0% Groups (${count})`;
     }
   }
 
@@ -1686,22 +1684,18 @@ function renderBreakdown(data){
 
     if(count === 0 || count <= 10){
       toggleFullBtn.style.display = 'none';
-      show100Only = false;
     } else {
       toggleFullBtn.style.display = 'inline-block';
-      show100Only = false;
-      toggleFullBtn.innerText = `Show only 100% Groups (${count})`;
+      toggleFullBtn.innerText = show100Only 
+        ? `Show All Groups (${fullElems.length})` 
+        : `Show only 100% Groups (${fullElems.length})`;
     }
   }
 
   if (toggleBtn) {
     toggleBtn.onclick = () => {
       showHidden = !showHidden;
-      const hiddenElems = container.querySelectorAll('.hidden-group');
-      hiddenElems.forEach(e => e.style.display = showHidden ? 'block' : 'none');
-      toggleBtn.innerText = showHidden 
-        ? `Hide 0% Groups (${hiddenElems.length})` 
-        : `Show 0% Groups (${hiddenElems.length})`;
+      renderBreakdown(data);
     };
     updateHiddenCount();
   }
@@ -1709,12 +1703,7 @@ function renderBreakdown(data){
   if (toggleFullBtn) {
     toggleFullBtn.onclick = () => {
       show100Only = !show100Only;
-      const nonFullElems = container.querySelectorAll('.non-100-group');
-      const fullElems = container.querySelectorAll('.is-100-group');
-      nonFullElems.forEach(e => e.style.display = show100Only ? 'none' : 'block');
-      toggleFullBtn.innerText = show100Only 
-        ? `Show All Groups (${fullElems.length})` 
-        : `Show only 100% Groups (${fullElems.length})`;
+      renderBreakdown(data);
     };
     updateFullCount();
   }
