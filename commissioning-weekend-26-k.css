@@ -410,13 +410,13 @@
       }
   }
           .accordion-button {
-              background-color: #B01E20;
-              color: white;
+              background-color: #DDDDDD;
+              color: #B01E20;
               font-weight: bold;
           }
           .accordion-button:not(.collapsed) {
-              background-color: #D22424;
-              color: white;
+              background-color: #9A9A9A;
+              color: #B01E20;
           }
           .accordion-button:focus {
               box-shadow: none;
