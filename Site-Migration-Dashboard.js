@@ -419,6 +419,8 @@ let priorityChart = null;
 let pageTypeChart = null;
 let pubSymChart = null;
 let effortChart = null;
+// Status breakdown toggle state
+let showStatusBreakdown = false;
 // Helper: transform raw counts to visually compressed values for pie slices
 // while preserving raw counts for tooltips. Methods: 'sqrt' (default), 'log', or 'none'.
 function transformCountsForPie(rawCounts, method = 'sqrt'){
@@ -432,7 +434,7 @@ function transformCountsForPie(rawCounts, method = 'sqrt'){
 }
 // Application version (edit this value to bump text shown on the page)
 // Keep this value here so you can edit it directly in the JS without relying on DashboardData.json
-const APP_VERSION = '2510.05.0900';
+const APP_VERSION = '2602.05.1031';
 // Also expose to window so you can tweak at runtime in the browser console if needed
 window.APP_VERSION = window.APP_VERSION || APP_VERSION;
 
@@ -1508,7 +1510,7 @@ try{ addChartLegendModal(statusChart, 'Status'); }catch(e){}
 
 function renderBreakdown(data){
   const container = document.getElementById("progressBreakdownBody");
-  container.innerHTML = "<div class='mb-2'><button id='toggleHiddenGroups' class='btn btn-sm btn-secondary me-2'>Show 0% Groups</button><button id='toggleFullGroups' class='btn btn-sm btn-secondary'>Show 100% Groups</button></div>";
+  container.innerHTML = "<div class='mb-2'><button id='toggleHiddenGroups' class='btn btn-sm btn-secondary me-2'>Show 0% Groups</button><button id='toggleFullGroups' class='btn btn-sm btn-secondary me-2'>Show 100% Groups</button><button id='toggleStatus' class='btn btn-sm btn-secondary'>Show Status</button></div>";
 
   const groups = [
     {name:"Division", field:"Division"},
@@ -1533,10 +1535,31 @@ function renderBreakdown(data){
       else key = rawVal || 'Not Set';
 
       const k = key || 'Not Set';
-      grouped[k] = grouped[k] || { total: 0, done: 0, donot: 0, siteTitles: new Set() };
+      grouped[k] = grouped[k] || { total: 0, done: 0, donot: 0, statusBreakdown: {}, siteTitles: new Set() };
       grouped[k].total++;
-      if (/[45]/.test(String(d.Status || '').charAt(0)) || (d.Status || '') === 'THQ Redirect') grouped[k].done++;
-      if ((d.Status || '') === 'Do Not Migrate') grouped[k].donot++;
+      
+      // Categorize by status
+      const status = d.Status || '';
+      let statusCategory = 'Unknown';
+      if (/^4|^5/.test(String(status).charAt(0))) {
+        statusCategory = 'Completed';
+        grouped[k].done++;
+      } else if (status === 'THQ Redirect') {
+        statusCategory = 'THQ Redirect';
+        grouped[k].done++;
+      } else if (status === 'Do Not Migrate') {
+        statusCategory = 'Do Not Migrate';
+        grouped[k].donot++;
+      } else if (/^2/.test(String(status).charAt(0))) {
+        statusCategory = 'In Progress';
+      } else if (/^1/.test(String(status).charAt(0))) {
+        statusCategory = 'Needs Info';
+      } else if (/^3/.test(String(status).charAt(0))) {
+        statusCategory = 'In QA';
+      }
+      
+      grouped[k].statusBreakdown[statusCategory] = (grouped[k].statusBreakdown[statusCategory] || 0) + 1;
+      
       const siteTitle = (d['Site Title'] || d['SiteTitle'] || '').toString().trim();
       if (siteTitle) grouped[k].siteTitles.add(siteTitle);
     });
@@ -1593,11 +1616,35 @@ function renderBreakdown(data){
       else if (prog === 100) fullClass = 'is-100-group';
       if (g.field === 'Area Command Admin Group.title' && siteCount === 1 && prog === 0) hiddenClass = 'hidden-group';
 
-      const colorClass = prog < 40 ? 'bg-danger' : prog < 70 ? 'bg-warning' : 'bg-success';
-      const progressHtml = `
-        <div class="progress mt-1">
-          <div class="progress-bar ${colorClass}" style="width:${prog}%">${prog}%</div>
-        </div>`;
+      // Build progress bar - simple by default, status breakdown if enabled
+      let progressHtml = '';
+      
+      if (showStatusBreakdown) {
+        // Status breakdown bar with colored segments
+        progressHtml = '<div class="progress mt-1" style="height:24px;">';
+        
+        // Use same order as overall progress bar
+        const statusOrder = ['Do Not Migrate', 'Needs Info', 'In Progress', 'In QA', 'THQ Redirect', 'Unknown', 'Completed'];
+        const breakdown = grp.statusBreakdown || {};
+        
+        statusOrder.forEach(status => {
+          const count = breakdown[status] || 0;
+          if (count > 0) {
+            const pct = Math.round(count / total * 100);
+            const color = statusColors[status] || '#6c757d';
+            progressHtml += `<div class="progress-bar" style="width:${pct}%; background-color:${color}; border-right:1px solid white;" title="${status}: ${count}"></div>`;
+          }
+        });
+        
+        progressHtml += `</div><small style="text-align:right; display:block; margin-top:2px; color:#666;">${prog}% Complete</small>`;
+      } else {
+        // Simple single-color bar
+        const colorClass = prog < 40 ? 'bg-danger' : prog < 70 ? 'bg-warning' : 'bg-success';
+        progressHtml = `
+          <div class="progress mt-1">
+            <div class="progress-bar ${colorClass}" style="width:${prog}%">${prog}%</div>
+          </div>`;
+      }
 
       sectionHtml += `      
         <div class="mb-1 ${hiddenClass} ${fullClass}" data-key="${encodeURIComponent(rawKey)}" style="display:${hiddenClass === 'hidden-group' ? 'none' : 'block'}">
@@ -1672,14 +1719,26 @@ function renderBreakdown(data){
     updateFullCount();
   }
 
+  // --- Toggle button logic for status breakdown ---
+  const toggleStatusBtn = document.getElementById('toggleStatus');
+  if (toggleStatusBtn) {
+    // Set initial button text based on current state
+    toggleStatusBtn.innerText = showStatusBreakdown ? 'Hide Status' : 'Show Status';
+    
+    toggleStatusBtn.onclick = () => {
+      showStatusBreakdown = !showStatusBreakdown;
+      renderBreakdown(data);
+    };
+  }
+
   // --- Accordion total badge update ---
   function updateBadge(){
     const badge = document.getElementById("breakdownBadge");
     if (!badge) return;
 
-    // Count all rendered progress bars
-    const allBars = container.querySelectorAll(".progress-bar");
-    badge.textContent = allBars.length;
+    // Count all visible group entries (not progress-bar divs, as status view has multiple bars per group)
+    const allGroups = container.querySelectorAll(".mb-1[data-key]");
+    badge.textContent = allGroups.length;
   }
 
   updateBadge();
