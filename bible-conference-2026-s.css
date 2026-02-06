@@ -428,10 +428,10 @@
           }
   /* Applying styles specifically to the name paragraph */
   .name-text {
-    font-size: 40px;
+    font-size: 50px;
     font-weight: 700;
-    font-family: "Georgia", "Garamond", "Times New Roman", serif;
-    background: linear-gradient(90deg, #5a5650 0%, #6d6660 20%, #8a7f6f 50%, #6d6660 80%, #5a5650 100%);
+    font-family: Georgia, 'Times New Roman', Times, serif;
+    background: linear-gradient(90deg, #44413d 0%, #504b47 20%, #635b4f 50%, #6d6660 80%, #272623 100%);
     background-size: 200% auto;
     color: white;
     background-clip: text;
@@ -448,8 +448,8 @@
       -1px -1px 2px rgba(220, 200, 170, 0.3),
       1px -1px 2px rgba(220, 200, 170, 0.3),
       -1px 1px 2px rgba(220, 200, 170, 0.3);
-    -webkit-text-stroke: 0.5px rgba(220, 200, 170, 0.4);
-    letter-spacing: 2px;
+    -webkit-text-stroke: 1px rgba(255, 245, 231, 0.4);
+    letter-spacing: 3px;
     filter: drop-shadow(0 0 8px rgba(230, 213, 187, 0.5));
   }
   
