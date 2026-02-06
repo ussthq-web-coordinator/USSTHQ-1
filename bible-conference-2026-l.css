@@ -350,12 +350,13 @@
   .name-text {
     font-size: 40px;
     font-weight: 700;
-    background: linear-gradient(45deg, #4a98bd, #b48ec7, #e0a899, #88c999, #f2d479, #d28e77);
+    font-style: oblique;
+    background: linear-gradient(45deg, #4a98bd, #b48ec7, #dd8870, #a1c0a9, #f2d479, #d28e77);
     background-size: 50% auto;
     color: white;
     background-clip: text;
     -webkit-background-clip: text;
-    -webkit-text-fill-color: white;
+    -webkit-text-fill-color: transparent;
     animation: glowPulse 12s ease-in-out infinite;
     margin: 30px 0;
     white-space: nowrap; /* Prevent wrapping */
@@ -366,7 +367,7 @@
   @keyframes glowPulse {
     0% {
       background-position: 0% center;
-      filter: drop-shadow(0 0 5px #ff4081);
+      filter: drop-shadow(0 0 5px #d940ff);
     }
     50% {
       background-position: 100% center;
