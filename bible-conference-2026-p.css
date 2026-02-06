@@ -351,7 +351,7 @@
     font-size: 40px;
     font-weight: 700;
     font-style: italic;
-    background: linear-gradient(45deg, #daeff8, #abaaac, #1b1b1b, #abaaac, #daeff8, #1b1b1b);
+    background: linear-gradient(#daeff8, #abaaac, #1b1b1b, #abaaac, #daeff8, #1b1b1b);
     background-size: 50% auto;
     color: white;
     background-clip: text;
