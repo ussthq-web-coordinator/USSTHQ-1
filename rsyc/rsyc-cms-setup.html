@@ -37,6 +37,11 @@
                 <button id="toggleAdvanced" class="btn-toggle" title="Show/Hide Embed Codes">
                     <i class="bi bi-chevron-down"></i> Embed Code
                 </button>
+                
+                <!-- HTML Inspector Button -->
+                <button id="showHTMLInspector" class="btn btn-sm btn-outline-info" title="View Raw HTML">
+                    <i class="bi bi-braces"></i> View HTML
+                </button>
             </div>
         </header>
 
@@ -90,7 +95,7 @@
                 <div class="preview-container-fullscreen" id="livePreview" style="flex: 1; overflow-y: auto; background: white;">
                     <div class="preview-placeholder" style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; color: #999;">
                         <div class="placeholder-icon" style="font-size: 48px; margin-bottom: 16px;">👆</div>
-                        <p style="margin: 0; font-size: 14px;">Select a center above to see the live preview</p>
+                        <p style="margin: 0; font-size: 14px;">Select a center above to see the live preview with full modal functionality</p>
                     </div>
                 </div>
             </div>
@@ -108,6 +113,22 @@
             <strong>RSYC Error:</strong>
             <span id="rsyc-error-text" style="margin-left:8px;">An error occurred. Check console for details.</span>
             <button id="rsyc-error-close" style="float:right; background:transparent; border:none; font-weight:700; color:#990000; cursor:pointer;">✖</button>
+        </div>
+
+        <!-- HTML Inspector Modal -->
+        <div id="htmlInspectorModal" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.5); z-index:12000; overflow:auto;">
+            <div style="background:white; margin:40px auto; padding:20px; border-radius:8px; max-width:1000px; max-height:90vh; overflow:auto;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; border-bottom:1px solid #e9ecef; padding-bottom:12px;">
+                    <h4 style="margin:0;"><i class="bi bi-braces"></i> Raw HTML Output</h4>
+                    <button onclick="document.getElementById('htmlInspectorModal').style.display='none'" style="background:none; border:none; font-size:24px; cursor:pointer; color:#666;">×</button>
+                </div>
+                <div style="margin-bottom:12px;">
+                    <button id="copyHTMLBtn" style="padding:8px 16px; background:#28a745; color:white; border:none; border-radius:4px; cursor:pointer; font-weight:600;">
+                        <i class="bi bi-clipboard"></i> Copy to Clipboard
+                    </button>
+                </div>
+                <pre id="htmlOutput" style="background:#f5f5f5; padding:16px; border:1px solid #ddd; border-radius:4px; overflow:auto; max-height:600px; font-size:12px; line-height:1.4;"></pre>
+            </div>
         </div>
     </div>
 
@@ -432,6 +453,32 @@
                         }
                     });
                 }
+                
+                // HTML Inspector
+                const htmlInspectorBtn = document.getElementById('showHTMLInspector');
+                if (htmlInspectorBtn) {
+                    htmlInspectorBtn.addEventListener('click', () => {
+                        const modal = document.getElementById('htmlInspectorModal');
+                        const htmlOutput = document.getElementById('htmlOutput');
+                        if (this.lastGeneratedHTML) {
+                            htmlOutput.textContent = this.lastGeneratedHTML;
+                            modal.style.display = 'block';
+                        } else {
+                            alert('No HTML generated yet. Please select a center first.');
+                        }
+                    });
+                }
+                
+                // Copy HTML button
+                const copyHTMLBtn = document.getElementById('copyHTMLBtn');
+                if (copyHTMLBtn) {
+                    copyHTMLBtn.addEventListener('click', () => {
+                        const htmlOutput = document.getElementById('htmlOutput');
+                        navigator.clipboard.writeText(htmlOutput.textContent).then(() => {
+                            alert('HTML copied to clipboard!');
+                        }).catch(err => console.error('Failed to copy:', err));
+                    });
+                }
 
                 // Error close
                 if (errorCloseBtn) {
@@ -523,6 +570,9 @@
 
                     // Generate profile using template's generateProfile method (same as generator)
                     let html = this.templateEngine.generateProfile(centerData, enabledSections);
+                    
+                    // Store the raw HTML for inspector
+                    this.lastGeneratedHTML = html;
 
                     // Inject into preview
                     const preview = document.getElementById('livePreview');

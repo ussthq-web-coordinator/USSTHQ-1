@@ -3,21 +3,243 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>RSYC Embed Test</title>
+    <title>RSYC Embed Test - View Injected HTML</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css">
     <style>
         body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 20px;
             background: #f5f5f5;
+            padding: 20px;
+            font-family: Arial, sans-serif;
         }
-        .container {
+        .controls {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .controls h5 {
+            margin-bottom: 15px;
+            color: #333;
+        }
+        .split-view {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-top: 20px;
+        }
+        .panel {
             background: white;
             border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            max-height: 700px;
+        }
+        .panel-header {
+            padding: 15px 20px;
+            background: #007bff;
+            color: white;
+            font-weight: 600;
+            border-bottom: 1px solid #ddd;
+        }
+        .panel-body {
+            flex: 1;
+            overflow-y: auto;
             padding: 20px;
-            margin-bottom: 20px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        #livePreview {
+            background: white;
+        }
+        #htmlInspector {
+            background: #f5f5f5;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            line-height: 1.4;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+        .control-group {
+            margin-bottom: 15px;
+        }
+        label {
+            font-weight: 600;
+            margin-bottom: 5px;
+            display: block;
+        }
+        input, select {
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        button {
+            padding: 10px 20px;
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 600;
+            margin-right: 10px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        button.secondary {
+            background: #6c757d;
+        }
+        button.secondary:hover {
+            background: #545b62;
+        }
+        .note {
+            background: #fff3cd;
+            border: 1px solid #ffc107;
+            border-radius: 4px;
+            padding: 12px;
+            margin-bottom: 15px;
+            color: #856404;
+            font-size: 13px;
+        }
+        @media (max-width: 1200px) {
+            .split-view {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="controls">
+        <h5><i class="bi bi-arrow-repeat"></i> RSYC Embed Test - View Raw HTML</h5>
+        <div class="note">
+            <strong>Info:</strong> This page shows what HTML is being injected into your page by the rsyc-profile-injector.js script.
+            Use this to debug spacing, styling, and content issues.
+        </div>
+        
+        <div class="control-group">
+            <label for="centerId">Center ID:</label>
+            <input type="number" id="centerId" value="4" placeholder="Enter center ID" min="1">
+        </div>
+        
+        <div>
+            <button id="loadBtn" class="btn btn-primary">Load Profile</button>
+            <button id="copyHTMLBtn" class="btn secondary">Copy HTML</button>
+            <button id="downloadHTMLBtn" class="btn secondary">Download HTML</button>
+        </div>
+    </div>
+
+    <div class="split-view">
+        <!-- Live Preview -->
+        <div class="panel">
+            <div class="panel-header">
+                <i class="bi bi-eye"></i> Live Preview (As It Appears)
+            </div>
+            <div class="panel-body" id="livePreview">
+                <p style="color: #999; text-align: center; padding: 40px 0;">Select a center and click "Load Profile"</p>
+            </div>
+        </div>
+
+        <!-- Raw HTML Inspector -->
+        <div class="panel">
+            <div class="panel-header">
+                <i class="bi bi-code"></i> Raw HTML (What's Being Injected)
+            </div>
+            <div class="panel-body" id="htmlInspector">
+                Select a center and click "Load Profile" to view the raw HTML...
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="rsyc-data.js"></script>
+    <script src="rsyc-staff-order.js"></script>
+    <script src="rsyc-templates.js"></script>
+    <script src="rsyc-cms-publisher.js"></script>
+
+    <script>
+        let lastGeneratedHTML = '';
+
+        document.getElementById('loadBtn').addEventListener('click', async () => {
+            const centerId = document.getElementById('centerId').value;
+            
+            if (!centerId) {
+                alert('Please enter a Center ID');
+                return;
+            }
+
+            try {
+                // Load data
+                const dataLoader = new RSYCDataLoader();
+                await dataLoader.loadCriticalData();
+                await dataLoader.loadOptionalData();
+
+                // Get center data
+                const centerData = await dataLoader.getCenterData(centerId);
+                if (!centerData || !centerData.center) {
+                    alert(`Center not found: ${centerId}`);
+                    return;
+                }
+
+                // Generate HTML using template engine (same as injector)
+                const templateEngine = new RSYCTemplates();
+                const allSectionsConfig = templateEngine.getSections();
+                const contentSections = Object.keys(allSectionsConfig)
+                    .filter(key => !['hero', 'about'].includes(key))
+                    .sort((a, b) => (allSectionsConfig[a].order || 999) - (allSectionsConfig[b].order || 999));
+
+                // Generate the HTML
+                const html = templateEngine.generateProfile(centerData, contentSections);
+                lastGeneratedHTML = html;
+
+                // Show in preview
+                const preview = document.getElementById('livePreview');
+                preview.innerHTML = html;
+
+                // Show raw HTML
+                const inspector = document.getElementById('htmlInspector');
+                inspector.textContent = html;
+
+                console.log('HTML generated for center:', centerData.center.name);
+                console.log('HTML length:', html.length, 'characters');
+            } catch (error) {
+                alert('Error: ' + error.message);
+                console.error(error);
+            }
+        });
+
+        document.getElementById('copyHTMLBtn').addEventListener('click', () => {
+            if (!lastGeneratedHTML) {
+                alert('Load a profile first');
+                return;
+            }
+            navigator.clipboard.writeText(lastGeneratedHTML).then(() => {
+                alert('HTML copied to clipboard!');
+            }).catch(err => {
+                alert('Failed to copy: ' + err);
+            });
+        });
+
+        document.getElementById('downloadHTMLBtn').addEventListener('click', () => {
+            if (!lastGeneratedHTML) {
+                alert('Load a profile first');
+                return;
+            }
+            const centerId = document.getElementById('centerId').value;
+            const blob = new Blob([lastGeneratedHTML], { type: 'text/html' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `rsyc-center-${centerId}.html`;
+            a.click();
+            URL.revokeObjectURL(url);
+        });
+
+        // Load center 4 by default
+        document.getElementById('loadBtn').click();
+    </script>
+</body>
+</html>
         }
         h1 {
             color: #333;

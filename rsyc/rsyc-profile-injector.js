@@ -101,28 +101,42 @@
             
             console.log('[RSYCProfileInjector] ✅ Profile generated:', centerData.center.name);
 
-            // Render complete profile immediately (match generator approach)
-            const container = document.createElement('div');
-            container.className = 'rsyc-profile';
-            container.id = `rsyc-container-${centerId}`;
-            container.innerHTML = `
-                <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
-                <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css">
-                <style type="text/css">
-
+            // Inject custom styles once
+            if (!document.getElementById('rsyc-injected-styles')) {
+                const styleEl = document.createElement('style');
+                styleEl.id = 'rsyc-injected-styles';
+                styleEl.type = 'text/css';
+                styleEl.textContent = `
 .localSites-items,
 .localSites-item {
   height: auto !important;
   min-height: auto !important;
 }
 
-  /* Hide the "Visit Website" link completely */
+/* Hide the "Visit Website" link completely */
 .localSites-website {
   display: none !important;
 }
 
-div #freeTextArea-0 {
+/* Override the huge page height */
+#page {
+  height: auto !important;
+  min-height: auto !important;
+}
+
+/* Override the huge freeTextArea height and padding */
+.freeTextArea.u-centerBgImage.u-sa-whiteBg.u-coverBgImage {
+  height: auto !important;
+  min-height: auto !important;
+  padding: 0 !important;
+  margin: 0 !important;
+}
+
+div #freeTextArea {
   margin-bottom: -75px !important;
+  height: auto !important;
+  min-height: auto !important;
+  padding: 0 !important;
 }
   
 #freeTextArea-scripture .container {
@@ -130,14 +144,49 @@ div #freeTextArea-0 {
   margin-bottom: 0 !important;
 }
 
+#freeTextArea-scripture {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 60px 20px !important;
+}
+
+#freeTextArea-scripture .u-positionRelative {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 100% !important;
+}
+
 #freeTextArea-scripture p:last-child {
   margin-bottom: 0 !important;
   padding-bottom: 0 !important;
 }
 
-</style>
-                ${html}
-            `;
+/* Mobile-specific padding for footer scripture */
+@media (max-width: 768px) {
+  #freeTextArea-scripture {
+    padding: 60px 20px 100px 20px !important;
+  }
+}
+
+/* Center and style videos/embeds - keep original size with rounded corners */
+.rsyc-profile video,
+.rsyc-profile iframe,
+.rsyc-profile embed {
+  display: block !important;
+  margin: 20px auto !important;
+  border-radius: 8px !important;
+}
+`;
+                document.head.appendChild(styleEl);
+            }
+
+            // Render complete profile immediately (match generator approach)
+            const container = document.createElement('div');
+            container.className = 'rsyc-profile';
+            container.id = `rsyc-container-${centerId}`;
+            container.innerHTML = html;
 
             targetElement.innerHTML = '';
             targetElement.appendChild(container);

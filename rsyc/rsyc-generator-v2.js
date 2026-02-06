@@ -603,6 +603,20 @@ class RSYCGeneratorV2 {
             }
         });
 
+        // Copy inject code
+        document.getElementById('copyInjectCode')?.addEventListener('click', () => {
+            const centerId = this.currentCenter?.Id || this.currentCenter?.id || '';
+            const injectCode = `<div data-rsyc-center-id="${centerId}">\n\t&nbsp;\n</div>\n<script src="https://thisishoperva.org/rsyc/rsyc-profile-injector.js"><\/script>`;
+            navigator.clipboard.writeText(injectCode).then(() => {
+                const btn = document.getElementById('copyInjectCode');
+                const originalText = btn.textContent;
+                btn.textContent = '✓ Copied!';
+                setTimeout(() => {
+                    btn.textContent = originalText;
+                }, 2000);
+            });
+        });
+
         // Responsive tweak: adjust schedule card widths on window resize (debounced)
         try {
             if (!this._rsycScheduleResizeHandler) {
@@ -625,6 +639,9 @@ class RSYCGeneratorV2 {
             this.updateStatus('selectedCenter', 'Selected: None');
             this.showPlaceholder();
             this.disableButtons();
+            // Hide inject code
+            const injectDisplay = document.getElementById('injectCodeDisplay');
+            if (injectDisplay) injectDisplay.style.display = 'none';
             return;
         }
         // Find the selected center. Be permissive: match by Id, id, sharePointId, Title or name
@@ -661,6 +678,15 @@ class RSYCGeneratorV2 {
                 console.error('❌ viewDataStructure button not found!');
             }
             
+            // Show and update inject code
+            const injectDisplay = document.getElementById('injectCodeDisplay');
+            if (injectDisplay) {
+                injectDisplay.style.display = 'flex';
+                const centerId = this.currentCenter.Id || this.currentCenter.id;
+                const injectIdSpan = document.getElementById('injectCenterId');
+                if (injectIdSpan) injectIdSpan.textContent = centerId;
+            }
+            
             // Auto-generate preview
             this.autoGeneratePreview();
         } else {
@@ -668,6 +694,9 @@ class RSYCGeneratorV2 {
             // As a fallback, reset dropdown to empty so user knows selection didn't stick
             const dd = document.getElementById('centerSelect');
             try { if (dd) dd.value = ''; } catch (e) {}
+            // Hide inject code
+            const injectDisplay = document.getElementById('injectCodeDisplay');
+            if (injectDisplay) injectDisplay.style.display = 'none';
         }
         
         // Update arrow button states
