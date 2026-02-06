@@ -1535,7 +1535,7 @@ function renderBreakdown(data){
       const k = key || 'Not Set';
       grouped[k] = grouped[k] || { total: 0, done: 0, donot: 0, siteTitles: new Set() };
       grouped[k].total++;
-      if (/[45]/.test(String(d.Status || '').charAt(0))) grouped[k].done++;
+      if (/[45]/.test(String(d.Status || '').charAt(0)) || (d.Status || '') === 'THQ Redirect') grouped[k].done++;
       if ((d.Status || '') === 'Do Not Migrate') grouped[k].donot++;
       const siteTitle = (d['Site Title'] || d['SiteTitle'] || '').toString().trim();
       if (siteTitle) grouped[k].siteTitles.add(siteTitle);
