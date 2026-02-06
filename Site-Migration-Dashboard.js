@@ -1508,7 +1508,7 @@ try{ addChartLegendModal(statusChart, 'Status'); }catch(e){}
 
 function renderBreakdown(data){
   const container = document.getElementById("progressBreakdownBody");
-  container.innerHTML = "<button id='toggleHiddenGroups' class='btn btn-sm btn-secondary mb-2'>Show 0% Groups</button>";
+  container.innerHTML = "<div class='mb-2'><button id='toggleHiddenGroups' class='btn btn-sm btn-secondary me-2'>Show 0% Groups</button><button id='toggleFullGroups' class='btn btn-sm btn-secondary'>Show 100% Groups</button></div>";
 
   const groups = [
     {name:"Division", field:"Division"},
@@ -1585,8 +1585,12 @@ function renderBreakdown(data){
       const prog = total ? Math.round((grp.done + grp.donot) / total * 100) : 0;
       const siteCount = grp.siteTitles ? grp.siteTitles.size : 0;
 
-      // Determine hidden class for 0% bars
-      let hiddenClass = (prog === 0) ? 'hidden-group' : '';
+      // Determine hidden classes for 0% bars and non-100% bars
+      let hiddenClass = '';
+      let fullClass = '';
+      if (prog === 0) hiddenClass = 'hidden-group';
+      else if (prog !== 100) hiddenClass = 'non-100-group';
+      else if (prog === 100) fullClass = 'is-100-group';
       if (g.field === 'Area Command Admin Group.title' && siteCount === 1 && prog === 0) hiddenClass = 'hidden-group';
 
       const colorClass = prog < 40 ? 'bg-danger' : prog < 70 ? 'bg-warning' : 'bg-success';
@@ -1596,7 +1600,7 @@ function renderBreakdown(data){
         </div>`;
 
       sectionHtml += `      
-        <div class="mb-1 ${hiddenClass}" data-key="${encodeURIComponent(rawKey)}" style="display:${hiddenClass ? 'none' : 'block'}">
+        <div class="mb-1 ${hiddenClass} ${fullClass}" data-key="${encodeURIComponent(rawKey)}" style="display:${hiddenClass === 'hidden-group' ? 'none' : 'block'}">
           <strong>${display}</strong> <small class="text-muted">(${total} pages${siteCount ? ' across ' + siteCount + ' sites' : ''})</small>${progressHtml}
         </div>`;
     });
@@ -1605,9 +1609,11 @@ function renderBreakdown(data){
     container.innerHTML += sectionHtml;
   });
 
-  // --- Toggle button logic for 0% bars ---
+  // --- Toggle button logic for 0% and 100% bars ---
   const toggleBtn = document.getElementById('toggleHiddenGroups');
+  const toggleFullBtn = document.getElementById('toggleFullGroups');
   let showHidden = false;
+  let show100Only = false;
 
   function updateHiddenCount() {
     if (!toggleBtn) return;
@@ -1626,6 +1632,21 @@ function renderBreakdown(data){
     }
   }
 
+  function updateFullCount() {
+    if (!toggleFullBtn) return;
+    const fullElems = container.querySelectorAll('.is-100-group');
+    const count = fullElems.length;
+
+    if(count === 0 || count <= 10){
+      toggleFullBtn.style.display = 'none';
+      show100Only = false;
+    } else {
+      toggleFullBtn.style.display = 'inline-block';
+      show100Only = false;
+      toggleFullBtn.innerText = `Show only 100% Groups (${count})`;
+    }
+  }
+
   if (toggleBtn) {
     toggleBtn.onclick = () => {
       showHidden = !showHidden;
@@ -1636,6 +1657,19 @@ function renderBreakdown(data){
         : `Show 0% Groups (${hiddenElems.length})`;
     };
     updateHiddenCount();
+  }
+
+  if (toggleFullBtn) {
+    toggleFullBtn.onclick = () => {
+      show100Only = !show100Only;
+      const nonFullElems = container.querySelectorAll('.non-100-group');
+      const fullElems = container.querySelectorAll('.is-100-group');
+      nonFullElems.forEach(e => e.style.display = show100Only ? 'none' : 'block');
+      toggleFullBtn.innerText = show100Only 
+        ? `Show All Groups (${fullElems.length})` 
+        : `Show only 100% Groups (${fullElems.length})`;
+    };
+    updateFullCount();
   }
 
   // --- Accordion total badge update ---
