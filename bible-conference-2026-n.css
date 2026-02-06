@@ -350,8 +350,8 @@
   .name-text {
     font-size: 40px;
     font-weight: 700;
-    font-style: oblique;
-    background: linear-gradient(45deg, #4a98bd, #b48ec7, #dd8870, #a1c0a9, #f2d479, #d28e77);
+    font-style: italic;
+    background: linear-gradient(45deg, #daeff8, #abaaac, #daeff8, #abaaac, #daeff8, #abaaac);
     background-size: 50% auto;
     color: white;
     background-clip: text;
