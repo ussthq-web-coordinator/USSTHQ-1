@@ -128,24 +128,24 @@
     }
       .promo-materials-section {
     width: 100%;
-    background: #3AAFA9;
+    background: #7A9C4B;
     color: black;
     padding: 20px 20px 20px 20px;
     }
         .facebook-group-section {
     width: 100%;
-    background: #DAC1A0;
+    background: #f5efe6;
     color: black;
     padding: 20px 20px 20px 20px;
     }
     .recordings-section {
     width: 100%;
-    background: #4AB7B1;
+    background: #7A9C4B;
     color: black;
     padding: 20px 20px 20px 20px;
     }
   
-    .musical-guest-section {
+    .musical-guest-section-old {
       padding: 20px 20px;
       color: #1a1a1a;
       /* Geometric animated background with warm metallics and teal accents */
@@ -169,6 +169,58 @@
         200% auto;
       animation: geometricShift 20s ease-in-out infinite, iridescenceShift 7s ease-in-out infinite, polygonShift 15s linear infinite;
       position: relative;
+  }
+
+  .musical-guest-section {
+    padding: 20px 20px;
+    color: #1a1a1a;
+    /* Geometric animated background with forest green and warm cream accents */
+    background: 
+     repeating-linear-gradient(30deg, transparent, transparent 35px, rgba(122, 156, 75, 0.1) 35px, rgba(122, 156, 75, 0.1) 70px),
+repeating-linear-gradient(90deg, transparent, transparent 35px, rgba(122, 156, 75, 0.1) 35px, rgba(122, 156, 75, 0.1) 70px),
+      linear-gradient(120deg, rgba(122, 156, 75, 0.35) 0%, rgba(245, 239, 230, 0.3) 25%, rgba(145, 175, 95, 0.35) 50%, rgba(245, 239, 230, 0.3) 75%, rgba(122, 156, 75, 0.35) 100%),
+      linear-gradient(90deg, 
+        #7a9c4b 0%,
+        #8aab55 12%,
+        #f5efe6 25%,
+        #91af5f 40%,
+        #9bb765 50%,
+        #f5efe6 60%,
+        #839c55 75%,
+        #7a9c4b 100%);
+    background-size: 
+      70px 70px,
+      70px 70px,
+      200% 200%,
+      200% auto;
+    animation: geometricShift 20s ease-in-out infinite, iridescenceShift 7s ease-in-out infinite, polygonShift 15s linear infinite;
+    position: relative;
+  }
+
+    .musical-guest-section-backup {
+    padding: 20px 20px;
+    color: #1a1a1a;
+    /* Geometric animated background with forest green and warm cream accents */
+    background: 
+      repeating-linear-gradient(45deg, transparent, transparent 35px, rgba(122, 156, 75, 0.1) 35px, rgba(122, 156, 75, 0.1) 70px),
+      repeating-linear-gradient(-45deg, transparent, transparent 35px, rgba(245, 239, 230, 0.12) 35px, rgba(245, 239, 230, 0.12) 70px),
+      linear-gradient(120deg, rgba(122, 156, 75, 0.35) 0%, rgba(245, 239, 230, 0.3) 25%, rgba(145, 175, 95, 0.35) 50%, rgba(245, 239, 230, 0.3) 75%, rgba(122, 156, 75, 0.35) 100%),
+      linear-gradient(90deg, 
+        #7a9c4b 0%,
+        #8aab55 12%,
+        #f5efe6 25%,
+        #91af5f 40%,
+        #9bb765 50%,
+        #f5efe6 60%,
+        #839c55 75%,
+        #7a9c4b 100%);
+    background-size: 
+      70px 70px,
+      70px 70px,
+      200% 200%,
+      200% auto;
+    animation: geometricShift 20s ease-in-out infinite, iridescenceShift 7s ease-in-out infinite, polygonShift 15s linear infinite;
+    position: relative;
   }
 
   /* Polygon/geometric shift animation */
@@ -282,7 +334,7 @@
     } 
     .lodging-section {
     width: 100%;
-    background: #D2B48C;
+    background: #f5efe6;
     color: black;
     padding: 20px 20px 20px 20px;
     }
