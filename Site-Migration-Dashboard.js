@@ -447,6 +447,7 @@ const statusColors = {
   "Completed": "#28a745",      // green
   "In QA": "#fd7e14",          // orange
   "Needs Info": "#002056",     // navy
+  "Pending Migration": "#0D6FB8", // light blue
   "In Progress": "#6f42c1",    // purple
   "THQ Redirect": "#00929C",    // teal
   "Unknown": "#6c757d"         // gray
@@ -1261,6 +1262,8 @@ filtered.forEach(d => {
   s = "Do Not Migrate";
 } else if (/^2/.test(s)) {
   s = "In Progress";
+} else if (/^1b/.test(s)) {
+  s = "Pending Migration";
 } else if (/^1/.test(s)) {
   s = "Needs Info";
 } else if (/^3[a-d]/.test(s)) {
@@ -1564,6 +1567,8 @@ function renderBreakdown(data){
         grouped[k].donot++;
       } else if (/^2/.test(String(status).charAt(0))) {
         statusCategory = 'In Progress';
+      } else if (/^1b/.test(String(status))) {
+        statusCategory = 'Pending Migration';
       } else if (/^1/.test(String(status).charAt(0))) {
         statusCategory = 'Needs Info';
       } else if (/^3/.test(String(status).charAt(0))) {
@@ -1651,7 +1656,7 @@ function renderBreakdown(data){
         progressHtml = '<div class="progress mt-1" style="height:24px;">';
         
         // Use same order as overall progress bar
-        const statusOrder = ['Do Not Migrate', 'Needs Info', 'In Progress', 'In QA', 'THQ Redirect', 'Unknown', 'Completed'];
+        const statusOrder = ['Do Not Migrate', 'Needs Info', 'Pending Migration', 'In Progress', 'In QA', 'THQ Redirect', 'Unknown', 'Completed'];
         const breakdown = grp.statusBreakdown || {};
         
         statusOrder.forEach(status => {
@@ -1711,15 +1716,17 @@ function renderBreakdown(data){
   function updateFullCount() {
     if (!toggleFullBtn) return;
     const fullElems = container.querySelectorAll('.is-100-group');
+    const allElems = container.querySelectorAll('.mb-1[data-key]');
     const count = fullElems.length;
+    const totalCount = allElems.length;
 
     if(count === 0 || count <= 10){
       toggleFullBtn.style.display = 'none';
     } else {
       toggleFullBtn.style.display = 'inline-block';
       toggleFullBtn.innerText = show100Only 
-        ? `Show All Groups (${fullElems.length})` 
-        : `Show only 100% Groups (${fullElems.length})`;
+        ? `Show All Groups (${totalCount})` 
+        : `Show only 100% Groups (${count})`;
     }
   }
 
@@ -1900,7 +1907,7 @@ title: "Title",
 function renderOverallProgress(filtered){
   if (!Array.isArray(filtered)) return;
   const total = filtered.length;
-  const counts = { "Do Not Migrate":0, "Needs Info":0, "In Progress":0, "In QA":0, "THQ Redirect":0, Unknown:0, Completed:0 };
+  const counts = { "Do Not Migrate":0, "Needs Info":0, "Pending Migration":0, "In Progress":0, "In QA":0, "THQ Redirect":0, Unknown:0, Completed:0 };
   
   filtered.forEach(d=>{
     const s = getCanonicalStatus(d.Status);
@@ -1966,6 +1973,7 @@ function getCanonicalStatus(status) {
   if (status === "Do Not Migrate") return "Do Not Migrate";
   if (status === "THQ Redirect") return "THQ Redirect";
   if (/^2/.test(status)) return "In Progress";
+  if (/^1b/.test(status)) return "Pending Migration";
   if (/^1/.test(status)) return "Needs Info";
   if (/^3[a-d]/.test(status)) return "In QA";
   return "Unknown";
@@ -2323,6 +2331,7 @@ function renderCharts(filtered) {
       if (/^(4|5)/.test(s)) s = "Completed";
       else if (s === "Do Not Migrate") s = "Do Not Migrate";
       else if (/^2/.test(s)) s = "In Progress";
+      else if (/^1b/.test(s)) s = "Pending Migration";
       else if (/^1/.test(s)) s = "Needs Info";
       else if (/^3[a-d]/.test(s)) s = "In QA";
       else s = s || "Unknown";
