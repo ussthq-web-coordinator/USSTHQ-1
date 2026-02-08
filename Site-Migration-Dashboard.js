@@ -423,6 +423,7 @@ let effortChart = null;
 let showStatusBreakdown = false;
 let showHidden = false;
 let show100Only = false;
+let userToggledHidden = false; // Track if user manually toggled the 0% visibility
 // Helper: transform raw counts to visually compressed values for pie slices
 // while preserving raw counts for tooltips. Methods: 'sqrt' (default), 'log', or 'none'.
 function transformCountsForPie(rawCounts, method = 'sqrt'){
@@ -436,7 +437,7 @@ function transformCountsForPie(rawCounts, method = 'sqrt'){
 }
 // Application version (edit this value to bump text shown on the page)
 // Keep this value here so you can edit it directly in the JS without relying on DashboardData.json
-const APP_VERSION = '2602.05.1031';
+const APP_VERSION = '2602.08.0543';
 // Also expose to window so you can tweak at runtime in the browser console if needed
 window.APP_VERSION = window.APP_VERSION || APP_VERSION;
 
@@ -1512,7 +1513,16 @@ try{ addChartLegendModal(statusChart, 'Status'); }catch(e){}
 
 function renderBreakdown(data){
   const container = document.getElementById("progressBreakdownBody");
-  container.innerHTML = "<div class='mb-2'><button id='toggleHiddenGroups' class='btn btn-sm btn-secondary me-2'>Show 0% Groups</button><button id='toggleFullGroups' class='btn btn-sm btn-secondary me-2'>Show 100% Groups</button><button id='toggleStatus' class='btn btn-sm btn-secondary'>Show Status</button></div>";
+  if (!container) return;
+  
+  // Create button container with proper structure
+  const buttonDiv = document.createElement('div');
+  buttonDiv.className = 'mb-3 d-flex gap-2 flex-wrap';
+  buttonDiv.innerHTML = "<button id='toggleHiddenGroups' class='btn btn-sm btn-secondary'>Show 0% Groups</button><button id='toggleFullGroups' class='btn btn-sm btn-secondary'>Show 100% Groups</button><button id='toggleStatus' class='btn btn-sm btn-secondary'>Show Status</button>";
+  
+  // Clear container and add buttons
+  container.innerHTML = '';
+  container.appendChild(buttonDiv);
 
   const groups = [
     {name:"Division", field:"Division"},
@@ -1582,6 +1592,21 @@ function renderBreakdown(data){
         const d = (e.display || '').toString().toLowerCase();
         return rk.includes('area command') || d.includes('area command');
       });
+    }
+
+    // --- Smart default for showing 0% groups: show them only if most groups are 0% ---
+    // Only apply smart default if user hasn't manually toggled the setting
+    if (g.field === 'Division' && !userToggledHidden) { // Only check on first group iteration to avoid recalculating
+      let zeroPercentCount = 0;
+      entries.forEach(({ rawKey }) => {
+        const grp = grouped[rawKey];
+        const total = grp.total;
+        const prog = total ? Math.round((grp.done + grp.donot) / total * 100) : 0;
+        if (prog === 0) zeroPercentCount++;
+      });
+      const zeroPercentRatio = entries.length > 0 ? zeroPercentCount / entries.length : 0;
+      // Show 0% groups by default only if more than 50% of groups are at 0%
+      showHidden = zeroPercentRatio > 0.5;
     }
 
     // --- Count entries for heading badge ---
@@ -1655,7 +1680,13 @@ function renderBreakdown(data){
     });
 
     sectionHtml += `</div>`; // close breakdown-section
-    container.innerHTML += sectionHtml;
+    
+    // Create a temporary div to parse HTML and append properly
+    const tempDiv = document.createElement('div');
+    tempDiv.innerHTML = sectionHtml;
+    while (tempDiv.firstChild) {
+      container.appendChild(tempDiv.firstChild);
+    }
   });
 
   // --- Toggle button logic for 0% and 100% bars ---
@@ -1695,6 +1726,7 @@ function renderBreakdown(data){
   if (toggleBtn) {
     toggleBtn.onclick = () => {
       showHidden = !showHidden;
+      userToggledHidden = true; // Mark that user manually toggled
       renderBreakdown(data);
     };
     updateHiddenCount();
@@ -2483,6 +2515,9 @@ function renderCharts(filtered) {
 }
 
 function updateDashboard(){
+  // Reset user toggle flag when filters change so smart default applies again
+  userToggledHidden = false;
+  
   renderCards();
   // Only render the table if Tabulator is available
   if (typeof Tabulator !== 'undefined') {
