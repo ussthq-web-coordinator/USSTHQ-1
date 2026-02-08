@@ -1674,7 +1674,7 @@ function renderBreakdown(data){
       }
 
       sectionHtml += `      
-        <div class="mb-1 ${hiddenClass} ${fullClass}" data-key="${encodeURIComponent(rawKey)}" style="display:${((hiddenClass === 'hidden-group' && !showHidden) || (show100Only && hiddenClass === 'non-100-group')) ? 'none' : 'block'}">
+        <div class="mb-1 ${hiddenClass} ${fullClass}" data-key="${encodeURIComponent(rawKey)}" style="display:${((hiddenClass === 'hidden-group' && !showHidden) || (show100Only && (hiddenClass === 'non-100-group' || hiddenClass === 'hidden-group'))) ? 'none' : 'block'}">
           <strong>${display}</strong> <small class="text-muted">(${total} pages${siteCount ? ' across ' + siteCount + ' sites' : ''})</small>${progressHtml}
         </div>`;
     });
