@@ -1690,9 +1690,37 @@ function renderBreakdown(data){
           </div>`;
       }
 
+      // Only show site title if single site AND title is meaningfully different from group name
+      let siteTitleToShow = '';
+      if (siteCount === 1 && grp.siteTitles) {
+        const rawSiteTitle = Array.from(grp.siteTitles)[0];
+        const cleanedSiteTitle = rawSiteTitle.replace(/The\s+|Salvation Army\s+(?:of\s+)?/gi, '').trim();
+        const displayLower = display.toLowerCase();
+        const siteTitleLower = cleanedSiteTitle.toLowerCase();
+        
+        // Extract significant words (filter out common generic words)
+        const genericWords = new Set(['area', 'command', 'corps', 'the', 'of', 'and', 'or']);
+        const getSignificantWords = (str) => 
+          str.split(/\s+/).filter(w => w.length > 2 && !genericWords.has(w.toLowerCase()));
+        
+        const displayWords = getSignificantWords(display);
+        const siteTitleWords = getSignificantWords(cleanedSiteTitle);
+        
+        // Check if most significant words from site title appear in display
+        const matchedWords = siteTitleWords.filter(word => 
+          displayWords.some(dWord => dWord.includes(word) || word.includes(dWord))
+        );
+        
+        // Only show if less than 70% of site title's significant words are in the group name
+        const similarity = siteTitleWords.length > 0 ? matchedWords.length / siteTitleWords.length : 0;
+        if (similarity < 0.7) {
+          siteTitleToShow = ' | ' + cleanedSiteTitle;
+        }
+      }
+
       sectionHtml += `      
         <div class="mb-1 ${hiddenClass} ${fullClass}" data-key="${encodeURIComponent(rawKey)}" style="display:${((hiddenClass === 'hidden-group' && !showHidden) || (show100Only && (hiddenClass === 'non-100-group' || hiddenClass === 'hidden-group'))) ? 'none' : 'block'}">
-          <strong>${display}</strong> <small class="text-muted">(${total} pages${siteCount ? ' across ' + siteCount + ' sites' : ''})</small>${progressHtml}
+          <strong>${display}${siteTitleToShow}</strong> <small class="text-muted">(${total} pages${siteCount ? ' across ' + siteCount + ' sites' : ''})</small>${progressHtml}
         </div>`;
     });
 
