@@ -1628,7 +1628,16 @@ function renderBreakdown(data){
     }
 
     // --- Count entries for heading badge ---
-    const groupCount = entries.length;
+    // For Location groups with multiple sites, count each site separately
+    let groupCount = entries.length;
+    if (g.field === 'Local Web Admin Group.title') {
+      groupCount = 0;
+      entries.forEach(({ rawKey }) => {
+        const grp = grouped[rawKey];
+        const siteCount = grp.siteTitles ? grp.siteTitles.size : 0;
+        groupCount += siteCount > 1 ? siteCount : 1;
+      });
+    }
 
     // --- Start section HTML with badge ---
     let sectionHtml = `
@@ -1649,80 +1658,174 @@ function renderBreakdown(data){
     // --- Render each entry ---
     entries.forEach(({ rawKey, display }) => {
       const grp = grouped[rawKey];
-      const total = grp.total;
-      const prog = total ? Math.round((grp.done + grp.donot) / total * 100) : 0;
       const siteCount = grp.siteTitles ? grp.siteTitles.size : 0;
 
-      // Determine hidden classes for 0% bars and non-100% bars
-      let hiddenClass = '';
-      let fullClass = '';
-      if (prog === 0) hiddenClass = 'hidden-group';
-      else if (prog !== 100) hiddenClass = 'non-100-group';
-      else if (prog === 100) fullClass = 'is-100-group';
-      if (g.field === 'Area Command Admin Group.title' && siteCount === 1 && prog === 0) hiddenClass = 'hidden-group';
+      // Special handling for Location groups with multiple sites: split into individual site entries
+      if (g.field === 'Local Web Admin Group.title' && siteCount > 1) {
+        // Create individual entry for each site
+        Array.from(grp.siteTitles).sort().forEach(siteTitle => {
+          // Filter data to only get records for this specific site
+          const siteData = data.filter(d => {
+            const rawLocal = (d['Local Web Admin Group.title'] || '').toString().trim();
+            const siteKey = rawLocal || 'Not Set';
+            const siteTitleItem = (d['Site Title'] || d['SiteTitle'] || '').toString().trim();
+            return siteKey === rawKey && siteTitleItem === siteTitle;
+          });
 
-      // Build progress bar - simple by default, status breakdown if enabled
-      let progressHtml = '';
-      
-      if (showStatusBreakdown) {
-        // Status breakdown bar with colored segments
-        progressHtml = '<div class="progress mt-1" style="height:24px;">';
-        
-        // Use same order as overall progress bar
-        const statusOrder = ['Do Not Migrate', 'Needs Info', 'Pending Migration', 'In Progress', 'In QA', 'THQ Redirect', 'Unknown', 'Completed'];
-        const breakdown = grp.statusBreakdown || {};
-        
-        statusOrder.forEach(status => {
-          const count = breakdown[status] || 0;
-          if (count > 0) {
-            const pct = Math.round(count / total * 100);
-            const color = statusColors[status] || '#6c757d';
-            progressHtml += `<div class="progress-bar" style="width:${pct}%; background-color:${color}; border-right:1px solid white;" title="${status}: ${count}"></div>`;
+          const siteTotal = siteData.length;
+          let siteDone = 0;
+          let siteDonot = 0;
+          const siteStatusBreakdown = {};
+
+          siteData.forEach(d => {
+            const status = d.Status || '';
+            let statusCategory = 'Unknown';
+            if (/^4|^5/.test(String(status).charAt(0))) {
+              statusCategory = 'Completed';
+              siteDone++;
+            } else if (status === 'THQ Redirect') {
+              statusCategory = 'THQ Redirect';
+              siteDone++;
+            } else if (status === 'Do Not Migrate') {
+              statusCategory = 'Do Not Migrate';
+              siteDonot++;
+            } else if (/^2/.test(String(status).charAt(0))) {
+              statusCategory = 'In Progress';
+            } else if (/^1b/.test(String(status))) {
+              statusCategory = 'Pending Migration';
+            } else if (/^1/.test(String(status).charAt(0))) {
+              statusCategory = 'Needs Info';
+            } else if (/^3/.test(String(status).charAt(0))) {
+              statusCategory = 'In QA';
+            }
+            siteStatusBreakdown[statusCategory] = (siteStatusBreakdown[statusCategory] || 0) + 1;
+          });
+
+          const siteProg = siteTotal ? Math.round((siteDone + siteDonot) / siteTotal * 100) : 0;
+
+          // Determine hidden classes
+          let hiddenClass = '';
+          let fullClass = '';
+          if (siteProg === 0) hiddenClass = 'hidden-group';
+          else if (siteProg !== 100) hiddenClass = 'non-100-group';
+          else if (siteProg === 100) fullClass = 'is-100-group';
+
+          // Build progress bar for this specific site
+          let progressHtml = '';
+          
+          if (showStatusBreakdown) {
+            progressHtml = '<div class="progress mt-1" style="height:24px;">';
+            const statusOrder = ['Do Not Migrate', 'Needs Info', 'Pending Migration', 'In Progress', 'In QA', 'THQ Redirect', 'Unknown', 'Completed'];
+            statusOrder.forEach(status => {
+              const count = siteStatusBreakdown[status] || 0;
+              if (count > 0) {
+                const pct = Math.round(count / siteTotal * 100);
+                const color = statusColors[status] || '#6c757d';
+                progressHtml += `<div class="progress-bar" style="width:${pct}%; background-color:${color}; border-right:1px solid white;" title="${status}: ${count}"></div>`;
+              }
+            });
+            progressHtml += `</div><small style="text-align:right; display:block; margin-top:2px; color:#666;">${siteProg}% Complete</small>`;
+          } else {
+            const colorClass = siteProg < 40 ? 'bg-danger' : siteProg < 70 ? 'bg-warning' : 'bg-success';
+            progressHtml = `<div class="progress mt-1"><div class="progress-bar ${colorClass}" style="width:${siteProg}%">${siteProg}%</div></div>`;
           }
+
+          // Clean site title
+          const cleanedSiteTitle = siteTitle.replace(/The\s+|Salvation Army\s+(?:of\s+)?/gi, '').trim();
+          const siteEntryKey = `${rawKey}|${siteTitle}`;
+
+          sectionHtml += `      
+            <div class="mb-1 ${hiddenClass} ${fullClass}" data-key="${encodeURIComponent(siteEntryKey)}" style="display:${((hiddenClass === 'hidden-group' && !showHidden) || (show100Only && (hiddenClass === 'non-100-group' || hiddenClass === 'hidden-group'))) ? 'none' : 'block'}">
+              <strong>${display} | ${cleanedSiteTitle}</strong> <small class="text-muted">(${siteTotal} pages)</small>${hideProgressBars ? '' : progressHtml}
+            </div>`;
         });
-        
-        progressHtml += `</div><small style="text-align:right; display:block; margin-top:2px; color:#666;">${prog}% Complete</small>`;
       } else {
-        // Simple single-color bar
-        const colorClass = prog < 40 ? 'bg-danger' : prog < 70 ? 'bg-warning' : 'bg-success';
-        progressHtml = `
-          <div class="progress mt-1">
-            <div class="progress-bar ${colorClass}" style="width:${prog}%">${prog}%</div>
+        // Regular single-site or non-location handling
+        const total = grp.total;
+        const prog = total ? Math.round((grp.done + grp.donot) / total * 100) : 0;
+
+        // Determine hidden classes for 0% bars and non-100% bars
+        let hiddenClass = '';
+        let fullClass = '';
+        if (prog === 0) hiddenClass = 'hidden-group';
+        else if (prog !== 100) hiddenClass = 'non-100-group';
+        else if (prog === 100) fullClass = 'is-100-group';
+        if (g.field === 'Area Command Admin Group.title' && siteCount === 1 && prog === 0) hiddenClass = 'hidden-group';
+
+        // Build progress bar - simple by default, status breakdown if enabled
+        let progressHtml = '';
+        
+        if (showStatusBreakdown) {
+          // Status breakdown bar with colored segments
+          progressHtml = '<div class="progress mt-1" style="height:24px;">';
+          
+          // Use same order as overall progress bar
+          const statusOrder = ['Do Not Migrate', 'Needs Info', 'Pending Migration', 'In Progress', 'In QA', 'THQ Redirect', 'Unknown', 'Completed'];
+          const breakdown = grp.statusBreakdown || {};
+          
+          statusOrder.forEach(status => {
+            const count = breakdown[status] || 0;
+            if (count > 0) {
+              const pct = Math.round(count / total * 100);
+              const color = statusColors[status] || '#6c757d';
+              progressHtml += `<div class="progress-bar" style="width:${pct}%; background-color:${color}; border-right:1px solid white;" title="${status}: ${count}"></div>`;
+            }
+          });
+          
+          progressHtml += `</div><small style="text-align:right; display:block; margin-top:2px; color:#666;">${prog}% Complete</small>`;
+        } else {
+          // Simple single-color bar
+          const colorClass = prog < 40 ? 'bg-danger' : prog < 70 ? 'bg-warning' : 'bg-success';
+          progressHtml = `
+            <div class="progress mt-1">
+              <div class="progress-bar ${colorClass}" style="width:${prog}%">${prog}%</div>
+            </div>`;
+        }
+
+        // Only show site title if single site AND title is meaningfully different from group name
+        let siteTitleToShow = '';
+        if (siteCount === 1 && grp.siteTitles) {
+          const rawSiteTitle = Array.from(grp.siteTitles)[0];
+          const cleanedSiteTitle = rawSiteTitle.replace(/The\s+|Salvation Army\s+(?:of\s+)?/gi, '').trim();
+          const displayLower = display.toLowerCase();
+          const siteTitleLower = cleanedSiteTitle.toLowerCase();
+          
+          // Normalize regional variations (e.g., "North East" → "Northeast") and abbreviations (e.g., "St." → "St", "Ft" → "Fort")
+          const normalizeRegional = (str) => {
+            return str
+              .replace(/\b(north|south|east|west)\s+(east|west|carolina|dakota)\b/gi, '$1$2')
+              .replace(/\bft\.?\s+/gi, 'fort ') // "Ft." or "Ft " → "Fort "
+              .replace(/\b(st|mt)\./gi, '$1'); // Remove periods from other common abbreviations
+          };
+          
+          const displayNormalized = normalizeRegional(displayLower);
+          const siteTitleNormalized = normalizeRegional(siteTitleLower);
+          
+          // Extract significant words (filter out common generic words)
+          const genericWords = new Set(['area', 'command', 'corps', 'the', 'of', 'and', 'or']);
+          const getSignificantWords = (str) => 
+            str.split(/\s+/).filter(w => w.length > 2 && !genericWords.has(w.toLowerCase()));
+          
+          const displayWords = getSignificantWords(displayNormalized);
+          const siteTitleWords = getSignificantWords(siteTitleNormalized);
+          
+          // Check if most significant words from site title appear in display
+          const matchedWords = siteTitleWords.filter(word => 
+            displayWords.some(dWord => dWord.includes(word) || word.includes(dWord))
+          );
+          
+          // Only show if less than 70% of site title's significant words are in the group name
+          const similarity = siteTitleWords.length > 0 ? matchedWords.length / siteTitleWords.length : 0;
+          if (similarity < 0.7) {
+            siteTitleToShow = ' | ' + cleanedSiteTitle;
+          }
+        }
+
+        sectionHtml += `      
+          <div class="mb-1 ${hiddenClass} ${fullClass}" data-key="${encodeURIComponent(rawKey)}" style="display:${((hiddenClass === 'hidden-group' && !showHidden) || (show100Only && (hiddenClass === 'non-100-group' || hiddenClass === 'hidden-group'))) ? 'none' : 'block'}">
+            <strong>${display}${siteTitleToShow}</strong> <small class="text-muted">(${total} pages${siteCount > 1 ? ' across ' + siteCount + ' sites' : ''})</small>${hideProgressBars ? '' : progressHtml}
           </div>`;
       }
-
-      // Only show site title if single site AND title is meaningfully different from group name
-      let siteTitleToShow = '';
-      if (siteCount === 1 && grp.siteTitles) {
-        const rawSiteTitle = Array.from(grp.siteTitles)[0];
-        const cleanedSiteTitle = rawSiteTitle.replace(/The\s+|Salvation Army\s+(?:of\s+)?/gi, '').trim();
-        const displayLower = display.toLowerCase();
-        const siteTitleLower = cleanedSiteTitle.toLowerCase();
-        
-        // Extract significant words (filter out common generic words)
-        const genericWords = new Set(['area', 'command', 'corps', 'the', 'of', 'and', 'or']);
-        const getSignificantWords = (str) => 
-          str.split(/\s+/).filter(w => w.length > 2 && !genericWords.has(w.toLowerCase()));
-        
-        const displayWords = getSignificantWords(display);
-        const siteTitleWords = getSignificantWords(cleanedSiteTitle);
-        
-        // Check if most significant words from site title appear in display
-        const matchedWords = siteTitleWords.filter(word => 
-          displayWords.some(dWord => dWord.includes(word) || word.includes(dWord))
-        );
-        
-        // Only show if less than 70% of site title's significant words are in the group name
-        const similarity = siteTitleWords.length > 0 ? matchedWords.length / siteTitleWords.length : 0;
-        if (similarity < 0.7) {
-          siteTitleToShow = ' | ' + cleanedSiteTitle;
-        }
-      }
-
-      sectionHtml += `      
-        <div class="mb-1 ${hiddenClass} ${fullClass}" data-key="${encodeURIComponent(rawKey)}" style="display:${((hiddenClass === 'hidden-group' && !showHidden) || (show100Only && (hiddenClass === 'non-100-group' || hiddenClass === 'hidden-group'))) ? 'none' : 'block'}">
-          <strong>${display}${siteTitleToShow}</strong> <small class="text-muted">(${total} pages${siteCount > 1 ? ' across ' + siteCount + ' sites' : ''})</small>${hideProgressBars ? '' : progressHtml}
-        </div>`;
     });
 
     sectionHtml += `</div>`; // close breakdown-section
