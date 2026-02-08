@@ -450,7 +450,7 @@ function transformCountsForPie(rawCounts, method = 'sqrt'){
 }
 // Application version (edit this value to bump text shown on the page)
 // Keep this value here so you can edit it directly in the JS without relying on DashboardData.json
-const APP_VERSION = '2602.08.1417';
+const APP_VERSION = '2602.08.1611';
 // Also expose to window so you can tweak at runtime in the browser console if needed
 window.APP_VERSION = window.APP_VERSION || APP_VERSION;
 
@@ -1894,6 +1894,9 @@ function renderBreakdown(data){
   // --- Toggle button logic for status breakdown ---
   const toggleStatusBtn = document.getElementById('toggleStatus');
   if (toggleStatusBtn) {
+    // Hide status button when progress bars are hidden
+    toggleStatusBtn.style.display = hideProgressBars ? 'none' : 'inline-block';
+    
     // Set initial button text based on current state
     toggleStatusBtn.innerText = showStatusBreakdown ? 'Hide Status' : 'Show Status';
     
