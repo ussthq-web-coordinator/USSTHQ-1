@@ -250,7 +250,11 @@ const filterMapping = {
   filterSymType: d => d["Symphony Site Type"] || "Not Set",
   // New filters
   filterPriority: d => d.Priority || "Not Set",
-  filterEffort: d => d["Effort Needed"] || "Not Set"
+  filterEffort: d => d["Effort Needed"] || "Not Set",
+  filterZestyUrl: d => {
+    const zestyUrl = d["Zesty URL Path Part"] || "";
+    return (zestyUrl && zestyUrl.toString().trim()) ? "Provided" : "Not Provided";
+  }
 };
 
 function updateFiltersOptions() {
@@ -263,7 +267,8 @@ function updateFiltersOptions() {
     filterPubSym: getSelectValue("filterPubSym"),
     filterSymType: getSelectValue("filterSymType"),
     filterPriority: getSelectValue("filterPriority"),
-    filterEffort: getSelectValue("filterEffort")
+    filterEffort: getSelectValue("filterEffort"),
+    filterZestyUrl: getSelectValue("filterZestyUrl")
   };
 
   // Read Modified date inputs so option lists can be constrained by date range as well
@@ -335,6 +340,7 @@ function getFilteredData(){
   const priority = getSelectValue("filterPriority");
   const effort = getSelectValue("filterEffort");
   const siteTitle = getSelectValue("filterSiteTitle");
+  const zestyUrl = getSelectValue("filterZestyUrl");
   const modFromEl = document.getElementById('filterModifiedFrom');
   const modToEl = document.getElementById('filterModifiedTo');
   const modifiedFromMs = dateToUtcMidnightMs(modFromEl && modFromEl.value);
@@ -399,6 +405,12 @@ function getFilteredData(){
         if (!isNotSet(d["Site Title"])) return false;
       } else if (d["Site Title"] !== siteTitle) return false;
     }
+    // Zesty URL
+    if (zestyUrl) {
+      const zestyUrlValue = d["Zesty URL Path Part"] || "";
+      const zestyStatus = (zestyUrlValue && zestyUrlValue.toString().trim()) ? "Provided" : "Not Provided";
+      if (zestyStatus !== zestyUrl) return false;
+    }
     // Modified date range
     if (modifiedFromMs && (!d.Modified || dateToUtcMidnightMs(d.Modified) === null || dateToUtcMidnightMs(d.Modified) < modifiedFromMs)) return false;
     if (modifiedToMs && (!d.Modified || dateToUtcMidnightMs(d.Modified) === null || dateToUtcMidnightMs(d.Modified) > modifiedToMs)) return false;
@@ -437,7 +449,7 @@ function transformCountsForPie(rawCounts, method = 'sqrt'){
 }
 // Application version (edit this value to bump text shown on the page)
 // Keep this value here so you can edit it directly in the JS without relying on DashboardData.json
-const APP_VERSION = '2602.08.0543';
+const APP_VERSION = '2602.08.1417';
 // Also expose to window so you can tweak at runtime in the browser console if needed
 window.APP_VERSION = window.APP_VERSION || APP_VERSION;
 
@@ -2107,7 +2119,7 @@ function debounce(fn, wait){
 
 // Initialize filter controls: attach change listeners and populate options
 function initFilters(){
-  const filterIds = ["filterDivision","filterAC","filterStatus","filterPageType","filterPubSym","filterSymType","filterPriority","filterEffort","filterSiteTitle"];
+  const filterIds = ["filterDivision","filterAC","filterStatus","filterPageType","filterPubSym","filterSymType","filterPriority","filterEffort","filterSiteTitle","filterZestyUrl"];
 
   filterIds.forEach(id=>{
     const sel = document.getElementById(id);
