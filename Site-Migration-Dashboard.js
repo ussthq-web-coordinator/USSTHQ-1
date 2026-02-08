@@ -435,6 +435,7 @@ let effortChart = null;
 let showStatusBreakdown = false;
 let showHidden = false;
 let show100Only = false;
+let hideProgressBars = false; // Track if progress bars should be hidden
 let userToggledHidden = false; // Track if user manually toggled the 0% visibility
 // Helper: transform raw counts to visually compressed values for pie slices
 // while preserving raw counts for tooltips. Methods: 'sqrt' (default), 'log', or 'none'.
@@ -1533,7 +1534,7 @@ function renderBreakdown(data){
   // Create button container with proper structure
   const buttonDiv = document.createElement('div');
   buttonDiv.className = 'mb-3 d-flex gap-2 flex-wrap';
-  buttonDiv.innerHTML = "<button id='toggleHiddenGroups' class='btn btn-sm btn-secondary'>Show 0% Groups</button><button id='toggleFullGroups' class='btn btn-sm btn-secondary'>Show 100% Groups</button><button id='toggleStatus' class='btn btn-sm btn-secondary'>Show Status</button>";
+  buttonDiv.innerHTML = "<button id='toggleHiddenGroups' class='btn btn-sm btn-secondary'>Show 0% Groups</button><button id='toggleFullGroups' class='btn btn-sm btn-secondary'>Show 100% Groups</button><button id='toggleStatus' class='btn btn-sm btn-secondary'>Show Status</button><button id='toggleProgressBars' class='btn btn-sm btn-secondary'>Hide Progress Bars</button>";
   
   // Clear container and add buttons
   container.innerHTML = '';
@@ -1720,7 +1721,7 @@ function renderBreakdown(data){
 
       sectionHtml += `      
         <div class="mb-1 ${hiddenClass} ${fullClass}" data-key="${encodeURIComponent(rawKey)}" style="display:${((hiddenClass === 'hidden-group' && !showHidden) || (show100Only && (hiddenClass === 'non-100-group' || hiddenClass === 'hidden-group'))) ? 'none' : 'block'}">
-          <strong>${display}${siteTitleToShow}</strong> <small class="text-muted">(${total} pages${siteCount ? ' across ' + siteCount + ' sites' : ''})</small>${progressHtml}
+          <strong>${display}${siteTitleToShow}</strong> <small class="text-muted">(${total} pages${siteCount > 1 ? ' across ' + siteCount + ' sites' : ''})</small>${hideProgressBars ? '' : progressHtml}
         </div>`;
     });
 
@@ -1795,6 +1796,18 @@ function renderBreakdown(data){
     
     toggleStatusBtn.onclick = () => {
       showStatusBreakdown = !showStatusBreakdown;
+      renderBreakdown(data);
+    };
+  }
+
+  // --- Toggle button logic for progress bars ---
+  const toggleProgressBtn = document.getElementById('toggleProgressBars');
+  if (toggleProgressBtn) {
+    // Set initial button text based on current state
+    toggleProgressBtn.innerText = hideProgressBars ? 'Show Progress Bars' : 'Hide Progress Bars';
+    
+    toggleProgressBtn.onclick = () => {
+      hideProgressBars = !hideProgressBars;
       renderBreakdown(data);
     };
   }
