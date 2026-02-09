@@ -100,16 +100,13 @@ class RSYCTemplates {
         const photoData = photos && photos.length > 0 ? photos[0] : null;
         const exteriorPhoto = photoData?.urlExteriorPhoto || '';
 
-        const exteriorPhotoHTML = exteriorPhoto ? `
-        <div class="mb-4">
-            <img src="${this.escapeHTML(exteriorPhoto)}" alt="${this.escapeHTML(center.name)} Exterior" 
-                 class="img-fluid" style="width: 100%; height: auto; border-radius: 12px; object-fit: cover;">
-        </div>` : '';
-
         return `<!-- About This Center -->
 <section class="rsyc-about">
+    ${exteriorPhoto ? `
+    <img src="${this.escapeHTML(exteriorPhoto)}" alt="${this.escapeHTML(center.name)} Exterior" 
+         style="display: block; width: 100%; height: auto; max-width: none;">
+    ` : ''}
     <div class="container">
-        ${exteriorPhotoHTML}
         <h2>About This Center</h2>
         <div class="about-content" data-make-contacts-clickable>
             ${center.aboutText}
@@ -1027,7 +1024,7 @@ ${modal}`;
 
             return `
 		<div class="card shadow border rounded-3 flex-shrink-0" style="width: 280px; scroll-snap-align: start; border: 1px solid #dee2e6; overflow:hidden;">
-			<img alt="${this.escapeHTML(displayName)}" class="card-img-top" src="${this.escapeHTML(photo)}" style="width:100%; height:250px; object-fit:cover; display:block;">
+			<img alt="${this.escapeHTML(displayName)}" class="card-img-top" src="${this.escapeHTML(photo)}" style="width:100%; height:250px; object-fit:cover; object-position:top center; display:block;">
 			<div class="card-body d-flex flex-column">
 				<div class="fw-bold mb-1" style="font-size: 1.1rem; line-height: 1.3;">${this.escapeHTML(displayName)}</div>
 				<div class="text-muted mb-2" style="font-size: 0.95rem;">${this.escapeHTML(title)}</div>

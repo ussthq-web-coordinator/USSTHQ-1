@@ -33,8 +33,8 @@
             showLoadingSkeleton(targetElement);
 
             // Load required scripts if not already loaded
-            const baseUrl = window.location.hostname === 'localhost'
-                ? 'http://localhost:3001'
+            const baseUrl = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+                ? window.location.origin
                 : 'https://thisishoperva.org';
 
             console.log('[RSYCProfileInjector] Loading scripts from:', baseUrl);
