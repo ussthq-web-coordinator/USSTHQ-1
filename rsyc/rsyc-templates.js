@@ -75,43 +75,18 @@ class RSYCTemplates {
      * Hero Section
      */
     generateHero(data) {
-        const { center } = data;
-        return `<!-- Hero Section -->
-<section class="rsyc-hero">
-    <div class="container">
-        <h1>${this.escapeHTML(center.name)}</h1>
-        <p class="location">
-            <i class="bi bi-geo-alt-fill"></i>
-            ${this.escapeHTML(center.city)}, ${this.escapeHTML(center.state)} ${center.zip}
-        </p>
-        ${center.websiteURL ? `<a href="${this.escapeHTML(center.websiteURL)}" class="btn btn-primary">Visit Website</a>` : ''}
-    </div>
-</section>`;
-    }
-
-    /**
-     * About This Center Section
-     */
-    generateAbout(data) {
         const { center, photos } = data;
-        if (!center.aboutText) return '';
-
+        
         // Get exterior photo from photos array
         const photoData = photos && photos.length > 0 ? photos[0] : null;
         const exteriorPhoto = photoData?.urlExteriorPhoto || '';
-
-        return `<!-- About This Center -->
-<section class="rsyc-about">
-    ${exteriorPhoto ? `
+        
+        if (!exteriorPhoto) return ''; // No hero without photo
+        
+        return `<!-- Hero Section -->
+<section class="rsyc-hero">
     <img src="${this.escapeHTML(exteriorPhoto)}" alt="${this.escapeHTML(center.name)} Exterior" 
-         style="display: block; width: 100%; height: auto; max-width: none;">
-    ` : ''}
-    <div class="container">
-        <h2>About This Center</h2>
-        <div class="about-content" data-make-contacts-clickable>
-            ${center.aboutText}
-        </div>
-    </div>
+         style="display: block; width: 100%; height: 500px; object-fit: cover; object-position: center;">
 </section>`;
     }
 
