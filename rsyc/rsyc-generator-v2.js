@@ -476,7 +476,10 @@ class RSYCGeneratorV2 {
                 if (btn) btn.disabled = true;
                 this.updateStatus('dataStatus', 'Data: Refreshing...');
 
-                // Reload all JSON from remote sources
+                // Clear cache first to force fresh data load
+                this.dataLoader.clearCache();
+
+                // Reload all JSON from remote sources (with cache busting)
                 await this.dataLoader.loadAll();
 
                 // Re-process centers to ensure rich text contact linking
@@ -634,6 +637,31 @@ class RSYCGeneratorV2 {
                 window.addEventListener('resize', this._rsycScheduleResizeHandler);
             }
         } catch (e) { /* ignore in older browsers */ }
+
+        // Listen for staff order changes from rsyc-staff-order.js
+        // When user saves a new role order, regenerate the preview to reflect the changes
+        window.addEventListener('rsyc:roleOrderChanged', (e) => {
+            console.log('📋 Staff role order changed, regenerating preview...');
+            if (this.currentCenter) {
+                try {
+                    this.autoGeneratePreview();
+                } catch (err) {
+                    console.warn('Failed to regenerate preview after role order change:', err);
+                }
+            }
+        });
+
+        // Listen for explicit generate requests
+        window.addEventListener('rsyc:requestGeneratePreview', () => {
+            console.log('📋 Generate preview requested via custom event');
+            if (this.currentCenter) {
+                try {
+                    this.autoGeneratePreview();
+                } catch (err) {
+                    console.warn('Failed to regenerate preview:', err);
+                }
+            }
+        });
     }
 
     onCenterSelect(centerId) {

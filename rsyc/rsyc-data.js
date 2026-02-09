@@ -1,7 +1,20 @@
 /**
  * RSYC Data Loader
- * Fetches and caches all JSON data from SharePoint
+ * Fetches and caches all JSON data from SharePoint or local files
  */
+
+// Global helper to safely extract string values from potentially complex SharePoint data structures
+const getVal = (v) => {
+    if (v === null || v === undefined) return '';
+    if (typeof v === 'object') {
+        if (v.Value !== undefined) return String(v.Value).trim();
+        if (v.Email !== undefined) return String(v.Email).trim();
+        if (v.TermGuid !== undefined && v.Label !== undefined) return String(v.Label).trim();
+        // If it's an object but none of the known keys match, try to stringify or return empty
+        return '';
+    }
+    return String(v).trim();
+};
 
 class RSYCDataLoader {
     constructor() {
@@ -16,9 +29,30 @@ class RSYCDataLoader {
         ];
         this.currentProxyIndex = 0;
         this.baseURL = 'https://thisishoperva.org/rsyc/';
+        this.localBaseURL = '/rsyc/data/'; // Local files served from /rsyc/data/ for testing
         this.useCorsProxy = true;          // Enable proxy fallback for cross-origin requests
         this.tryDirectFirst = true;      // attempt direct fetch before using proxy
+        this.tryLocalFirst = true;       // Try loading from local /rsyc/data/ folder first for development
         
+        this.cache = {
+            centers: null,
+            programs: null,
+            schedules: null,
+            leaders: null,
+            photos: null,
+            hours: null,
+            facilities: null,
+            featuredPrograms: null,
+            lastUpdated: null
+        };
+        this.loading = false;
+    }
+
+    /**
+     * Clear all cached data - useful for forcing a refresh
+     */
+    clearCache() {
+        console.log('🔄 Clearing data cache...');
         this.cache = {
             centers: null,
             programs: null,
@@ -223,7 +257,10 @@ class RSYCDataLoader {
      * Fetch JSON from URL with fallback
      */
     async fetchJSON(filename) {
-        const directUrl = this.baseURL + filename;
+        // Add cache busting for local development - always get fresh data
+        const cacheBuster = `?v=${new Date().getTime()}`;
+        const directUrl = this.baseURL + filename + cacheBuster;
+        const localUrl = this.localBaseURL + filename + cacheBuster;
         
         // Use local proxy if we're running on localhost
         const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
@@ -233,7 +270,7 @@ class RSYCDataLoader {
         const doFetch = async (url, label, isProxy = false) => {
             try {
                 console.log(`📥 Fetching ${label}: ${filename} -> ${url}`);
-                const resp = await fetch(url, { mode: 'cors' });
+                const resp = await fetch(url, { mode: 'cors', cache: 'no-store' });
                 if (!resp.ok) throw new Error(`HTTP ${resp.status}: ${resp.statusText}`);
                 
                 let json = await resp.json();
@@ -255,6 +292,16 @@ class RSYCDataLoader {
                 throw err;
             }
         };
+
+        // Try local files first for development/testing
+        if (this.tryLocalFirst && isLocalhost) {
+            try {
+                return await doFetch(localUrl, 'local-file', false);
+            } catch (err) {
+                console.warn(`⚠️ Local file not found for ${filename}, falling back to remote...`);
+                // fall through to remote
+            }
+        }
 
         // Try proxy first if on localhost
         if (isLocalhost) {
@@ -306,22 +353,22 @@ class RSYCDataLoader {
             Id: center.ID,  // Main ID (integer) - Use the numeric ID, not the GUID
             id: center.ID,  // Main ID (integer)
             sharePointId: center.ID,  // SharePoint list item numeric ID for hours/schedules/photos lookup
-            Title: center.Title,  // Add Title for V2 compatibility
-            name: center.field_1,
-            shortName: center.Title,
-            type: center.field_5,
-            division: center.field_6,
-            divisionCode: center.field_4,
-            city: center.field_12,
-            state: center.field_13,
-            zip: center.field_14,
+            Title: getVal(center.Title),  // Add Title for V2 compatibility
+            name: getVal(center.field_1),
+            shortName: getVal(center.Title),
+            type: getVal(center.field_5),
+            division: getVal(center.field_6),
+            divisionCode: getVal(center.field_4),
+            city: getVal(center.field_12),
+            state: getVal(center.field_13),
+            zip: getVal(center.field_14),
             latitude: center.field_15,
             longitude: center.field_16,
-            websiteURL: center.field_21,
-            centerType: center.field_22,
-            corpName: center.field_10,
-            gdosID: center.field_19,
-            aboutText: center.AboutThisCenter || '',
+            websiteURL: getVal(center.field_21),
+            centerType: getVal(center.field_22),
+            corpName: getVal(center.field_10),
+            gdosID: getVal(center.field_19),
+            aboutText: getVal(center.AboutThisCenter),
             explainerVideoEmbedCode: center.ExplainerVideoEmbedCode || '',
             // Normalize scripture: handle object wrappers, rich text, or plain string
             scripture: (function() {
@@ -456,25 +503,65 @@ class RSYCDataLoader {
                 if (v) { endTs = v; break; }
             }
 
+            // Extract all contacts from ContactInfo array (SharePoint user objects)
+            let contacts = [];
+            let contactInfo = '';
+            
+            if (Array.isArray(schedule.ContactInfo) && schedule.ContactInfo.length > 0) {
+                contacts = schedule.ContactInfo.map(contact => ({
+                    name: contact.DisplayName || '',
+                    email: contact.Email || '',
+                    jobTitle: contact.JobTitle || ''
+                }));
+            }
+            
+            // Fall back to individual fields if ContactInfo array is not populated
+            if (contacts.length === 0) {
+                const contactName = getVal(schedule.ContactName);
+                const contactEmail = getVal(schedule.ContactEmail);
+                const contactJobTitle = getVal(schedule.ContactJobTitle || schedule.ContactTitle);
+                if (contactName || contactEmail || contactJobTitle) {
+                    contacts.push({
+                        name: contactName,
+                        email: contactEmail,
+                        jobTitle: contactJobTitle
+                    });
+                }
+            }
+            if (!contactInfo) contactInfo = getVal(schedule.ContactInfoText);
+
+            // Extract ages served as readable values
+            const agesServed = (schedule.AgesServed || []).map(a => a.Value);
+            
             return {
                 id: schedule.ID,
                 centerId: schedule['Center#Id'],
                 title: schedule.CustomProgramScheduleTitle,
                 subtitle: subtitle,
+                centerName: schedule.Center?.Value || '',
                 status: schedule.Status?.Value || '',
                 description: schedule.Narrative || schedule.Description || '',
                 ageRange: schedule.AgeRange || '',
+                agesServed: agesServed,
                 cost: schedule.Cost || '',
                 location: schedule.Location || '',
-                contactInfo: schedule.ContactInfo || '',
+                contactInfo: contactInfo,
+                contacts: contacts,
                 capacity: schedule.Capacity || '',
                 prerequisites: schedule.Prerequisites || '',
                 materialsProvided: schedule.MaterialsProvided || '',
-                whatToBring: schedule.WhatToBring || '',
+                whatToBring: schedule.Whattobring || schedule.WhatToBring || '',
+                orientationDetails: schedule.OrientationDetails || '',
                 registrationDeadline: schedule.RegistrationDeadline || '',
                 registrationFee: schedule.RegistrationFee || '',
                 dropOffPickUp: schedule.DropOffPickUp || '',
+                transportationFeeandDetails: schedule.TransportationFeeandDetails || '',
+                closedDates: schedule.ClosedDates || '',
+                openHalfDayDates: schedule.OpenHalfDayDates || '',
+                openFullDayDates: schedule.OpenFullDayDates || '',
                 videoEmbedCode: schedule.VideoEmbedCode || '',
+                startDate: schedule.StartDate || '',
+                endDate: schedule.EndDate || '',
                 // Extract .Value from ScheduleDays array
                 scheduleDays: scheduleDays,
                 scheduleTime: schedule.ScheduleTime,
@@ -485,10 +572,10 @@ class RSYCDataLoader {
                 programRunsIn: (schedule.ProgramRunsIn || []).map(m => m.Value),
                 // Extract .Value from RegistrationTypicallyOpensin array
                 registrationOpensIn: (schedule.RegistrationTypicallyOpensin || []).map(m => m.Value),
-                relatedPrograms: (Array.isArray(schedule.RelatedProgram) ? schedule.RelatedProgram : []).map(p => ({
-                    id: p.Id,
-                    name: p.Value
-                })),
+                relatedPrograms: (schedule.RelatedProgram && schedule.RelatedProgram.Value) ? [{
+                    id: schedule.RelatedProgram.Id,
+                    name: schedule.RelatedProgram.Value
+                }] : [],
                 // Internal helper fields for sorting
                 _firstDayIndex: firstDayIndex,
                 _timeMinutes: timeMinutes,
@@ -503,24 +590,61 @@ class RSYCDataLoader {
      * Process leaders/staff
      */
     processLeaders(data) {
-        return data.map(leader => ({
-            id: leader.ID,
-            centerIds: leader['Center#Id'] || [],
-            roleType: leader.RoleType?.Value || '',
-            positionTitle: leader.PositionTitle,
-            alternateName: leader.AlternateName,
-            biography: leader.Biography,
-            // Top-level image fields (many naming variants) to allow templates to prefer leader.imageURL
-            imageURL: leader.ImageURL || leader.ImageUrl || leader.Image || leader.Photo || leader.PhotoURL || leader.Picture || null,
-            // Preserve person object (if present)
-            person: leader.Person ? {
-                name: leader.Person.DisplayName,
-                email: leader.Person.Email,
-                picture: leader.Person.Picture || null,
-                department: leader.Person.Department,
-                title: leader.Person.JobTitle
-            } : null
-        }));
+        return data.map(leader => {
+            // Extract faceFocus from SharePoint expanded reference: FaceFocus.Value
+            let faceFocus = '';
+            if (leader.FaceFocus && leader.FaceFocus.Value) {
+                faceFocus = String(leader.FaceFocus.Value).trim();
+            } else if (leader.FaceFocus && typeof leader.FaceFocus === 'string') {
+                faceFocus = leader.FaceFocus.trim();
+            }
+            
+            // Check person nested FaceFocus if leader doesn't have one
+            if (!faceFocus && leader.Person && leader.Person.FaceFocus) {
+                if (leader.Person.FaceFocus.Value) {
+                    faceFocus = String(leader.Person.FaceFocus.Value).trim();
+                } else if (typeof leader.Person.FaceFocus === 'string') {
+                    faceFocus = leader.Person.FaceFocus.trim();
+                }
+            }
+
+            // Extract zoom/scale level for zooming into head and shoulders
+            // Supports: ZoomLevel, Scale, PhotoZoom, ImageScale, etc.
+            let zoomLevel = 1;
+            const zoomCandidates = [leader.ZoomLevel, leader.Scale, leader.PhotoZoom, leader.ImageScale];
+            for (const candidate of zoomCandidates) {
+                if (candidate) {
+                    const parsed = parseFloat(candidate);
+                    if (!isNaN(parsed) && parsed > 0) {
+                        zoomLevel = parsed;
+                        break;
+                    }
+                }
+            }
+            
+            return {
+                id: leader.ID,
+                centerIds: leader['Center#Id'] || [],
+                roleType: leader.RoleType?.Value || '',
+                positionTitle: getVal(leader.PositionTitle),
+                alternateName: getVal(leader.AlternateName),
+                biography: getVal(leader.Biography),
+                // Normalized face focus for smart crop feature
+                faceFocus: faceFocus,
+                // Zoom level for square image cropping (1 = full image, 1.5+ = zoomed in)
+                zoomLevel: zoomLevel,
+                // Top-level image fields (many naming variants) to allow templates to prefer leader.imageURL
+                imageURL: leader.ImageURL || leader.ImageUrl || leader.Image || leader.Photo || leader.PhotoURL || leader.Picture || null,
+                // Preserve person object (if present)
+                person: leader.Person ? {
+                    name: leader.Person.DisplayName,
+                    email: leader.Person.Email,
+                    picture: leader.Person.Picture || null,
+                    department: leader.Person.Department,
+                    title: leader.Person.JobTitle
+                } : null
+            };
+        });
     }
 
     /**
@@ -602,8 +726,8 @@ class RSYCDataLoader {
             const normalized = raw.toString().trim().replace(/^(?:bi\s+)+/i, '');
             return {
                 id: facility.ID,
-                name: facility.Title,
-                description: facility.Description,
+                name: getVal(facility.Title),
+                description: getVal(facility.Description),
                 iconClass: normalized
             };
         });
@@ -618,9 +742,9 @@ class RSYCDataLoader {
             const normalized = raw.toString().trim().replace(/^(?:bi\s+)+/i, '');
             return {
                 id: program.ID,
-                name: program.Title,
+                name: getVal(program.Title),
                 category: program.Category?.Value || '',
-                description: program.Description,
+                description: getVal(program.Description),
                 iconClass: normalized
             };
         });

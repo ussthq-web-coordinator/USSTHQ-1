@@ -1,14 +1,16 @@
 <!-- 
    ========================================
    RSYC CUSTOM STYLES - MASTER FILE
-   Version: 1.0.2
-   Last Updated: 2025-11-15
+   Version: 1.0.4
+   Last Updated: 2026-02-09
    
    This file contains ALL custom CSS for RSYC profiles.
    Copy this ENTIRE file to CMS when updated.
    ======================================== 
 
    CHANGE LOG:
+   2026-02-09 - Version 1.0.4 - Restored align-items-stretch to keep hover card and image heights matched on desktop
+   2026-02-09 - Version 1.0.3 - Updated images to be square and stack on tablets (changed md to lg breakpoints)
    2025-11-15 - Version 1.0.2 - Updated with verified production code (removed Symphony link, fixed btn-outline-primary hover)
    2025-11-15 - Version 1.0.1 - FIXED: Added missing modal JavaScript (showRSYCModal, closeRSYCModal)
    2025-11-15 - Version 1.0.0 - Organized and documented existing styles
@@ -274,8 +276,10 @@ strong {
   overflow: hidden;
   border: 1px solid #dee2e6;
   display: flex;
-  flex: 1 1 auto;
-  height: 100%;
+  aspect-ratio: 1 / 1;
+  width: 100%;
+  height: 100%; /* Stretch to match hover-card height */
+  min-height: 0;
 }
 .photo-card img {
   width: 100%;
@@ -284,8 +288,8 @@ strong {
   border-radius: 1rem;
 }
 
-.row.align-items-stretch > .col-md-5,
-.row.align-items-stretch > .col-md-7 {
+.row.align-items-stretch > .col-lg-5,
+.row.align-items-stretch > .col-lg-7 {
   display: flex;
   flex-direction: column;
   margin: 0; /* ensure no extra space */

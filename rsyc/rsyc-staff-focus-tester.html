@@ -1,0 +1,828 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RSYC Staff Face Focus Tester</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: #f8f9fa;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+        }
+
+        .page-header {
+            background: linear-gradient(135deg, #20B3A8 0%, #158f85 100%);
+            color: white;
+            padding: 30px 0;
+            margin-bottom: 30px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+
+        .page-header h1 {
+            font-size: 28px;
+            font-weight: 700;
+            margin: 0;
+        }
+
+        .page-header .subtitle {
+            font-size: 14px;
+            opacity: 0.9;
+            margin-top: 8px;
+        }
+
+        .controls-bar {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 30px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .controls-bar label {
+            margin: 0;
+            font-weight: 600;
+            font-size: 13px;
+            color: #333;
+        }
+
+        .controls-bar select,
+        .controls-bar input {
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 13px;
+        }
+
+        .status-text {
+            font-size: 13px;
+            color: #666;
+            margin-left: auto;
+        }
+
+        .staff-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+            gap: 25px;
+            margin-bottom: 40px;
+        }
+
+        .staff-card {
+            background: white;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            transition: box-shadow 0.3s ease;
+            display: flex;
+            flex-direction: column;
+            border: 1px solid #dee2e6;
+            width: 280px;
+        }
+
+        .staff-card:hover {
+            box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+        }
+
+        .staff-photo {
+            width: 100%;
+            height: 250px;
+            object-fit: cover;
+            display: block;
+        }
+
+        .staff-card-body {
+            padding: 16px;
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .staff-name {
+            font-weight: 700;
+            margin-bottom: 4px;
+            line-height: 1.3;
+            font-size: 1.1rem;
+        }
+
+        .staff-role {
+            color: #6c757d;
+            margin-bottom: 8px;
+            font-size: 0.95rem;
+        }
+
+        .staff-center {
+            font-size: 12px;
+            color: #999;
+            margin-bottom: 12px;
+        }
+
+        .face-focus-controls {
+            border-top: 1px solid #eee;
+            padding-top: 12px;
+            margin-top: 12px;
+        }
+
+        .control-section {
+            margin-bottom: 12px;
+        }
+
+        .control-section:last-child {
+            margin-bottom: 0;
+        }
+
+        .focus-label {
+            font-size: 11px;
+            font-weight: 600;
+            color: #555;
+            text-transform: uppercase;
+            margin-bottom: 8px;
+            display: block;
+        }
+
+        .zoom-control {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+
+        .zoom-slider {
+            flex-grow: 1;
+            height: 4px;
+            border-radius: 2px;
+            background: #ddd;
+            outline: none;
+            -webkit-appearance: none;
+            appearance: none;
+        }
+
+        .zoom-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            background: #20B3A8;
+            cursor: pointer;
+            transition: background 0.2s ease;
+        }
+
+        .zoom-slider::-webkit-slider-thumb:hover {
+            background: #158f85;
+        }
+
+        .zoom-slider::-moz-range-thumb {
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            background: #20B3A8;
+            cursor: pointer;
+            border: none;
+            transition: background 0.2s ease;
+        }
+
+        .zoom-slider::-moz-range-thumb:hover {
+            background: #158f85;
+        }
+
+        .zoom-value {
+            font-size: 11px;
+            color: #666;
+            min-width: 28px;
+            text-align: right;
+        }
+
+        .preset-buttons {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 6px;
+            margin-bottom: 8px;
+        }
+
+        .preset-btn {
+            padding: 6px 10px;
+            font-size: 11px;
+            border: 1px solid #ddd;
+            background: white;
+            color: #333;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .preset-btn:hover {
+            border-color: #20B3A8;
+            background: #f0fffe;
+            color: #20B3A8;
+        }
+
+        .preset-btn.active {
+            background: #20B3A8;
+            color: white;
+            border-color: #20B3A8;
+        }
+
+        .custom-input-group {
+            display: flex;
+            gap: 6px;
+            margin-bottom: 8px;
+        }
+
+        .custom-input-group input {
+            flex-grow: 1;
+            padding: 6px 8px;
+            font-size: 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-family: monospace;
+        }
+
+        .custom-input-group button {
+            padding: 6px 10px;
+            font-size: 11px;
+            background: #20B3A8;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background 0.2s ease;
+        }
+
+        .custom-input-group button:hover {
+            background: #158f85;
+        }
+
+        .current-focus {
+            font-size: 12px;
+            color: #333;
+            background: #f5f5f5;
+            padding: 8px;
+            border-radius: 4px;
+            font-family: monospace;
+            word-break: break-all;
+            margin-bottom: 8px;
+        }
+
+        .copy-btn {
+            padding: 4px 8px;
+            font-size: 10px;
+            background: #e9ecef;
+            color: #333;
+            border: 1px solid #dee2e6;
+            border-radius: 3px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .copy-btn:hover {
+            background: #dee2e6;
+            border-color: #adb5bd;
+        }
+
+        .copy-btn.copied {
+            background: #28a745;
+            color: white;
+            border-color: #28a745;
+        }
+
+        .no-data {
+            text-align: center;
+            padding: 60px 20px;
+            color: #666;
+        }
+
+        .no-data i {
+            font-size: 48px;
+            color: #ccc;
+            display: block;
+            margin-bottom: 15px;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+
+        .loading i {
+            font-size: 32px;
+            animation: spin 1s linear infinite;
+            display: inline-block;
+            margin-right: 10px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .export-section {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 30px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+
+        .export-section h3 {
+            font-size: 16px;
+            font-weight: 700;
+            margin-bottom: 12px;
+            color: #111;
+        }
+
+        .export-textarea {
+            width: 100%;
+            height: 200px;
+            padding: 12px;
+            font-family: monospace;
+            font-size: 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            resize: vertical;
+        }
+
+        .preset-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 8px;
+        }
+
+        @media (max-width: 768px) {
+            .staff-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .preset-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+
+            .controls-bar {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .status-text {
+                margin-left: 0;
+                margin-top: 10px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <div class="page-header">
+        <div class="container">
+            <h1><i class="bi bi-person-circle"></i> Staff Face Focus Tester</h1>
+            <div class="subtitle">Test and configure face focus cropping for all staff members</div>
+        </div>
+    </div>
+
+    <div class="container">
+        <!-- Controls -->
+        <div class="controls-bar">
+            <label for="centerFilter">Filter by Center:</label>
+            <select id="centerFilter">
+                <option value="">All Centers</option>
+            </select>
+
+            <label for="roleFilter" style="margin-left: 20px;">Filter by Role:</label>
+            <select id="roleFilter">
+                <option value="">All Roles</option>
+            </select>
+
+            <div class="status-text">
+                Showing <strong id="staffCount">0</strong> staff members
+            </div>
+        </div>
+
+        <!-- Staff Grid -->
+        <div id="staffGrid" class="staff-grid">
+            <div class="loading">
+                <i class="bi bi-hourglass-split"></i>
+                <p>Loading staff data...</p>
+            </div>
+        </div>
+
+        <!-- Export Section -->
+        <div class="export-section" id="exportSection" style="display:none;">
+            <h3><i class="bi bi-download"></i> Export Face Focus Configuration</h3>
+            <p style="font-size: 13px; color: #666; margin-bottom: 12px;">
+                Copy the JSON below to update your RSYCLeaders.json file with the face focus values you selected:
+            </p>
+            <textarea class="export-textarea" id="exportJSON" readonly></textarea>
+            <button class="btn btn-sm btn-primary mt-3" id="copyExportBtn">
+                <i class="bi bi-clipboard"></i> Copy JSON
+            </button>
+            <button class="btn btn-sm btn-secondary mt-3" id="downloadExportBtn">
+                <i class="bi bi-download"></i> Download JSON
+            </button>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="rsyc-data.js"></script>
+    <script>
+        // Face focus presets (same as in dropdown options)
+        const FACE_FOCUS_PRESETS = [
+            'center center',
+            'center 15%',
+            'center 25%',
+            'center 33%',
+            'center 35%',
+            'center 40%',
+            'center 50%',
+            '40% center',
+            '60% center',
+            '40% 30%',
+            '60% 30%',
+            '40% 65%',
+            '60% 65%',
+            'left center',
+            'right center',
+            'top center'
+        ];
+
+        let allLeaders = [];
+        let selectedFocusValues = {}; // Store selected focus values by leader ID
+        let selectedZoomValues = {}; // Store selected zoom values by leader ID
+
+        // Load data and initialize
+        async function init() {
+            try {
+                // Load data
+                await window.rsycData.loadAll();
+                
+                const data = window.rsycData.cache;
+                allLeaders = data.leaders || [];
+
+                // Populate filters
+                populateFilters();
+
+                // Render staff
+                renderStaff(allLeaders);
+
+                // Show export section
+                document.getElementById('exportSection').style.display = 'block';
+            } catch (error) {
+                console.error('Failed to load data:', error);
+                document.getElementById('staffGrid').innerHTML = `
+                    <div class="no-data">
+                        <i class="bi bi-exclamation-triangle"></i>
+                        <p>Failed to load staff data</p>
+                        <p style="font-size: 12px; color: #999;">${error.message}</p>
+                    </div>
+                `;
+            }
+        }
+
+        function populateFilters() {
+            const centers = new Map();
+            const roles = new Set();
+
+            allLeaders.forEach(leader => {
+                leader.centerIds?.forEach(centerId => {
+                    const center = window.rsycData.getCenter(centerId);
+                    if (center) {
+                        centers.set(centerId, center.name);
+                    }
+                });
+
+                if (leader.roleType) {
+                    roles.add(leader.roleType);
+                }
+            });
+
+            // Populate center dropdown
+            const centerSelect = document.getElementById('centerFilter');
+            Array.from(centers.entries())
+                .sort((a, b) => a[1].localeCompare(b[1]))
+                .forEach(([id, name]) => {
+                    const option = document.createElement('option');
+                    option.value = id;
+                    option.textContent = name;
+                    centerSelect.appendChild(option);
+                });
+
+            // Populate role dropdown
+            const roleSelect = document.getElementById('roleFilter');
+            Array.from(roles)
+                .sort()
+                .forEach(role => {
+                    const option = document.createElement('option');
+                    option.value = role;
+                    option.textContent = role;
+                    roleSelect.appendChild(option);
+                });
+
+            // Add event listeners
+            centerSelect.addEventListener('change', filterStaff);
+            roleSelect.addEventListener('change', filterStaff);
+        }
+
+        function filterStaff() {
+            const centerFilter = document.getElementById('centerFilter').value;
+            const roleFilter = document.getElementById('roleFilter').value;
+
+            const filtered = allLeaders.filter(leader => {
+                const matchesCenter = !centerFilter || leader.centerIds?.includes(parseInt(centerFilter));
+                const matchesRole = !roleFilter || leader.roleType === roleFilter;
+                return matchesCenter && matchesRole;
+            });
+
+            renderStaff(filtered);
+        }
+
+        function renderStaff(leaders) {
+            const grid = document.getElementById('staffGrid');
+            document.getElementById('staffCount').textContent = leaders.length;
+
+            if (leaders.length === 0) {
+                grid.innerHTML = `
+                    <div class="no-data">
+                        <i class="bi bi-inbox"></i>
+                        <p>No staff members found</p>
+                    </div>
+                `;
+                return;
+            }
+
+            grid.innerHTML = leaders.map(leader => createStaffCard(leader)).join('');
+
+            // Attach event listeners to newly created elements
+            leaders.forEach(leader => {
+                attachCardEvents(leader.id);
+            });
+        }
+
+        function createStaffCard(leader) {
+            const center = leader.centerIds?.[0] ? window.rsycData.getCenter(leader.centerIds[0]) : null;
+            const centerName = center?.name || 'Unknown Center';
+            
+            const displayName = leader.person?.name || leader.alternateName || 'Unknown';
+            const role = leader.positionTitle || leader.roleType || 'Role';
+            const bio = 'Adjust the face focus and zoom level to frame head and shoulders perfectly.';
+            const photo = leader.imageURL || 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="280" height="280"%3E%3Crect fill="%23e9ecef" width="280" height="280"/%3E%3C/svg%3E';
+            
+            const currentFocus = selectedFocusValues[leader.id] || leader.faceFocus || 'top center';
+            const currentZoom = selectedZoomValues[leader.id] || 1;
+            const scaleStyle = currentZoom !== 1 ? `transform:scale(${currentZoom});` : '';
+
+            return `
+                <div class="staff-card">
+                    <div style="width:100%; aspect-ratio:1/1; overflow:hidden; background:#f0f0f0;">
+                        <img class="staff-photo" 
+                             src="${photo}" 
+                             alt="${displayName}"
+                             style="width:100%; height:100%; object-fit:cover; object-position: ${currentFocus}; ${scaleStyle} display:block;"
+                             data-leader-id="${leader.id}">
+                    </div>
+                    <div class="staff-card-body">
+                        <div class="staff-name">${escapeHTML(displayName)}</div>
+                        <div class="staff-role">${escapeHTML(role)}</div>
+                        <div class="staff-center">${escapeHTML(centerName)}</div>
+                        <p class="card-text" style="flex-grow:1; font-size: 0.875rem; line-height: 1.5; margin-bottom: 0;">
+                            ${bio}
+                        </p>
+
+                        <div class="face-focus-controls">
+                            <!-- Zoom Level Control -->
+                            <div class="control-section">
+                                <label class="focus-label">Zoom Level</label>
+                                <div class="zoom-control">
+                                    <input type="range" 
+                                           min="1" 
+                                           max="2.5" 
+                                           step="0.1" 
+                                           value="${currentZoom}"
+                                           class="zoom-slider"
+                                           data-leader-id="${leader.id}">
+                                    <div class="zoom-value" id="zoomValue-${leader.id}">${currentZoom.toFixed(1)}x</div>
+                                </div>
+                            </div>
+
+                            <!-- Face Position Control -->
+                            <div class="control-section">
+                                <label class="focus-label">Face Position</label>
+                                
+                                <div class="current-focus" id="currentFocus-${leader.id}">
+                                    ${currentFocus}
+                                </div>
+
+                                <div class="preset-buttons">
+                                    ${FACE_FOCUS_PRESETS.map(preset => `
+                                        <button class="preset-btn" 
+                                                data-leader-id="${leader.id}"
+                                                data-value="${preset}"
+                                                ${currentFocus === preset ? 'aria-pressed="true"' : ''}>
+                                            ${preset}
+                                        </button>
+                                    `).join('')}
+                                </div>
+
+                                <div class="custom-input-group">
+                                    <input type="text" 
+                                           placeholder="Custom: e.g., 50% 40%"
+                                           data-leader-id="${leader.id}"
+                                           class="custom-focus-input">
+                                    <button class="custom-apply-btn" data-leader-id="${leader.id}">Apply</button>
+                                </div>
+
+                                <button class="copy-btn" id="copyBtn-${leader.id}" data-leader-id="${leader.id}" title="Copy focus value">
+                                    <i class="bi bi-clipboard"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function attachCardEvents(leaderId) {
+            // Zoom slider
+            const zoomSlider = document.querySelector(`input[data-leader-id="${leaderId}"].zoom-slider`);
+            if (zoomSlider) {
+                zoomSlider.addEventListener('input', (e) => {
+                    const zoomValue = parseFloat(e.target.value);
+                    setZoom(leaderId, zoomValue);
+                });
+            }
+
+            // Preset buttons
+            document.querySelectorAll(`button[data-leader-id="${leaderId}"][data-value]`).forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    const value = btn.getAttribute('data-value');
+                    setFaceFocus(leaderId, value);
+                });
+            });
+
+            // Custom input
+            const customInput = document.querySelector(`input[data-leader-id="${leaderId}"].custom-focus-input`);
+            const applyBtn = document.querySelector(`button[data-leader-id="${leaderId}"].custom-apply-btn`);
+            
+            if (applyBtn) {
+                applyBtn.addEventListener('click', () => {
+                    if (customInput.value.trim()) {
+                        setFaceFocus(leaderId, customInput.value.trim());
+                    }
+                });
+            }
+
+            if (customInput) {
+                customInput.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter' && customInput.value.trim()) {
+                        setFaceFocus(leaderId, customInput.value.trim());
+                    }
+                });
+            }
+
+            // Copy button
+            const copyBtn = document.getElementById(`copyBtn-${leaderId}`);
+            if (copyBtn) {
+                copyBtn.addEventListener('click', () => {
+                    const value = selectedFocusValues[leaderId] || 'top center';
+                    navigator.clipboard.writeText(value).then(() => {
+                        copyBtn.classList.add('copied');
+                        copyBtn.textContent = '✓ Copied';
+                        setTimeout(() => {
+                            copyBtn.classList.remove('copied');
+                            copyBtn.innerHTML = '<i class="bi bi-clipboard"></i>';
+                        }, 2000);
+                    });
+                });
+            }
+        }
+
+        function setFaceFocus(leaderId, value) {
+            selectedFocusValues[leaderId] = value;
+            updatePhoto(leaderId);
+
+            // Update current focus display
+            const focusDisplay = document.getElementById(`currentFocus-${leaderId}`);
+            if (focusDisplay) {
+                focusDisplay.textContent = value;
+            }
+
+            // Update preset button states
+            document.querySelectorAll(`button[data-leader-id="${leaderId}"][data-value]`).forEach(btn => {
+                if (btn.getAttribute('data-value') === value) {
+                    btn.classList.add('active');
+                } else {
+                    btn.classList.remove('active');
+                }
+            });
+
+            // Clear custom input
+            const customInput = document.querySelector(`input[data-leader-id="${leaderId}"].custom-focus-input`);
+            if (customInput) {
+                customInput.value = '';
+            }
+
+            // Update export
+            updateExport();
+        }
+
+        function setZoom(leaderId, zoomValue) {
+            selectedZoomValues[leaderId] = zoomValue;
+            const zoomDisplay = document.getElementById(`zoomValue-${leaderId}`);
+            if (zoomDisplay) {
+                zoomDisplay.textContent = zoomValue.toFixed(1) + 'x';
+            }
+            updatePhoto(leaderId);
+            updateExport();
+        }
+
+        function updatePhoto(leaderId) {
+            const photo = document.querySelector(`img[data-leader-id="${leaderId}"]`);
+            if (!photo) return;
+            
+            const faceFocus = selectedFocusValues[leaderId] || 'top center';
+            const zoomLevel = selectedZoomValues[leaderId] || 1;
+            
+            photo.style.objectPosition = faceFocus;
+            if (zoomLevel !== 1) {
+                photo.style.transform = `scale(${zoomLevel})`;
+            } else {
+                photo.style.transform = '';
+            }
+        }
+
+        function updateExport() {
+            const leaderIds = Object.keys(selectedFocusValues);
+            if (leaderIds.length === 0) {
+                document.getElementById('exportJSON').value = '// No settings configured yet';
+                return;
+            }
+
+            const updates = {};
+            leaderIds.forEach(leaderId => {
+                const leader = allLeaders.find(l => l.id == leaderId);
+                if (leader) {
+                    const displayName = leader.person?.name || leader.alternateName || `Leader ${leaderId}`;
+                    updates[leaderId] = {
+                        name: displayName,
+                        FaceFocus: selectedFocusValues[leaderId],
+                        ZoomLevel: selectedZoomValues[leaderId] || 1
+                    };
+                }
+            });
+
+            const json = JSON.stringify(updates, null, 2);
+            document.getElementById('exportJSON').value = json;
+        }
+
+        function escapeHTML(text) {
+            const map = {
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                '"': '&quot;',
+                "'": '&#039;'
+            };
+            return text.replace(/[&<>"']/g, m => map[m]);
+        }
+
+        // Export buttons
+        document.getElementById('copyExportBtn').addEventListener('click', () => {
+            const textarea = document.getElementById('exportJSON');
+            navigator.clipboard.writeText(textarea.value).then(() => {
+                const btn = document.getElementById('copyExportBtn');
+                const originalText = btn.innerHTML;
+                btn.innerHTML = '<i class="bi bi-check-circle"></i> Copied!';
+                btn.classList.add('active');
+                setTimeout(() => {
+                    btn.innerHTML = originalText;
+                    btn.classList.remove('active');
+                }, 2000);
+            });
+        });
+
+        document.getElementById('downloadExportBtn').addEventListener('click', () => {
+            const textarea = document.getElementById('exportJSON');
+            const element = document.createElement('a');
+            element.setAttribute('href', 'data:application/json;charset=utf-8,' + encodeURIComponent(textarea.value));
+            element.setAttribute('download', 'face-focus-config.json');
+            element.style.display = 'none';
+            document.body.appendChild(element);
+            element.click();
+            document.body.removeChild(element);
+        });
+
+        // Initialize on page load
+        init();
+    </script>
+</body>
+</html>

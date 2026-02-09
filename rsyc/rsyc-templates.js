@@ -16,9 +16,11 @@ class RSYCTemplates {
             // Staff immediately after Featured Programs
             'staff': { name: 'Staff & Leadership', enabled: true, order: 7 },
             'nearby': { name: 'Nearby Centers', enabled: true, order: 8 },
-            'volunteer': { name: 'Volunteer Opportunities', enabled: true, order: 9 },
-            'footerPhoto': { name: 'Footer Photo', enabled: true, order: 10 },
-            'contact': { name: 'Contact & Donate', enabled: true, order: 11 }
+            'parents': { name: 'For Parents', enabled: true, order: 9 },
+            'youth': { name: 'For Youth', enabled: true, order: 10 },
+            'volunteer': { name: 'Volunteer Opportunities', enabled: true, order: 11 },
+            'footerPhoto': { name: 'Footer Photo', enabled: true, order: 12 },
+            'contact': { name: 'Contact & Donate', enabled: true, order: 13 }
         };
     }
 
@@ -105,8 +107,10 @@ class RSYCTemplates {
      */
     generatePrograms(data) {
         const { programDetails, photos, center } = data;
-        // Always show section, even if empty
         const hasPrograms = programDetails && programDetails.length > 0;
+
+        // Hide section if no programs provided
+        if (!hasPrograms) return '';
 
         // Get programs photo from photos array, fallback to default
         const photoData = photos && photos.length > 0 ? photos[0] : null;
@@ -169,8 +173,8 @@ class RSYCTemplates {
             <div class="container my-5">
                 <div class="row align-items-stretch">
                     <!-- Left block: Photo (5 columns) -->
-                    <div class="col-md-5 d-flex">
-                        <div class="photo-card w-100 h-100 flex-fill" style="aspect-ratio: 1 / 1;">
+                    <div class="col-lg-5 d-flex">
+                        <div class="photo-card w-100 h-100 flex-fill" style="aspect-ratio: 1 / 1; min-width: 100%; min-height: auto;">
                             ${programPhoto ? `
                             <img alt="Program Photo" 
                                  class="img-fluid w-100 h-100" 
@@ -185,7 +189,7 @@ class RSYCTemplates {
                     </div>
                     
                     <!-- Right block: Featured Programs (7 columns) -->
-                    <div class="col-md-7 d-flex">
+                    <div class="col-lg-7 d-flex">
                         <div class="hover-card w-100 d-flex flex-column flex-fill">
                             <i class="bi bi-award icon-lg"></i>
                             <h2 class="fw-bold mb-4">Featured <em>Programs</em></h2>
@@ -373,9 +377,12 @@ ${modal}`;
 <!-- Modal for Schedule Details -->
 <div id="rsyc-modal-schedule-${schedule.id}" class="rsyc-modal" style="display:none;">
     <div class="rsyc-modal-content">
-        <div class="rsyc-modal-header">
-            <h3>${this.escapeHTML(schedule.title)}</h3>
-            <button class="rsyc-modal-close" onclick="closeRSYCModal('schedule-${schedule.id}')">&times;</button>
+        <div class="rsyc-modal-header" style="display:flex; justify-content:space-between; align-items:center;">
+            <h3>What's Happening</h3>
+            <div style="display:flex; gap:0.5rem; align-items:center;">
+                <button class="rsyc-modal-print" onclick="printRSYCModal('schedule-${schedule.id}')" style="background:none; border:none; cursor:pointer; font-size:1.2rem; padding:0.5rem; color:#333;" title="Print"><i class="bi bi-printer"></i></button>
+                <button class="rsyc-modal-close" onclick="closeRSYCModal('schedule-${schedule.id}')">&times;</button>
+            </div>
         </div>
         <div class="rsyc-modal-body" style="color:#333;">
             ${schedule.videoEmbedCode ? `
@@ -385,7 +392,12 @@ ${modal}`;
                     </div>
                 </div>
             ` : ''}
-            ${schedule.description ? `<div class="mb-4"><div style="font-size:1rem; line-height:1.6; color:#333;">${schedule.description}</div></div>` : ''}
+            ${schedule.centerName ? `<div class="mb-3" style="font-size:1.1rem; font-weight:600; color:#0C0C0C;"><strong>The Salvation Army ${this.escapeHTML(center.name || center.Title)}</strong></div>` : ''}
+            ${schedule.title ? `<h3 class="mb-2" style="color:#333;">${this.escapeHTML(schedule.title)}</h3>` : ''}
+            ${schedule.subtitle ? `<p class="mb-3" style="color:#666; font-style:italic;">${this.escapeHTML(schedule.subtitle)}</p>` : ''}
+            ${schedule.description ? `<p class="mb-1">${schedule.description}</p>` : ''}
+            
+            ${hasContent(schedule.scheduleDisclaimer) ? `<div class="mb-4" style="background:#fff3cd; padding:1rem; border-radius:6px; border-left:3px solid #ff6b6b; color:#000;"><strong style="color:#000;"><i class="bi bi-exclamation-triangle me-2"></i>Important Dates/Closures:</strong><br><div class="mt-2" style="font-size:0.95rem;">${this.escapeHTML(schedule.scheduleDisclaimer)}</div></div>` : ''}
             
             <div class="row">
                 ${hasContent(schedule.ageRange) ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Age Range:</strong><br>${this.escapeHTML(schedule.ageRange)}</div>` : ''}
@@ -400,22 +412,60 @@ ${modal}`;
                 ${hasContent(schedule.cost) ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Cost:</strong><br>${this.escapeHTML(schedule.cost)}</div>` : ''}
                 ${hasContent(schedule.location) ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Location:</strong><br>${this.escapeHTML(schedule.location)}</div>` : ''}
                 ${hasContent(schedule.capacity) ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Capacity:</strong><br>${this.escapeHTML(schedule.capacity)}</div>` : ''}
-                ${hasContent(schedule.contactInfo) ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Contact:</strong><br>${this.escapeHTML(schedule.contactInfo)}</div>` : ''}
-                ${hasContent(schedule.prerequisites) ? `<div class="col-sm-12 mb-3" style="color:#333;"><strong>Prerequisites:</strong><br>${this.escapeHTML(schedule.prerequisites)}</div>` : ''}
-                ${hasContent(schedule.materialsProvided) ? `<div class="col-sm-12 mb-3" style="color:#333;"><strong>Materials Provided:</strong><br>${this.escapeHTML(schedule.materialsProvided)}</div>` : ''}
-                ${hasContent(schedule.whatToBring) ? `<div class="col-sm-12 mb-3" style="color:#333;"><strong>What to Bring:</strong><br>${this.escapeHTML(schedule.whatToBring)}</div>` : ''}
-                ${hasContent(schedule.dropOffPickUp) ? `<div class="col-sm-12 mb-3" style="color:#333;"><strong>Drop-off/Pick-up Info:</strong><br>${this.escapeHTML(schedule.dropOffPickUp)}</div>` : ''}
+                
+                ${hasContent(schedule.agesServed?.join(', ')) ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Ages:</strong><br>${this.escapeHTML(schedule.agesServed.join(', '))}</div>` : ''}
+                ${hasContent(schedule.startDate) || hasContent(schedule.endDate) ? `<div class="col-sm-12 mb-3" style="color:#333;"><strong>Program Dates:</strong><br>${hasContent(schedule.startDate) ? this.escapeHTML(schedule.startDate) : ''} ${hasContent(schedule.startDate) && hasContent(schedule.endDate) ? '-' : ''} ${hasContent(schedule.endDate) ? this.escapeHTML(schedule.endDate) : ''}</div>` : ''}
+                
+                ${hasContent(schedule.transportationFeeandDetails) ? `<div class="col-sm-12 mb-3" style="color:#333;"><strong>Transportation:</strong><br>${this.preserveLineBreaks(schedule.transportationFeeandDetails)}</div>` : ''}
+                
+                ${hasContent(schedule.closedDates) ? `<div class="col-sm-12 mb-3" style="background:#ffe6e6; padding:1rem; border-radius:6px; border-left:3px solid #dc3545; color:#333;"><strong style="color:#dc3545;"><i class="bi bi-calendar-x me-2"></i>Closed Dates:</strong><br>${this.preserveLineBreaks(schedule.closedDates)}</div>` : ''}
+                ${hasContent(schedule.openHalfDayDates) ? `<div class="col-sm-12 mb-3" style="color:#333;"><strong>Open Half Days:</strong><br>${this.preserveLineBreaks(schedule.openHalfDayDates)}</div>` : ''}
+                ${hasContent(schedule.openFullDayDates) ? `<div class="col-sm-12 mb-3" style="color:#333;"><strong>Open Full Days:</strong><br>${this.preserveLineBreaks(schedule.openFullDayDates)}</div>` : ''}
+                
+                ${hasContent(schedule.orientationDetails) ? `
+                <div class="col-sm-12 mb-3" style="background:#fffacd; padding:1rem; border-radius:6px; border-left:3px solid #ff8c00; color:#333;">
+                    <strong style="color:#000;"><i class="bi bi-info-circle me-2"></i>Orientation Details:</strong>
+                    <div class="mt-2" style="font-size:0.95rem; color:#000;">${this.preserveLineBreaks(schedule.orientationDetails)}</div>
+                </div>
+                ` : ''}
+                
+                ${hasContent(schedule.whatToBring) || hasContent(schedule.materialsProvided) ? `
+                <div class="col-sm-12 mb-3" style="background:#f0f8ff; padding:1rem; border-radius:6px; border-left:3px solid #4169e1; color:#333;">
+                    <strong style="color:#4169e1;"><i class="bi bi-backpack2 me-2"></i>Preparation:</strong>
+                    ${hasContent(schedule.whatToBring) ? `<div class="mt-2"><u>What to Bring:</u><br>${this.preserveLineBreaks(schedule.whatToBring)}</div>` : ''}
+                    ${hasContent(schedule.materialsProvided) ? `<div class="mt-2"><u>Materials Provided:</u><br>${this.preserveLineBreaks(schedule.materialsProvided)}</div>` : ''}
+                </div>
+                ` : ''}
+                
+                ${hasContent(schedule.prerequisites) ? `<div class="col-sm-12 mb-3" style="color:#333;"><strong>Prerequisites:</strong><br>${this.preserveLineBreaks(schedule.prerequisites)}</div>` : ''}
+                ${hasContent(schedule.dropOffPickUp) ? `<div class="col-sm-12 mb-3" style="color:#333;"><strong>Drop-off/Pick-up Info:</strong><br>${this.preserveLineBreaks(schedule.dropOffPickUp)}</div>` : ''}
             </div>
             
-            ${hasContent(disclaimer) ? `<div class="mt-3 p-3" style="background:#f8f9fa; border-left:3px solid #2F4857; border-radius:4px; color:#333;">${this.escapeHTML(disclaimer)}</div>` : ''}
+            ${(schedule.contacts && schedule.contacts.length > 0) || hasContent(schedule.contactInfo) ? `
+            <div class="col-sm-12 mb-3">
+                <div class="p-3" style="background:#f0f7f7; border-radius:10px; border:1px solid #d1e7e7; color:#333;">
+                    <strong style="color:#20B3A8; text-transform:uppercase; font-size:1.5rem; letter-spacing:0.05rem; display:block; margin-bottom:0.5rem;">Point${schedule.contacts && schedule.contacts.length > 1 ? 's' : ''} of Contact</strong>
+                    ${schedule.contacts && schedule.contacts.length > 0 ? schedule.contacts.map((contact, idx) => `
+                        <div${idx > 0 ? ` style="margin-top:1rem; padding-top:1rem; border-top:1px solid rgba(32,179,168,0.15);"` : ''}>
+                            ${hasContent(contact.name) ? `<div style="font-weight:700; font-size:1.5rem;">${this.escapeHTML(contact.name)}</div>` : ''}
+                            ${hasContent(contact.jobTitle) ? `<div class="small text-muted" style="font-weight:500;">${this.escapeHTML(contact.jobTitle)}</div>` : ''}
+                            ${hasContent(contact.email) ? `<div class="mt-2"><a href="mailto:${this.escapeHTML(contact.email)}" style="color:#2F4857; text-decoration:none; font-weight:400;"><i class="bi bi-envelope-at me-2"></i>${this.escapeHTML(contact.email)}</a></div>` : ''}
+                        </div>
+                    `).join('') : ''}
+                    ${hasContent(schedule.contactInfo) ? `<div class="mt-2 pt-2 border-top" style="font-size:0.9rem; border-top-color:rgba(32,179,168,0.2) !important;">${this.escapeHTML(schedule.contactInfo)}</div>` : ''}
+                </div>
+            </div>
+            ` : ''}
             
-            ${schedule.relatedPrograms?.length > 0 ? `
-                <div class="mt-3" style="color:#333;">
-                    <strong>Related Programs:</strong>
-                    <div class="mt-2">
-                        ${schedule.relatedPrograms.map(p => `<span class="badge bg-secondary me-1">${this.escapeHTML(p.name)}</span>`).join('')}
+            ${(schedule.relatedPrograms && Array.isArray(schedule.relatedPrograms) && schedule.relatedPrograms.length > 0) ? `
+            <div class="col-sm-12 mb-3">
+                <div style="background:#f5f5f5; padding:1rem; border-radius:6px; color:#333;">
+                    <strong style="color:#333; font-size:1.1rem; display:block; margin-bottom:0.75rem;"><i class="bi bi-link me-2" style="color:#20B3A8;"></i>Related Programs</strong>
+                    <div class="d-flex flex-wrap gap-2">
+                        ${schedule.relatedPrograms.map(p => `<span class="badge bg-primary">${this.escapeHTML(p.name)}</span>`).join('')}
                     </div>
                 </div>
+            </div>
             ` : ''}
         </div>
     </div>
@@ -427,15 +477,20 @@ ${modal}`;
                 let activeHTML = months ? this.formatActiveForDisplay(months) : '';
 
                 return `
-                    <div class="schedule-card text-dark d-flex flex-column h-100" style="min-width:230px;padding:1rem;border-radius:8px;background:#fff;box-shadow:0 1px 4px rgba(0,0,0,0.06);">
-                        <h5 class="fw-bold mb-1">${this.escapeHTML(schedule.title)}</h5>
-                        ${schedule.subtitle ? `<div class="text-muted small mb-1">${this.escapeHTML(schedule.subtitle)}</div>` : ''}
-                        <p class="mb-0">
-                            ${daysText ? `<strong>Days:</strong> <span class="d-inline-block">${this.escapeHTML(daysText)}</span><br>` : ''}
-                            ${timeText ? `<strong>Time:</strong> ${this.escapeHTML(timeText)}<br>` : ''}
-                            ${activeHTML}
-                        </p>
-                        ${expandableInfo}
+                    <div class="schedule-card text-dark" style="min-width:230px;padding:1rem;border-radius:8px;background:#fff;box-shadow:0 1px 4px rgba(0,0,0,0.06);display:flex;flex-direction:column;height:100%;gap:0.75rem;">
+                        <div style="flex-shrink:0;">
+                            <h5 class="fw-bold mb-1">${this.escapeHTML(schedule.title)}</h5>
+                            ${schedule.subtitle ? `<div class="text-muted small">${this.escapeHTML(schedule.subtitle)}</div>` : ''}
+                        </div>
+                        <div style="flex-grow:1;display:flex;flex-direction:column;">
+                            <p class="mb-0">
+                                ${daysText ? `<strong>Days:</strong> <span class="d-inline-block">${this.escapeHTML(daysText)}</span><br>` : ''}
+                                ${timeText ? `<strong>Time:</strong> ${this.escapeHTML(timeText)}<br>` : ''}
+                            </p>
+                        </div>
+                        <div style="flex-shrink:0;">
+                            ${expandableInfo}
+                        </div>
                     </div>
                     ${scheduleModal}`;
             }).join('');
@@ -450,11 +505,31 @@ ${modal}`;
         </small>
     </p>` : '';
             
+            // Store schedules in global variable for printing
+            if (typeof window.RSYC_SCHEDULES === 'undefined') {
+                window.RSYC_SCHEDULES = {};
+            }
+            const schedulesCacheKey = `schedules_${center.id || 'default'}`;
+            const photoData = data.photos && data.photos.length > 0 ? data.photos[0] : null;
+            const exteriorPhoto = photoData?.urlExteriorPhoto || '';
+            window.RSYC_SCHEDULES[schedulesCacheKey] = {
+                centerName: center.name || center.Title,
+                aboutText: center.aboutText || '',
+                exteriorPhoto: exteriorPhoto,
+                schedules: sortedSchedules
+            };
+            
             scheduleScrollSection = `
     ${scrollHint}
 
     <div class="horizontal-scroll ${justifyContent}" style="display:flex;gap:1rem;overflow-x:auto;overflow-y:visible;padding-bottom:0.5rem;align-items:stretch;">
         ${scheduleCards}
+    </div>
+    
+    <div class="text-center mt-4" style="display:none;">
+        <button class="btn btn-outline-primary" onclick="printAllSchedules('${schedulesCacheKey}')">
+            <i class="bi bi-printer me-2"></i>Print All Schedules
+        </button>
     </div>`;
         }
         
@@ -768,8 +843,10 @@ ${summerSection}
      */
     generateFacilities(data) {
         const { center, facilityFeatures, photos } = data;
-        // Always show section, even if empty
         const hasFeatures = facilityFeatures && facilityFeatures.length > 0;
+
+        // Hide section if no features provided
+        if (!hasFeatures) return '';
 
         // Get facility photo from photos array, fallback to default
         const photoData = photos && photos.length > 0 ? photos[0] : null;
@@ -832,7 +909,7 @@ ${summerSection}
             <div class="container my-5">
                 <div class="row align-items-stretch">
                     <!-- Left block: Facility Features (7 columns) -->
-                    <div class="col-md-7 d-flex order-2 order-md-1">
+                    <div class="col-lg-7 d-flex order-2 order-lg-1">
                         <div class="hover-card p-4 flex-fill d-flex flex-column">
                             <i class="bi bi-building icon-lg mb-3"></i>
                             <h2 class="fw-bold mb-4">Facility <em>Features</em></h2>
@@ -845,8 +922,8 @@ ${summerSection}
                     </div>
 
                     <!-- Right block: Photo (5 columns) -->
-                    <div class="col-md-5 d-flex mt-4 mt-md-0 order-1 order-md-2">
-                        <div class="photo-card w-100 h-100" style="aspect-ratio: 1 / 1;">
+                    <div class="col-lg-5 d-flex mt-4 mt-lg-0 order-1 order-lg-2">
+                        <div class="photo-card w-100 h-100" style="aspect-ratio: 1 / 1; min-width: 100%; min-height: auto;">
                             ${facilityPhoto ? `
                             <img alt="Facility Exterior" 
                                  src="${this.escapeHTML(facilityPhoto)}" 
@@ -1000,9 +1077,17 @@ ${modal}`;
                 defaultPhoto
             );
 
+            // Smart crop: Use normalized faceFocus from data loader (extracts FaceFocus.Value from SharePoint)
+            const faceFocus = leader.faceFocus || 'top center';
+            const zoomLevel = leader.zoomLevel || 1;
+            const scaleStyle = zoomLevel !== 1 ? `transform:scale(${zoomLevel});` : '';
+            const objectPositionStyle = `object-position:${faceFocus};`;
+
             return `
 		<div class="card shadow border rounded-3 flex-shrink-0" style="width: 280px; scroll-snap-align: start; border: 1px solid #dee2e6; overflow:hidden;">
-			<img alt="${this.escapeHTML(displayName)}" class="card-img-top" src="${this.escapeHTML(photo)}" style="width:100%; height:250px; object-fit:cover; object-position:top center; display:block;">
+			<div style="width:100%; aspect-ratio:1/1; overflow:hidden; background:#f0f0f0;">
+				<img alt="${this.escapeHTML(displayName)}" class="card-img-top" src="${this.escapeHTML(photo)}" style="width:100%; height:100%; object-fit:cover; ${objectPositionStyle} ${scaleStyle} display:block;">
+			</div>
 			<div class="card-body d-flex flex-column">
 				<div class="fw-bold mb-1" style="font-size: 1.1rem; line-height: 1.3;">${this.escapeHTML(displayName)}</div>
 				<div class="text-muted mb-2" style="font-size: 0.95rem;">${this.escapeHTML(title)}</div>
@@ -1116,7 +1201,7 @@ ${modal}`;
                     
                     <!-- Right block: Photo (5 columns) -->
                     <div class="col-md-5 d-flex">
-                        <div class="photo-card w-100 h-100 flex-fill">
+                        <div class="photo-card w-100 h-100 flex-fill" style="aspect-ratio: 1 / 1; min-width: 100%; min-height: auto;">
                             <!-- Template photo: https://s3.amazonaws.com/uss-cache.salvationarmy.org/71fe3cd2-5a53-4557-91ea-bb40ab76e2f5_nearby-corps-1.jpg -->
                             <img alt="Nearby Centers Photo" 
                                  class="img-fluid w-100 h-100" 
@@ -1142,10 +1227,11 @@ ${modal}`;
         const parentPhoto = photoData?.urlParentsSectionPhoto || 'https://s3.amazonaws.com/uss-cache.salvationarmy.org/c86f2661-8584-4ec2-9a2b-efb037af243c_480824461_1048794390619512_2584431963266610630_n.jpg';
         
         // Use center's registration URL if available
-        const registrationURL = center.signUpURL || 'https://online.traxsolutions.com/southernusasalvationarmy/winston-salem#/dashboard';
+        const registrationURL = center.signUpURL;
         
         // Check if staff section has data (to show/hide Meet Our Staff button)
         const hasStaff = leaders && leaders.length > 0;
+        const hasRegistrationURL = registrationURL && registrationURL.trim() !== '';
         
         // A Place for Growth modal
         const growthModal = `
@@ -1195,8 +1281,8 @@ ${modal}`;
             <div class="container my-5">
                 <div class="row align-items-stretch">
                     <!-- Left block: Photo (5 columns) -->
-                    <div class="col-md-5 d-flex">
-                        <div class="photo-card w-100 h-100 flex-fill" style="aspect-ratio: 1 / 1;">
+                    <div class="col-lg-5 d-flex">
+                        <div class="photo-card w-100 h-100 flex-fill" style="aspect-ratio: 1 / 1; min-width: 100%; min-height: auto;">
                             ${parentPhoto ? `
                             <img alt="Youth Center" 
                                  class="img-fluid w-100 h-100" 
@@ -1211,7 +1297,7 @@ ${modal}`;
                     </div>
                     
                     <!-- Right block: Hover card (7 columns) -->
-                    <div class="col-md-7 d-flex">
+                    <div class="col-lg-7 d-flex">
                         <div class="hover-card w-100 d-flex flex-column flex-fill">
                             <i class="bi bi-shield-lock icon-lg"></i>
                             <h2 class="fw-bold mb-2">For <em>Parents</em></h2>
@@ -1224,11 +1310,13 @@ ${modal}`;
                                 <button class="btn btn-outline-primary btn-md" onclick="showRSYCModal('growth', '${this.escapeHTML(center.name, true)}')">
                                     <i class="bi bi-flower2 me-2"></i> A Place for Growth
                                 </button>
+                                ${hasRegistrationURL ? `
                                 <a class="btn btn-outline-primary btn-md" 
                                    href="${this.escapeHTML(registrationURL)}" 
                                    target="_blank">
                                     <i class="bi bi-calendar-check me-2"></i> Sign-up your Youth
                                 </a>
+                                ` : ''}
                                 ${hasStaff ? `
                                 <a class="btn btn-outline-primary btn-md" href="#profiles">
                                     <i class="bi bi-chat-text me-2"></i> Meet Our Staff
@@ -1262,7 +1350,7 @@ ${modal}`;
             <div class="container my-5">
                 <div class="row align-items-stretch">
                     <!-- Left block: Hover card (7 columns) -->
-                    <div class="col-md-7 d-flex order-2 order-md-1">
+                    <div class="col-lg-7 d-flex order-2 order-lg-1">
                         <div class="hover-card w-100 d-flex flex-column flex-fill">
                             <i class="bi bi-lightning-charge icon-lg"></i>
                             <h2 class="fw-bold mb-2">For <em>Youth</em></h2>
@@ -1279,8 +1367,8 @@ ${modal}`;
                         </div>
                     </div>
                     <!-- Right block: Photo (5 columns) -->
-                    <div class="col-md-5 d-flex order-1 order-md-2">
-                        <div class="photo-card w-100" style="aspect-ratio: 1 / 1; overflow:hidden; border-radius:12px;">
+                    <div class="col-lg-5 d-flex order-1 order-lg-2">
+                        <div class="photo-card w-100" style="aspect-ratio: 1 / 1; overflow:hidden; border-radius:12px; min-width: 100%; min-height: auto;">
                             <img alt="Teens Photo" src="${photoUrl}" style="width:100%; height:100%; object-fit:cover; object-position: center;">
                         </div>
                     </div>
@@ -1313,9 +1401,9 @@ ${modal}`;
     <div class="u-positionRelative">
         <div class="container">
             <div class="container my-5">
-                <div class="row align-items-stretch flex-column-reverse flex-md-row">
+                <div class="row align-items-stretch flex-column-reverse flex-lg-row">
                     <!-- Left block: Nearby Centers card (7 columns) -->
-                    <div class="col-md-7 d-flex mb-4 mb-md-0">
+                    <div class="col-lg-7 d-flex mb-4 mb-lg-0">
                         <div class="hover-card w-100 d-flex flex-column h-100">
                             <i class="bi bi-geo-alt icon-lg"></i>
                             <h2 class="fw-bold mb-4">Nearby <em>Salvation Army</em> Centers</h2>
@@ -1380,8 +1468,8 @@ ${modal}`;
                     </div>
 
                     <!-- Right block: Photo (5 columns) -->
-                    <div class="col-md-5 d-flex">
-                        <div class="photo-card w-100 h-100 flex-fill" style="aspect-ratio: 1 / 1;">
+                    <div class="col-lg-5 d-flex">
+                        <div class="photo-card w-100 h-100 flex-fill" style="aspect-ratio: 1 / 1; min-width: 100%; min-height: auto;">
                             <img alt="Nearby Centers Photo" class="img-fluid w-100 h-100" src="${this.escapeHTML(nearbyPhoto)}" style="object-fit:cover; object-position: center;">
                         </div>
                     </div>
@@ -1460,13 +1548,13 @@ ${modal}`;
             <div class="container my-5">
                 <div class="row align-items-stretch">
                     <!-- Left block: Photo (5 columns) -->
-                    <div class="col-md-5 d-flex">
-                        <div class="photo-card w-100" style="aspect-ratio: 1 / 1; overflow:hidden; border-radius:12px;">
+                    <div class="col-lg-5 d-flex">
+                        <div class="photo-card w-100" style="aspect-ratio: 1 / 1; overflow:hidden; border-radius:12px; min-width: 100%; min-height: auto;">
                             <img alt="Get Involved Photo" src="${photoUrl}" style="width:100%; height:100%; object-fit:cover; object-position: center;">
                         </div>
                     </div>
                     <!-- Right block: Hover card (7 columns) -->
-                    <div class="col-md-7 d-flex">
+                    <div class="col-lg-7 d-flex">
                         <div class="hover-card w-100 d-flex flex-column flex-fill">
                             <i class="bi bi-heart-pulse icon-lg"></i>
 
@@ -1614,7 +1702,7 @@ div #freeTextArea-0 {
 }
   
 #freeTextArea-scripture .container {
-  padding-bottom: 25px !important;
+  padding-bottom: 100px !important;
   margin-bottom: 0 !important;
 }
 
@@ -1636,7 +1724,7 @@ div #freeTextArea-0 {
                 <cite>${this.escapeHTML(scriptureText)}</cite>
             </p>
             
-            <p style="text-align: center;">
+            <p style="text-align: center; padding-bottom: 2rem;">
                 <strong><cite>-&nbsp;${this.escapeHTML(scriptureReference)}</cite></strong>
             </p>
         </div>
@@ -1893,6 +1981,17 @@ div #freeTextArea-0 {
     }
 
     /**
+     * Escape HTML and preserve line breaks
+     */
+    preserveLineBreaks(str) {
+        if (!str) return '';
+        const div = document.createElement('div');
+        div.textContent = str;
+        // Replace line breaks with <br> tags
+        return div.innerHTML.replace(/\n/g, '<br>');
+    }
+
+    /**
      * Escape HTML to prevent XSS
      */
     escapeHTML(str) {
@@ -1962,3 +2061,181 @@ window.RSYCTemplates = RSYCTemplates;
 
 // Create global instance
 window.rsycTemplates = new RSYCTemplates();
+
+// Print function for modal content
+function printRSYCModal(modalId) {
+    const modal = document.getElementById(`rsyc-modal-${modalId}`);
+    if (!modal) return;
+    
+    // Extract schedule title and center name from modal
+    const titleElement = modal.querySelector('.rsyc-modal-body h3');
+    const scheduleTitle = titleElement ? titleElement.textContent.trim() : 'Schedule';
+    
+    const centerElement = modal.querySelector('.rsyc-modal-body > div:first-child');
+    const centerName = centerElement ? centerElement.textContent.trim().replace('The Salvation Army ', '') : '';
+    
+    // Create print window title: "Schedule Title - Center Name"
+    const printTitle = centerName ? `${scheduleTitle} - ${centerName}` : scheduleTitle;
+    
+    // Create a new window for printing
+    const printWindow = window.open('', '', 'height=900,width=1200');
+    
+    // Get modal content
+    const modalContent = modal.querySelector('.rsyc-modal-content');
+    
+    // Write HTML to print window
+    printWindow.document.write('<!DOCTYPE html>');
+    printWindow.document.write('<html>');
+    printWindow.document.write('<head>');
+    printWindow.document.write('<meta charset="utf-8">');
+    printWindow.document.write(`<title>${printTitle}</title>`);
+    printWindow.document.write('<style>');
+    printWindow.document.write('body { font-family: Arial, sans-serif; margin: 0.5in 0.25in; font-size: 13px; }');
+    printWindow.document.write('h3 { color: #333; margin: 0.5rem 0; font-size: 16px; }');
+    printWindow.document.write('p { margin: 0.5rem 0; line-height: 1.6; font-size: 12px; }');
+    printWindow.document.write('strong { font-weight: 600; }');
+    printWindow.document.write('.rsyc-modal-header { margin-bottom: 1.5rem; font-size: 13px; }');
+    printWindow.document.write('.rsyc-modal-body { color: #333; font-size: 12px; }');
+    printWindow.document.write('.rsyc-modal-close, .rsyc-modal-print { display: none; }');
+    printWindow.document.write('.row { display: flex; flex-wrap: wrap; margin-bottom: 1rem; }');
+    printWindow.document.write('.col-sm-12 { width: 100%; font-size: 12px; }');
+    printWindow.document.write('.col-md-6 { width: 50%; font-size: 12px; }');
+    printWindow.document.write('.mb-1 { margin-bottom: 0.25rem; }');
+    printWindow.document.write('.mb-2 { margin-bottom: 0.5rem; }');
+    printWindow.document.write('.mb-3 { margin-bottom: 1rem; }');
+    printWindow.document.write('.mb-4 { margin-bottom: 1.5rem; }');
+    printWindow.document.write('u { text-decoration: underline; }');
+    printWindow.document.write('br { line-height: 1.6; }');
+    printWindow.document.write('.p-3 { padding: 1rem; }');
+    printWindow.document.write('</style>');
+    printWindow.document.write('</head>');
+    printWindow.document.write('<body>');
+    printWindow.document.write(modalContent.innerHTML);
+    printWindow.document.write('<div style="margin-top: 2rem; padding-top: 1rem; border-top: 1px solid #ddd; text-align: center; font-size: 11px; color: #666;">');
+    printWindow.document.write('<p style="margin: 0;">Learn more about exciting activities for children, teens, and families at www.redshieldyouth.org</p>');
+    printWindow.document.write('</div>');
+    printWindow.document.write('</body>');
+    printWindow.document.write('</html>');
+    printWindow.document.close();
+    
+    // Wait for content to load, then print
+    printWindow.onload = function() {
+        printWindow.print();
+        printWindow.close();
+    };
+}
+
+/**
+ * Print all schedules aggregated into a one-page format
+ */
+function printAllSchedules(cacheKey) {
+    // Retrieve schedules from global cache
+    if (!window.RSYC_SCHEDULES || !window.RSYC_SCHEDULES[cacheKey]) {
+        alert('Schedule data not available');
+        return;
+    }
+    
+    const { centerName, aboutText, exteriorPhoto, schedules } = window.RSYC_SCHEDULES[cacheKey];
+    
+    if (!schedules || schedules.length === 0) {
+        alert('No schedules to print');
+        return;
+    }
+    
+    // Create print window
+    const printWindow = window.open('', '', 'height=900,width=1200');
+    const printTitle = `Program Schedules - ${centerName}`;
+    
+    // Write document with optimized CSS for one-pager
+    printWindow.document.write('<!DOCTYPE html>');
+    printWindow.document.write('<html>');
+    printWindow.document.write('<head>');
+    printWindow.document.write('<meta charset="utf-8">');
+    printWindow.document.write(`<title>${printTitle}</title>`);
+    printWindow.document.write('<style>');
+    printWindow.document.write('* { margin: 0; padding: 0; box-sizing: border-box; }');
+    printWindow.document.write('body { font-family: Arial, sans-serif; margin: 0.4in 0.3in; font-size: 12px; line-height: 1.5; color: #333; }');
+    printWindow.document.write('h2 { color: #20B3A8; font-size: 18px; margin-bottom: 0.3rem; padding-bottom: 0.3rem; border-bottom: 2px solid #20B3A8; }');
+    printWindow.document.write('h3 { color: #2F4857; font-size: 13px; margin: 0.5rem 0 0.3rem 0; }');
+    printWindow.document.write('h4 { color: #20B3A8; font-size: 13px; margin: 0.4rem 0 0.2rem 0; font-weight: 600; }');
+    printWindow.document.write('p { margin: 0.3rem 0; }');
+    printWindow.document.write('.schedule-group { page-break-inside: avoid; margin-bottom: 1rem; }');
+    printWindow.document.write('.header { text-align: center; margin-bottom: 0.8rem; }');
+    printWindow.document.write('.center-name { font-size: 13px; color: #666; margin-bottom: 0.2rem; }');
+    printWindow.document.write('.about-section { margin-bottom: 1rem; padding-bottom: 1rem; border-bottom: 1px solid #ddd; display: grid; grid-template-columns: 2fr 1fr; gap: 1rem; align-items: start; }');
+    printWindow.document.write('.about-text { grid-column: 1; font-size: 11px; line-height: 1.5; color: #333; }');
+    printWindow.document.write('.about-photo { grid-column: 2; width: 100%; height: auto; aspect-ratio: 1 / 1; border-radius: 4px; object-fit: cover; }');
+    printWindow.document.write('.schedule-list { columns: 2; column-gap: 0.5in; }');
+    printWindow.document.write('.schedule-item { break-inside: avoid; }');
+    printWindow.document.write('.footer-note { margin-top: 1rem; padding-top: 0.8rem; border-top: 1px solid #ddd; text-align: center; font-size: 10px; color: #666; }');
+    printWindow.document.write('@media print { body { margin: 0.4in 0.3in; } }');
+    printWindow.document.write('</style>');
+    printWindow.document.write('</head>');
+    printWindow.document.write('<body>');
+    
+    // Header
+    printWindow.document.write('<div class="header">');
+    printWindow.document.write(`<h2>Program Schedules</h2>`);
+    printWindow.document.write(`<div class="center-name">The Salvation Army ${centerName}</div>`);
+    printWindow.document.write('</div>');
+    
+    // About This Center section with photo side-by-side
+    if (aboutText) {
+        printWindow.document.write('<div class="about-section">');
+        printWindow.document.write('<div class="about-text">');
+        printWindow.document.write(aboutText);
+        printWindow.document.write('</div>');
+        if (exteriorPhoto) {
+            printWindow.document.write(`<img src="${exteriorPhoto}" alt="Center Exterior" class="about-photo">`);
+        }
+        printWindow.document.write('</div>');
+    }
+    
+    // Schedules in two-column layout for compact view
+    printWindow.document.write('<div class="schedule-list">');
+    schedules.forEach((schedule, index) => {
+        const daysText = schedule.scheduleDays && Array.isArray(schedule.scheduleDays) && schedule.scheduleDays.length > 0
+            ? schedule.scheduleDays.join(', ')
+            : '';
+        const timeText = schedule.scheduleTime || '';
+        const ageRange = schedule.ageRange || '';
+        const location = schedule.location || '';
+        const cost = schedule.cost || '';
+        const registrationDeadline = schedule.registrationDeadline || '';
+        
+        printWindow.document.write('<div class="schedule-item" style="margin-bottom: 0.8rem; padding-bottom: 0.8rem; border-bottom: 1px solid #e0e0e0;">');
+        printWindow.document.write(`<h4>${schedule.title || 'Program'}</h4>`);
+        
+        if (schedule.subtitle) {
+            printWindow.document.write(`<p style="font-size: 11px; color: #666; margin-bottom: 0.3rem;">${schedule.subtitle}</p>`);
+        }
+        
+        // Compact details in grid
+        printWindow.document.write('<div style="font-size: 11px; line-height: 1.4;">');
+        if (daysText) printWindow.document.write(`<div><strong>Days:</strong> ${daysText}</div>`);
+        if (timeText) printWindow.document.write(`<div><strong>Time:</strong> ${timeText}</div>`);
+        if (ageRange) printWindow.document.write(`<div><strong>Ages:</strong> ${ageRange}</div>`);
+        if (location) printWindow.document.write(`<div><strong>Location:</strong> ${location}</div>`);
+        if (cost) printWindow.document.write(`<div><strong>Cost:</strong> ${cost}</div>`);
+        if (registrationDeadline) printWindow.document.write(`<div><strong>Registration:</strong> ${registrationDeadline}</div>`);
+        printWindow.document.write('</div>');
+        
+        printWindow.document.write('</div>');
+    });
+    printWindow.document.write('</div>');
+    
+    // Footer note
+    printWindow.document.write('<div class="footer-note">');
+    printWindow.document.write('<p style="margin: 0;">Learn more about exciting activities for children, teens, and families at www.redshieldyouth.org</p>');
+    printWindow.document.write('</div>');
+    
+    printWindow.document.write('</body>');
+    printWindow.document.write('</html>');
+    printWindow.document.close();
+    
+    // Wait for content to load, then print
+    printWindow.onload = function() {
+        printWindow.print();
+        printWindow.close();
+    };
+}
