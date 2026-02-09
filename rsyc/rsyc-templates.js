@@ -84,9 +84,19 @@ class RSYCTemplates {
         if (!exteriorPhoto) return ''; // No hero without photo
         
         return `<!-- Hero Section -->
-<section class="rsyc-hero">
+<style>
+    .rsyc-hero img {
+        width: 100% !important;
+    }
+    @media (min-width: 992px) {
+        .rsyc-hero img {
+            width: 80% !important;
+        }
+    }
+</style>
+<section class="rsyc-hero" style="background-color: #20B3A8; padding: 20px 0; display: flex; justify-content: center; align-items: center;">
     <img src="${this.escapeHTML(exteriorPhoto)}" alt="${this.escapeHTML(center.name)} Exterior" 
-         style="display: block; width: 100%; height: 500px; object-fit: cover; object-position: center;">
+         style="display: block; height: 500px; object-fit: cover; object-position: center; margin: 0 auto; border-radius: 15px;">
 </section>`;
     }
 
@@ -450,20 +460,13 @@ ${modal}`;
         
         // Build About This Center section (always show if available) in white rounded card
         let aboutSection = '';
-        let aboutImageSection = '';
+        let aboutImageSection = ''; // Image removed from about section
         if (center.aboutText) {
-            // Get exterior photo from photos array
-            const photoData = data.photos && data.photos.length > 0 ? data.photos[0] : null;
-            const exteriorPhoto = photoData?.urlExteriorPhoto || '';
+            // Get exterior photo from photos array (no longer used)
+            // const photoData = data.photos && data.photos.length > 0 ? data.photos[0] : null;
+            // const exteriorPhoto = photoData?.urlExteriorPhoto || '';
             
-            // Place image outside and above the white card, as wide as the schedule
-            aboutImageSection = exteriorPhoto ? `
-    <div class="mt-5 d-flex justify-content-center">
-        <div style="max-width:800px;width:100%;">
-            <img src="${this.escapeHTML(exteriorPhoto)}" alt="${this.escapeHTML(center.name)} Exterior" 
-                 class="img-fluid" style="width: 100%; height: 400px; border-radius: 12px; object-fit: cover; object-position: center;">
-        </div>
-    </div>` : '';
+            // aboutImageSection is now empty - image removed per user request
             
             // Add bottom margin only if we have schedules to display below
             const hasSchedules = schedules && schedules.length > 0;
@@ -477,7 +480,7 @@ ${modal}`;
                 </div>` : '';
             
             aboutSection = `
-    <div class="mt-3 d-flex justify-content-center${bottomMarginClass}">
+    <div class="d-flex justify-content-center${bottomMarginClass}">
         <div class="schedule-card w-100 text-dark" style="max-width:800px;width:100%;padding:1.5rem;border-radius:8px;background:#fff;box-shadow:0 1px 4px rgba(0,0,0,0.06);">
             <h2 class="fw-bold mb-3 text-center">About This <em>Center</em></h2>
             <p class="text-center mb-3"><strong>The Salvation Army ${this.escapeHTML(center.name || center.Title)}</strong></p>
@@ -533,7 +536,7 @@ ${modal}`;
 <div id="freeTextArea-schedules" class="freeTextArea u-centerBgImage section u-sa-tealBg u-coverBgImage">
     <div class="u-positionRelative">
         <div class="container">
-            <div class="my-5">
+            <div class="mt-0 mb-5">
                 ${aboutImageSection}
                 
                 ${aboutSection}

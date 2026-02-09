@@ -513,12 +513,17 @@ class RSYCGeneratorV2 {
         });
 
         // Section checkboxes - auto-update on change + update count
-        const checkboxes = document.querySelectorAll('.section-checkboxes input[type="checkbox"]');
-        const updateHandler = () => {
-            this.updateSectionsCount();
-            if (this.currentCenter) this.autoGeneratePreview();
-        };
-        checkboxes.forEach(cb => cb.addEventListener('change', updateHandler));
+        // Use event delegation on the parent container to ensure all checkboxes are caught
+        const sectionCheckboxesContainer = document.querySelector('.section-checkboxes');
+        if (sectionCheckboxesContainer) {
+            sectionCheckboxesContainer.addEventListener('change', (e) => {
+                if (e.target.type === 'checkbox') {
+                    console.log('[SectionCheckbox] Changed:', e.target.value, 'Checked:', e.target.checked);
+                    this.updateSectionsCount();
+                    if (this.currentCenter) this.autoGeneratePreview();
+                }
+            });
+        }
 
         // Initialize section count immediately
         this.updateSectionsCount();
@@ -770,6 +775,21 @@ class RSYCGeneratorV2 {
             const previewStatus = document.getElementById('previewStatus');
             if (previewStatus) previewStatus.textContent = `${selected} section(s) selected`;
         }
+        // Sync checked sections to global injector config
+        this.syncSectionsToConfig();
+    }
+
+    /**
+     * Sync selected sections from checkboxes to global RSYCProfileConfig
+     * This allows the injector to use the same sections the publisher has selected
+     */
+    syncSectionsToConfig() {
+        const selectedSections = this.getSelectedSections();
+        if (!window.RSYCProfileConfig) {
+            window.RSYCProfileConfig = {};
+        }
+        window.RSYCProfileConfig.enabledSections = selectedSections;
+        console.log('[Publisher] Synced sections to config:', selectedSections);
     }
 
     async autoGeneratePreview() {

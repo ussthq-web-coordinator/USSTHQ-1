@@ -9,8 +9,19 @@
     console.log('[RSYCProfileInjector] Initializing...');
 
     /**
-     * Show loading skeleton for faster perceived performance
+     * Global sections configuration - can be set before loading profiles
+     * Usage: window.RSYCProfileConfig.enabledSections = ['hero', 'about', 'schedules'];
      */
+    window.RSYCProfileConfig = window.RSYCProfileConfig || {
+        enabledSections: ['hero', 'about', 'schedules', 'hours', 'facilities', 'programs', 'staff', 'nearby', 'parents', 'youth', 'volunteer', 'footerPhoto', 'contact']
+    };
+
+    /**
+     * Show loading skeleton for faster perceived performance (hidden by default)
+     * Only shown if loading takes longer than threshold
+     */
+    let loadingTimeoutId = null;
+    
     function showLoadingSkeleton(targetElement, centerName) {
         targetElement.innerHTML = `
             <div style="padding: 24px; background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%); background-size: 200% 100%; animation: loading 1.5s infinite; border-radius: 8px; margin-bottom: 16px; height: 200px;"></div>
@@ -25,31 +36,45 @@
     }
 
     /**
+     * Clear any pending loading skeleton
+     */
+    function clearLoadingSkeleton() {
+        if (loadingTimeoutId) {
+            clearTimeout(loadingTimeoutId);
+            loadingTimeoutId = null;
+        }
+    }
+
+    /**
      * Load and render a profile into a container (optimized)
      */
-    async function loadProfile(centerId, targetElement) {
+    async function loadProfile(centerId, targetElement, enabledSections = null) {
         try {
-            // Show skeleton immediately for better perceived performance
-            showLoadingSkeleton(targetElement);
+            // Start timer for loading skeleton (only show after 1.5 seconds)
+            loadingTimeoutId = setTimeout(() => {
+                showLoadingSkeleton(targetElement);
+            }, 1500);
 
             // Load required scripts if not already loaded
             const baseUrl = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
                 ? window.location.origin
                 : 'https://thisishoperva.org';
 
+            const cacheBuster = `?v=${new Date().getTime()}`;
+
             console.log('[RSYCProfileInjector] Loading scripts from:', baseUrl);
             
             // Load support scripts in parallel - rsyc-data can load in parallel with others
             await Promise.all([
-                loadScript(`${baseUrl}/rsyc/rsyc-staff-order.js`),
-                loadScript(`${baseUrl}/rsyc/rsyc-data.js`),
-                loadScript(`${baseUrl}/rsyc/rsyc-cms-publisher.js`),
-                loadScript(`${baseUrl}/rsyc/rsyc-templates.js`),
+                loadScript(`${baseUrl}/rsyc/rsyc-staff-order.js${cacheBuster}`),
+                loadScript(`${baseUrl}/rsyc/rsyc-data.js${cacheBuster}`),
+                loadScript(`${baseUrl}/rsyc/rsyc-cms-publisher.js${cacheBuster}`),
+                loadScript(`${baseUrl}/rsyc/rsyc-templates.js${cacheBuster}`),
             ]);
             console.log('[RSYCProfileInjector] ✓ Loaded core scripts');
             
             // Load tracker in background after initial render
-            loadScript(`${baseUrl}/rsyc/rsyc-tracker.js`).catch(() => {
+            loadScript(`${baseUrl}/rsyc/rsyc-tracker.js${cacheBuster}`).catch(() => {
                 console.warn('[RSYCProfileInjector] Tracker script optional, continuing...');
             });
 
@@ -89,17 +114,17 @@
             // Generate profile HTML using the template engine (exactly like generator.js)
             const templateEngine = new window.RSYCTemplates();
             
-            // Get all sections from template in proper order (exactly like generator.js)
-            const allSectionsConfig = templateEngine.getSections();
-            // Exclude hero and about for live injection - these are page structure elements
-            const contentSections = Object.keys(allSectionsConfig)
-                .filter(key => !['hero', 'about'].includes(key))
-                .sort((a, b) => (allSectionsConfig[a].order || 999) - (allSectionsConfig[b].order || 999));
+            // Use sections from global config
+            const contentSections = window.RSYCProfileConfig.enabledSections;
+            console.log('[RSYCProfileInjector] Using configured sections:', contentSections.join(', '));
 
             // Generate complete profile using generateProfile (exactly like generator.js)
             const html = templateEngine.generateProfile(centerData, contentSections);
             
             console.log('[RSYCProfileInjector] ✅ Profile generated:', centerData.center.name);
+
+            // Clear the loading skeleton timer since we have content
+            clearLoadingSkeleton();
 
             // Inject custom styles once
             if (!document.getElementById('rsyc-injected-styles')) {
@@ -198,6 +223,10 @@ div #freeTextArea {
 
         } catch (error) {
             console.error('[RSYCProfileInjector] Error:', error);
+            
+            // Clear loading skeleton on error
+            clearLoadingSkeleton();
+            
             targetElement.innerHTML = `<div style="padding: 20px; background: #ffe6e6; color: #990000; border-radius: 8px; border: 1px solid #ffcccc;">
                 <strong>Error loading profile:</strong> ${error.message}
             </div>`;
@@ -222,8 +251,8 @@ div #freeTextArea {
             script.src = src;
             script.onload = () => {
                 console.log('[RSYCProfileInjector] Script onload fired:', src);
-                // Give a tiny delay to ensure the script initializes
-                setTimeout(resolve, 100);
+                // Minimal delay to ensure script initializes
+                resolve();
             };
             script.onerror = () => {
                 reject(new Error(`Failed to load: ${src}`));
@@ -284,8 +313,9 @@ div #freeTextArea {
         // Handle data-rsyc-center-id divs
         document.querySelectorAll('[data-rsyc-center-id]').forEach((container) => {
             const centerId = container.dataset.rsycCenterId;
+            
             if (centerId) {
-                console.log(`[RSYCProfileInjector] Found profile container: ${centerId}`);
+                console.log(`[RSYCProfileInjector] Found profile container: ${centerId}`, `Sections: ${window.RSYCProfileConfig.enabledSections.join(', ')}`);
                 loadProfile(centerId, container);
             }
         });
@@ -303,7 +333,7 @@ div #freeTextArea {
 
     // Expose global function
     window.RSYCLoadProfile = function(centerId, targetElement) {
-        console.log(`[RSYCProfileInjector] RSYCLoadProfile called for: ${centerId}`);
+        console.log(`[RSYCProfileInjector] RSYCLoadProfile called for: ${centerId}`, `Sections: ${window.RSYCProfileConfig.enabledSections.join(', ')}`);
         loadProfile(centerId, targetElement);
     };
 
