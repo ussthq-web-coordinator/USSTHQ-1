@@ -795,11 +795,18 @@ div.col-sm-12.eventsList * {
     width: 100%;
     height: 100%;
     background: rgba(0, 0, 0, 0.7);
-    z-index: 10000;
+    z-index: 999999;
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 20px;
+    padding: 10px;
+    overflow: auto;
+    -webkit-overflow-scrolling: touch;
+    /* Ensure modal appears on top */
+    isolation: isolate;
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
 }
 
 /* Modal content container */
@@ -808,11 +815,18 @@ div.col-sm-12.eventsList * {
     border-radius: 12px;
     max-width: 900px;
     width: 100%;
-    max-height: 85vh;
+    max-height: 90vh;
     display: flex;
     flex-direction: column;
-    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
     animation: rsycModalSlideIn 0.3s ease-out;
+    position: relative;
+    z-index: 1000000;
+    margin: auto;
+    /* Extra elevation properties */
+    -webkit-transform: translateZ(0);
+    transform: translateZ(0);
+    will-change: transform;
 }
 
 @keyframes rsycModalSlideIn {
@@ -826,13 +840,21 @@ div.col-sm-12.eventsList * {
     }
 }
 
-/* Modal header */
+/* Modal header - STICKY on mobile so it's always accessible */
 .rsyc-modal-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
     padding: 20px 30px;
     border-bottom: 1px solid #e0e0e0;
+    background: white;
+    flex-shrink: 0;
+    /* Make header sticky on touch devices for better UX */
+    position: sticky;
+    top: 0;
+    z-index: 1000001;
+    /* Ensure it stays above modal content */
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
 .rsyc-modal-header h3 {
@@ -840,6 +862,11 @@ div.col-sm-12.eventsList * {
     font-size: 1.5rem;
     font-weight: 600;
     color: #333;
+    min-width: 0;
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 /* Close button */
@@ -858,6 +885,8 @@ div.col-sm-12.eventsList * {
     border-radius: 50%;
     transition: all 0.2s;
     line-height: 1;
+    flex-shrink: 0;
+    margin-left: 15px;
 }
 
 .rsyc-modal-close:hover {
@@ -870,6 +899,7 @@ div.col-sm-12.eventsList * {
     padding: 30px;
     overflow-y: auto;
     flex: 1;
+    -webkit-overflow-scrolling: touch;
 }
 
 /* Scrollbar styling for modal body */
@@ -888,6 +918,148 @@ div.col-sm-12.eventsList * {
 
 .rsyc-modal-body::-webkit-scrollbar-thumb:hover {
     background: #999;
+}
+
+/* Print button - Always accessible in modal header */
+.rsyc-modal-print {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 0.5rem;
+    color: #666;
+    font-size: 1.2rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    transition: all 0.2s;
+    flex-shrink: 0;
+    margin-left: 10px;
+}
+
+.rsyc-modal-print:hover {
+    background: #f0f0f0;
+    color: #333;
+}
+
+/* Responsive adjustments for small screens */
+@media (max-width: 768px) {
+    .rsyc-modal {
+        align-items: center;
+        padding: 10px;
+    }
+    
+    .rsyc-modal-content {
+        max-height: 85vh;
+        width: 95%;
+        border-radius: 8px;
+    }
+    
+    .rsyc-modal-header {
+        padding: 15px 20px;
+        gap: 10px;
+    }
+    
+    .rsyc-modal-header h3 {
+        font-size: 1.2rem;
+    }
+    
+    .rsyc-modal-close {
+        font-size: 1.5rem;
+        width: 30px;
+        height: 30px;
+        margin-left: 10px;
+    }
+    
+    .rsyc-modal-print {
+        font-size: 1rem;
+        padding: 0.4rem;
+        margin-left: 8px;
+    }
+    
+    .rsyc-modal-body {
+        padding: 20px;
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+}
+
+/* Responsive schedule display - Show accordion on small devices/iPad */
+@media (max-width: 1024px) {
+    .rsyc-schedule-card-desktop {
+        display: none !important;
+    }
+    
+    .rsyc-schedule-accordion-mobile {
+        display: block !important;
+        width: 100% !important;
+        margin-bottom: 0.75rem;
+    }
+    
+    .rsyc-details-btn-desktop {
+        display: none !important;
+    }
+    
+    .rsyc-details-btn-mobile {
+        display: inline-block !important;
+    }
+    
+    /* Stack schedule items vertically on mobile */
+    .horizontal-scroll {
+        display: flex !important;
+        flex-direction: column !important;
+        overflow-x: visible !important;
+        overflow-y: visible !important;
+    }
+}
+
+/* Desktop: Show card, hide accordion */
+@media (min-width: 1025px) {
+    .rsyc-schedule-card-desktop {
+        display: flex !important;
+    }
+    
+    .rsyc-schedule-accordion-mobile {
+        display: none !important;
+    }
+    
+    .rsyc-details-btn-desktop {
+        display: inline-block !important;
+    }
+    
+    .rsyc-details-btn-mobile {
+        display: none !important;
+    }
+}
+
+/* Accordion styling */
+.rsyc-schedule-accordion {
+    transition: all 0.3s ease;
+}
+
+.accordion-header {
+    transition: background-color 0.2s ease;
+}
+
+.accordion-header:hover {
+    background-color: #e8ebed;
+}
+
+.accordion-body {
+    animation: slideDown 0.3s ease-out;
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        max-height: 0;
+        overflow: hidden;
+    }
+    to {
+        opacity: 1;
+        max-height: 2000px;
+        overflow: visible;
+    }
 }
 
 /* ========================================
@@ -1093,6 +1265,25 @@ function closeRSYCModal(type) {
     if (modal) {
         modal.style.display = 'none';
         document.body.style.overflow = ''; // Restore scroll
+    }
+}
+
+// Toggle RSYC schedule accordion (for mobile/iPad)
+function toggleRSYCAccordion(accordionId) {
+    const content = document.getElementById(accordionId);
+    const icon = document.getElementById(accordionId + '-icon');
+    
+    if (!content) {
+        console.warn(`Accordion content not found: ${accordionId}`);
+        return;
+    }
+    
+    if (content.style.display === 'none' || content.style.display === '') {
+        content.style.display = 'block';
+        if (icon) icon.style.transform = 'rotate(180deg)';
+    } else {
+        content.style.display = 'none';
+        if (icon) icon.style.transform = 'rotate(0deg)';
     }
 }
 

@@ -136,8 +136,13 @@
             container.id = `rsyc-unit-container-${unitType}-${_normalizeForId(unitValue)}`;
             container.innerHTML = html;
 
-            targetElement.innerHTML = '';
-            targetElement.appendChild(container);
+            // For 'all' type, append content; for others, replace content
+            if (unitType === 'all') {
+                targetElement.appendChild(container);
+            } else {
+                targetElement.innerHTML = '';
+                targetElement.appendChild(container);
+            }
 
             // Load custom styles
             loadCustomStyles();

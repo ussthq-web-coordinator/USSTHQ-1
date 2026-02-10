@@ -18,6 +18,151 @@ class RSYCUnitTemplates {
             'leaders': { name: 'Leadership', enabled: true, order: 8 },
             'contact': { name: 'Contact & Learn More', enabled: true, order: 9 }
         };
+
+        // Define filter function globally so inline onchange handlers can access it
+        window.applyAllCentersFilters = function() {
+            const cards = document.querySelectorAll('.center-card');
+            const cityVal = document.getElementById('city-filter')?.value || '';
+            const stateVal = document.getElementById('state-filter')?.value || '';
+            const featVal = document.getElementById('features-filter')?.value || '';
+            const progVal = document.getElementById('programs-filter')?.value || '';
+            
+            // Get visible cards based on current filters
+            let visibleCards = [];
+            cards.forEach(card => {
+                const matchCity = !cityVal || card.dataset.city === cityVal;
+                const matchState = !stateVal || card.dataset.state === stateVal;
+                const matchFeatures = !featVal || (card.dataset.features && card.dataset.features.includes(featVal));
+                const matchPrograms = !progVal || (card.dataset.programs && card.dataset.programs.includes(progVal));
+                
+                const show = matchCity && matchState && matchFeatures && matchPrograms;
+                card.style.display = show ? '' : 'none';
+                if (show) visibleCards.push(card);
+            });
+            
+            // Update available options in other filters based on visible cards
+            window.updateFilterOptions(visibleCards, cityVal, stateVal, featVal, progVal);
+        };
+
+        // Update filter options based on visible centers - rebuild options to show only available choices
+        window.updateFilterOptions = function(visibleCards) {
+            const allCards = document.querySelectorAll('.center-card');
+            
+            // Get current filter values
+            const cityVal = document.getElementById('city-filter').value;
+            const stateVal = document.getElementById('state-filter').value;
+            const featVal = document.getElementById('features-filter').value;
+            const progVal = document.getElementById('programs-filter').value;
+            
+            // Helper function to get available values when a specific filter is excluded
+            const getAvailableValues = (excludeFilter) => {
+                const available = {
+                    cities: new Set(),
+                    states: new Set(),
+                    features: new Set(),
+                    programs: new Set()
+                };
+                
+                allCards.forEach(card => {
+                    // Check if card matches all filters EXCEPT the one being evaluated
+                    const matchCity = excludeFilter === 'city' || !cityVal || card.dataset.city === cityVal;
+                    const matchState = excludeFilter === 'state' || !stateVal || card.dataset.state === stateVal;
+                    const matchFeatures = excludeFilter === 'features' || !featVal || (card.dataset.features && card.dataset.features.includes(featVal));
+                    const matchPrograms = excludeFilter === 'programs' || !progVal || (card.dataset.programs && card.dataset.programs.includes(progVal));
+                    
+                    if (matchCity && matchState && matchFeatures && matchPrograms) {
+                        if (card.dataset.city) available.cities.add(card.dataset.city);
+                        if (card.dataset.state) available.states.add(card.dataset.state);
+                        if (card.dataset.features) {
+                            card.dataset.features.split('|').forEach(f => f && available.features.add(f));
+                        }
+                        if (card.dataset.programs) {
+                            card.dataset.programs.split('|').forEach(p => p && available.programs.add(p));
+                        }
+                    }
+                });
+                
+                return available;
+            };
+            
+            // Rebuild City filter options - remove unavailable options entirely (better Apple device support)
+            const citySelect = document.getElementById('city-filter');
+            if (citySelect) {
+                const allCities = [...new Set(Array.from(allCards).map(c => c.dataset.city))].sort();
+                const availableCities = getAvailableValues('city');
+                const options = ['<option value="">All Cities</option>'];
+                
+                allCities.forEach(city => {
+                    if (availableCities.cities.has(city)) {
+                        const isSelected = city === cityVal ? ' selected' : '';
+                        options.push(`<option value="${city}"${isSelected}>${city}</option>`);
+                    }
+                });
+                
+                citySelect.innerHTML = options.join('');
+            }
+            
+            // Rebuild State filter options - remove unavailable options entirely
+            const stateSelect = document.getElementById('state-filter');
+            if (stateSelect) {
+                const allStates = [...new Set(Array.from(allCards).map(c => c.dataset.state))].sort();
+                const availableStates = getAvailableValues('state');
+                const options = ['<option value="">All States</option>'];
+                
+                allStates.forEach(state => {
+                    if (availableStates.states.has(state)) {
+                        const isSelected = state === stateVal ? ' selected' : '';
+                        options.push(`<option value="${state}"${isSelected}>${state}</option>`);
+                    }
+                });
+                
+                stateSelect.innerHTML = options.join('');
+            }
+            
+            // Rebuild Features filter options - remove unavailable options entirely
+            const featuresSelect = document.getElementById('features-filter');
+            if (featuresSelect) {
+                const allFeatures = [...new Set(Array.from(allCards).flatMap(c => (c.dataset.features || '').split('|').filter(f => f)))].sort();
+                const availableFeatures = getAvailableValues('features');
+                const options = ['<option value="">All Features</option>'];
+                
+                allFeatures.forEach(feature => {
+                    if (availableFeatures.features.has(feature)) {
+                        const isSelected = feature === featVal ? ' selected' : '';
+                        options.push(`<option value="${feature}"${isSelected}>${feature}</option>`);
+                    }
+                });
+                
+                featuresSelect.innerHTML = options.join('');
+            }
+            
+            // Rebuild Programs filter options - remove unavailable options entirely
+            const programsSelect = document.getElementById('programs-filter');
+            if (programsSelect) {
+                const allPrograms = [...new Set(Array.from(allCards).flatMap(c => (c.dataset.programs || '').split('|').filter(p => p)))].sort();
+                const availablePrograms = getAvailableValues('programs');
+                const options = ['<option value="">All Programs</option>'];
+                
+                allPrograms.forEach(program => {
+                    if (availablePrograms.programs.has(program)) {
+                        const isSelected = program === progVal ? ' selected' : '';
+                        options.push(`<option value="${program}"${isSelected}>${program}</option>`);
+                    }
+                });
+                
+                programsSelect.innerHTML = options.join('');
+            }
+        };
+
+        // Define clear filters function
+        window.clearAllCentersFilters = function() {
+            document.getElementById('city-filter').value = '';
+            document.getElementById('state-filter').value = '';
+            document.getElementById('features-filter').value = '';
+            document.getElementById('programs-filter').value = '';
+            
+            window.applyAllCentersFilters();
+        };
     }
 
     /**
@@ -59,13 +204,27 @@ class RSYCUnitTemplates {
         console.log('[RSYCUnitTemplates] Generating grid for', unit.centers.length, 'centers');
         console.log('[RSYCUnitTemplates] Sample center:', unit.centers[0]);
 
+        // Filter out closed centers - hide any center with "Closed" in the title or name
+        const activeCenters = unit.centers.filter(center => {
+            const fullName = (center.name || '').toLowerCase();
+            const shortName = (center.shortName || '').toLowerCase();
+            const title = (center.Title || '').toLowerCase();
+            return !fullName.includes('closed') && !shortName.includes('closed') && !title.includes('closed');
+        });
+
+        if (activeCenters.length === 0) {
+            return '<div class="container py-5"><p class="text-center text-muted">No active centers found</p></div>';
+        }
+
+        console.log('[RSYCUnitTemplates] After filtering closed centers:', activeCenters.length, 'active centers');
+
         // Extract unique filter values
-        const cities = [...new Set(unit.centers.map(c => c.city).filter(c => c))].sort();
-        const states = [...new Set(unit.centers.map(c => c.state).filter(c => c))].sort();
+        const cities = [...new Set(activeCenters.map(c => c.city).filter(c => c))].sort();
+        const states = [...new Set(activeCenters.map(c => c.state).filter(c => c))].sort();
         const allFeatures = new Set();
         const allPrograms = new Set();
         
-        unit.centers.forEach(center => {
+        activeCenters.forEach(center => {
             if (center.facilityFeatures && Array.isArray(center.facilityFeatures)) {
                 center.facilityFeatures.forEach(f => allFeatures.add(f.name || f));
             }
@@ -85,15 +244,34 @@ class RSYCUnitTemplates {
 
         console.log('[RSYCUnitTemplates] Sorted filters - Features:', features, 'Programs:', programs);
 
+        // Sort centers alphabetically by name (after removing prefix)
+        const sortedCenters = activeCenters.sort((a, b) => {
+            let nameA = (a.name || '').replace(/^red\s+shield\s+youth\s+centers?\s+of\s+/i, '').replace(/^rsyc\s+/i, '');
+            let nameB = (b.name || '').replace(/^red\s+shield\s+youth\s+centers?\s+of\s+/i, '').replace(/^rsyc\s+/i, '');
+            return nameA.localeCompare(nameB);
+        });
+
         // Generate center cards with image overlay
-        const centerCards = unit.centers.map(center => {
-            const centerName = this.escapeHTML(center.name || 'Salvation Army Center');
-            const city = this.escapeHTML(center.city || 'City');
-            const state = this.escapeHTML(center.state || '');
+        const centerCards = sortedCenters.map(center => {
+            // Remove prefix from display name
+            let displayName = (center.name || 'Salvation Army Center');
+            displayName = displayName
+                .replace(/^red\s+shield\s+youth\s+centers?\s+of\s+/i, '')
+                .replace(/^rsyc\s+/i, '');
+            const centerName = this.escapeHTML(displayName);
+            
+            const city = center.city || 'City';  // Don't escape for data attributes
+            const state = center.state || '';  // Don't escape for data attributes
             const centerId = this.escapeHTML(center.id || '');
             
-            // Generate URL slug from center name - convert to lowercase, replace spaces/dashes with single dash
-            const centerSlug = (center.name || '')
+            // Generate URL slug from center name - remove common prefix, convert to lowercase, replace spaces/dashes with single dash
+            let slugName = (center.name || '');
+            // Remove common prefixes like "Red Shield Youth Centers of" or "Red Shield Youth Center of"
+            slugName = slugName
+                .replace(/^red\s+shield\s+youth\s+centers?\s+of\s+/i, '')
+                .replace(/^rsyc\s+/i, '');
+            
+            const centerSlug = slugName
                 .toLowerCase()
                 .replace(/\s+/g, '-')           // Replace spaces with dashes
                 .replace(/-+/g, '-')            // Collapse multiple dashes to single dash
@@ -107,13 +285,14 @@ class RSYCUnitTemplates {
                 imageUrl = photo.urlExteriorPhoto || photo.urlFacilityFeaturesPhoto || photo.urlProgramsPhoto || imageUrl;
             }
 
-            // Build feature and program strings for filtering
+            // Build feature and program strings for filtering - don't escape these either
             const featureStr = (center.facilityFeatures || []).map(f => typeof f === 'string' ? f : f.name).join('|');
             const programStr = (center.featuredPrograms || []).map(p => typeof p === 'string' ? p : p.name).join('|');
 
             return `
             <div class="center-card" data-city="${city}" data-state="${state}" data-features="${featureStr}" data-programs="${programStr}" style="cursor: pointer; border-radius: 12px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.1); transition: transform 0.3s ease, box-shadow 0.3s ease;" onclick="window.location.href='${centerUrl}';">
-                <div style="position: relative; background-image: url('${imageUrl}'); background-size: cover; background-position: center; height: 300px; width: 100%;">
+                <div style="position: relative; height: 300px; width: 100%; overflow: hidden; background-color: #f0f0f0;">
+                    <img src="${imageUrl}" alt="${centerName}" loading="lazy" style="width: 100%; height: 100%; object-fit: cover; object-position: center;">
                     <div style="position: absolute; inset: 0; background: linear-gradient(to bottom, rgba(0,0,0,0.1) 0%, rgba(0,0,0,0.5) 100%); display: flex; flex-direction: column; justify-content: flex-end; padding: 1.5rem; color: white;">
                         <h5 style="font-weight: bold; margin-bottom: 0.5rem; font-size: 1.1rem;">
                             ${centerName}
@@ -129,38 +308,49 @@ class RSYCUnitTemplates {
 
         console.log('[RSYCUnitTemplates] Generated', centerCards.length, 'card HTML strings');
 
-        // Build filter HTML
+        // Build filter dropdown options separately to avoid template literal nesting issues
+        const cityOptions = cities.map(c => `<option value="${c}">${c}</option>`).join('');
+        const stateOptions = states.map(s => `<option value="${s}">${s}</option>`).join('');
+        const featuresOptions = features.map(f => `<option value="${f}">${f}</option>`).join('');
+        const programsOptions = programs.map(p => `<option value="${p}">${p}</option>`).join('');
+
+        // Build filter HTML with inline onchange handlers
         const filterHTML = `
-        <div style="background-color: #f8f9fa; padding: 30px 20px; border-bottom: 1px solid #e0e0e0;">
+        <div id="all-centers-filters" style="background-color: #f8f9fa; padding: 30px 20px 40px 20px; border-bottom: 1px solid #e0e0e0; margin-top: -40px;">
             <div class="container">
-                <h5 class="fw-bold mb-4">Filter Centers</h5>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+                    <h5 class="fw-bold mb-0" style="margin-top: 0;">Filter Centers</h5>
+                    <button onclick="window.clearAllCentersFilters()" style="background-color: #6c757d; color: white; border: none; padding: 0.5rem 1.25rem; border-radius: 6px; cursor: pointer; font-weight: 500; font-size: 0.9rem; transition: background-color 0.2s ease;" onmouseover="this.style.backgroundColor='#5a6268'" onmouseout="this.style.backgroundColor='#6c757d'">
+                        Clear All Filters
+                    </button>
+                </div>
                 <div class="row g-3">
                     <div class="col-md-6 col-lg-3">
                         <label class="form-label fw-500 mb-2">City</label>
-                        <select class="form-select form-select-sm filter-select" id="city-filter" data-filter-type="city">
+                        <select class="form-select form-select-sm filter-select" id="city-filter" data-filter-type="city" onchange="window.applyAllCentersFilters()">
                             <option value="">All Cities</option>
-                            ${cities.map(c => `<option value="${c}">${this.escapeHTML(c)}</option>`).join('')}
+                            ${cityOptions}
                         </select>
                     </div>
                     <div class="col-md-6 col-lg-3">
                         <label class="form-label fw-500 mb-2">State</label>
-                        <select class="form-select form-select-sm filter-select" id="state-filter" data-filter-type="state">
+                        <select class="form-select form-select-sm filter-select" id="state-filter" data-filter-type="state" onchange="window.applyAllCentersFilters()">
                             <option value="">All States</option>
-                            ${states.map(s => `<option value="${s}">${this.escapeHTML(s)}</option>`).join('')}
+                            ${stateOptions}
                         </select>
                     </div>
                     <div class="col-md-6 col-lg-3">
                         <label class="form-label fw-500 mb-2">Facility Features</label>
-                        <select class="form-select form-select-sm filter-select" id="features-filter" data-filter-type="features">
+                        <select class="form-select form-select-sm filter-select" id="features-filter" data-filter-type="features" onchange="window.applyAllCentersFilters()">
                             <option value="">All Features</option>
-                            ${features.map(f => `<option value="${f}">${this.escapeHTML(f)}</option>`).join('')}
+                            ${featuresOptions}
                         </select>
                     </div>
                     <div class="col-md-6 col-lg-3">
                         <label class="form-label fw-500 mb-2">Programs</label>
-                        <select class="form-select form-select-sm filter-select" id="programs-filter" data-filter-type="programs">
+                        <select class="form-select form-select-sm filter-select" id="programs-filter" data-filter-type="programs" onchange="window.applyAllCentersFilters()">
                             <option value="">All Programs</option>
-                            ${programs.map(p => `<option value="${p}">${this.escapeHTML(p)}</option>`).join('')}
+                            ${programsOptions}
                         </select>
                     </div>
                 </div>
@@ -169,42 +359,13 @@ class RSYCUnitTemplates {
 
         return `${filterHTML}
 <!-- All Centers Grid -->
-<div class="section" style="background-color: white; padding: 60px 20px; min-height: 500px;">
+<div class="section" style="background-color: white; padding: 40px 20px 60px 20px; min-height: 500px;">
     <div style="max-width: 1200px; margin: 0 auto;">
         <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 24px;" id="centers-grid">
             ${centerCards}
         </div>
     </div>
-</div>
-
-<script>
-(function() {
-    const filterSelects = document.querySelectorAll('.filter-select');
-    const centerCards = document.querySelectorAll('.center-card');
-    
-    function applyFilters() {
-        const cityValue = document.getElementById('city-filter')?.value || '';
-        const stateValue = document.getElementById('state-filter')?.value || '';
-        const featuresValue = document.getElementById('features-filter')?.value || '';
-        const programsValue = document.getElementById('programs-filter')?.value || '';
-        
-        centerCards.forEach(card => {
-            let show = true;
-            
-            if (cityValue && card.dataset.city !== cityValue) show = false;
-            if (stateValue && card.dataset.state !== stateValue) show = false;
-            if (featuresValue && !card.dataset.features?.includes(featuresValue)) show = false;
-            if (programsValue && !card.dataset.programs?.includes(programsValue)) show = false;
-            
-            card.style.display = show ? '' : 'none';
-        });
-    }
-    
-    filterSelects.forEach(select => {
-        select.addEventListener('change', applyFilters);
-    });
-})();
-</script>`;
+</div>`;
     }
 
     /**

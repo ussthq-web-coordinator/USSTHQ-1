@@ -3,6 +3,25 @@
  * Generates modular HTML sections for center profiles
  */
 
+// Global toggle function for RSYC accordions
+window.toggleRSYCAccordion = function(accordionId) {
+    const content = document.getElementById(accordionId);
+    const icon = document.getElementById(accordionId + '-icon');
+    
+    if (!content) {
+        console.warn(`Accordion content not found: ${accordionId}`);
+        return;
+    }
+    
+    if (content.style.display === 'none' || content.style.display === '') {
+        content.style.display = 'block';
+        if (icon) icon.style.transform = 'rotate(180deg)';
+    } else {
+        content.style.display = 'none';
+        if (icon) icon.style.transform = 'rotate(0deg)';
+    }
+};
+
 class RSYCTemplates {
     constructor() {
         this.sections = {
@@ -362,9 +381,12 @@ ${modal}`;
                 const scheduleId = `schedule-${schedule.id}`;
                 
                 const expandableInfo = `
-                    <div class="mt-2">
-                        <button class="btn btn-outline-primary" style="font-size: 0.7rem; padding: 0.25rem 0.5rem;" onclick="showRSYCModal('schedule-${schedule.id}', '${this.escapeHTML(schedule.title, true)}')">
+                    <div class="mt-2" style="display: flex; gap: 0.5rem;">
+                        <button class="btn btn-outline-primary rsyc-details-btn-desktop" style="font-size: 0.7rem; padding: 0.25rem 0.5rem; display: none;" onclick="showRSYCModal('schedule-${schedule.id}', '${this.escapeHTML(schedule.title, true)}')">
                             View Full Details
+                        </button>
+                        <button class="btn btn-outline-primary rsyc-details-btn-mobile" style="font-size: 0.7rem; padding: 0.25rem 0.5rem; display: none;" onclick="toggleRSYCAccordion('rsyc-accordion-${schedule.id}')">
+                            <i class="bi bi-chevron-down"></i> More Info
                         </button>
                     </div>
                 `;
@@ -476,23 +498,138 @@ ${modal}`;
                 // Use formatActiveForDisplay() to normalize spacing (fixes cases like "exceptJune")
                 let activeHTML = months ? this.formatActiveForDisplay(months) : '';
 
-                return `
-                    <div class="schedule-card text-dark" style="min-width:230px;padding:1rem;border-radius:8px;background:#fff;box-shadow:0 1px 4px rgba(0,0,0,0.06);display:flex;flex-direction:column;height:100%;gap:0.75rem;">
-                        <div style="flex-shrink:0;">
-                            <h5 class="fw-bold mb-1">${this.escapeHTML(schedule.title)}</h5>
-                            ${schedule.subtitle ? `<div class="text-muted small">${this.escapeHTML(schedule.subtitle)}</div>` : ''}
-                        </div>
-                        <div style="flex-grow:1;display:flex;flex-direction:column;">
-                            <p class="mb-0">
-                                ${daysText ? `<strong>Days:</strong> <span class="d-inline-block">${this.escapeHTML(daysText)}</span><br>` : ''}
-                                ${timeText ? `<strong>Time:</strong> ${this.escapeHTML(timeText)}<br>` : ''}
+                // Build accordion version for small screens/iPad with same content as modal
+                const accordionId = `rsyc-accordion-${schedule.id}`;
+                const scheduleAccordion = `
+                <div class="rsyc-schedule-accordion" style="width: 100%; margin-bottom: 1rem; border-radius: 8px; overflow: hidden; border: 1px solid #e0e0e0; background: white;">
+                    <div class="accordion-header" style="padding: 1rem; cursor: pointer; display: flex; justify-content: space-between; align-items: center; background: #f8f9fa; border-bottom: 1px solid #e0e0e0; color: #000;" onclick="window.toggleRSYCAccordion('${accordionId}')">
+                        <div style="color: #000;">
+                            <h5 class="fw-bold mb-1" style="margin: 0; color: #000;">${this.escapeHTML(schedule.title)}</h5>
+                            ${schedule.subtitle ? `<div class="text-muted small" style="color: #666;">${this.escapeHTML(schedule.subtitle)}</div>` : ''}
+                            <p class="mb-0 mt-2" style="font-size: 0.9rem; color: #000;">
+                                ${daysText ? `<strong>Days:</strong> ${this.escapeHTML(daysText)}<br>` : ''}
+                                ${timeText ? `<strong>Time:</strong> ${this.escapeHTML(timeText)}` : ''}
                             </p>
                         </div>
-                        <div style="flex-shrink:0;">
-                            ${expandableInfo}
+                        <div style="display: flex; gap: 0.5rem; align-items: center; flex-shrink: 0; margin-left: 1rem;">
+                            <button class="rsyc-modal-print" onclick="event.stopPropagation(); printRSYCModal('schedule-${schedule.id}')" style="background:none; border:none; cursor:pointer; font-size:1rem; padding:0.25rem; color:#666;" title="Print"><i class="bi bi-printer"></i></button>
+                            <i class="bi bi-chevron-down" id="${accordionId}-icon" style="font-size: 1.2rem; color: #666; transition: transform 0.3s;"></i>
                         </div>
                     </div>
-                    ${scheduleModal}`;
+                    <div id="${accordionId}" class="accordion-body" style="display: none; padding: 1rem; color: #333; background: white;">
+                        ${schedule.videoEmbedCode ? `
+                            <div class="mb-4">
+                                <div class="ratio ratio-16x9" style="border-radius: 12px; overflow: hidden;">
+                                    ${schedule.videoEmbedCode}
+                                </div>
+                            </div>
+                        ` : ''}
+                        ${schedule.centerName ? `<div class="mb-3" style="font-size:1.1rem; font-weight:600; color:#0C0C0C;"><strong>The Salvation Army ${this.escapeHTML(center.name || center.Title)}</strong></div>` : ''}
+                        ${schedule.title ? `<h3 class="mb-2" style="color:#333;">${this.escapeHTML(schedule.title)}</h3>` : ''}
+                        ${schedule.subtitle ? `<p class="mb-3" style="color:#666; font-style:italic;">${this.escapeHTML(schedule.subtitle)}</p>` : ''}
+                        ${schedule.description ? `<p class="mb-1">${schedule.description}</p>` : ''}
+                        
+                        ${hasContent(schedule.scheduleDisclaimer) ? `<div class="mb-4" style="background:#fff3cd; padding:1rem; border-radius:6px; border-left:3px solid #ff6b6b; color:#000;"><strong style="color:#000;"><i class="bi bi-exclamation-triangle me-2"></i>Important Dates/Closures:</strong><br><div class="mt-2" style="font-size:0.95rem;">${this.escapeHTML(schedule.scheduleDisclaimer)}</div></div>` : ''}
+                        
+                        <div class="row">
+                            ${hasContent(schedule.ageRange) ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Age Range:</strong><br>${this.escapeHTML(schedule.ageRange)}</div>` : ''}
+                            ${hasContent(daysText) ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Days:</strong><br>${this.escapeHTML(daysText)}</div>` : ''}
+                            ${hasContent(timeText) ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Time:</strong><br>${this.escapeHTML(timeText)}</div>` : ''}
+                            ${hasContent(schedule.timezone) ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Time Zone:</strong><br>${this.escapeHTML(schedule.timezone)}</div>` : ''}
+                            ${hasContent(schedule.frequency) ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Frequency:</strong><br>${this.escapeHTML(schedule.frequency)}</div>` : ''}
+                            ${hasContent(months) ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Program Runs In:</strong><br>${this.escapeHTML(months)}</div>` : ''}
+                            ${hasContent(registrationMonths) ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Registration Opens:</strong><br>${this.escapeHTML(registrationMonths)}</div>` : ''}
+                            ${hasContent(schedule.registrationDeadline) ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Registration Deadline:</strong><br>${this.escapeHTML(schedule.registrationDeadline)}</div>` : ''}
+                            ${hasContent(schedule.registrationFee) ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Registration Fee:</strong><br>${this.escapeHTML(schedule.registrationFee)}</div>` : ''}
+                            ${hasContent(schedule.cost) ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Cost:</strong><br>${this.escapeHTML(schedule.cost)}</div>` : ''}
+                            ${hasContent(schedule.location) ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Location:</strong><br>${this.escapeHTML(schedule.location)}</div>` : ''}
+                            ${hasContent(schedule.capacity) ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Capacity:</strong><br>${this.escapeHTML(schedule.capacity)}</div>` : ''}
+                            
+                            ${hasContent(schedule.agesServed?.join(', ')) ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Ages:</strong><br>${this.escapeHTML(schedule.agesServed.join(', '))}</div>` : ''}
+                            ${hasContent(schedule.startDate) || hasContent(schedule.endDate) ? `<div class="col-sm-12 mb-3" style="color:#333;"><strong>Program Dates:</strong><br>${hasContent(schedule.startDate) ? this.escapeHTML(schedule.startDate) : ''} ${hasContent(schedule.startDate) && hasContent(schedule.endDate) ? '-' : ''} ${hasContent(schedule.endDate) ? this.escapeHTML(schedule.endDate) : ''}</div>` : ''}
+                            
+                            ${hasContent(schedule.transportationFeeandDetails) ? `<div class="col-sm-12 mb-3" style="color:#333;"><strong>Transportation:</strong><br>${this.preserveLineBreaks(schedule.transportationFeeandDetails)}</div>` : ''}
+                            
+                            ${hasContent(schedule.closedDates) ? `<div class="col-sm-12 mb-3" style="background:#ffe6e6; padding:1rem; border-radius:6px; border-left:3px solid #dc3545; color:#333;"><strong style="color:#dc3545;"><i class="bi bi-calendar-x me-2"></i>Closed Dates:</strong><br>${this.preserveLineBreaks(schedule.closedDates)}</div>` : ''}
+                            ${hasContent(schedule.openHalfDayDates) ? `<div class="col-sm-12 mb-3" style="color:#333;"><strong>Open Half Days:</strong><br>${this.preserveLineBreaks(schedule.openHalfDayDates)}</div>` : ''}
+                            ${hasContent(schedule.openFullDayDates) ? `<div class="col-sm-12 mb-3" style="color:#333;"><strong>Open Full Days:</strong><br>${this.preserveLineBreaks(schedule.openFullDayDates)}</div>` : ''}
+                            
+                            ${hasContent(schedule.orientationDetails) ? `
+                            <div class="col-sm-12 mb-3" style="background:#fffacd; padding:1rem; border-radius:6px; border-left:3px solid #ff8c00; color:#333;">
+                                <strong style="color:#000;"><i class="bi bi-info-circle me-2"></i>Orientation Details:</strong>
+                                <div class="mt-2" style="font-size:0.95rem; color:#000;">${this.preserveLineBreaks(schedule.orientationDetails)}</div>
+                            </div>
+                            ` : ''}
+                            
+                            ${hasContent(schedule.whatToBring) || hasContent(schedule.materialsProvided) ? `
+                            <div class="col-sm-12 mb-3" style="background:#f0f8ff; padding:1rem; border-radius:6px; border-left:3px solid #4169e1; color:#333;">
+                                <strong style="color:#4169e1;"><i class="bi bi-backpack2 me-2"></i>Preparation:</strong>
+                                ${hasContent(schedule.whatToBring) ? `<div class="mt-2"><u>What to Bring:</u><br>${this.preserveLineBreaks(schedule.whatToBring)}</div>` : ''}
+                                ${hasContent(schedule.materialsProvided) ? `<div class="mt-2"><u>Materials Provided:</u><br>${this.preserveLineBreaks(schedule.materialsProvided)}</div>` : ''}
+                            </div>
+                            ` : ''}
+                            
+                            ${hasContent(schedule.prerequisites) ? `<div class="col-sm-12 mb-3" style="color:#333;"><strong>Prerequisites:</strong><br>${this.preserveLineBreaks(schedule.prerequisites)}</div>` : ''}
+                            ${hasContent(schedule.dropOffPickUp) ? `<div class="col-sm-12 mb-3" style="color:#333;"><strong>Drop-off/Pick-up Info:</strong><br>${this.preserveLineBreaks(schedule.dropOffPickUp)}</div>` : ''}
+                        </div>
+                        
+                        ${(schedule.contacts && schedule.contacts.length > 0) || hasContent(schedule.contactInfo) ? `
+                        <div class="col-sm-12 mb-3">
+                            <div class="p-3" style="background:#f0f7f7; border-radius:10px; border:1px solid #d1e7e7; color:#333;">
+                                <strong style="color:#20B3A8; text-transform:uppercase; font-size:1.5rem; letter-spacing:0.05rem; display:block; margin-bottom:0.5rem;">Point${schedule.contacts && schedule.contacts.length > 1 ? 's' : ''} of Contact</strong>
+                                ${schedule.contacts && schedule.contacts.length > 0 ? schedule.contacts.map((contact, idx) => `
+                                    <div${idx > 0 ? ` style="margin-top:1rem; padding-top:1rem; border-top:1px solid rgba(32,179,168,0.15);"` : ''}>
+                                        ${hasContent(contact.name) ? `<div style="font-weight:700; font-size:1.5rem;">${this.escapeHTML(contact.name)}</div>` : ''}
+                                        ${hasContent(contact.jobTitle) ? `<div class="small text-muted" style="font-weight:500;">${this.escapeHTML(contact.jobTitle)}</div>` : ''}
+                                        ${hasContent(contact.email) ? `<div class="mt-2"><a href="mailto:${this.escapeHTML(contact.email)}" style="color:#2F4857; text-decoration:none; font-weight:400;"><i class="bi bi-envelope-at me-2"></i>${this.escapeHTML(contact.email)}</a></div>` : ''}
+                                    </div>
+                                `).join('') : ''}
+                                ${hasContent(schedule.contactInfo) ? `<div class="mt-2 pt-2 border-top" style="font-size:0.9rem; border-top-color:rgba(32,179,168,0.2) !important;">${this.escapeHTML(schedule.contactInfo)}</div>` : ''}
+                            </div>
+                        </div>
+                        ` : ''}
+                        
+                        ${(schedule.relatedPrograms && Array.isArray(schedule.relatedPrograms) && schedule.relatedPrograms.length > 0) ? `
+                        <div class="col-sm-12 mb-3">
+                            <div style="background:#f5f5f5; padding:1rem; border-radius:6px; color:#333;">
+                                <strong style="color:#333; font-size:1.1rem; display:block; margin-bottom:0.75rem;"><i class="bi bi-link me-2" style="color:#20B3A8;"></i>Related Programs</strong>
+                                <div class="d-flex flex-wrap gap-2">
+                                    ${schedule.relatedPrograms.map(p => `<span class="badge bg-primary">${this.escapeHTML(p.name)}</span>`).join('')}
+                                </div>
+                            </div>
+                        </div>
+                        ` : ''}
+                    </div>
+                </div>
+                `;
+                
+                return `
+                    <div>
+                        <!-- Desktop Card Version -->
+                        <div class="schedule-card rsyc-schedule-card-desktop text-dark" style="min-width:230px;padding:1rem;border-radius:8px;background:#fff;box-shadow:0 1px 4px rgba(0,0,0,0.06);display:flex;flex-direction:column;height:100%;gap:0.75rem;">
+                            <div style="flex-shrink:0;">
+                                <h5 class="fw-bold mb-1">${this.escapeHTML(schedule.title)}</h5>
+                                ${schedule.subtitle ? `<div class="text-muted small">${this.escapeHTML(schedule.subtitle)}</div>` : ''}
+                            </div>
+                            <div style="flex-grow:1;display:flex;flex-direction:column;">
+                                <p class="mb-0">
+                                    ${daysText ? `<strong>Days:</strong> <span class="d-inline-block">${this.escapeHTML(daysText)}</span><br>` : ''}
+                                    ${timeText ? `<strong>Time:</strong> ${this.escapeHTML(timeText)}<br>` : ''}
+                                </p>
+                            </div>
+                            <div style="flex-shrink:0;">
+                                ${expandableInfo}
+                            </div>
+                        </div>
+                        
+                        <!-- Mobile Accordion Version -->
+                        <div class="rsyc-schedule-accordion-mobile" style="display: none;">
+                            ${scheduleAccordion}
+                        </div>
+                        
+                        ${scheduleModal}
+                    </div>
+                    `;
             }).join('');
             
             // Conditionally center if 3 or fewer cards, otherwise left-align for proper scrolling
@@ -2062,7 +2199,7 @@ window.RSYCTemplates = RSYCTemplates;
 // Create global instance
 window.rsycTemplates = new RSYCTemplates();
 
-// Print function for modal content
+// Print function for modal content - Mobile-friendly with fallback
 function printRSYCModal(modalId) {
     const modal = document.getElementById(`rsyc-modal-${modalId}`);
     if (!modal) return;
@@ -2077,56 +2214,99 @@ function printRSYCModal(modalId) {
     // Create print window title: "Schedule Title - Center Name"
     const printTitle = centerName ? `${scheduleTitle} - ${centerName}` : scheduleTitle;
     
-    // Create a new window for printing
-    const printWindow = window.open('', '', 'height=900,width=1200');
-    
     // Get modal content
     const modalContent = modal.querySelector('.rsyc-modal-content');
     
-    // Write HTML to print window
-    printWindow.document.write('<!DOCTYPE html>');
-    printWindow.document.write('<html>');
-    printWindow.document.write('<head>');
-    printWindow.document.write('<meta charset="utf-8">');
-    printWindow.document.write(`<title>${printTitle}</title>`);
-    printWindow.document.write('<style>');
-    printWindow.document.write('body { font-family: Arial, sans-serif; margin: 0.5in 0.25in; font-size: 13px; }');
-    printWindow.document.write('h3 { color: #333; margin: 0.5rem 0; font-size: 16px; }');
-    printWindow.document.write('p { margin: 0.5rem 0; line-height: 1.6; font-size: 12px; }');
-    printWindow.document.write('strong { font-weight: 600; }');
-    printWindow.document.write('.rsyc-modal-header { margin-bottom: 1.5rem; font-size: 13px; }');
-    printWindow.document.write('.rsyc-modal-body { color: #333; font-size: 12px; }');
-    printWindow.document.write('.rsyc-modal-close, .rsyc-modal-print { display: none; }');
-    printWindow.document.write('.row { display: flex; flex-wrap: wrap; margin-bottom: 1rem; }');
-    printWindow.document.write('.col-sm-12 { width: 100%; font-size: 12px; }');
-    printWindow.document.write('.col-md-6 { width: 50%; font-size: 12px; }');
-    printWindow.document.write('.mb-1 { margin-bottom: 0.25rem; }');
-    printWindow.document.write('.mb-2 { margin-bottom: 0.5rem; }');
-    printWindow.document.write('.mb-3 { margin-bottom: 1rem; }');
-    printWindow.document.write('.mb-4 { margin-bottom: 1.5rem; }');
-    printWindow.document.write('u { text-decoration: underline; }');
-    printWindow.document.write('br { line-height: 1.6; }');
-    printWindow.document.write('.p-3 { padding: 1rem; }');
-    printWindow.document.write('</style>');
-    printWindow.document.write('</head>');
-    printWindow.document.write('<body>');
-    printWindow.document.write(modalContent.innerHTML);
-    printWindow.document.write('<div style="margin-top: 2rem; padding-top: 1rem; border-top: 1px solid #ddd; text-align: center; font-size: 11px; color: #666;">');
-    printWindow.document.write('<p style="margin: 0;">Learn more about exciting activities for children, teens, and families at www.redshieldyouth.org</p>');
-    printWindow.document.write('</div>');
-    printWindow.document.write('</body>');
-    printWindow.document.write('</html>');
-    printWindow.document.close();
+    // Create a new window for printing
+    const printWindow = window.open('', '', 'height=900,width=1200');
     
-    // Wait for content to load, then print
-    printWindow.onload = function() {
-        printWindow.print();
-        printWindow.close();
-    };
+    // Check if window opened successfully (mobile popups may be blocked)
+    if (!printWindow) {
+        alert('Unable to open print window. Your browser may have popup blocking enabled.');
+        return;
+    }
+    
+    // Build HTML content
+    const htmlContent = `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>${printTitle}</title>
+<style>
+body { font-family: Arial, sans-serif; margin: 0.5in 0.25in; font-size: 13px; }
+h3 { color: #333; margin: 0.5rem 0; font-size: 16px; }
+p { margin: 0.5rem 0; line-height: 1.6; font-size: 12px; }
+strong { font-weight: 600; }
+.rsyc-modal-header { margin-bottom: 1.5rem; font-size: 13px; }
+.rsyc-modal-body { color: #333; font-size: 12px; }
+.rsyc-modal-close, .rsyc-modal-print { display: none; }
+.row { display: flex; flex-wrap: wrap; margin-bottom: 1rem; }
+.col-sm-12 { width: 100%; font-size: 12px; }
+.col-md-6 { width: 50%; font-size: 12px; }
+.mb-1 { margin-bottom: 0.25rem; }
+.mb-2 { margin-bottom: 0.5rem; }
+.mb-3 { margin-bottom: 1rem; }
+.mb-4 { margin-bottom: 1.5rem; }
+u { text-decoration: underline; }
+br { line-height: 1.6; }
+.p-3 { padding: 1rem; }
+@media print {
+    body { margin: 0.5in 0.25in; }
+}
+</style>
+</head>
+<body>
+${modalContent.innerHTML}
+<div style="margin-top: 2rem; padding-top: 1rem; border-top: 1px solid #ddd; text-align: center; font-size: 11px; color: #666;">
+<p style="margin: 0;">Learn more about exciting activities for children, teens, and families at www.redshieldyouth.org</p>
+</div>
+</body>
+</html>`;
+    
+    // Write content using a more reliable method
+    try {
+        printWindow.document.open();
+        printWindow.document.write(htmlContent);
+        printWindow.document.close();
+        
+        // Use setTimeout to ensure content is rendered before printing
+        // This is more reliable on mobile devices
+        const printFunction = function() {
+            try {
+                printWindow.print();
+                // Use setTimeout to ensure print dialog completes before closing
+                setTimeout(function() {
+                    printWindow.close();
+                }, 500);
+            } catch(e) {
+                console.error('Print error:', e);
+                // Don't close window if print fails, let user print manually
+            }
+        };
+        
+        // Check if document is ready
+        if (printWindow.document.readyState === 'complete') {
+            printFunction();
+        } else {
+            // Wait for window to fully load
+            printWindow.onload = printFunction;
+            // Fallback timeout for mobile browsers that don't fire onload reliably
+            setTimeout(printFunction, 1000);
+        }
+    } catch(e) {
+        alert('Unable to print. Please try again.');
+        console.error('Print setup error:', e);
+        try {
+            printWindow.close();
+        } catch(e) {
+            // If close fails, just leave window open
+        }
+    }
 }
 
 /**
- * Print all schedules aggregated into a one-page format
+ * Print all schedules aggregated into a one-page format - Mobile-friendly
  */
 function printAllSchedules(cacheKey) {
     // Retrieve schedules from global cache
@@ -2144,55 +2324,17 @@ function printAllSchedules(cacheKey) {
     
     // Create print window
     const printWindow = window.open('', '', 'height=900,width=1200');
-    const printTitle = `Program Schedules - ${centerName}`;
     
-    // Write document with optimized CSS for one-pager
-    printWindow.document.write('<!DOCTYPE html>');
-    printWindow.document.write('<html>');
-    printWindow.document.write('<head>');
-    printWindow.document.write('<meta charset="utf-8">');
-    printWindow.document.write(`<title>${printTitle}</title>`);
-    printWindow.document.write('<style>');
-    printWindow.document.write('* { margin: 0; padding: 0; box-sizing: border-box; }');
-    printWindow.document.write('body { font-family: Arial, sans-serif; margin: 0.4in 0.3in; font-size: 12px; line-height: 1.5; color: #333; }');
-    printWindow.document.write('h2 { color: #20B3A8; font-size: 18px; margin-bottom: 0.3rem; padding-bottom: 0.3rem; border-bottom: 2px solid #20B3A8; }');
-    printWindow.document.write('h3 { color: #2F4857; font-size: 13px; margin: 0.5rem 0 0.3rem 0; }');
-    printWindow.document.write('h4 { color: #20B3A8; font-size: 13px; margin: 0.4rem 0 0.2rem 0; font-weight: 600; }');
-    printWindow.document.write('p { margin: 0.3rem 0; }');
-    printWindow.document.write('.schedule-group { page-break-inside: avoid; margin-bottom: 1rem; }');
-    printWindow.document.write('.header { text-align: center; margin-bottom: 0.8rem; }');
-    printWindow.document.write('.center-name { font-size: 13px; color: #666; margin-bottom: 0.2rem; }');
-    printWindow.document.write('.about-section { margin-bottom: 1rem; padding-bottom: 1rem; border-bottom: 1px solid #ddd; display: grid; grid-template-columns: 2fr 1fr; gap: 1rem; align-items: start; }');
-    printWindow.document.write('.about-text { grid-column: 1; font-size: 11px; line-height: 1.5; color: #333; }');
-    printWindow.document.write('.about-photo { grid-column: 2; width: 100%; height: auto; aspect-ratio: 1 / 1; border-radius: 4px; object-fit: cover; }');
-    printWindow.document.write('.schedule-list { columns: 2; column-gap: 0.5in; }');
-    printWindow.document.write('.schedule-item { break-inside: avoid; }');
-    printWindow.document.write('.footer-note { margin-top: 1rem; padding-top: 0.8rem; border-top: 1px solid #ddd; text-align: center; font-size: 10px; color: #666; }');
-    printWindow.document.write('@media print { body { margin: 0.4in 0.3in; } }');
-    printWindow.document.write('</style>');
-    printWindow.document.write('</head>');
-    printWindow.document.write('<body>');
-    
-    // Header
-    printWindow.document.write('<div class="header">');
-    printWindow.document.write(`<h2>Program Schedules</h2>`);
-    printWindow.document.write(`<div class="center-name">The Salvation Army ${centerName}</div>`);
-    printWindow.document.write('</div>');
-    
-    // About This Center section with photo side-by-side
-    if (aboutText) {
-        printWindow.document.write('<div class="about-section">');
-        printWindow.document.write('<div class="about-text">');
-        printWindow.document.write(aboutText);
-        printWindow.document.write('</div>');
-        if (exteriorPhoto) {
-            printWindow.document.write(`<img src="${exteriorPhoto}" alt="Center Exterior" class="about-photo">`);
-        }
-        printWindow.document.write('</div>');
+    // Check if window opened successfully (mobile popups may be blocked)
+    if (!printWindow) {
+        alert('Unable to open print window. Your browser may have popup blocking enabled.');
+        return;
     }
     
-    // Schedules in two-column layout for compact view
-    printWindow.document.write('<div class="schedule-list">');
+    const printTitle = `Program Schedules - ${centerName}`;
+    
+    // Build schedules content
+    let schedulesHTML = '';
     schedules.forEach((schedule, index) => {
         const daysText = schedule.scheduleDays && Array.isArray(schedule.scheduleDays) && schedule.scheduleDays.length > 0
             ? schedule.scheduleDays.join(', ')
@@ -2203,39 +2345,114 @@ function printAllSchedules(cacheKey) {
         const cost = schedule.cost || '';
         const registrationDeadline = schedule.registrationDeadline || '';
         
-        printWindow.document.write('<div class="schedule-item" style="margin-bottom: 0.8rem; padding-bottom: 0.8rem; border-bottom: 1px solid #e0e0e0;">');
-        printWindow.document.write(`<h4>${schedule.title || 'Program'}</h4>`);
+        schedulesHTML += '<div class="schedule-item" style="margin-bottom: 0.8rem; padding-bottom: 0.8rem; border-bottom: 1px solid #e0e0e0;">';
+        schedulesHTML += `<h4>${schedule.title || 'Program'}</h4>`;
         
         if (schedule.subtitle) {
-            printWindow.document.write(`<p style="font-size: 11px; color: #666; margin-bottom: 0.3rem;">${schedule.subtitle}</p>`);
+            schedulesHTML += `<p style="font-size: 11px; color: #666; margin-bottom: 0.3rem;">${schedule.subtitle}</p>`;
         }
         
         // Compact details in grid
-        printWindow.document.write('<div style="font-size: 11px; line-height: 1.4;">');
-        if (daysText) printWindow.document.write(`<div><strong>Days:</strong> ${daysText}</div>`);
-        if (timeText) printWindow.document.write(`<div><strong>Time:</strong> ${timeText}</div>`);
-        if (ageRange) printWindow.document.write(`<div><strong>Ages:</strong> ${ageRange}</div>`);
-        if (location) printWindow.document.write(`<div><strong>Location:</strong> ${location}</div>`);
-        if (cost) printWindow.document.write(`<div><strong>Cost:</strong> ${cost}</div>`);
-        if (registrationDeadline) printWindow.document.write(`<div><strong>Registration:</strong> ${registrationDeadline}</div>`);
-        printWindow.document.write('</div>');
+        schedulesHTML += '<div style="font-size: 11px; line-height: 1.4;">';
+        if (daysText) schedulesHTML += `<div><strong>Days:</strong> ${daysText}</div>`;
+        if (timeText) schedulesHTML += `<div><strong>Time:</strong> ${timeText}</div>`;
+        if (ageRange) schedulesHTML += `<div><strong>Ages:</strong> ${ageRange}</div>`;
+        if (location) schedulesHTML += `<div><strong>Location:</strong> ${location}</div>`;
+        if (cost) schedulesHTML += `<div><strong>Cost:</strong> ${cost}</div>`;
+        if (registrationDeadline) schedulesHTML += `<div><strong>Registration:</strong> ${registrationDeadline}</div>`;
+        schedulesHTML += '</div>';
         
-        printWindow.document.write('</div>');
+        schedulesHTML += '</div>';
     });
-    printWindow.document.write('</div>');
     
-    // Footer note
-    printWindow.document.write('<div class="footer-note">');
-    printWindow.document.write('<p style="margin: 0;">Learn more about exciting activities for children, teens, and families at www.redshieldyouth.org</p>');
-    printWindow.document.write('</div>');
+    // Build complete HTML document
+    const htmlContent = `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>${printTitle}</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: Arial, sans-serif; margin: 0.4in 0.3in; font-size: 12px; line-height: 1.5; color: #333; }
+h2 { color: #20B3A8; font-size: 18px; margin-bottom: 0.3rem; padding-bottom: 0.3rem; border-bottom: 2px solid #20B3A8; }
+h3 { color: #2F4857; font-size: 13px; margin: 0.5rem 0 0.3rem 0; }
+h4 { color: #20B3A8; font-size: 13px; margin: 0.4rem 0 0.2rem 0; font-weight: 600; }
+p { margin: 0.3rem 0; }
+.schedule-group { page-break-inside: avoid; margin-bottom: 1rem; }
+.header { text-align: center; margin-bottom: 0.8rem; }
+.center-name { font-size: 13px; color: #666; margin-bottom: 0.2rem; }
+.about-section { margin-bottom: 1rem; padding-bottom: 1rem; border-bottom: 1px solid #ddd; display: grid; grid-template-columns: 2fr 1fr; gap: 1rem; align-items: start; }
+.about-text { grid-column: 1; font-size: 11px; line-height: 1.5; color: #333; }
+.about-photo { grid-column: 2; width: 100%; height: auto; aspect-ratio: 1 / 1; border-radius: 4px; object-fit: cover; }
+.schedule-list { columns: 2; column-gap: 0.5in; }
+.schedule-item { break-inside: avoid; }
+.footer-note { margin-top: 1rem; padding-top: 0.8rem; border-top: 1px solid #ddd; text-align: center; font-size: 10px; color: #666; }
+@media print { body { margin: 0.4in 0.3in; } }
+</style>
+</head>
+<body>
+
+<div class="header">
+<h2>Program Schedules</h2>
+<div class="center-name">The Salvation Army ${centerName}</div>
+</div>
+
+${aboutText ? `<div class="about-section">
+<div class="about-text">
+${aboutText}
+</div>
+${exteriorPhoto ? `<img src="${exteriorPhoto}" alt="Center Exterior" class="about-photo">` : ''}
+</div>` : ''}
+
+<div class="schedule-list">
+${schedulesHTML}
+</div>
+
+<div class="footer-note">
+<p style="margin: 0;">Learn more about exciting activities for children, teens, and families at www.redshieldyouth.org</p>
+</div>
+
+</body>
+</html>`;
     
-    printWindow.document.write('</body>');
-    printWindow.document.write('</html>');
-    printWindow.document.close();
-    
-    // Wait for content to load, then print
-    printWindow.onload = function() {
-        printWindow.print();
-        printWindow.close();
-    };
+    // Write content using a more reliable method
+    try {
+        printWindow.document.open();
+        printWindow.document.write(htmlContent);
+        printWindow.document.close();
+        
+        // Use setTimeout to ensure content is rendered before printing
+        // This is more reliable on mobile devices
+        const printFunction = function() {
+            try {
+                printWindow.print();
+                // Use setTimeout to ensure print dialog completes before closing
+                setTimeout(function() {
+                    printWindow.close();
+                }, 500);
+            } catch(e) {
+                console.error('Print error:', e);
+                // Don't close window if print fails, let user print manually
+            }
+        };
+        
+        // Check if document is ready
+        if (printWindow.document.readyState === 'complete') {
+            printFunction();
+        } else {
+            // Wait for window to fully load
+            printWindow.onload = printFunction;
+            // Fallback timeout for mobile browsers that don't fire onload reliably
+            setTimeout(printFunction, 1000);
+        }
+    } catch(e) {
+        alert('Unable to print. Please try again.');
+        console.error('Print setup error:', e);
+        try {
+            printWindow.close();
+        } catch(e) {
+            // If close fails, just leave window open
+        }
+    }
 }

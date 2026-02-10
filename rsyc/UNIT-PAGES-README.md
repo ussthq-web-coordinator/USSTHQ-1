@@ -4,6 +4,7 @@
 
 The RSYC Unit Pages system extends the existing center profile system to support organizational hierarchy pages at multiple levels:
 
+- **All Centers** Page - Interactive grid of all 57 centers nationwide with filters
 - **Division** Pages (e.g., "Texas Division")
 - **State** Pages (e.g., "North Carolina State")  
 - **City** Pages (e.g., "Charlotte, NC")
@@ -65,10 +66,11 @@ All content is strategically designed for three key audiences:
 
 | File | Purpose | Dependencies |
 |------|---------|--------------|
-| `rsyc-unit-data.js` | Data aggregation layer | rsyc-data.js |
-| `rsyc-unit-templates.js` | HTML template generation | None |
+| `rsyc-unit-data.js` | Data aggregation layer (hierarchies + "all" units) | rsyc-data.js |
+| `rsyc-unit-templates.js` | HTML template generation (includes generateAllCentersGrid) | None |
 | `rsyc-unit-injector.js` | Client-side page rendering | All above |
 | `rsyc-unit-publisher.html` | Admin interface | All above |
+| `rsyc-generator-v2.css` | Stylesheet for all pages | None |
 
 ### Data Flow
 
@@ -146,9 +148,61 @@ https://your-domain.com/divisions/texas/
 <script src="https://thisishoperva.org/rsyc/rsyc-unit-injector.js"></script>
 ```
 
+### Example 5: All Centers National Page (NEW)
+
+**Purpose**: Display all 57 Salvation Army Youth Centers across the country with interactive filters
+
+**URL Pattern:**
+```
+https://your-domain.com/all-centers/
+```
+
+**HTML:**
+```html
+<!DOCTYPE html>
+<html>
+<head>
+  <link rel="stylesheet" href="https://thisishoperva.org/rsyc/rsyc-generator-v2.css">
+</head>
+<body>
+  <div id="all-centers-page" 
+       data-rsyc-unit-type="all" 
+       data-rsyc-unit-value="all"></div>
+  
+  <script src="https://thisishoperva.org/rsyc/rsyc-unit-injector.js"></script>
+</body>
+</html>
+```
+
+**What Users See:**
+- **Filter Bar** with 4 dropdowns:
+  - City (46 options)
+  - State (11 options)
+  - Facility Features (31 options)
+  - Programs (43 options)
+- **Interactive Card Grid** (3-column responsive layout):
+  - Each center displayed as a card with:
+    - **Background image**: Center's exterior photo (fallback to default Salvation Army building image)
+    - **Gradient overlay**: Semi-transparent black-to-transparent gradient
+    - **Center name**: Bold text overlaid on image
+    - **Location**: City, State text
+    - **"Learn More"** link
+  - Cards update instantly as filters are applied
+- **Responsive Design**: Adapts to all screen sizes
+
+**Features:**
+- ✅ Real-time client-side filtering (no page reload)
+- ✅ Multiple filter combinations work together (AND logic)
+- ✅ Dynamic filter population from actual center data
+- ✅ Each center links to `/redshieldyouth/{center-slug}` URL pattern
+- ✅ Exterior photos for visual center identification
+- ✅ Works offline once CSS and scripts are cached
+
 ## Section Configuration
 
 ### Available Sections
+
+**For Division, State, City, and Area Command pages:**
 
 ```javascript
 {
@@ -163,6 +217,10 @@ https://your-domain.com/divisions/texas/
   'contact': { name: 'Contact & Learn More', order: 9 }
 }
 ```
+
+**For "All Centers" page:**
+- Only "Filters" + "Card Grid" sections (no traditional unit page sections)
+- Automatically populates with all centers and all available filter options
 
 ### Global Configuration
 
@@ -307,6 +365,185 @@ https://your-domain.com/divisions/texas/
   }
 </style>
 ```
+
+## All Centers Page - Production Implementation
+
+### What Was Built
+
+A complete "All Centers" unit type that displays all 57 Red Shield Youth Centers nationally with:
+- **Interactive Card Grid**: CSS Grid layout (3 columns on desktop, responsive on mobile)
+- **Center Photos**: Each card uses exterior photo from RSYCHomepagePhotos.json
+- **Gradient Overlay**: Semi-transparent gradient with center name, location, "Learn More" link
+- **Smart Filtering**: 4 independent filters that work together
+- **URL Navigation**: Links to `/redshieldyouth/{center-slug}` pattern
+
+### Changes Made to Core Files
+
+#### rsyc-unit-data.js
+- Added `'all': {}` entry to `indexByType` object
+- Added `_buildAllUnits(centers)` method that:
+  - Creates a single unit containing all 57 centers
+  - Enriches each center with photos data from `dataLoader.cache.photos`
+  - Calculates statistics (centerCount, etc.)
+- Updated `buildUnitHierarchy()` to call `_buildAllUnits()`
+
+#### rsyc-unit-templates.js
+- Added special handling in `generateUnitProfile()`:
+  - Detects `unit.type === 'all'`
+  - Calls new `generateAllCentersGrid()` method instead of regular sections
+- Added `generateAllCentersGrid(unit)` method that:
+  - Extracts unique filter values from all centers (cities, states, features, programs)
+  - Generates filter HTML with 4 dropdowns
+  - Generates center cards with:
+    - Exterior photo background (or fallback default image)
+    - Gradient overlay
+    - Center name, city/state
+    - "Learn More" link to center URL
+  - Includes inline JavaScript for real-time filtering with instant card visibility updates
+
+#### rsyc-data.js
+- Added mapping: `areaCommand: getVal(center.field_17)` in `processCenters()`
+- Maps SharePoint field_17 to center.areaCommand for area command unit support
+
+#### rsyc-unit-injector.js
+- Fixed function call: `_normalizeForId()` instead of `this._normalizeForId()`
+
+### How to Deploy to Production
+
+#### 1. **Upload Files to Server**
+Copy these files to your RSYC directory:
+- `rsyc-unit-data.js` (updated with _buildAllUnits)
+- `rsyc-unit-templates.js` (updated with generateAllCentersGrid)
+- `rsyc-data.js` (updated with areaCommand field mapping)
+- `rsyc-unit-injector.js` (fixed function call)
+
+#### 2. **Create the All Centers Page**
+
+**Option A: Static HTML Page (Recommended)**
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>All Red Shield Youth Centers</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-icons/1.10.0/font/bootstrap-icons.min.css">
+    <link rel="stylesheet" href="https://thisishoperva.org/rsyc/rsyc-generator-v2.css">
+</head>
+<body>
+    <div style="max-width: 1400px; margin: 0 auto; padding: 20px;">
+        <h1 style="margin-bottom: 30px; color: #20B3A8;">Red Shield Youth Centers Across America</h1>
+        
+        <!-- All Centers Grid will load here -->
+        <div id="all-centers-page" 
+             data-rsyc-unit-type="all" 
+             data-rsyc-unit-value="all"></div>
+    </div>
+
+    <script src="https://thisishoperva.org/rsyc/rsyc-unit-injector.js"></script>
+</body>
+</html>
+```
+
+**Option B: CMS Integration (Zesty, WordPress, etc.)**
+```html
+<div id="all-centers-page" 
+     data-rsyc-unit-type="all" 
+     data-rsyc-unit-value="all"></div>
+<script src="https://thisishoperva.org/rsyc/rsyc-unit-injector.js"></script>
+```
+
+#### 3. **URL Routing**
+
+**Create a route for the all-centers page:**
+
+```
+/all-centers/
+/centers/all/
+/explore/centers/
+```
+
+(Choose whichever fits your URL structure)
+
+#### 4. **Navigation Integration**
+
+Add link to your main navigation:
+```html
+<a href="/all-centers/">All Centers</a>
+```
+
+#### 5. **Testing Checklist**
+
+- [ ] Page loads without errors (check console with F12)
+- [ ] All 57 centers display in the grid
+- [ ] City filter shows ~46 options and filters correctly
+- [ ] State filter shows 11 options and filters correctly  
+- [ ] Facility Features filter shows ~31 options and filters correctly
+- [ ] Programs filter shows ~43 options and filters correctly
+- [ ] Multiple filters work together (e.g., filter by both State and City)
+- [ ] Each center card displays exterior photo or fallback image
+- [ ] "Learn More" links navigate to `/redshieldyouth/{center-slug}`
+- [ ] Grid is responsive on mobile (1 column), tablet (2 columns), desktop (3 columns)
+- [ ] Page loads in under 2 seconds (after initial data fetch)
+
+### URL Slug Generation
+
+The "Learn More" link slugs are generated automatically from center names:
+
+**Examples:**
+- "Aiken Teen Center" → `/redshieldyouth/aiken-teen-center`
+- "Charleston WV - St Albans" → `/redshieldyouth/charleston-wv-st-albans`
+- "Allegany County" → `/redshieldyouth/allegany-county`
+
+**Algorithm:**
+1. Convert to lowercase
+2. Replace spaces with dashes
+3. Collapse multiple consecutive dashes to single dash
+4. Remove special characters (keep only alphanumeric and dashes)
+
+**Important**: Ensure these URLs either:
+- Redirect to center detail pages using slug-based routing, OR
+- Each center has a page at `/redshieldyouth/{slug}/` URL pattern
+
+### Performance Optimization
+
+**For large pages:**
+- All filtering happens client-side (no server requests)
+- CSS Grid layout is optimized for browser rendering
+- Images are lazy-loaded by browser
+- Caching enabled (1 hour for unit hierarchy)
+
+**Expected load time:**
+- First visit: ~1.5s (data fetching + rendering)
+- Subsequent visits: ~100ms (cached data)
+- Filter interaction: <10ms (client-side)
+
+### Image Source Priority
+
+The system tries to use photos in this order:
+1. **urlExteriorPhoto** (preferred - center exterior/building photo)
+2. **urlFacilityFeaturesPhoto** (facility features image)
+3. **urlProgramsPhoto** (programs image)
+4. **Default**: Salvation Army building image (https://s3.amazonaws.com/uss-cache.salvationarmy.org/9150a418-1c58-4d01-bf81-5753d1c608ae_salvation+army+building+1.png)
+
+### Troubleshooting Deployment
+
+**Issue**: "Unit not found: all - all"
+- **Cause**: Cache might be stale
+- **Solution**: Hard refresh page (Ctrl+Shift+R), check console logs
+
+**Issue**: Cards not showing images
+- **Cause**: Photos not loaded in data
+- **Solution**: Check RSYCHomepagePhotos.json loads (F12 Network tab), fallback should still show
+
+**Issue**: Filters not working
+- **Cause**: Filter data attributes not properly set
+- **Solution**: Verify JavaScript not throwing errors (check console), filters should still populate
+
+**Issue**: Links go to wrong URL
+- **Cause**: Center slug generation issue or routing not configured
+- **Solution**: Verify center names in data, test slug generation formula
 
 ## Troubleshooting
 
