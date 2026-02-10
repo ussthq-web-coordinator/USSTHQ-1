@@ -20,3 +20,4 @@
 
     // Expose globally
     window.RSYCPublisher = RSYCPublisher;
+})();

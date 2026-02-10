@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RSYC Unit Page Publisher</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-icons/1.10.0/font/bootstrap-icons.min.css" rel="stylesheet">
+    <link href="rsyc-generator-v2.css" rel="stylesheet">
+    <style>
+        body {
+            background-color: #f8f9fa;
+        }
+        
+        .sidebar {
+            background: white;
+            border-right: 1px solid #e9ecef;
+            position: sticky;
+            top: 0;
+            height: 100vh;
+            overflow-y: auto;
+        }
+        
+        .preview-container {
+            background: white;
+            min-height: 100vh;
+        }
+        
+        .config-section {
+            padding: 1.5rem;
+            border-bottom: 1px solid #e9ecef;
+        }
+        
+        .config-section h6 {
+            color: #20B3A8;
+            font-weight: 600;
+            margin-bottom: 1rem;
+            text-transform: uppercase;
+            font-size: 0.85rem;
+            letter-spacing: 0.5px;
+        }
+        
+        .btn-section-toggle {
+            display: flex;
+            align-items: center;
+            width: 100%;
+            padding: 0.5rem 0.75rem;
+            border: 1px solid #dee2e6;
+            border-radius: 6px;
+            background: white;
+            cursor: pointer;
+            margin-bottom: 0.5rem;
+            transition: all 0.2s;
+        }
+        
+        .btn-section-toggle:hover {
+            background: #f8f9fa;
+            border-color: #20B3A8;
+        }
+        
+        .btn-section-toggle.active {
+            background: #e8f5f4;
+            border-color: #20B3A8;
+            color: #20B3A8;
+        }
+        
+        .section-checkbox {
+            margin-right: 0.75rem;
+        }
+        
+        .embed-code {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 6px;
+            padding: 1rem;
+            font-family: monospace;
+            font-size: 0.85rem;
+            max-height: 200px;
+            overflow-y: auto;
+            margin-top: 1rem;
+        }
+        
+        .loading-spinner {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 1050;
+        }
+        
+        .preview-header {
+            background: #20B3A8;
+            color: white;
+            padding: 1rem 1.5rem;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .alert-info {
+            background-color: #d1ecf1;
+            border-color: #bee5eb;
+            color: #0c5460;
+        }
+    </style>
+</head>
+<body>
+    <div class="container-fluid">
+        <div class="row" style="height: 100vh;">
+            <!-- Sidebar -->
+            <div class="col-lg-3 sidebar">
+                <div style="padding: 1.5rem;">
+                    <h4 class="fw-bold mb-1">
+                        <i class="bi bi-building" style="color: #20B3A8;"></i> RSYC Unit Publisher
+                    </h4>
+                    <p class="text-muted small">Create unit pages for Division, State, City, or Area Command</p>
+                </div>
+
+                <!-- Unit Selection -->
+                <div class="config-section">
+                    <h6><i class="bi bi-geo"></i> Select Unit</h6>
+                    <div class="mb-3">
+                        <label class="form-label small fw-600">Unit Type</label>
+                        <select id="unitType" class="form-select form-select-sm">
+                            <option value="">-- Choose Type --</option>
+                            <option value="division">Division</option>
+                            <option value="state">State</option>
+                            <option value="city">City</option>
+                            <option value="area-command">Area Command</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small fw-600">Unit Value</label>
+                        <select id="unitValue" class="form-select form-select-sm" disabled>
+                            <option value="">-- Load units first --</option>
+                        </select>
+                    </div>
+                    <button id="loadUnitBtn" class="btn btn-sm" style="background-color: #20B3A8; color: white; width: 100%;" disabled>
+                        <i class="bi bi-arrow-clockwise"></i> Load Unit
+                    </button>
+                </div>
+
+                <!-- Section Configuration -->
+                <div class="config-section">
+                    <h6><i class="bi bi-layout-sidebar"></i> Sections</h6>
+                    <div id="sectionsList" style="max-height: 300px; overflow-y: auto;">
+                        <p class="text-muted small">Select a unit to configure sections</p>
+                    </div>
+                </div>
+
+                <!-- Embed Code -->
+                <div class="config-section">
+                    <h6><i class="bi bi-code"></i> Embed Code</h6>
+                    <button id="copyEmbedBtn" class="btn btn-sm btn-outline-secondary w-100 mb-2" disabled>
+                        <i class="bi bi-clipboard"></i> Copy Code
+                    </button>
+                    <div id="embedCode" class="embed-code" style="display: none;">
+&lt;div id="unit-page" 
+     data-rsyc-unit-type="division" 
+     data-rsyc-unit-value="Texas"&gt;&lt;/div&gt;
+&lt;script src="https://thisishoperva.org/rsyc/rsyc-unit-injector.js"&gt;&lt;/script&gt;
+                    </div>
+                </div>
+
+                <!-- Quick Links -->
+                <div class="config-section">
+                    <h6><i class="bi bi-question-circle"></i> Help</h6>
+                    <div class="small">
+                        <p class="mb-2"><strong>How to use:</strong></p>
+                        <ol style="padding-left: 1rem; margin-bottom: 1rem;">
+                            <li>Select unit type</li>
+                            <li>Choose unit value</li>
+                            <li>Configure sections</li>
+                            <li>Copy embed code</li>
+                            <li>Paste into page</li>
+                        </ol>
+                    </div>
+                    <a href="UNIT-PAGES-ARCHITECTURE.md" class="btn btn-sm btn-outline-secondary w-100">
+                        <i class="bi bi-file-text"></i> Full Docs
+                    </a>
+                </div>
+            </div>
+
+            <!-- Preview Area -->
+            <div class="col-lg-9 preview-container">
+                <div class="preview-header">
+                    <div>
+                        <h5 class="mb-0">
+                            <span id="previewTitle">Unit Page Preview</span>
+                        </h5>
+                    </div>
+                    <div>
+                        <button id="refreshBtn" class="btn btn-sm btn-light" style="color: white;">
+                            <i class="bi bi-arrow-clockwise"></i>
+                        </button>
+                        <button id="fullscreenBtn" class="btn btn-sm btn-light" style="color: white;">
+                            <i class="bi bi-fullscreen"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <div id="previewContent" style="padding: 2rem;">
+                    <div class="alert alert-info">
+                        <i class="bi bi-info-circle me-2"></i>
+                        <strong>Welcome!</strong> Select a unit type and value from the sidebar to preview the page.
+                    </div>
+                </div>
+
+                <!-- Loading Indicator -->
+                <div class="loading-spinner">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/js/bootstrap.bundle.min.js"></script>
+    <script src="rsyc-data.js"></script>
+    <script src="rsyc-unit-data.js"></script>
+    <script src="rsyc-unit-templates.js"></script>
+
+    <script>
+        let dataLoader = null;
+        let unitDataLoader = null;
+        let currentUnit = null;
+        let allUnits = {};
+
+        // Initialize
+        async function init() {
+            console.log('Initializing RSYC Unit Publisher...');
+            
+            dataLoader = new RSYCDataLoader();
+            unitDataLoader = new RSYCUnitDataLoader(dataLoader);
+            
+            // Load data
+            await dataLoader.loadCriticalData();
+            await dataLoader.loadOptionalData();
+            
+            // Build hierarchy
+            allUnits = await unitDataLoader.buildUnitHierarchy();
+            
+            console.log('✓ Unit Publisher initialized');
+            document.getElementById('unitType').disabled = false;
+        }
+
+        // Handle unit type change
+        document.getElementById('unitType').addEventListener('change', async (e) => {
+            const unitType = e.target.value;
+            const unitValueSelect = document.getElementById('unitValue');
+            
+            if (!unitType) {
+                unitValueSelect.innerHTML = '<option>-- Choose Type --</option>';
+                unitValueSelect.disabled = true;
+                document.getElementById('loadUnitBtn').disabled = true;
+                return;
+            }
+            
+            // Get units of this type
+            const units = unitDataLoader.getUnitsByType(unitType);
+            const options = units
+                .sort((a, b) => a.displayName.localeCompare(b.displayName))
+                .map(u => `<option value="${u.value}">${u.displayName} (${u.centers.length} centers)</option>`);
+            
+            unitValueSelect.innerHTML = `<option value="">-- Select ${unitType} --</option>` + options.join('');
+            unitValueSelect.disabled = false;
+            
+            // Enable load button when value selected
+            unitValueSelect.addEventListener('change', () => {
+                document.getElementById('loadUnitBtn').disabled = !unitValueSelect.value;
+            });
+        });
+
+        // Handle load unit
+        document.getElementById('loadUnitBtn').addEventListener('click', async () => {
+            const unitType = document.getElementById('unitType').value;
+            const unitValue = document.getElementById('unitValue').value;
+            
+            if (!unitType || !unitValue) {
+                alert('Please select both type and value');
+                return;
+            }
+            
+            showLoading(true);
+            try {
+                currentUnit = unitDataLoader.getUnit(unitType, unitValue);
+                
+                if (!currentUnit) {
+                    alert('Unit not found');
+                    return;
+                }
+                
+                // Update title
+                document.getElementById('previewTitle').textContent = currentUnit.displayName;
+                
+                // Render preview
+                const templateEngine = new RSYCUnitTemplates();
+                const sections = ['hero', 'overview', 'centers', 'programs', 'resources', 'impact', 'giving', 'leaders', 'contact'];
+                const html = templateEngine.generateUnitProfile(currentUnit, sections);
+                
+                document.getElementById('previewContent').innerHTML = html;
+                
+                // Update sections list
+                renderSectionsList(sections);
+                
+                // Update embed code
+                updateEmbedCode(unitType, unitValue);
+                
+                console.log('✓ Unit loaded and previewed');
+            } catch (error) {
+                console.error('Error loading unit:', error);
+                document.getElementById('previewContent').innerHTML = `
+                    <div class="alert alert-danger">
+                        <strong>Error:</strong> ${error.message}
+                    </div>
+                `;
+            } finally {
+                showLoading(false);
+            }
+        });
+
+        // Render sections list
+        function renderSectionsList(sections) {
+            const sectionConfig = {
+                'hero': 'Hero Section',
+                'overview': 'Unit Overview',
+                'centers': 'Centers Grid',
+                'programs': 'Featured Programs',
+                'resources': 'Resources for Families',
+                'impact': 'Impact & Growth',
+                'giving': 'Give to This Unit',
+                'leaders': 'Leadership',
+                'contact': 'Contact & Learn More'
+            };
+            
+            const html = sections.map(section => `
+                <div class="btn-section-toggle active" data-section="${section}">
+                    <input type="checkbox" class="section-checkbox" checked>
+                    <span>${sectionConfig[section] || section}</span>
+                </div>
+            `).join('');
+            
+            document.getElementById('sectionsList').innerHTML = html;
+        }
+
+        // Update embed code
+        function updateEmbedCode(unitType, unitValue) {
+            const code = `&lt;div id="unit-page" 
+     data-rsyc-unit-type="${unitType}" 
+     data-rsyc-unit-value="${unitValue}"&gt;&lt;/div&gt;
+&lt;script src="https://thisishoperva.org/rsyc/rsyc-unit-injector.js"&gt;&lt;/script&gt;`;
+            
+            document.getElementById('embedCode').textContent = code;
+            document.getElementById('embedCode').style.display = 'block';
+            document.getElementById('copyEmbedBtn').disabled = false;
+        }
+
+        // Copy embed code
+        document.getElementById('copyEmbedBtn').addEventListener('click', () => {
+            const code = document.getElementById('embedCode').textContent;
+            navigator.clipboard.writeText(code).then(() => {
+                alert('Embed code copied to clipboard!');
+            });
+        });
+
+        // Refresh preview
+        document.getElementById('refreshBtn').addEventListener('click', () => {
+            if (currentUnit) {
+                document.getElementById('loadUnitBtn').click();
+            }
+        });
+
+        // Show/hide loading
+        function showLoading(show) {
+            document.querySelector('.loading-spinner').style.display = show ? 'block' : 'none';
+        }
+
+        // Initialize on load
+        window.addEventListener('load', init);
+    </script>
+</body>
+</html>

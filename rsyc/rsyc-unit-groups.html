@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RSYC Unit Pages - Local Test</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-icons/1.10.0/font/bootstrap-icons.min.css">
+    <link rel="stylesheet" href="rsyc-generator-v2.css">
+    <style>
+        body { padding: 20px; }
+        .test-container { max-width: 1200px; margin: 0 auto; }
+        .test-info { background: #f0f7f7; padding: 15px; border-radius: 8px; margin-bottom: 20px; }
+        .test-info h6 { color: #20B3A8; margin-bottom: 10px; }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <div class="test-info">
+            <h6><i class="bi bi-info-circle"></i> RSYC Unit Injector - Local Test</h6>
+            <p class="mb-0 small">Loading: <strong>All Centers</strong></p>
+        </div>
+
+        <!-- All Centers Grid Page -->
+        <div id="unit-page" data-rsyc-unit-type="all" data-rsyc-unit-value="all"></div>
+    </div>
+
+    <!-- Local script loading for development -->
+    <script>
+        console.log('[RSYC Unit Test] Page loaded, baseUrl:', window.location.origin);
+    </script>
+
+    <!-- Only load the injector - it will load all dependencies -->
+    <script src="rsyc-unit-injector.js"></script>
+
+    <!-- Debug helper (optional - remove in production) -->
+    <script src="rsyc-unit-debug.js"></script>
+
+    <script>
+        // Show status when page loads
+        window.addEventListener('load', () => {
+            console.log('\n%c✨ RSYC Unit Pages Loaded ✨', 'font-size: 16px; color: #20B3A8; font-weight: bold;');
+            console.log('Debug Commands:');
+            console.log('  • RSYCDebug.showStatus() - Show system status');
+            console.log('  • RSYCDebug.checkScripts() - Verify all scripts loaded');
+            console.log('  • RSYCDebug.showStyles() - Check stylesheet loading');
+            console.log('  • RSYCDebug.loadUnit("division", "Texas") - Manual unit loading\n');
+        });
+    </script>
+</body>
+</html>

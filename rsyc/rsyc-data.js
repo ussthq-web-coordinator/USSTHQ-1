@@ -361,6 +361,7 @@ class RSYCDataLoader {
             divisionCode: getVal(center.field_4),
             city: getVal(center.field_12),
             state: getVal(center.field_13),
+            areaCommand: getVal(center.field_17),
             zip: getVal(center.field_14),
             latitude: center.field_15,
             longitude: center.field_16,
