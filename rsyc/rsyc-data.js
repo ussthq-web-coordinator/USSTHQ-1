@@ -30,7 +30,7 @@ class RSYCDataLoader {
         this.currentProxyIndex = 0;
         this.baseURL = 'https://thisishoperva.org/rsyc/';
         this.localBaseURL = '/rsyc/data/'; // Local files served from /rsyc/data/ for testing
-        this.useCorsProxy = true;          // Enable proxy fallback for cross-origin requests
+        this.useCorsProxy = false;         // Disable public proxies on production (handled via .htaccess)
         this.tryDirectFirst = true;      // attempt direct fetch before using proxy
         this.tryLocalFirst = true;       // Try loading from local /rsyc/data/ folder first for development
         
@@ -68,17 +68,17 @@ class RSYCDataLoader {
     }
 
     /**
-     * Load ONLY critical data (centers + hours) for fast initial render
+     * Load ONLY critical data (centers + hours + photos) for fast initial render
      */
     async loadCriticalData() {
-        if (this.cache.centers && this.cache.hours) {
+        if (this.cache.centers && this.cache.hours && this.cache.photos) {
             return; // Already loaded
         }
 
         try {
             console.log('⚡ Loading critical data...');
             
-            const [centers, hours] = await Promise.all([
+            const [centers, hours, photos] = await Promise.all([
                 this.fetchJSON('units-rsyc-profiles.json').catch(e => {
                     console.error('Failed to load centers:', e.message);
                     return [];
@@ -86,11 +86,16 @@ class RSYCDataLoader {
                 this.fetchJSON('RSYCHours.json').catch(e => {
                     console.warn('Hours data unavailable:', e.message);
                     return [];
+                }),
+                this.fetchJSON('RSYCHomepagePhotos.json').catch(e => {
+                    console.warn('Photos unavailable, using defaults:', e.message);
+                    return [];
                 })
             ]);
 
             this.cache.centers = this.processCenters(centers);
             this.cache.hours = this.processHours(hours);
+            this.cache.photos = this.processPhotos(photos);
             this.cache.lastUpdated = new Date();
 
             // Auto-populate CENTER_IDS from loaded data
@@ -100,7 +105,8 @@ class RSYCDataLoader {
 
             console.log('⚡ Critical data loaded:', {
                 centers: this.cache.centers.length,
-                hours: this.cache.hours.length
+                hours: this.cache.hours.length,
+                photos: this.cache.photos.length
             });
         } catch (error) {
             console.error('❌ Error loading critical data:', error);
@@ -109,7 +115,7 @@ class RSYCDataLoader {
     }
 
     /**
-     * Load optional data (schedules, programs, staff, facilities, photos)
+     * Load optional data (schedules, programs, staff, facilities)
      */
     async loadOptionalData() {
         // Skip if already loaded
@@ -120,7 +126,7 @@ class RSYCDataLoader {
         try {
             console.log('📦 Loading optional data...');
             
-            const [schedules, leaders, facilities, featuredPrograms, photos] = await Promise.all([
+            const [schedules, leaders, facilities, featuredPrograms] = await Promise.all([
                 this.fetchJSON('RSYCProgramSchedules.json').catch(e => {
                     console.warn('Schedules data unavailable:', e.message);
                     return [];
@@ -136,10 +142,6 @@ class RSYCDataLoader {
                 this.fetchJSON('RSYCPrograms.json').catch(e => {
                     console.warn('Programs data unavailable:', e.message);
                     return [];
-                }),
-                this.fetchJSON('RSYCHomepagePhotos.json').catch(e => {
-                    console.warn('Photos unavailable, using defaults:', e.message);
-                    return [];
                 })
             ]);
 
@@ -147,12 +149,10 @@ class RSYCDataLoader {
             this.cache.leaders = this.processLeaders(leaders);
             this.cache.facilities = this.processFacilities(facilities);
             this.cache.featuredPrograms = this.processPrograms(featuredPrograms);
-            this.cache.photos = this.processPhotos(photos);
 
             console.log('📦 Optional data loaded:', {
                 schedules: this.cache.schedules.length,
                 leaders: this.cache.leaders.length,
-                photos: this.cache.photos.length,
                 facilities: this.cache.facilities.length,
                 programs: this.cache.featuredPrograms.length
             });
@@ -257,14 +257,21 @@ class RSYCDataLoader {
      * Fetch JSON from URL with fallback
      */
     async fetchJSON(filename) {
-        // Add cache busting for local development - always get fresh data
-        const cacheBuster = `?v=${new Date().getTime()}`;
+        // Use a more stable cache buster (changes every hour) instead of every millisecond
+        // This significantly improves performance by allowing browser caching while still
+        // ensuring updates are picked up relatively quickly.
+        const hourlyVersion = Math.floor(Date.now() / 3600000);
+        const cacheBuster = `?v=${hourlyVersion}`;
         const directUrl = this.baseURL + filename + cacheBuster;
         const localUrl = this.localBaseURL + filename + cacheBuster;
         
         // Use local proxy if we're running on localhost
         const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+        
+        // Use our local API proxy if on localhost, otherwise disable proxies and use direct fetch
+        // (Production uses .htaccess to allow origins)
         const proxyUrl = isLocalhost ? `/api/cors-proxy?url=${encodeURIComponent(directUrl)}` : directUrl;
+        const useDevelopmentProxy = isLocalhost;
 
         // Helper to fetch and parse JSON, with nice error messages
         const doFetch = async (url, label, isProxy = false) => {
@@ -273,13 +280,79 @@ class RSYCDataLoader {
                 const resp = await fetch(url, { mode: 'cors', cache: 'no-store' });
                 if (!resp.ok) throw new Error(`HTTP ${resp.status}: ${resp.statusText}`);
                 
-                let json = await resp.json();
+                const text = await resp.text();
+                
+                // Helper to attempt parsing with recovery for trailing junk
+                const tryParse = (str) => {
+                    if (!str) return null;
+                    const trimmed = str.trim();
+                    try {
+                        return JSON.parse(trimmed);
+                    } catch (e) {
+                        console.warn(`[RSYCDecovery] Primary parse failed: ${e.message.substring(0, 100)}...`);
+                        
+                        // 1. Position-based recovery (V8 specific but very accurate)
+                        // Error message: "Unexpected non-whitespace character after JSON at position 123"
+                        const posMatch = e.message.match(/position (\d+)/);
+                        if (posMatch && posMatch[1]) {
+                            const pos = parseInt(posMatch[1], 10);
+                            try {
+                                console.log(`[RSYCDecovery] Attempting parse up to position ${pos}...`);
+                                return JSON.parse(trimmed.substring(0, pos));
+                            } catch (e2) { /* ignore and try next method */ }
+                        }
+
+                        // 2. Structural recovery (finding braces)
+                        const first = Math.min(
+                            str.indexOf('{') === -1 ? Infinity : str.indexOf('{'),
+                            str.indexOf('[') === -1 ? Infinity : str.indexOf('[')
+                        );
+                        
+                        if (first === Infinity) throw e;
+
+                        // Identify all potential closing characters
+                        const lastBrace = str.lastIndexOf('}');
+                        const lastBracket = str.lastIndexOf(']');
+                        let lastCandidate = Math.max(lastBrace, lastBracket);
+                        
+                        if (lastCandidate !== -1 && lastCandidate > first) {
+                            try {
+                                // Try the "obvious" last candidate first
+                                return JSON.parse(str.substring(first, lastCandidate + 1));
+                            } catch (recoveryError) {
+                                // Aggressive backward search for valid JSON boundary
+                                console.log('[RSYCDecovery] Structural recovery failed, starting backward search...');
+                                let searchPos = lastCandidate - 1;
+                                while (searchPos > first) {
+                                    const nextBrace = str.lastIndexOf('}', searchPos);
+                                    const nextBracket = str.lastIndexOf(']', searchPos);
+                                    const nextCandidate = Math.max(nextBrace, nextBracket);
+                                    
+                                    if (nextCandidate === -1 || nextCandidate <= first) break;
+                                    
+                                    try {
+                                        const candidateJson = JSON.parse(str.substring(first, nextCandidate + 1));
+                                        console.log(`[RSYCDecovery] ✅ Successfully recovered JSON at position ${nextCandidate}`);
+                                        return candidateJson;
+                                    } catch (err) {
+                                        searchPos = nextCandidate - 1;
+                                    }
+                                }
+                            }
+                        }
+                        
+                        // If all recovery failed, throw original error
+                        throw e;
+                    }
+                };
+
+                let json = tryParse(text);
                 
                 // Handle allorigins.win response format (wraps content)
                 if (isProxy && json && json.contents) {
                     // allorigins returns JSON as string in 'contents' property
                     if (typeof json.contents === 'string') {
-                        json = JSON.parse(json.contents);
+                        json = tryParse(json.contents);
                     } else {
                         json = json.contents;
                     }
@@ -289,6 +362,7 @@ class RSYCDataLoader {
                 return json;
             } catch (err) {
                 // Re-throw so caller can decide fallback
+                console.warn(`⚠️ Parse failed for ${filename} (${label}):`, err.message);
                 throw err;
             }
         };
@@ -304,7 +378,7 @@ class RSYCDataLoader {
         }
 
         // Try proxy first if on localhost
-        if (isLocalhost) {
+        if (useDevelopmentProxy) {
             try {
                 return await doFetch(proxyUrl, 'local-proxy', true);
             } catch (err) {
@@ -342,7 +416,7 @@ class RSYCDataLoader {
         }
 
         // If we get here, all methods failed
-        throw new Error(`Failed to fetch ${filename}: direct fetch blocked by CORS. Enable CORS headers on https://thisishoperva.org or configure a backend proxy.`);
+        throw new Error(`Failed to fetch ${filename}: Direct fetch failed (CORS or Network). Ensure https://thisishoperva.org allows your origin in .htaccess.`);
     }
 
     /**
@@ -369,8 +443,10 @@ class RSYCDataLoader {
             centerType: getVal(center.field_22),
             corpName: getVal(center.field_10),
             gdosID: getVal(center.field_19),
-            aboutText: getVal(center.AboutThisCenter),
-            explainerVideoEmbedCode: center.ExplainerVideoEmbedCode || '',
+            aboutText: getVal(center.AboutThisCenter) || `Give your child the chance to explore, create, and grow while having a blast! From afterschool programs to summer and school-break day camps, the Red Shield Youth Center offers experiences that spark curiosity, build confidence, and encourage new friendships. Signing up also opens the door to overnight camp adventures, giving kids even more ways to challenge themselves, make memories, and discover what they’re capable of. Enroll today and give your child a summer—or school year—full of fun, learning, and unforgettable experiences.`,
+            explainerVideoEmbedCode: center.ExplainerVideoEmbedCode || `<div style="position:relative;width:100%;height:0;padding-bottom:56.25%;">
+	<iframe allowfullscreen="" allowtransparency="true" frameborder="0" mozallowfullscreen="" scrolling="no" src="https://salvationarmysouth.widen.net/view/video/g52shymyyo/Red-Shield-Youth-Centers-Promo_RC2.mp4?u=ukifzm" style="position:absolute;top:0;left:0;width:100%;height:100%;" title="Video for &quot;Red Shield Youth Centers Promo_RC2.mp4&quot;" webkitallowfullscreen=""></iframe>
+</div>`,
             // Normalize scripture: handle object wrappers, rich text, or plain string
             scripture: (function() {
                 const raw = center.FooterScriptureVerse || center.FooterScripture || center.Scripture || '';
@@ -630,6 +706,7 @@ class RSYCDataLoader {
                 positionTitle: getVal(leader.PositionTitle),
                 alternateName: getVal(leader.AlternateName),
                 biography: getVal(leader.Biography),
+                Sort: leader.Sort,
                 // Normalized face focus for smart crop feature
                 faceFocus: faceFocus,
                 // Zoom level for square image cropping (1 = full image, 1.5+ = zoomed in)
@@ -729,7 +806,9 @@ class RSYCDataLoader {
                 id: facility.ID,
                 name: getVal(facility.Title),
                 description: getVal(facility.Description),
-                iconClass: normalized
+                iconClass: normalized,
+                created: facility.Created || null,
+                modified: facility.Modified || null
             };
         });
     }
@@ -746,7 +825,9 @@ class RSYCDataLoader {
                 name: getVal(program.Title),
                 category: program.Category?.Value || '',
                 description: getVal(program.Description),
-                iconClass: normalized
+                iconClass: normalized,
+                created: program.Created || null,
+                modified: program.Modified || null
             };
         });
     }

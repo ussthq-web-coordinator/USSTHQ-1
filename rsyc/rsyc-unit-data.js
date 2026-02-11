@@ -41,7 +41,12 @@ class RSYCUnitDataLoader {
                 return {};
             }
 
-            const centers = this.dataLoader.cache.centers;
+            // Enrich centers with photos before building hierarchy so all unit types (division, all, etc) have images
+            const photos = this.dataLoader.cache.photos || [];
+            const centers = this.dataLoader.cache.centers.map(center => ({
+                ...center,
+                photos: photos.filter(p => p.centerId === center.sharePointId)
+            }));
             
             // Index centers by organizational attributes
             this._indexCenters(centers);
@@ -158,19 +163,18 @@ class RSYCUnitDataLoader {
      * Build "all" unit containing all centers
      */
     _buildAllUnits(centers) {
-        // Enrich centers with photos data
-        const enrichedCenters = centers.map(center => ({
-            ...center,
-            photos: (this.dataLoader.cache.photos || []).filter(p => p.centerId === center.sharePointId)
-        }));
+        if (!centers || centers.length === 0) {
+            console.warn('⚠️ No centers provided to _buildAllUnits');
+            return;
+        }
 
         const unit = {
             type: 'all',
             value: 'all',
             displayName: 'All Centers',
-            centers: enrichedCenters,
+            centers: centers,
             stats: {
-                centerCount: enrichedCenters.length,
+                centerCount: centers.length,
                 programCount: 0,
                 youthServed: 0,
                 staffCount: 0
@@ -179,6 +183,7 @@ class RSYCUnitDataLoader {
 
         this._calculateStats(unit);
         this.cache.indexByType.all['all'] = unit;
+        console.log('🏗️  Built "all" unit with', centers.length, 'centers');
     }
 
     /**

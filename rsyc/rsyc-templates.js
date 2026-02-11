@@ -114,10 +114,19 @@ class RSYCTemplates {
             width: 80% !important;
         }
     }
+    /* Global Modal Corner Radius */
+    .rsyc-modal-content {
+        border-radius: 20px !important;
+        overflow: hidden !important;
+    }
+    .rsyc-modal-header {
+        border-top-left-radius: 20px !important;
+        border-top-right-radius: 20px !important;
+    }
 </style>
 <section class="rsyc-hero" style="background-color: #20B3A8; padding: 20px 0; display: flex; justify-content: center; align-items: center;">
     <img src="${this.escapeHTML(exteriorPhoto)}" alt="${this.escapeHTML(center.name)} Exterior" 
-         style="display: block; height: 500px; object-fit: cover; object-position: center; margin: 0 auto; border-radius: 15px;">
+         style="display: block; height: 500px; object-fit: cover; object-position: center; margin: 35px auto 0 auto; border-radius: 15px;">
 </section>`;
     }
 
@@ -186,6 +195,16 @@ class RSYCTemplates {
         }
 
         return `<!-- Featured Programs -->
+<style>
+    .rsyc-modal-content {
+        border-radius: 20px !important;
+        overflow: hidden !important;
+    }
+    .rsyc-modal-header {
+        border-top-left-radius: 20px !important;
+        border-top-right-radius: 20px !important;
+    }
+</style>
 <div id="freeTextArea-programs" class="freeTextArea u-centerBgImage section u-sa-whiteBg u-coverBgImage">
     <div class="u-positionRelative">
         <div class="container">
@@ -236,6 +255,9 @@ ${modal}`;
         
         // Build schedule cards if available
         let scheduleCards = '';
+        // Accumulate schedule modals separately so they are placed
+        // once at the end of the schedules section (consistent with other modals)
+        let scheduleModals = '';
         let scheduleScrollSection = '';
         let scheduleTitleSection = '';
         
@@ -330,6 +352,16 @@ ${modal}`;
                 let timeText = '';
                 if (schedule.scheduleTime) {
                     timeText = schedule.scheduleTime;
+                    
+                    // Append Time Zone (Eastern or Central only)
+                    if (schedule.timezone) {
+                        const tz = schedule.timezone.toLowerCase();
+                        if (tz.includes('eastern')) {
+                            timeText += ' (Eastern)';
+                        } else if (tz.includes('central')) {
+                            timeText += ' (Central)';
+                        }
+                    }
                 }
                 
                 // Parse months for tooltip - summarize into readable ranges
@@ -382,7 +414,7 @@ ${modal}`;
                 
                 const expandableInfo = `
                     <div class="mt-2" style="display: flex; gap: 0.5rem;">
-                        <button class="btn btn-outline-primary rsyc-details-btn-desktop" style="font-size: 0.7rem; padding: 0.25rem 0.5rem; display: none;" onclick="showRSYCModal('schedule-${schedule.id}', '${this.escapeHTML(schedule.title, true)}')">
+                        <button class="btn btn-outline-primary rsyc-details-btn-desktop view-all-btn" data-modal="rsyc-modal-schedule-${schedule.id}" style="font-size: 0.7rem; padding: 0.25rem 0.5rem; display: none;" onclick="showRSYCModal('schedule-${schedule.id}', '${this.escapeHTML(schedule.title, true)}')">
                             View Full Details
                         </button>
                         <button class="btn btn-outline-primary rsyc-details-btn-mobile" style="font-size: 0.7rem; padding: 0.25rem 0.5rem; display: none;" onclick="toggleRSYCAccordion('rsyc-accordion-${schedule.id}')">
@@ -414,48 +446,65 @@ ${modal}`;
                     </div>
                 </div>
             ` : ''}
-            ${schedule.centerName ? `<div class="mb-3" style="font-size:1.1rem; font-weight:600; color:#0C0C0C;"><strong>The Salvation Army ${this.escapeHTML(center.name || center.Title)}</strong></div>` : ''}
+            ${schedule.centerName ? `<div class="mb-3" style="display:flex;align-items:center;justify-content:space-between;gap:0.75rem;">
+                <div style="font-size:1.1rem; font-weight:600; color:#0C0C0C;"><strong>The Salvation Army ${this.escapeHTML(center.name || center.Title)}</strong></div>
+                <img src="https://thisishoperva.org/rsyc/Red+Shield+Youth+Centers+Logo+-+Color.svg" alt="Red Shield Youth Centers Logo" style="height:42px; max-width:120px; width:auto; object-fit:contain; display:block;" />
+            </div>` : ''}
             ${schedule.title ? `<h3 class="mb-2" style="color:#333;">${this.escapeHTML(schedule.title)}</h3>` : ''}
             ${schedule.subtitle ? `<p class="mb-3" style="color:#666; font-style:italic;">${this.escapeHTML(schedule.subtitle)}</p>` : ''}
-            ${schedule.description ? `<p class="mb-1">${schedule.description}</p>` : ''}
+            ${schedule.description ? `<p class="mb-1 rsyc-description">${schedule.description}</p>` : ''}
             
-            ${hasContent(schedule.scheduleDisclaimer) ? `<div class="mb-4" style="background:#fff3cd; padding:1rem; border-radius:6px; border-left:3px solid #ff6b6b; color:#000;"><strong style="color:#000;"><i class="bi bi-exclamation-triangle me-2"></i>Important Dates/Closures:</strong><br><div class="mt-2" style="font-size:0.95rem;">${this.escapeHTML(schedule.scheduleDisclaimer)}</div></div>` : ''}
+            ${hasContent(schedule.scheduleDisclaimer) ? `<div class="mb-4 rsyc-important-dates" style="background:#fff3cd; padding:1rem; border-radius:6px; border-left:3px solid #ff6b6b; color:#000;"><strong class="rsyc-important-dates-title" style="color:#000;"><i class="bi bi-exclamation-triangle me-2"></i>Important Dates/Closures:</strong><br><div class="mt-2 rsyc-important-dates-body" style="font-size:0.95rem;">${this.escapeHTML(schedule.scheduleDisclaimer)}</div></div>` : ''}
             
             <div class="row">
-                ${hasContent(schedule.ageRange) ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Age Range:</strong><br>${this.escapeHTML(schedule.ageRange)}</div>` : ''}
                 ${hasContent(daysText) ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Days:</strong><br>${this.escapeHTML(daysText)}</div>` : ''}
                 ${hasContent(timeText) ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Time:</strong><br>${this.escapeHTML(timeText)}</div>` : ''}
-                ${hasContent(schedule.timezone) ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Time Zone:</strong><br>${this.escapeHTML(schedule.timezone)}</div>` : ''}
-                ${hasContent(schedule.frequency) ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Frequency:</strong><br>${this.escapeHTML(schedule.frequency)}</div>` : ''}
                 ${hasContent(months) ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Program Runs In:</strong><br>${this.escapeHTML(months)}</div>` : ''}
                 ${hasContent(registrationMonths) ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Registration Opens:</strong><br>${this.escapeHTML(registrationMonths)}</div>` : ''}
-                ${hasContent(schedule.registrationDeadline) ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Registration Deadline:</strong><br>${this.escapeHTML(schedule.registrationDeadline)}</div>` : ''}
                 ${hasContent(schedule.registrationFee) ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Registration Fee:</strong><br>${this.escapeHTML(schedule.registrationFee)}</div>` : ''}
-                ${hasContent(schedule.cost) ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Cost:</strong><br>${this.escapeHTML(schedule.cost)}</div>` : ''}
+                ${hasContent(schedule.ageRange) ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Ages:</strong><br>${this.escapeHTML(schedule.ageRange)}</div>` : ''}
+                ${hasContent(schedule.startDate) || hasContent(schedule.endDate) ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Program Dates:</strong><br>${hasContent(schedule.startDate) ? this.escapeHTML(schedule.startDate) : ''} ${hasContent(schedule.startDate) && hasContent(schedule.endDate) ? '-' : ''} ${hasContent(schedule.endDate) ? this.escapeHTML(schedule.endDate) : ''}</div>` : ''}
+                
+                ${hasContent(schedule.registrationDeadline) ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Registration Deadline:</strong><br>${this.escapeHTML(schedule.registrationDeadline)}</div>` : ''}
                 ${hasContent(schedule.location) ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Location:</strong><br>${this.escapeHTML(schedule.location)}</div>` : ''}
+                ${hasContent(schedule.cost) ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Cost:</strong><br>${this.escapeHTML(schedule.cost)}</div>` : ''}
+                ${hasContent(schedule.frequency) ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Frequency:</strong><br>${this.escapeHTML(schedule.frequency)}</div>` : ''}
                 ${hasContent(schedule.capacity) ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Capacity:</strong><br>${this.escapeHTML(schedule.capacity)}</div>` : ''}
+                ${hasContent(schedule.agesServed?.join(', ')) ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Ages Served:</strong><br>${this.escapeHTML(schedule.agesServed.join(', '))}</div>` : ''}
+            </div>
                 
-                ${hasContent(schedule.agesServed?.join(', ')) ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Ages:</strong><br>${this.escapeHTML(schedule.agesServed.join(', '))}</div>` : ''}
-                ${hasContent(schedule.startDate) || hasContent(schedule.endDate) ? `<div class="col-sm-12 mb-3" style="color:#333;"><strong>Program Dates:</strong><br>${hasContent(schedule.startDate) ? this.escapeHTML(schedule.startDate) : ''} ${hasContent(schedule.startDate) && hasContent(schedule.endDate) ? '-' : ''} ${hasContent(schedule.endDate) ? this.escapeHTML(schedule.endDate) : ''}</div>` : ''}
-                
-                ${hasContent(schedule.transportationFeeandDetails) ? `<div class="col-sm-12 mb-3" style="color:#333;"><strong>Transportation:</strong><br>${this.preserveLineBreaks(schedule.transportationFeeandDetails)}</div>` : ''}
+                ${hasContent(schedule.transportationFeeandDetails) ? `<div class="col-sm-12 mb-3 rsyc-transportation" style="background:#fff9ea; padding:1rem; border-radius:6px; border-left:3px solid #ffb300; color:#333;"><strong style="color:#030303;"><i class="bi bi-bus-front me-2"></i>Transportation:</strong><br><div class="mt-1 rsyc-transportation-value" style="font-size:0.95rem;">${this.preserveLineBreaks(schedule.transportationFeeandDetails)}</div></div>` : ''}
                 
                 ${hasContent(schedule.closedDates) ? `<div class="col-sm-12 mb-3" style="background:#ffe6e6; padding:1rem; border-radius:6px; border-left:3px solid #dc3545; color:#333;"><strong style="color:#dc3545;"><i class="bi bi-calendar-x me-2"></i>Closed Dates:</strong><br>${this.preserveLineBreaks(schedule.closedDates)}</div>` : ''}
                 ${hasContent(schedule.openHalfDayDates) ? `<div class="col-sm-12 mb-3" style="color:#333;"><strong>Open Half Days:</strong><br>${this.preserveLineBreaks(schedule.openHalfDayDates)}</div>` : ''}
                 ${hasContent(schedule.openFullDayDates) ? `<div class="col-sm-12 mb-3" style="color:#333;"><strong>Open Full Days:</strong><br>${this.preserveLineBreaks(schedule.openFullDayDates)}</div>` : ''}
                 
                 ${hasContent(schedule.orientationDetails) ? `
-                <div class="col-sm-12 mb-3" style="background:#fffacd; padding:1rem; border-radius:6px; border-left:3px solid #ff8c00; color:#333;">
-                    <strong style="color:#000;"><i class="bi bi-info-circle me-2"></i>Orientation Details:</strong>
-                    <div class="mt-2" style="font-size:0.95rem; color:#000;">${this.preserveLineBreaks(schedule.orientationDetails)}</div>
+                <div class="col-sm-12 mb-3 rsyc-orientation" style="background:#fffacd; padding:1rem; border-radius:6px; border-left:3px solid #ff8c00; color:#333;">
+                    <strong class="rsyc-orientation-title" style="color:#000;"><i class="bi bi-info-circle me-2"></i>Orientation Details:</strong>
+                    <div class="mt-2 rsyc-orientation-body" style="font-size:0.95rem; color:#000;">${this.preserveLineBreaks(schedule.orientationDetails)}</div>
                 </div>
                 ` : ''}
                 
                 ${hasContent(schedule.whatToBring) || hasContent(schedule.materialsProvided) ? `
                 <div class="col-sm-12 mb-3" style="background:#f0f8ff; padding:1rem; border-radius:6px; border-left:3px solid #4169e1; color:#333;">
-                    <strong style="color:#4169e1;"><i class="bi bi-backpack2 me-2"></i>Preparation:</strong>
-                    ${hasContent(schedule.whatToBring) ? `<div class="mt-2"><u>What to Bring:</u><br>${this.preserveLineBreaks(schedule.whatToBring)}</div>` : ''}
+                    <strong style="color:#030303;"><i class="bi bi-backpack2 me-2"></i>What to Bring:</strong>
+                    ${hasContent(schedule.whatToBring) ? `<div class="mt-2">${this.preserveLineBreaks(schedule.whatToBring)}</div>` : ''}
                     ${hasContent(schedule.materialsProvided) ? `<div class="mt-2"><u>Materials Provided:</u><br>${this.preserveLineBreaks(schedule.materialsProvided)}</div>` : ''}
+                </div>
+                ` : ''}
+                
+                ${((schedule.contacts && schedule.contacts.length > 0) || hasContent(schedule.contactInfo)) ? `
+                <div class="col-sm-12 mb-3 rsyc-contacts p-4" style="background:#f0f7f7; border-radius:12px; border:1px solid #d1e7e7; color:#333;">
+                    <strong class="rsyc-contacts-title mb-3" style="color:#20B3A8; text-transform:uppercase; font-size:1.1rem; letter-spacing:0.05rem; display:block;">Point${schedule.contacts && schedule.contacts.length > 1 ? 's' : ''} of Contact</strong>
+                    ${schedule.contacts && schedule.contacts.length > 0 ? schedule.contacts.map((contact, idx) => `
+                        <div class="rsyc-contact-item"${idx > 0 ? ` style="margin-top:1.2rem; padding-top:1.2rem; border-top:1px solid rgba(32,179,168,0.2);"` : ''}>
+                            ${hasContent(contact.name) ? `<div class="rsyc-contact-name" style="font-weight:700; font-size:1.25rem; color:#111;">${this.escapeHTML(contact.name)}</div>` : ''}
+                            ${hasContent(contact.jobTitle) ? `<div class="rsyc-contact-job" style="font-weight:500; color:#555; margin-bottom: 0.25rem;">${this.escapeHTML(contact.jobTitle)}</div>` : ''}
+                            ${hasContent(contact.email) ? `<div class="rsyc-contact-email mt-1"><a href="mailto:${this.escapeHTML(contact.email)}" style="color:#2F4857; text-decoration:underline; font-weight:400;"><i class="bi bi-envelope-at me-2"></i>${this.escapeHTML(contact.email)}</a></div>` : ''}
+                        </div>
+                    `).join('') : ''}
+                    ${hasContent(schedule.contactInfo) ? `<div class="mt-2 pt-2 border-top" style="font-size:0.9rem; border-top-color:rgba(32,179,168,0.2) !important;">${this.escapeHTML(schedule.contactInfo)}</div>` : ''}
                 </div>
                 ` : ''}
                 
@@ -463,29 +512,11 @@ ${modal}`;
                 ${hasContent(schedule.dropOffPickUp) ? `<div class="col-sm-12 mb-3" style="color:#333;"><strong>Drop-off/Pick-up Info:</strong><br>${this.preserveLineBreaks(schedule.dropOffPickUp)}</div>` : ''}
             </div>
             
-            ${(schedule.contacts && schedule.contacts.length > 0) || hasContent(schedule.contactInfo) ? `
-            <div class="col-sm-12 mb-3">
-                <div class="p-3" style="background:#f0f7f7; border-radius:10px; border:1px solid #d1e7e7; color:#333;">
-                    <strong style="color:#20B3A8; text-transform:uppercase; font-size:1.5rem; letter-spacing:0.05rem; display:block; margin-bottom:0.5rem;">Point${schedule.contacts && schedule.contacts.length > 1 ? 's' : ''} of Contact</strong>
-                    ${schedule.contacts && schedule.contacts.length > 0 ? schedule.contacts.map((contact, idx) => `
-                        <div${idx > 0 ? ` style="margin-top:1rem; padding-top:1rem; border-top:1px solid rgba(32,179,168,0.15);"` : ''}>
-                            ${hasContent(contact.name) ? `<div style="font-weight:700; font-size:1.5rem;">${this.escapeHTML(contact.name)}</div>` : ''}
-                            ${hasContent(contact.jobTitle) ? `<div class="small text-muted" style="font-weight:500;">${this.escapeHTML(contact.jobTitle)}</div>` : ''}
-                            ${hasContent(contact.email) ? `<div class="mt-2"><a href="mailto:${this.escapeHTML(contact.email)}" style="color:#2F4857; text-decoration:none; font-weight:400;"><i class="bi bi-envelope-at me-2"></i>${this.escapeHTML(contact.email)}</a></div>` : ''}
-                        </div>
-                    `).join('') : ''}
-                    ${hasContent(schedule.contactInfo) ? `<div class="mt-2 pt-2 border-top" style="font-size:0.9rem; border-top-color:rgba(32,179,168,0.2) !important;">${this.escapeHTML(schedule.contactInfo)}</div>` : ''}
-                </div>
-            </div>
-            ` : ''}
-            
             ${(schedule.relatedPrograms && Array.isArray(schedule.relatedPrograms) && schedule.relatedPrograms.length > 0) ? `
-            <div class="col-sm-12 mb-3">
-                <div style="background:#f5f5f5; padding:1rem; border-radius:6px; color:#333;">
-                    <strong style="color:#333; font-size:1.1rem; display:block; margin-bottom:0.75rem;"><i class="bi bi-link me-2" style="color:#20B3A8;"></i>Related Programs</strong>
-                    <div class="d-flex flex-wrap gap-2">
-                        ${schedule.relatedPrograms.map(p => `<span class="badge bg-primary">${this.escapeHTML(p.name)}</span>`).join('')}
-                    </div>
+            <div class="col-sm-12 mb-3" style="background:#f5f5f5; padding:1rem; border-radius:6px; color:#333;">
+                <strong style="color:#333; font-size:1.1rem; display:block; margin-bottom:0.75rem;"><i class="bi bi-link me-2" style="color:#20B3A8;"></i>Related Programs</strong>
+                <div class="d-flex flex-wrap gap-2">
+                    ${schedule.relatedPrograms.map(p => `<span class="badge bg-primary">${this.escapeHTML(p.name)}</span>`).join('')}
                 </div>
             </div>
             ` : ''}
@@ -524,10 +555,13 @@ ${modal}`;
                                 </div>
                             </div>
                         ` : ''}
-                        ${schedule.centerName ? `<div class="mb-3" style="font-size:1.1rem; font-weight:600; color:#0C0C0C;"><strong>The Salvation Army ${this.escapeHTML(center.name || center.Title)}</strong></div>` : ''}
+                        ${schedule.centerName ? `<div class="mb-3" style="display:flex;align-items:center;justify-content:space-between;gap:0.75rem;">
+                            <div style="font-size:1.1rem; font-weight:600; color:#0C0C0C;"><strong>The Salvation Army ${this.escapeHTML(center.name || center.Title)}</strong></div>
+                            <img src="https://thisishoperva.org/rsyc/Red+Shield+Youth+Centers+Logo+-+Color.svg" alt="Red Shield Youth Centers Logo" style="height:36px; max-width:100px; width:auto; object-fit:contain; display:block;" />
+                        </div>` : ''}
                         ${schedule.title ? `<h3 class="mb-2" style="color:#333;">${this.escapeHTML(schedule.title)}</h3>` : ''}
                         ${schedule.subtitle ? `<p class="mb-3" style="color:#666; font-style:italic;">${this.escapeHTML(schedule.subtitle)}</p>` : ''}
-                        ${schedule.description ? `<p class="mb-1">${schedule.description}</p>` : ''}
+                        ${schedule.description ? `<p class="mb-1 rsyc-description">${schedule.description}</p>` : ''}
                         
                         ${hasContent(schedule.scheduleDisclaimer) ? `<div class="mb-4" style="background:#fff3cd; padding:1rem; border-radius:6px; border-left:3px solid #ff6b6b; color:#000;"><strong style="color:#000;"><i class="bi bi-exclamation-triangle me-2"></i>Important Dates/Closures:</strong><br><div class="mt-2" style="font-size:0.95rem;">${this.escapeHTML(schedule.scheduleDisclaimer)}</div></div>` : ''}
                         
@@ -546,9 +580,9 @@ ${modal}`;
                             ${hasContent(schedule.capacity) ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Capacity:</strong><br>${this.escapeHTML(schedule.capacity)}</div>` : ''}
                             
                             ${hasContent(schedule.agesServed?.join(', ')) ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Ages:</strong><br>${this.escapeHTML(schedule.agesServed.join(', '))}</div>` : ''}
-                            ${hasContent(schedule.startDate) || hasContent(schedule.endDate) ? `<div class="col-sm-12 mb-3" style="color:#333;"><strong>Program Dates:</strong><br>${hasContent(schedule.startDate) ? this.escapeHTML(schedule.startDate) : ''} ${hasContent(schedule.startDate) && hasContent(schedule.endDate) ? '-' : ''} ${hasContent(schedule.endDate) ? this.escapeHTML(schedule.endDate) : ''}</div>` : ''}
+                            ${hasContent(schedule.startDate) || hasContent(schedule.endDate) ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Program Dates:</strong><br>${hasContent(schedule.startDate) ? this.escapeHTML(schedule.startDate) : ''} ${hasContent(schedule.startDate) && hasContent(schedule.endDate) ? '-' : ''} ${hasContent(schedule.endDate) ? this.escapeHTML(schedule.endDate) : ''}</div>` : ''}
                             
-                            ${hasContent(schedule.transportationFeeandDetails) ? `<div class="col-sm-12 mb-3" style="color:#333;"><strong>Transportation:</strong><br>${this.preserveLineBreaks(schedule.transportationFeeandDetails)}</div>` : ''}
+                            ${hasContent(schedule.transportationFeeandDetails) ? `<div class="col-sm-12 mb-3 rsyc-transportation" style="background:#fff9ea; padding:1rem; border-radius:6px; border-left:3px solid #ffb300; color:#333;"><strong style="color:#e6a800;"><i class="bi bi-bus-front me-2"></i>Transportation:</strong><br><div class="mt-1 rsyc-transportation-value" style="font-size:0.95rem;">${this.preserveLineBreaks(schedule.transportationFeeandDetails)}</div></div>` : ''}
                             
                             ${hasContent(schedule.closedDates) ? `<div class="col-sm-12 mb-3" style="background:#ffe6e6; padding:1rem; border-radius:6px; border-left:3px solid #dc3545; color:#333;"><strong style="color:#dc3545;"><i class="bi bi-calendar-x me-2"></i>Closed Dates:</strong><br>${this.preserveLineBreaks(schedule.closedDates)}</div>` : ''}
                             ${hasContent(schedule.openHalfDayDates) ? `<div class="col-sm-12 mb-3" style="color:#333;"><strong>Open Half Days:</strong><br>${this.preserveLineBreaks(schedule.openHalfDayDates)}</div>` : ''}
@@ -563,19 +597,14 @@ ${modal}`;
                             
                             ${hasContent(schedule.whatToBring) || hasContent(schedule.materialsProvided) ? `
                             <div class="col-sm-12 mb-3" style="background:#f0f8ff; padding:1rem; border-radius:6px; border-left:3px solid #4169e1; color:#333;">
-                                <strong style="color:#4169e1;"><i class="bi bi-backpack2 me-2"></i>Preparation:</strong>
-                                ${hasContent(schedule.whatToBring) ? `<div class="mt-2"><u>What to Bring:</u><br>${this.preserveLineBreaks(schedule.whatToBring)}</div>` : ''}
+                                <strong style="color:#4169e1;"><i class="bi bi-backpack2 me-2"></i>What to Bring:</strong>
+                                ${hasContent(schedule.whatToBring) ? `<div class="mt-2">${this.preserveLineBreaks(schedule.whatToBring)}</div>` : ''}
                                 ${hasContent(schedule.materialsProvided) ? `<div class="mt-2"><u>Materials Provided:</u><br>${this.preserveLineBreaks(schedule.materialsProvided)}</div>` : ''}
                             </div>
                             ` : ''}
-                            
-                            ${hasContent(schedule.prerequisites) ? `<div class="col-sm-12 mb-3" style="color:#333;"><strong>Prerequisites:</strong><br>${this.preserveLineBreaks(schedule.prerequisites)}</div>` : ''}
-                            ${hasContent(schedule.dropOffPickUp) ? `<div class="col-sm-12 mb-3" style="color:#333;"><strong>Drop-off/Pick-up Info:</strong><br>${this.preserveLineBreaks(schedule.dropOffPickUp)}</div>` : ''}
-                        </div>
-                        
-                        ${(schedule.contacts && schedule.contacts.length > 0) || hasContent(schedule.contactInfo) ? `
-                        <div class="col-sm-12 mb-3">
-                            <div class="p-3" style="background:#f0f7f7; border-radius:10px; border:1px solid #d1e7e7; color:#333;">
+
+                            ${(schedule.contacts && schedule.contacts.length > 0) || hasContent(schedule.contactInfo) ? `
+                            <div class="col-sm-12 mb-3 p-3" style="background:#f0f7f7; border-radius:10px; border:1px solid #d1e7e7; color:#333;">
                                 <strong style="color:#20B3A8; text-transform:uppercase; font-size:1.5rem; letter-spacing:0.05rem; display:block; margin-bottom:0.5rem;">Point${schedule.contacts && schedule.contacts.length > 1 ? 's' : ''} of Contact</strong>
                                 ${schedule.contacts && schedule.contacts.length > 0 ? schedule.contacts.map((contact, idx) => `
                                     <div${idx > 0 ? ` style="margin-top:1rem; padding-top:1rem; border-top:1px solid rgba(32,179,168,0.15);"` : ''}>
@@ -586,16 +615,17 @@ ${modal}`;
                                 `).join('') : ''}
                                 ${hasContent(schedule.contactInfo) ? `<div class="mt-2 pt-2 border-top" style="font-size:0.9rem; border-top-color:rgba(32,179,168,0.2) !important;">${this.escapeHTML(schedule.contactInfo)}</div>` : ''}
                             </div>
+                            ` : ''}
+                            
+                            ${hasContent(schedule.prerequisites) ? `<div class="col-sm-12 mb-3" style="color:#333;"><strong>Prerequisites:</strong><br>${this.preserveLineBreaks(schedule.prerequisites)}</div>` : ''}
+                            ${hasContent(schedule.dropOffPickUp) ? `<div class="col-sm-12 mb-3" style="color:#333;"><strong>Drop-off/Pick-up Info:</strong><br>${this.preserveLineBreaks(schedule.dropOffPickUp)}</div>` : ''}
                         </div>
-                        ` : ''}
                         
                         ${(schedule.relatedPrograms && Array.isArray(schedule.relatedPrograms) && schedule.relatedPrograms.length > 0) ? `
-                        <div class="col-sm-12 mb-3">
-                            <div style="background:#f5f5f5; padding:1rem; border-radius:6px; color:#333;">
-                                <strong style="color:#333; font-size:1.1rem; display:block; margin-bottom:0.75rem;"><i class="bi bi-link me-2" style="color:#20B3A8;"></i>Related Programs</strong>
-                                <div class="d-flex flex-wrap gap-2">
-                                    ${schedule.relatedPrograms.map(p => `<span class="badge bg-primary">${this.escapeHTML(p.name)}</span>`).join('')}
-                                </div>
+                        <div class="col-sm-12 mb-3" style="background:#f5f5f5; padding:1rem; border-radius:6px; color:#333;">
+                            <strong style="color:#333; font-size:1.1rem; display:block; margin-bottom:0.75rem;"><i class="bi bi-link me-2" style="color:#20B3A8;"></i>Related Programs</strong>
+                            <div class="d-flex flex-wrap gap-2">
+                                ${schedule.relatedPrograms.map(p => `<span class="badge bg-primary">${this.escapeHTML(p.name)}</span>`).join('')}
                             </div>
                         </div>
                         ` : ''}
@@ -603,6 +633,9 @@ ${modal}`;
                 </div>
                 `;
                 
+                // append the modal markup to the accumulated modals
+                scheduleModals += scheduleModal;
+
                 return `
                     <div>
                         <!-- Desktop Card Version -->
@@ -627,7 +660,7 @@ ${modal}`;
                             ${scheduleAccordion}
                         </div>
                         
-                        ${scheduleModal}
+                        
                     </div>
                     `;
             }).join('');
@@ -663,7 +696,7 @@ ${modal}`;
         ${scheduleCards}
     </div>
     
-    <div class="text-center mt-4" style="display:none;">
+    <div class="text-center mt-4">
         <button class="btn btn-outline-primary" onclick="printAllSchedules('${schedulesCacheKey}')">
             <i class="bi bi-printer me-2"></i>Print All Schedules
         </button>
@@ -758,6 +791,7 @@ ${modal}`;
                 <div class="schedule-scroll-wrapper">
                     ${scheduleScrollSection}
                 </div>
+                ${scheduleModals}
                 
                 ${socialSection}
             </div>
@@ -1158,6 +1192,17 @@ ${modal}`;
         };
 
         const sorted = [...leaders].sort((a, b) => {
+            // 1) Explicit Sort order (higher priority than roles)
+            // Use Number.parseFloat and handle NaN to ensure consistent sorting
+            const rawA = parseFloat(a.Sort);
+            const rawB = parseFloat(b.Sort);
+            const sortA = !isNaN(rawA) ? rawA : 1000;
+            const sortB = !isNaN(rawB) ? rawB : 1000;
+
+            if (sortA !== sortB) {
+                return sortA - sortB;
+            }
+
             // prefer roleType, but if roleType is 'Other' (or contains 'other')
             // use the actual positionTitle from the record so specific titles are respected
             const rawRoleA = (a.roleType || '').toString();
@@ -1871,84 +1916,63 @@ div #freeTextArea-0 {
 
     /**
      * Parse scripture text to separate quote and reference
-     * Handles various formats:
-     * - "Galatians 3:26  So in Christ Jesus you are all children of God through faith"
-     * - Proverbs 22:6 "Start children off on the way they should go..."
-     * - "Start children off..." Proverbs 22:6
-     * - "We love each other..." 1 John 4:19
+     * Handles various formats from the unit profile data:
+     * - "Proverbs 22:6 In all your ways..."
+     * - "Start children off on the way they should go..." Proverbs 22:6
      * - John 13:34 (ICB) - "I give you a new command..."
      * - "As each one has received a gift..."-1 Peter 4:10
+     * - “We love each other because he loved us first.” 1 John 4:19
      */
     parseScripture(scripture) {
-        let text = '';
-        let reference = '';
+        if (!scripture) return { text: '', reference: '' };
         
-        // Remove leading/trailing whitespace
-        scripture = scripture.trim();
+        // Remove leading/trailing whitespace and handle smart quotes/dashes immediately
+        scripture = scripture.trim()
+            .replace(/[“”]/g, '"')
+            .replace(/[‘’]/g, "'")
+            .replace(/[–—]/g, '-');
         
         // Bible book pattern (handles 1-2 word book names with optional numbers like "1 John", "2 Corinthians")
         // Captures: optional digit, book name (1-2 words), chapter:verse(-verse), optional version like (ICB)
-        const bookPattern = /(\d?\s?[A-Za-z]+(?:\s+[A-Za-z]+)?\s+\d+:\d+(?:-\d+)?(?:\s*\([A-Z]+\))?)/;
+        const bookPatternStr = '((?:(?:\\d\\s?)?[A-Za-z]+(?:\\s+[A-Za-z]+)?)\\s+\\d+:\\d+(?:-\\d+)?(?:\\s*\\([A-Z]+\\))?)';
+        const bookPattern = new RegExp(bookPatternStr);
         
-        // Pattern 1: Reference at start with dash/hyphen and quoted text
-        // Format: "John 13:34 (ICB) - "Quote text"" or ""Quote text"-1 Peter 4:10"
-        const refStartWithDash = scripture.match(/^(\d?\s?[A-Za-z]+(?:\s+[A-Za-z]+)?\s+\d+:\d+(?:-\d+)?(?:\s*\([A-Z]+\))?)\s*[-–—]\s*(.+)$/);
-        if (refStartWithDash) {
-            reference = refStartWithDash[1].trim();
-            text = refStartWithDash[2].trim();
-            text = text.replace(/^["'""]|["'""]$/g, '').trim();
+        // 1. Check for reference at start (e.g. "John 13:34 (ICB) - I give you...")
+        const startRefMatch = scripture.match(new RegExp(`^${bookPatternStr}\\s*[-:]*\\s*(.*)$`, 'i'));
+        if (startRefMatch) {
+            return {
+                text: startRefMatch[2].replace(/^["']|["']$/g, '').trim(),
+                reference: startRefMatch[1].trim()
+            };
+        }
+
+        // 2. Check for reference at end, optionally in parentheses (e.g. "God so loved... (John 3:16)")
+        const endRefMatch = scripture.match(new RegExp(`^(.*?)\\s*[-:]*\\s*\\(?${bookPatternStr}\\)?\\s*$`, 'i'));
+        if (endRefMatch && endRefMatch[1].trim()) {
+            return {
+                text: endRefMatch[1].replace(/^["']|["']$/g, '').trim(),
+                reference: endRefMatch[2].trim()
+            };
+        }
+
+        // 3. Try finding the pattern anywhere
+        const generalMatch = scripture.match(bookPattern);
+        if (generalMatch) {
+            const reference = generalMatch[1];
+            let text = scripture.replace(reference, '')
+                .replace(/^["']|["']$/g, '')
+                .replace(/\s*[-:]*\s*$/, '')
+                .replace(/^\s*[-:]*\s*/, '')
+                .replace(/[()]/g, '') // Remove surviving parens if we found ref inside them
+                .trim();
             return { text, reference };
         }
         
-        // Pattern 2: Quoted text at start with dash/hyphen and reference at end
-        // Format: ""Quote text"-1 Peter 4:10"
-        const quotedStartWithDash = scripture.match(/^["'""](.+?)["'""]?\s*[-–—]\s*(\d?\s?[A-Za-z]+(?:\s+[A-Za-z]+)?\s+\d+:\d+(?:-\d+)?(?:\s*\([A-Z]+\))?)$/);
-        if (quotedStartWithDash) {
-            text = quotedStartWithDash[1].trim();
-            reference = quotedStartWithDash[2].trim();
-            return { text, reference };
-        }
-        
-        // Pattern 3: Reference at start with space(s) and quoted text (no dash)
-        // Format: "Proverbs 22:6 "Start children off..." or "Galatians 3:26  Text here"
-        const refStartWithSpace = scripture.match(/^(\d?\s?[A-Za-z]+(?:\s+[A-Za-z]+)?\s+\d+:\d+(?:-\d+)?(?:\s*\([A-Z]+\))?)\s+(.+)$/);
-        if (refStartWithSpace) {
-            reference = refStartWithSpace[1].trim();
-            text = refStartWithSpace[2].trim();
-            text = text.replace(/^["'""]|["'""]$/g, '').trim();
-            return { text, reference };
-        }
-        
-        // Pattern 4: Quoted text at start, reference at end (no dash)
-        // Format: ""We love each other..." 1 John 4:19" or ""Quote" Proverbs 22:6"
-        const quotedStart = scripture.match(/^["'""](.+?)["'""]\s+(\d?\s?[A-Za-z]+(?:\s+[A-Za-z]+)?\s+\d+:\d+(?:-\d+)?(?:\s*\([A-Z]+\))?)$/);
-        if (quotedStart) {
-            text = quotedStart[1].trim();
-            reference = quotedStart[2].trim();
-            return { text, reference };
-        }
-        
-        // Pattern 5: Unquoted text with reference at end (space-separated)
-        // Format: "Text here 1 John 4:19"
-        const textWithRefEnd = scripture.match(/^(.+?)\s+(\d?\s?[A-Za-z]+(?:\s+[A-Za-z]+)?\s+\d+:\d+(?:-\d+)?(?:\s*\([A-Z]+\))?)$/);
-        if (textWithRefEnd) {
-            // Make sure we're not splitting within the book name
-            const potentialText = textWithRefEnd[1].trim();
-            const potentialRef = textWithRefEnd[2].trim();
-            
-            // Validate that the reference part looks like a real book reference
-            if (/^\d?\s?[A-Za-z]+(?:\s+[A-Za-z]+)?\s+\d+:\d+/.test(potentialRef)) {
-                text = potentialText.replace(/^["'""]|["'""]$/g, '').trim();
-                reference = potentialRef;
-                return { text, reference };
-            }
-        }
-        
-        // No clear reference found, use entire text as quote
-        text = scripture.replace(/^["'""]|["'""]$/g, '').trim();
-        reference = '';
-        
-        return { text, reference };
+        // Fallback: use entire text as quote, no reference
+        return { 
+            text: scripture.replace(/^["']|["']$/g, '').trim(), 
+            reference: '' 
+        };
     }
 
     /**
@@ -2068,12 +2092,7 @@ div #freeTextArea-0 {
             return `${sorted[0]} - ${sorted[sorted.length - 1]}`;
         }
         
-        // Not consecutive - list first few and add "..."
-        if (sorted.length > 4) {
-            return `${sorted.slice(0, 3).join(', ')}, and ${sorted.length - 3} more`;
-        }
-        
-        // 3-4 non-consecutive months - just list them
+        // Not consecutive - list them all (parents need to know exactly when it runs)
         return sorted.join(', ');
     }
 
@@ -2200,9 +2219,11 @@ window.RSYCTemplates = RSYCTemplates;
 window.rsycTemplates = new RSYCTemplates();
 
 // Print function for modal content - Mobile-friendly with fallback
-function printRSYCModal(modalId) {
+async function printRSYCModal(modalId) {
     const modal = document.getElementById(`rsyc-modal-${modalId}`);
     if (!modal) return;
+    
+    const printDate = new Date().toLocaleDateString('en-US');
     
     // Extract schedule title and center name from modal
     const titleElement = modal.querySelector('.rsyc-modal-body h3');
@@ -2211,111 +2232,229 @@ function printRSYCModal(modalId) {
     const centerElement = modal.querySelector('.rsyc-modal-body > div:first-child');
     const centerName = centerElement ? centerElement.textContent.trim().replace('The Salvation Army ', '') : '';
     
-    // Create print window title: "Schedule Title - Center Name"
-    const printTitle = centerName ? `${scheduleTitle} - ${centerName}` : scheduleTitle;
+    // Create print window title
+    const printTitle = centerName ? `${scheduleTitle} - ${centerName} - ${printDate}` : `${scheduleTitle} - ${printDate}`;
     
-    // Get modal content
+    // Get modal content and clone it
     const modalContent = modal.querySelector('.rsyc-modal-content');
-    
-    // Create a new window for printing
+    const printContent = modalContent.cloneNode(true);
+
+    // Detect if narrative (description) is long and reduce font size if so
+    const descriptionEl = printContent.querySelector('.rsyc-description');
+    if (descriptionEl && descriptionEl.textContent.trim().length > 600) {
+        descriptionEl.style.fontSize = '7.5pt';
+        descriptionEl.style.lineHeight = '1.3';
+    }
+
+    // Clean up cloned content
+    const existingLogoEl = printContent.querySelector('img[alt="Red Shield Youth Centers Logo"]');
+    if (existingLogoEl) existingLogoEl.remove();
+
+    // Fetch logo for injection
+    let logoSvgHtml = '';
+    const logoUrl = 'https://thisishoperva.org/rsyc/Red+Shield+Youth+Centers+Logo+-+Color.svg';
+    try {
+        const resp = await fetch(logoUrl);
+        if (resp.ok) {
+            logoSvgHtml = await resp.text();
+        } else {
+            logoSvgHtml = `<img src="${logoUrl}" style="height:auto; width:220px; display:block;" />`;
+        }
+    } catch (e) {
+        logoSvgHtml = `<img src="${logoUrl}" style="height:auto; width:220px; display:block;" />`;
+    }
+
     const printWindow = window.open('', '', 'height=900,width=1200');
-    
-    // Check if window opened successfully (mobile popups may be blocked)
     if (!printWindow) {
-        alert('Unable to open print window. Your browser may have popup blocking enabled.');
+        alert('Pop-up blocked. Please allow pop-ups for this site.');
         return;
     }
     
-    // Build HTML content
     const htmlContent = `<!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>${printTitle}</title>
-<style>
-body { font-family: Arial, sans-serif; margin: 0.5in 0.25in; font-size: 13px; }
-h3 { color: #333; margin: 0.5rem 0; font-size: 16px; }
-p { margin: 0.5rem 0; line-height: 1.6; font-size: 12px; }
-strong { font-weight: 600; }
-.rsyc-modal-header { margin-bottom: 1.5rem; font-size: 13px; }
-.rsyc-modal-body { color: #333; font-size: 12px; }
-.rsyc-modal-close, .rsyc-modal-print { display: none; }
-.row { display: flex; flex-wrap: wrap; margin-bottom: 1rem; }
-.col-sm-12 { width: 100%; font-size: 12px; }
-.col-md-6 { width: 50%; font-size: 12px; }
-.mb-1 { margin-bottom: 0.25rem; }
-.mb-2 { margin-bottom: 0.5rem; }
-.mb-3 { margin-bottom: 1rem; }
-.mb-4 { margin-bottom: 1.5rem; }
-u { text-decoration: underline; }
-br { line-height: 1.6; }
-.p-3 { padding: 1rem; }
-@media print {
-    body { margin: 0.5in 0.25in; }
-}
-</style>
+    <meta charset="UTF-8">
+    <title>${printTitle}</title>
+    <style>
+        :root {
+            --rsyc-teal: #20B3A8;
+            --rsyc-navy: #2F4857;
+        }
+
+        * { 
+            margin: 0; 
+            padding: 0; 
+            box-sizing: border-box; 
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+            color-adjust: exact !important;
+        }
+
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+            margin: 0.4in; 
+            font-size: 10pt; 
+            line-height: 1.4; 
+            color: #222; 
+        }
+
+        /* HEADER */
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15pt;
+            border-bottom: 1.5pt solid var(--rsyc-teal);
+            padding-bottom: 10pt;
+        }
+
+        .header-logo { width: 160pt; flex: 0 0 160pt; }
+        .header-logo svg, .header-logo img { width: 100%; height: auto; display: block; }
+
+        .header-text { text-align: left; }
+        .header-text h1 { color: var(--rsyc-teal); font-size: 16pt; margin-bottom: 2pt; }
+        .header-text p { font-size: 10pt; color: #666; font-style: italic; }
+
+        /* BODY CONTENT */
+        .rsyc-modal-body { width: 100%; }
+        
+        /* Hide redundant titles already in header */
+        .rsyc-modal-body > div:first-of-type,
+        .rsyc-modal-body > h3:first-of-type { display: none !important; }
+
+        .rsyc-modal-body h3 { 
+            color: var(--rsyc-navy); 
+            font-size: 12pt; 
+            margin: 10pt 0 8pt 0; 
+            border-bottom: 1px solid #eee;
+            padding-bottom: 4pt;
+        }
+
+        /* Detail Boxes (Important Dates, etc) */
+        .rsyc-important-dates {
+            background: #f8fcfb !important;
+            border: 1px solid #e0f2f1 !important;
+            border-radius: 4pt;
+            padding: 8pt !important;
+            margin-bottom: 10pt !important;
+        }
+
+        .rsyc-orientation {
+            background: #f8fcfb !important;
+            border: 1px solid #e0f2f1 !important;
+            border-radius: 4pt;
+            padding: 8pt !important;
+            margin-bottom: 0 !important; /* Remove margin below orientation */
+        }
+
+        .rsyc-contacts {
+            background: #f8fcfb !important;
+            border: 1px solid #e0f2f1 !important;
+            border-radius: 4pt;
+            padding: 8pt !important;
+            margin-top: 8pt !important; /* Small margin above contact container */
+            margin-bottom: 10pt !important;
+        }
+
+        .rsyc-important-dates-title, .rsyc-orientation-title, .rsyc-contacts-title {
+            color: var(--rsyc-teal) !important;
+            font-weight: 700 !important;
+            font-size: 10pt !important;
+            margin-bottom: 6pt !important;
+            text-transform: uppercase;
+        }
+
+        .rsyc-important-dates-body, .rsyc-orientation-body {
+            font-size: 8.5pt !important;
+            line-height: 1.3 !important;
+        }
+
+        .rsyc-transportation-value {
+            font-size: 8.5pt !important;
+            line-height: 1.3 !important;
+        }
+
+        /* POINT OF CONTACT - Compact Styling */
+        .rsyc-contact-item { margin-bottom: 6pt !important; padding: 4pt 0 !important; }
+        .rsyc-contact-name { font-size: 9.5pt !important; font-weight: 700 !important; color: #000 !important; }
+        .rsyc-contact-job { font-size: 8.5pt !important; color: #444 !important; font-weight: 500 !important; margin-bottom: 1pt !important; }
+        .rsyc-contact-phone, .rsyc-contact-email { font-size: 8.5pt !important; color: #555 !important; line-height: 1.2 !important; }
+
+        /* Normalize User Content */
+        p, li { font-size: 8.5pt !important; margin-bottom: 6pt !important; }
+        strong { font-weight: 600; color: #000; }
+        
+        .row { display: flex; flex-wrap: wrap; margin-left: -5pt; margin-right: -5pt; }
+        .col-sm-12 { width: 100% !important; flex: 0 0 100% !important; padding: 0 5pt !important; margin-bottom: 10pt !important; box-sizing: border-box !important; }
+        .col-md-6 { width: 50% !important; flex: 0 0 50% !important; padding: 0 5pt !important; margin-bottom: 10pt !important; box-sizing: border-box !important; }
+
+        /* Hide UI elements */
+        .rsyc-modal-close, .rsyc-modal-print, .btn { display: none !important; }
+
+        @media print {
+            body { margin: 0.4in; }
+        }
+
+        .date-stamp {
+            position: fixed;
+            bottom: 10pt;
+            right: 10pt;
+            font-size: 7pt;
+            color: #bbb;
+            z-index: 9999;
+        }
+    </style>
 </head>
 <body>
-${modalContent.innerHTML}
-<div style="margin-top: 2rem; padding-top: 1rem; border-top: 1px solid #ddd; text-align: center; font-size: 11px; color: #666;">
-<p style="margin: 0;">Learn more about exciting activities for children, teens, and families at www.redshieldyouth.org</p>
-</div>
+    <header class="header">
+        <div class="header-text">
+            <h1>${scheduleTitle}</h1>
+            <p>The Salvation Army ${centerName}</p>
+        </div>
+        <div class="header-logo">${logoSvgHtml}</div>
+    </header>
+
+    <main class="rsyc-modal-body">
+        ${printContent.innerHTML}
+    </main>
+
+    <footer style="margin-top: 40pt; padding-top: 15pt; border-top: 1px solid #eee; text-align: center; font-size: 10pt; color: #777;">
+        <p>Learn more about exciting activities and our updated contact information at <strong>www.redshieldyouth.org</strong></p>
+    </footer>
+    <div class="date-stamp">Printed on ${printDate}</div>
 </body>
 </html>`;
-    
-    // Write content using a more reliable method
+
     try {
         printWindow.document.open();
         printWindow.document.write(htmlContent);
         printWindow.document.close();
         
-        // Use setTimeout to ensure content is rendered before printing
-        // This is more reliable on mobile devices
-        const printFunction = function() {
-            try {
-                printWindow.print();
-                // Use setTimeout to ensure print dialog completes before closing
-                setTimeout(function() {
-                    printWindow.close();
-                }, 500);
-            } catch(e) {
-                console.error('Print error:', e);
-                // Don't close window if print fails, let user print manually
-            }
-        };
-        
-        // Check if document is ready
-        if (printWindow.document.readyState === 'complete') {
-            printFunction();
-        } else {
-            // Wait for window to fully load
-            printWindow.onload = printFunction;
-            // Fallback timeout for mobile browsers that don't fire onload reliably
-            setTimeout(printFunction, 1000);
-        }
+        setTimeout(() => {
+            printWindow.print();
+            setTimeout(() => { printWindow.close(); }, 500);
+        }, 800);
     } catch(e) {
-        alert('Unable to print. Please try again.');
-        console.error('Print setup error:', e);
-        try {
-            printWindow.close();
-        } catch(e) {
-            // If close fails, just leave window open
-        }
+        console.error('Print error:', e);
     }
 }
 
 /**
  * Print all schedules aggregated into a one-page format - Mobile-friendly
  */
-function printAllSchedules(cacheKey) {
+async function printAllSchedules(cacheKey) {
     // Retrieve schedules from global cache
     if (!window.RSYC_SCHEDULES || !window.RSYC_SCHEDULES[cacheKey]) {
         alert('Schedule data not available');
         return;
     }
     
-    const { centerName, aboutText, exteriorPhoto, schedules } = window.RSYC_SCHEDULES[cacheKey];
+    const { centerName, aboutText, schedules } = window.RSYC_SCHEDULES[cacheKey];
+    const exteriorPhoto = window.RSYC_SCHEDULES[cacheKey].exteriorPhoto || 'https://thisishoperva.org/rsyc/9150a418-1c58-4d01-bf81-5753d1c608ae_building+1.png';
+    
+    // Conditionally reduce aboutText font if very long
+    const isAboutLong = aboutText && aboutText.length > 800;
+    const aboutFontSize = isAboutLong ? '7.5pt' : '8.5pt';
     
     if (!schedules || schedules.length === 0) {
         alert('No schedules to print');
@@ -2325,134 +2464,270 @@ function printAllSchedules(cacheKey) {
     // Create print window
     const printWindow = window.open('', '', 'height=900,width=1200');
     
-    // Check if window opened successfully (mobile popups may be blocked)
     if (!printWindow) {
         alert('Unable to open print window. Your browser may have popup blocking enabled.');
         return;
     }
     
-    const printTitle = `Program Schedules - ${centerName}`;
+    const printDate = new Date().toLocaleDateString('en-US');
+    const printTitle = `Program Schedules - ${centerName} - ${printDate}`;
     
+    // The most modern and reliable way to print images across Edge/Safari 
+    // is to embed the raw SVG markup directly into the document.
+    // This avoids all external image security/loading issues.
+    let logoSvgHtml = '';
+    const logoUrl = 'https://thisishoperva.org/rsyc/Red+Shield+Youth+Centers+Logo+-+Color.svg';
+    try {
+        const resp = await fetch(logoUrl);
+        if (resp.ok) {
+            logoSvgHtml = await resp.text();
+            // Clean up SVG for inline use if needed (usually works as is)
+        } else {
+            logoSvgHtml = `<img src="${logoUrl}" style="height:auto; width:280px; display:block;" />`;
+        }
+    } catch (e) {
+        logoSvgHtml = `<img src="${logoUrl}" style="height:auto; width:280px; display:block;" />`;
+    }
+
     // Build schedules content
     let schedulesHTML = '';
     schedules.forEach((schedule, index) => {
         const daysText = schedule.scheduleDays && Array.isArray(schedule.scheduleDays) && schedule.scheduleDays.length > 0
             ? schedule.scheduleDays.join(', ')
             : '';
-        const timeText = schedule.scheduleTime || '';
-        const ageRange = schedule.ageRange || '';
-        const location = schedule.location || '';
-        const cost = schedule.cost || '';
-        const registrationDeadline = schedule.registrationDeadline || '';
         
-        schedulesHTML += '<div class="schedule-item" style="margin-bottom: 0.8rem; padding-bottom: 0.8rem; border-bottom: 1px solid #e0e0e0;">';
-        schedulesHTML += `<h4>${schedule.title || 'Program'}</h4>`;
-        
-        if (schedule.subtitle) {
-            schedulesHTML += `<p style="font-size: 11px; color: #666; margin-bottom: 0.3rem;">${schedule.subtitle}</p>`;
+        let timeText = schedule.scheduleTime || '';
+        if (timeText && schedule.timezone) {
+            const tz = schedule.timezone.toLowerCase();
+            if (tz.includes('eastern')) {
+                timeText += ' (Eastern)';
+            } else if (tz.includes('central')) {
+                timeText += ' (Central)';
+            }
+        }
+
+        const templateEngine = new RSYCTemplates();
+        const months = schedule.programRunsIn && Array.isArray(schedule.programRunsIn)
+            ? templateEngine.summarizeMonths(schedule.programRunsIn)
+            : '';
+            
+        const registrationOpens = schedule.registrationOpensIn && Array.isArray(schedule.registrationOpensIn)
+            ? templateEngine.summarizeMonths(schedule.registrationOpensIn)
+            : '';
+
+        let ageRange = schedule.ageRange || '';
+        if (!ageRange && schedule.agesServed && Array.isArray(schedule.agesServed) && schedule.agesServed.length > 0) {
+            ageRange = schedule.agesServed.join(', ');
         }
         
-        // Compact details in grid
-        schedulesHTML += '<div style="font-size: 11px; line-height: 1.4;">';
-        if (daysText) schedulesHTML += `<div><strong>Days:</strong> ${daysText}</div>`;
-        if (timeText) schedulesHTML += `<div><strong>Time:</strong> ${timeText}</div>`;
-        if (ageRange) schedulesHTML += `<div><strong>Ages:</strong> ${ageRange}</div>`;
-        if (location) schedulesHTML += `<div><strong>Location:</strong> ${location}</div>`;
-        if (cost) schedulesHTML += `<div><strong>Cost:</strong> ${cost}</div>`;
-        if (registrationDeadline) schedulesHTML += `<div><strong>Registration:</strong> ${registrationDeadline}</div>`;
-        schedulesHTML += '</div>';
+        const location = schedule.location || '';
+        const cost = schedule.cost || '';
+        const registrationFee = schedule.registrationFee || '';
+        const registrationDeadline = schedule.registrationDeadline || '';
+        const programDates = (schedule.startDate || schedule.endDate) 
+            ? `${schedule.startDate || ''} ${schedule.startDate && schedule.endDate ? '-' : ''} ${schedule.endDate || ''}`.trim()
+            : '';
         
-        schedulesHTML += '</div>';
+        schedulesHTML += `
+        <div class="schedule-item">
+            <h4>${schedule.title || 'Program'}</h4>
+            ${schedule.subtitle ? `<p class="subtitle">${schedule.subtitle}</p>` : ''}
+            
+            <div class="details">
+                ${daysText ? `<div><strong>Days:</strong> ${daysText}</div>` : ''}
+                ${timeText ? `<div><strong>Time:</strong> ${timeText}</div>` : ''}
+                ${months ? `<div><strong>Program Runs In:</strong> ${months}</div>` : ''}
+                ${registrationOpens ? `<div><strong>Registration Opens:</strong> ${registrationOpens}</div>` : ''}
+                ${registrationFee ? `<div><strong>Registration Fee:</strong> ${registrationFee}</div>` : ''}
+                ${ageRange ? `<div><strong>Ages:</strong> ${ageRange}</div>` : ''}
+                ${programDates ? `<div><strong>Program Dates:</strong> ${programDates}</div>` : ''}
+                
+                ${location ? `<div><strong>Location:</strong> ${location}</div>` : ''}
+                ${cost ? `<div><strong>Cost:</strong> ${cost}</div>` : ''}
+                ${registrationDeadline ? `<div><strong>Registration Deadline:</strong> ${registrationDeadline}</div>` : ''}
+            </div>
+        </div>`;
     });
     
     // Build complete HTML document
     const htmlContent = `<!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>${printTitle}</title>
-<style>
-* { margin: 0; padding: 0; box-sizing: border-box; }
-body { font-family: Arial, sans-serif; margin: 0.4in 0.3in; font-size: 12px; line-height: 1.5; color: #333; }
-h2 { color: #20B3A8; font-size: 18px; margin-bottom: 0.3rem; padding-bottom: 0.3rem; border-bottom: 2px solid #20B3A8; }
-h3 { color: #2F4857; font-size: 13px; margin: 0.5rem 0 0.3rem 0; }
-h4 { color: #20B3A8; font-size: 13px; margin: 0.4rem 0 0.2rem 0; font-weight: 600; }
-p { margin: 0.3rem 0; }
-.schedule-group { page-break-inside: avoid; margin-bottom: 1rem; }
-.header { text-align: center; margin-bottom: 0.8rem; }
-.center-name { font-size: 13px; color: #666; margin-bottom: 0.2rem; }
-.about-section { margin-bottom: 1rem; padding-bottom: 1rem; border-bottom: 1px solid #ddd; display: grid; grid-template-columns: 2fr 1fr; gap: 1rem; align-items: start; }
-.about-text { grid-column: 1; font-size: 11px; line-height: 1.5; color: #333; }
-.about-photo { grid-column: 2; width: 100%; height: auto; aspect-ratio: 1 / 1; border-radius: 4px; object-fit: cover; }
-.schedule-list { columns: 2; column-gap: 0.5in; }
-.schedule-item { break-inside: avoid; }
-.footer-note { margin-top: 1rem; padding-top: 0.8rem; border-top: 1px solid #ddd; text-align: center; font-size: 10px; color: #666; }
-@media print { body { margin: 0.4in 0.3in; } }
-</style>
+    <meta charset="UTF-8">
+    <title>${printTitle}</title>
+    <style>
+        /* MODERN PRINT FOUNDATION */
+        :root {
+            --rsyc-teal: #20B3A8;
+            --rsyc-navy: #2F4857;
+        }
+
+        * { 
+            margin: 0; 
+            padding: 0; 
+            box-sizing: border-box; 
+            -webkit-print-color-adjust: exact !important; 
+            print-color-adjust: exact !important; 
+            color-adjust: exact !important;
+        }
+
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+            margin: 0.2in; 
+            font-size: 8.5pt; 
+            line-height: 1.25; 
+            color: #222; 
+            background: #fff;
+        }
+
+        /* HEADER SECTION */
+        .header { 
+            display: flex; 
+            justify-content: space-between;
+            align-items: center; 
+            border-bottom: 2pt solid var(--rsyc-teal); 
+            padding-bottom: 4pt; 
+            margin-bottom: 6pt;
+        }
+        
+        .header-logo-container { width: 200pt; flex: 0 0 200pt; }
+        .header-logo-container svg, .header-logo-container img { width: 100%; height: auto; display: block; }
+        
+        .header-text { text-align: left; }
+        .header-text h2 { 
+            color: var(--rsyc-teal); 
+            font-size: 15pt; 
+            font-weight: 700; 
+            margin-bottom: 0px;
+            text-transform: uppercase;
+        }
+        
+        .center-name { 
+            font-size: 14pt; 
+            color: #555; 
+            font-style: italic;
+        }
+
+        /* ABOUT SECTION */
+        .about-section { 
+            display: block;
+            margin-bottom: 6pt;
+            padding-bottom: 4pt;
+            border-bottom: 1.5pt solid #eee;
+            overflow: auto;
+        }
+        
+        .about-text { font-size: ${aboutFontSize}; line-height: 1.4; text-align: justify; }
+        .about-photo { 
+            float: right;
+            width: 200pt; 
+            height: 140pt; 
+            object-fit: cover; 
+            border-radius: 4pt;
+            margin-left: 12pt;
+            margin-bottom: 2pt;
+        }
+
+        /* MULTI-COLUMN SCHEDULES */
+        .schedule-list { 
+            column-count: 2; 
+            column-gap: 18pt; 
+        }
+
+        .schedule-item { 
+            position: relative;
+            break-inside: avoid-column;
+            margin-bottom: 8pt;
+            padding: 6pt;
+            background: #fdfdfd;
+            border: 0.5pt solid #eee;
+            border-radius: 3pt;
+        }
+
+        .schedule-item h4 { 
+            color: var(--rsyc-teal); 
+            font-size: 10.5pt; 
+            font-weight: 700; 
+            margin-bottom: 2pt;
+        }
+
+        .subtitle { 
+            font-size: 8pt; 
+            color: #666; 
+            margin-bottom: 3pt; 
+            font-style: italic;
+        }
+
+        .details { display: grid; grid-template-columns: 1fr 1fr; gap: 4pt; font-size: 8.5pt; }
+        .details strong { color: var(--rsyc-navy); font-weight: 600; }
+
+        /* FOOTER */
+        .footer-note { 
+            margin-top: 6pt; 
+            padding-top: 4pt; 
+            border-top: 1px solid #ddd; 
+            text-align: center; 
+            font-size: 8.5pt; 
+            color: #666;
+        }
+
+        @media print {
+            body { margin: 0.2in; }
+            .schedule-item { border-color: #ddd; }
+        }
+
+        .date-stamp {
+            position: fixed;
+            bottom: 5pt;
+            right: 5pt;
+            font-size: 7pt;
+            color: #ccc;
+            z-index: 9999;
+        }
+    </style>
 </head>
 <body>
 
-<div class="header">
-<h2>Program Schedules</h2>
-<div class="center-name">The Salvation Army ${centerName}</div>
-</div>
+<header class="header">
+    <div class="header-text">
+        <h2>Program Schedules</h2>
+        <div class="center-name">The Salvation Army ${centerName}</div>
+    </div>
+    <div class="header-logo-container">
+        ${logoSvgHtml || ''}
+    </div>
+</header>
 
-${aboutText ? `<div class="about-section">
-<div class="about-text">
-${aboutText}
-</div>
-${exteriorPhoto ? `<img src="${exteriorPhoto}" alt="Center Exterior" class="about-photo">` : ''}
+${(aboutText || exteriorPhoto) ? `
+<div class="about-section">
+    ${exteriorPhoto ? `<img src="${exteriorPhoto}" alt="Center Photo" class="about-photo">` : ''}
+    <div class="about-text">${aboutText || ''}</div>
 </div>` : ''}
 
-<div class="schedule-list">
-${schedulesHTML}
-</div>
+<main class="schedule-list">
+    ${schedulesHTML}
+</main>
 
-<div class="footer-note">
-<p style="margin: 0;">Learn more about exciting activities for children, teens, and families at www.redshieldyouth.org</p>
-</div>
+<footer class="footer-note">
+    <p>Learn more about exciting activities for youth and our updated contact information at <strong>www.redshieldyouth.org</strong></p>
+</footer>
 
+<div class="date-stamp">Printed on ${printDate}</div>
 </body>
 </html>`;
     
-    // Write content using a more reliable method
     try {
         printWindow.document.open();
         printWindow.document.write(htmlContent);
         printWindow.document.close();
         
-        // Use setTimeout to ensure content is rendered before printing
-        // This is more reliable on mobile devices
-        const printFunction = function() {
-            try {
-                printWindow.print();
-                // Use setTimeout to ensure print dialog completes before closing
-                setTimeout(function() {
-                    printWindow.close();
-                }, 500);
-            } catch(e) {
-                console.error('Print error:', e);
-                // Don't close window if print fails, let user print manually
-            }
-        };
-        
-        // Check if document is ready
-        if (printWindow.document.readyState === 'complete') {
-            printFunction();
-        } else {
-            // Wait for window to fully load
-            printWindow.onload = printFunction;
-            // Fallback timeout for mobile browsers that don't fire onload reliably
-            setTimeout(printFunction, 1000);
-        }
+        // Wait for fonts and SVG to be fully ready
+        setTimeout(() => {
+            printWindow.print();
+            setTimeout(() => { printWindow.close(); }, 500);
+        }, 800);
     } catch(e) {
-        alert('Unable to print. Please try again.');
-        console.error('Print setup error:', e);
-        try {
-            printWindow.close();
-        } catch(e) {
-            // If close fails, just leave window open
-        }
+        alert('Unable to print. Please use the Print button in the preview window.');
+        console.error('Print error:', e);
     }
 }

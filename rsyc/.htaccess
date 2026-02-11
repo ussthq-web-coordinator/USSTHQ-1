@@ -1,16 +1,21 @@
 <IfModule mod_headers.c>
-  # Whitelist specific origins (exact-match). Adjust ports/origins as required.
-  SetEnvIf Origin "^http://localhost:8000$" CORS_ALLOW_ORIGIN=$0
-  SetEnvIf Origin "^http://localhost:3001$" CORS_ALLOW_ORIGIN=$0
-  SetEnvIf Origin "^https://hopewell.pages.dev$" CORS_ALLOW_ORIGIN=$0
-  SetEnvIf Origin "^https://southernusa.salvationarmy.org$" CORS_ALLOW_ORIGIN=$0
+  # Consistently allow any subdomain of salvationarmy.org, localhost with any port, and dev domains
+  SetEnvIf Origin "^https?://(localhost|127\.0\.0\.1)(:\d+)?$" CORS_ALLOW_ORIGIN=$0
+  SetEnvIf Origin "^https?://([a-z0-9-]+\.)*salvationarmy\.org$" CORS_ALLOW_ORIGIN=$0
+  SetEnvIf Origin "^https://hopewell\.pages\.dev$" CORS_ALLOW_ORIGIN=$0
 
-  # Echo back the matched Origin only when it is in the whitelist
+  # Use 'always set' to ensure we can overwrite it in the FilesMatch block
   Header always set Access-Control-Allow-Origin "%{CORS_ALLOW_ORIGIN}e" env=CORS_ALLOW_ORIGIN
   Header always set Access-Control-Allow-Methods "GET, OPTIONS"
   Header always set Access-Control-Allow-Headers "Origin, X-Requested-With, Content-Type, Accept"
   Header always set Access-Control-Max-Age "3600"
-  Header set Cache-Control "max-age=60, public"
+  
+  # For public assets, clear the specific Origin header (to avoid conflicts) and set to wildcard
+  <FilesMatch "\.(json|png|jpg|jpeg|gif|ico|svg|js|css)$">
+    Header always unset Access-Control-Allow-Origin
+    Header always set Access-Control-Allow-Origin "*"
+    Header always set Cache-Control "max-age=3600, public"
+  </FilesMatch>
 </IfModule>
 
 # Respond 200 to preflight OPTIONS requests

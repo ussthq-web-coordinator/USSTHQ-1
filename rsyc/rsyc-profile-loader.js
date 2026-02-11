@@ -23,8 +23,8 @@ const RSYCProfileLoader = {
                 return;
             }
 
-            // Show loading state
-            target.innerHTML = '<div style="padding: 20px; text-align: center; color: #999;">Loading profile...</div>';
+            // Show loading state (no visible text per user request)
+            target.innerHTML = '<div style="padding: 40px; text-align: center;"></div>';
 
             // Determine API URL
             const baseUrl = window.location.hostname === 'localhost'

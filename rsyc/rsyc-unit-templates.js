@@ -6,6 +6,21 @@
 
 class RSYCUnitTemplates {
     constructor() {
+        // State name mapping
+        const stateNames = {
+            'AL': 'Alabama', 'AK': 'Alaska', 'AZ': 'Arizona', 'AR': 'Arkansas', 'CA': 'California',
+            'CO': 'Colorado', 'CT': 'Connecticut', 'DE': 'Delaware', 'FL': 'Florida', 'GA': 'Georgia',
+            'HI': 'Hawaii', 'ID': 'Idaho', 'IL': 'Illinois', 'IN': 'Indiana', 'IA': 'Iowa',
+            'KS': 'Kansas', 'KY': 'Kentucky', 'LA': 'Louisiana', 'ME': 'Maine', 'MD': 'Maryland',
+            'MA': 'Massachusetts', 'MI': 'Michigan', 'MN': 'Minnesota', 'MS': 'Mississippi', 'MO': 'Missouri',
+            'MT': 'Montana', 'NE': 'Nebraska', 'NV': 'Nevada', 'NH': 'New Hampshire', 'NJ': 'New Jersey',
+            'NM': 'New Mexico', 'NY': 'New York', 'NC': 'North Carolina', 'ND': 'North Dakota', 'OH': 'Ohio',
+            'OK': 'Oklahoma', 'OR': 'Oregon', 'PA': 'Pennsylvania', 'RI': 'Rhode Island', 'SC': 'South Carolina',
+            'SD': 'South Dakota', 'TN': 'Tennessee', 'TX': 'Texas', 'UT': 'Utah', 'VT': 'Vermont',
+            'VA': 'Virginia', 'WA': 'Washington', 'WV': 'West Virginia', 'WI': 'Wisconsin', 'WY': 'Wyoming'
+        };
+        this.stateNames = stateNames;
+
         // Define which sections are available for unit pages
         this.sections = {
             'hero': { name: 'Hero Section', enabled: true, order: 1 },
@@ -112,7 +127,8 @@ class RSYCUnitTemplates {
                 allStates.forEach(state => {
                     if (availableStates.states.has(state)) {
                         const isSelected = state === stateVal ? ' selected' : '';
-                        options.push(`<option value="${state}"${isSelected}>${state}</option>`);
+                        const stateDisplay = stateNames[state] || state;
+                        options.push(`<option value="${state}"${isSelected}>${stateDisplay}</option>`);
                     }
                 });
                 
@@ -281,8 +297,15 @@ class RSYCUnitTemplates {
             // Get image from photos - prioritize Exterior Photo, then Facility Features
             let imageUrl = 'https://s3.amazonaws.com/uss-cache.salvationarmy.org/9150a418-1c58-4d01-bf81-5753d1c608ae_salvation+army+building+1.png';
             if (center.photos && center.photos.length > 0) {
-                const photo = center.photos[0];
-                imageUrl = photo.urlExteriorPhoto || photo.urlFacilityFeaturesPhoto || photo.urlProgramsPhoto || imageUrl;
+                // Find any photo that has an exterior photo URL
+                const exteriorPhoto = center.photos.find(p => p.urlExteriorPhoto);
+                if (exteriorPhoto) {
+                    imageUrl = exteriorPhoto.urlExteriorPhoto;
+                } else {
+                    // Fallback to the first available photo's other fields
+                    const photo = center.photos[0];
+                    imageUrl = photo.urlFacilityFeaturesPhoto || photo.urlProgramsPhoto || imageUrl;
+                }
             }
 
             // Build feature and program strings for filtering - don't escape these either
@@ -292,7 +315,7 @@ class RSYCUnitTemplates {
             return `
             <div class="center-card" data-city="${city}" data-state="${state}" data-features="${featureStr}" data-programs="${programStr}" style="cursor: pointer; border-radius: 12px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.1); transition: transform 0.3s ease, box-shadow 0.3s ease;" onclick="window.location.href='${centerUrl}';">
                 <div style="position: relative; height: 300px; width: 100%; overflow: hidden; background-color: #f0f0f0;">
-                    <img src="${imageUrl}" alt="${centerName}" loading="lazy" style="width: 100%; height: 100%; object-fit: cover; object-position: center;">
+                    <img src="${imageUrl}" alt="${centerName}" loading="lazy" decoding="async" style="width: 100%; height: 100%; object-fit: cover; object-position: center;">
                     <div style="position: absolute; inset: 0; background: linear-gradient(to bottom, rgba(0,0,0,0.1) 0%, rgba(0,0,0,0.5) 100%); display: flex; flex-direction: column; justify-content: flex-end; padding: 1.5rem; color: white;">
                         <h5 style="font-weight: bold; margin-bottom: 0.5rem; font-size: 1.1rem;">
                             ${centerName}
@@ -310,15 +333,15 @@ class RSYCUnitTemplates {
 
         // Build filter dropdown options separately to avoid template literal nesting issues
         const cityOptions = cities.map(c => `<option value="${c}">${c}</option>`).join('');
-        const stateOptions = states.map(s => `<option value="${s}">${s}</option>`).join('');
+        const stateOptions = states.map(s => `<option value="${s}">${this.stateNames[s] || s}</option>`).join('');
         const featuresOptions = features.map(f => `<option value="${f}">${f}</option>`).join('');
         const programsOptions = programs.map(p => `<option value="${p}">${p}</option>`).join('');
 
         // Build filter HTML with inline onchange handlers
         const filterHTML = `
-        <div id="all-centers-filters" style="background-color: #f8f9fa; padding: 30px 20px 40px 20px; border-bottom: 1px solid #e0e0e0; margin-top: -40px;">
+        <div id="all-centers-filters" style="background-color: #f8f9fa; padding: 25px 20px 30px 20px; border-bottom: 1px solid #e0e0e0; margin-top: 0;">
             <div class="container">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem;">
                     <h5 class="fw-bold mb-0" style="margin-top: 0;">Filter Centers</h5>
                     <button onclick="window.clearAllCentersFilters()" style="background-color: #6c757d; color: white; border: none; padding: 0.5rem 1.25rem; border-radius: 6px; cursor: pointer; font-weight: 500; font-size: 0.9rem; transition: background-color 0.2s ease;" onmouseover="this.style.backgroundColor='#5a6268'" onmouseout="this.style.backgroundColor='#6c757d'">
                         Clear All Filters
@@ -326,17 +349,17 @@ class RSYCUnitTemplates {
                 </div>
                 <div class="row g-3">
                     <div class="col-md-6 col-lg-3">
-                        <label class="form-label fw-500 mb-2">City</label>
-                        <select class="form-select form-select-sm filter-select" id="city-filter" data-filter-type="city" onchange="window.applyAllCentersFilters()">
-                            <option value="">All Cities</option>
-                            ${cityOptions}
-                        </select>
-                    </div>
-                    <div class="col-md-6 col-lg-3">
                         <label class="form-label fw-500 mb-2">State</label>
                         <select class="form-select form-select-sm filter-select" id="state-filter" data-filter-type="state" onchange="window.applyAllCentersFilters()">
                             <option value="">All States</option>
                             ${stateOptions}
+                        </select>
+                    </div>
+                    <div class="col-md-6 col-lg-3">
+                        <label class="form-label fw-500 mb-2">City</label>
+                        <select class="form-select form-select-sm filter-select" id="city-filter" data-filter-type="city" onchange="window.applyAllCentersFilters()">
+                            <option value="">All Cities</option>
+                            ${cityOptions}
                         </select>
                     </div>
                     <div class="col-md-6 col-lg-3">
@@ -415,7 +438,7 @@ class RSYCUnitTemplates {
 
         return `<!-- Hero Section -->
 <section class="rsyc-hero" style="background: linear-gradient(135deg, #20B3A8 0%, #1A8F8A 100%); padding: 60px 20px; display: flex; justify-content: center; align-items: center; min-height: 400px; text-align: center;">
-    <div style="max-width: 600px; color: white;">
+    <div style="max-width: 600px; color: white; margin-top: 35px;">
         <h1 style="font-size: 2.5rem; font-weight: bold; margin-bottom: 1rem;">${this.escapeHTML(unit.displayName)}</h1>
         <p style="font-size: 1.25rem; margin-bottom: 2rem; opacity: 0.95;">${message}</p>
         <p style="font-size: 1rem; opacity: 0.85;">A proud part of The Salvation Army</p>

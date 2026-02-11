@@ -382,7 +382,7 @@
 
         async function testDivMount() {
             const container = document.getElementById('divMountContainer');
-            container.innerHTML = '<div style="padding: 40px; text-align: center; color: #999;">Loading profile...</div>';
+            container.innerHTML = '<div style="padding: 40px; text-align: center;"></div>';
             
             try {
                 // Load the injector script
@@ -406,7 +406,7 @@
 
         async function testAutoInject() {
             const container = document.getElementById('autoInjectContainer');
-            container.innerHTML = '<div style="padding: 40px; text-align: center; color: #999;">Loading profile...</div>';
+            container.innerHTML = '<div style="padding: 40px; text-align: center;"></div>';
             
             try {
                 console.log('[RSYC Embed Test] Loading auto-inject script...');

@@ -804,8 +804,6 @@ div.col-sm-12.eventsList * {
     -webkit-overflow-scrolling: touch;
     /* Ensure modal appears on top */
     isolation: isolate;
-    -webkit-user-select: none;
-    user-select: none;
     -webkit-tap-highlight-color: transparent;
 }
 
@@ -1096,11 +1094,6 @@ button.btn-outline-primary:focus-visible {
 }
 
 /* Local Sites and Text Area Styling */
-.localSites-items,
-.localSites-item {
-  height: auto !important;
-  min-height: auto !important;
-}
 
 /* Hide the "Visit Website" link completely */
 .localSites-website {
@@ -1253,18 +1246,26 @@ document.addEventListener("DOMContentLoaded", function() {
 
 <script>
 function showRSYCModal(type, centerName) {
+    console.log('showRSYCModal called (rsyc-custom-styles.html)', type, centerName);
     const modal = document.getElementById('rsyc-modal-' + type);
     if (modal) {
+        console.log('  found modal in document:', modal.id);
         modal.style.display = 'flex';
         document.body.style.overflow = 'hidden'; // Prevent background scroll
+    } else {
+        console.log('  modal not found in document for type:', type);
     }
 }
 
 function closeRSYCModal(type) {
+    console.log('closeRSYCModal called (rsyc-custom-styles.html)', type);
     const modal = document.getElementById('rsyc-modal-' + type);
     if (modal) {
+        console.log('  closing modal in document:', modal.id);
         modal.style.display = 'none';
         document.body.style.overflow = ''; // Restore scroll
+    } else {
+        console.log('  modal not found in document for type:', type);
     }
 }
 

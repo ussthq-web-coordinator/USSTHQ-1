@@ -98,6 +98,19 @@ class RSYCGeneratorV2 {
             // Populate center dropdown
             this.populateCenterDropdown();
             
+            // Load previous selection if available
+            try {
+                const lastId = localStorage.getItem('rsyc_last_center_id');
+                if (lastId) {
+                    const dropdown = document.getElementById('centerSelect');
+                    if (dropdown && lastId) {
+                        console.log('🔄 Restoring last selected center:', lastId);
+                        dropdown.value = lastId;
+                        this.onCenterSelect(lastId);
+                    }
+                }
+            } catch (e) { /* ignore localStorage errors */ }
+
             // Attach event listeners
             this.attachEventListeners();
             
@@ -675,8 +688,15 @@ class RSYCGeneratorV2 {
             // Hide inject code
             const injectDisplay = document.getElementById('injectCodeDisplay');
             if (injectDisplay) injectDisplay.style.display = 'none';
+            try { localStorage.removeItem('rsyc_last_center_id'); } catch (e) {}
             return;
         }
+
+        // Save selection for future reloads
+        try {
+            localStorage.setItem('rsyc_last_center_id', centerId);
+        } catch (e) { /* ignore localStorage issues */ }
+
         // Find the selected center. Be permissive: match by Id, id, sharePointId, Title or name
         const centers = this.dataLoader?.cache?.centers || [];
         const findCenter = (val) => {
@@ -911,31 +931,54 @@ class RSYCGeneratorV2 {
 
         // Override showRSYCModal and closeRSYCModal to work within preview
         window.showRSYCModal = (type, centerName) => {
-            const modal = previewContainer.querySelector('#rsyc-modal-' + type);
+            console.log('showRSYCModal called (rsyc-generator-v2.attachPreviewEventListeners)', type, centerName);
+            let modal = previewContainer.querySelector('#rsyc-modal-' + type);
+            if (!modal) modal = document.getElementById('rsyc-modal-' + type);
             if (modal) {
+                console.log('  found modal:', modal.id);
                 modal.style.display = 'flex';
+                document.body.style.overflow = 'hidden';
+            } else {
+                console.log('  modal not found for type:', type);
             }
         };
 
         window.closeRSYCModal = (type) => {
-            const modal = previewContainer.querySelector('#rsyc-modal-' + type);
+            let modal = previewContainer.querySelector('#rsyc-modal-' + type);
+            if (!modal) modal = document.getElementById('rsyc-modal-' + type);
             if (modal) {
                 modal.style.display = 'none';
+                document.body.style.overflow = '';
             }
         };
 
         // Attach modal functionality
+        // Debug: list modals present in preview and document
+        try {
+            const previewModals = previewContainer.querySelectorAll('.rsyc-modal');
+            console.log('attachPreviewEventListeners: previewContainer rsyc-modals count:', previewModals.length);
+            previewModals.forEach(m => console.log('  preview modal id:', m.id));
+            const docModals = document.querySelectorAll('.rsyc-modal');
+            console.log('attachPreviewEventListeners: document rsyc-modals count:', docModals.length);
+            docModals.forEach(m => console.log('  document modal id:', m.id));
+        } catch (e) { console.warn('modal listing failed', e); }
+
         const viewAllButtons = previewContainer.querySelectorAll('.view-all-btn');
-        viewAllButtons.forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                e.preventDefault();
-                const modalId = btn.getAttribute('data-modal');
-                const modal = previewContainer.querySelector(`#${modalId}`);
-                if (modal) {
-                    modal.style.display = 'block';
-                }
-            });
-        });
+                viewAllButtons.forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        const modalId = btn.getAttribute('data-modal');
+                        let modal = previewContainer.querySelector(`#${modalId}`);
+                        if (!modal) modal = document.getElementById(modalId);
+                        if (modal) {
+                            console.log('view-all-btn opening modal:', modalId, modal.id);
+                            modal.style.display = 'flex';
+                            document.body.style.overflow = 'hidden';
+                        } else {
+                            console.log('view-all-btn could not find modal element for:', modalId);
+                        }
+                    });
+                });
 
         // Attach close button functionality
         const closeButtons = previewContainer.querySelectorAll('.rsyc-modal-close');
@@ -1213,6 +1256,24 @@ class RSYCGeneratorV2 {
      * in key sections and aggregate counts. Rows are clickable to select a
      * center in the dropdown and jump to the live preview.
      */
+    /**
+     * Generate URL slug from center name
+     */
+    getCenterSlug(name) {
+        if (!name) return '';
+        let slugName = name
+            .replace(/\s*\(?CLOSED\)?\s*/gi, '') // Strip " (CLOSED)" or " CLOSED"
+            .replace(/^red\s+shield\s+youth\s+centers?\s+of\s+/i, '')
+            .replace(/^rsyc\s+/i, '');
+        
+        return slugName
+            .toLowerCase()
+            .trim()
+            .replace(/\s+/g, '-')           // Replace spaces with dashes
+            .replace(/-+/g, '-')            // Collapse multiple dashes to single dash
+            .replace(/[^\w-]/g, '');        // Remove special characters except dashes (no need to escape - if at end)
+    }
+
     showDataAuditModal() {
         // Remove existing modal if present
         const existing = document.getElementById('dataAuditModal');
@@ -1223,309 +1284,589 @@ class RSYCGeneratorV2 {
         const leaders = this.dataLoader.cache.leaders || [];
         const photos = this.dataLoader.cache.photos || [];
         const hours = this.dataLoader.cache.hours || [];
+        const facilities = this.dataLoader.cache.facilities || [];
+        const featuredPrograms = this.dataLoader.cache.featuredPrograms || [];
 
         // Helper: normalize hour strings for robust comparison
         const normalizeHourValue = (v) => {
             if (v === null || v === undefined) return '';
             let s = String(v).trim();
             if (!s) return '';
-            // Treat explicit 'closed' as empty
             if (/^closed$/i.test(s)) return '';
-            // Normalize various dashes to simple hyphen
             s = s.replace(/[\u2012\u2013\u2014\u2015\u2212]/g, '-');
-            // Normalize spacing around hyphen
             s = s.replace(/\s*-\s*/g, ' - ');
-            // Collapse multiple spaces
             s = s.replace(/\s+/g, ' ');
-            // Upper-case AM/PM markers
             s = s.replace(/\b(am|pm)\b/ig, (m) => m.toUpperCase());
+            s = s.replace(/:00\b/g, ''); // Normalize 2:00 PM to 2 PM for better matching
             return s;
-        };
-
-        // Canonical default Symphony hours (normalized)
-        const defaultRegular = {
-            monday: normalizeHourValue('2:00 PM - 7:30 PM'),
-            tuesday: normalizeHourValue('2:00 PM - 7:30 PM'),
-            wednesday: normalizeHourValue('2:00 PM - 7:30 PM'),
-            thursday: normalizeHourValue('2:00 PM - 7:30 PM'),
-            friday: normalizeHourValue('2:00 PM - 7:30 PM'),
-            saturday: normalizeHourValue(''),
-            sunday: normalizeHourValue('')
-        };
-        const defaultSummer = {
-            monday: normalizeHourValue('7:30 AM - 5:30 PM'),
-            tuesday: normalizeHourValue('7:30 AM - 5:30 PM'),
-            wednesday: normalizeHourValue('7:30 AM - 5:30 PM'),
-            thursday: normalizeHourValue('7:30 AM - 5:30 PM'),
-            friday: normalizeHourValue('7:30 AM - 5:30 PM'),
-            saturday: normalizeHourValue(''),
-            sunday: normalizeHourValue('')
         };
 
         const isDefaultHoursRecord = (h) => {
             if (!h) return false;
             try {
-                const rh = h.regularHours || {};
-                const sh = h.summerHours || {};
                 const days = ['monday','tuesday','wednesday','thursday','friday','saturday','sunday'];
-                for (const d of days) {
-                    const a = normalizeHourValue(rh[d]);
-                    const b = defaultRegular[d];
-                    if (a !== b) return false;
-                }
-                for (const d of days) {
-                    const a = normalizeHourValue(sh[d]);
-                    const b = defaultSummer[d];
-                    if (a !== b) return false;
-                }
+                // Normalizer removes :00, so we use normalized strings here
+                const defReg = { monday:'2 PM - 7:30 PM', tuesday:'2 PM - 7:30 PM', wednesday:'2 PM - 7:30 PM', thursday:'2 PM - 7:30 PM', friday:'2 PM - 7:30 PM', saturday:'', sunday:'' };
+                const defSum = { monday:'7:30 AM - 5:30 PM', tuesday:'7:30 AM - 5:30 PM', wednesday:'7:30 AM - 5:30 PM', thursday:'7:30 AM - 5:30 PM', friday:'7:30 AM - 5:30 PM', saturday:'', sunday:'' };
+                for (const d of days) if (normalizeHourValue(h.regularHours?.[d]) !== defReg[d]) return false;
+                for (const d of days) if (normalizeHourValue(h.summerHours?.[d]) !== defSum[d]) return false;
                 return true;
-            } catch (e) {
-                return false;
-            }
+            } catch (e) { return false; }
         };
 
         // Compute per-center indicators
         const rows = centers.map(c => {
             const spId = c.sharePointId;
-            const hasAbout = !!(c.aboutText && String(c.aboutText).trim());
+            const name = c.name || c.Title || '(unnamed)';
+            // Detect closure from title/name or explicit property
+            const isClosed = !!c.isClosed || 
+                           String(c.name || '').toUpperCase().includes('CLOSED') || 
+                           String(c.Title || '').toUpperCase().includes('CLOSED');
+            
+            const centerSlug = this.getCenterSlug(name);
+            const liveUrl = `https://southernusa.salvationarmy.org/redshieldyouth/${centerSlug}`;
+
+            // Check if center has custom about text (not the default boilerplate)
+            const defaultAbout = "Give your child the chance to explore, create, and grow while having a blast!";
+            const hasAbout = !!(c.aboutText && 
+                              String(c.aboutText).trim() && 
+                              !String(c.aboutText).includes(defaultAbout));
+
             const hasVolunteer = !!(c.volunteerText && String(c.volunteerText).trim());
-            const schedCount = schedules.filter(s => s.centerId == spId).length;
+            const centerSchedules = schedules.filter(s => s.centerId == spId);
+            const schedCount = centerSchedules.length;
+            const hasStaff = centerSchedules.some(s => (s.contacts && s.contacts.length > 0) || (s.ContactInfo && s.ContactInfo.length > 0));
             const leaderCount = leaders.filter(l => (l.centerIds || []).includes(spId)).length;
-            // Count distinct populated photo URL fields for this center across photo records
             const photosForCenter = photos.filter(p => p.centerId == spId);
             const urlFields = ['urlExteriorPhoto','urlFacilityFeaturesPhoto','urlProgramsPhoto','urlNearbyCentersPhoto','urlParentsSectionPhoto','urlYouthSectionPhoto','urlGetInvolvedPhoto','urlFooterPhoto'];
             const urlSet = new Set();
-            photosForCenter.forEach(p => {
-                urlFields.forEach(f => {
-                    const v = (p && p[f]) ? String(p[f]).trim() : '';
-                    if (v) urlSet.add(v);
-                });
-            });
+            photosForCenter.forEach(p => urlFields.forEach(f => {
+                if (p && p[f] && String(p[f]).trim()) urlSet.add(String(p[f]).trim());
+            }));
             const photoCount = urlSet.size;
-            const hasFooterPhoto = photosForCenter.some(p => {
-                const v = (p && p.urlFooterPhoto) ? String(p.urlFooterPhoto).trim() : '';
-                return !!v;
-            });
+            const hasFooterPhoto = photosForCenter.some(p => p && p.urlFooterPhoto && String(p.urlFooterPhoto).trim());
             const hasFooterScripture = !!(c.scripture && String(c.scripture).trim());
+            const hasSignUpUrl = !!(c.signUpURL && String(c.signUpURL).trim());
+            const hasDonationUrl = !!(c.donationURL && String(c.donationURL).trim());
+            // Check if center has a custom video (not the default territory promo)
+            const hasExplainerVideo = !!(c.explainerVideoEmbedCode && 
+                                       String(c.explainerVideoEmbedCode).trim() && 
+                                       !String(c.explainerVideoEmbedCode).includes('g52shymyyo'));
+            
             const hoursForCenter = hours.find(h => h.centerId == spId);
-            // Consider hours 'custom' only when an hours record exists AND it does not match the
-            // canonical Symphony default hours block. If it matches the default (no changes),
-            // treat as no custom hours.
-            let hasHours = !!hoursForCenter;
-            if (hasHours && isDefaultHoursRecord(hoursForCenter)) {
-                hasHours = false;
-            }
+            let hasHours = !!hoursForCenter && !isDefaultHoursRecord(hoursForCenter);
             const facilityCount = (c.facilityFeatures || []).length;
             const programCount = (c.featuredPrograms || []).length;
+
             return {
                 id: c.id || c.Id,
                 sharePointId: spId,
-                name: c.name || c.Title || '(unnamed)',
-                hasAbout,
-                hasVolunteer,
-                hasFooterPhoto,
-                hasFooterScripture,
-                schedCount,
-                leaderCount,
-                photoCount,
-                hasHours,
-                facilityCount,
-                programCount
+                name: name,
+                liveUrl: liveUrl,
+                division: (c.division || c.field_6 || 'Unknown').replace(/\s*Division/i, ''),
+                areaCommand: c.areaCommand || c.field_17 || 'None',
+                divisionCode: c.divisionCode || '',
+                isClosed: isClosed,
+                hasAbout, hasVolunteer, hasStaff, schedCount, leaderCount, photoCount, hasHours, facilityCount, programCount,
+                hasFooterPhoto, hasFooterScripture,
+                hasSignUpUrl, hasDonationUrl, hasExplainerVideo
             };
         });
 
-        // Aggregate counts: both number of centers with data and total item counts
-        // Also compute distinct counts for facility features and featured programs
-        const facilitySet = new Set();
-        const programSet = new Set();
+        // Association Audit
+        const facilityUsage = {};
+        const programUsage = {};
+        
+        // Initialize ALL known items to 0 usage
+        facilities.forEach(f => { if (f.name) facilityUsage[f.name] = 0; });
+        featuredPrograms.forEach(p => { if (p.name) programUsage[p.name] = 0; });
+
+        // Count usages from centers
         centers.forEach(c => {
-            const feats = c.facilityFeatures || [];
-            feats.forEach(f => {
-                const fid = f && (f.id || f.Id || f.FeatureId || f.featureId || f.name || f.Name || f.Title) || (f ? JSON.stringify(f) : null);
-                if (fid !== undefined && fid !== null) facilitySet.add(String(fid));
-            });
-            const progs = c.featuredPrograms || [];
-            progs.forEach(p => {
-                const pid = p && (p.id || p.Id || p.ProgramId || p.programId || p.name || p.Name || p.Title) || (p ? JSON.stringify(p) : null);
-                if (pid !== undefined && pid !== null) programSet.add(String(pid));
-            });
+            (c.facilityFeatures || []).forEach(f => { facilityUsage[f.name] = (facilityUsage[f.name] || 0) + 1; });
+            (c.featuredPrograms || []).forEach(p => { programUsage[p.name] = (programUsage[p.name] || 0) + 1; });
         });
+        
+        const lowFacilities = Object.entries(facilityUsage).filter(([name, count]) => count < 30).sort((a,b) => a[1]-b[1]);
+        const lowPrograms = Object.entries(programUsage).filter(([name, count]) => count < 30).sort((a,b) => a[1]-b[1]);
+
+        // Recently Created Audit (last 90 days)
+        const ninetyDaysAgo = new Date();
+        ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
+        const parseSpDate = (d) => d ? new Date(d) : null;
+        const recentFacs = facilities.filter(f => parseSpDate(f.created) > ninetyDaysAgo).sort((a,b) => parseSpDate(b.created) - parseSpDate(a.created));
+        const recentProgs = featuredPrograms.filter(p => parseSpDate(p.created) > ninetyDaysAgo).sort((a,b) => parseSpDate(b.created) - parseSpDate(a.created));
+
+        // Missing Data Lists (for visual UI cards)
+        const missingAbout = rows.filter(r => !r.hasAbout && !r.isClosed).map(r => r.name);
+        const missingPhotos = rows.filter(r => r.photoCount === 0 && !r.isClosed).map(r => r.name);
 
         const aggregates = {
             centers: centers.length,
+            closed: rows.filter(r => r.isClosed).length,
             about: rows.filter(r => r.hasAbout).length,
-            volunteers: rows.reduce((s, r) => s + (r.hasVolunteer ? 1 : 0), 0),
-            footerPhoto: rows.reduce((s, r) => s + (r.hasFooterPhoto ? 1 : 0), 0),
-            footerScripture: rows.reduce((s, r) => s + (r.hasFooterScripture ? 1 : 0), 0),
-            schedules_centers: rows.reduce((s, r) => s + (r.schedCount > 0 ? 1 : 0), 0),
+            schedules_centers: rows.filter(r => r.schedCount > 0).length,
             schedules_items: rows.reduce((s, r) => s + (r.schedCount || 0), 0),
-            leaders_centers: rows.reduce((s, r) => s + (r.leaderCount > 0 ? 1 : 0), 0),
+            leaders_centers: rows.filter(r => r.leaderCount > 0).length,
             leaders_items: rows.reduce((s, r) => s + (r.leaderCount || 0), 0),
-            photos_centers: rows.reduce((s, r) => s + (r.photoCount > 0 ? 1 : 0), 0),
+            photos_centers: rows.filter(r => r.photoCount > 0).length,
             photos_items: rows.reduce((s, r) => s + (r.photoCount || 0), 0),
-            hours: rows.reduce((s, r) => s + (r.hasHours ? 1 : 0), 0),
-            facilities_centers: rows.reduce((s, r) => s + (r.facilityCount > 0 ? 1 : 0), 0),
-            facilities_items: rows.reduce((s, r) => s + (r.facilityCount || 0), 0),
-            facilities_distinct: facilitySet.size,
-            programs_centers: rows.reduce((s, r) => s + (r.programCount > 0 ? 1 : 0), 0),
-            programs_items: rows.reduce((s, r) => s + (r.programCount || 0), 0),
-            programs_distinct: programSet.size
+            hours: rows.filter(r => r.hasHours).length
         };
 
-    // Build modal HTML
         const modal = document.createElement('div');
         modal.id = 'dataAuditModal';
-        modal.style.position = 'fixed';
-        modal.style.inset = '0';
-        modal.style.background = 'rgba(0,0,0,0.6)';
-        modal.style.zIndex = 12500;
-        modal.style.overflow = 'auto';
+        modal.style.cssText = 'position:fixed; inset:0; background:rgba(0,0,0,0.6); z-index:12500; overflow:auto; padding:30px 10px;';
 
         const modalInner = document.createElement('div');
-        modalInner.style.background = 'white';
-        modalInner.style.margin = '30px auto';
-        modalInner.style.padding = '16px';
-        modalInner.style.maxWidth = '1100px';
-        modalInner.style.borderRadius = '8px';
-        modalInner.style.boxShadow = '0 10px 40px rgba(0,0,0,0.25)';
+        modalInner.style.cssText = 'background:white; margin:0 auto; padding:24px; max-width:1250px; border-radius:12px; box-shadow:0 10px 40px rgba(0,0,0,0.3); font-family:sans-serif;';
+
+        const esc = (v) => v ? String(v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') : '';
 
         // Header
         const header = document.createElement('div');
-        header.style.display = 'flex';
-        header.style.justifyContent = 'space-between';
-        header.style.alignItems = 'center';
-        header.style.marginBottom = '12px';
-        header.innerHTML = `<h3 style="margin:0;">Data Audit — ${aggregates.centers} centers</h3>`;
-        const closeBtn = document.createElement('button');
-        closeBtn.textContent = 'Close';
-        closeBtn.className = 'btn btn-sm btn-danger';
-        closeBtn.onclick = () => modal.remove();
-        header.appendChild(closeBtn);
+        header.style.cssText = 'display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #eee; padding-bottom:16px; margin-bottom:24px;';
+        header.innerHTML = `<div>
+            <h2 style="margin:0; color:#333;">RSYC Data Integrity Audit</h2>
+            <p style="margin:4px 0 0 0; color:#666; font-size:14px;">Audit date: ${new Date().toLocaleDateString()} • ${centers.length} Centers (${aggregates.closed} Closed)</p>
+        </div>`;
+        
+        const btnGroup = document.createElement('div');
+        btnGroup.style.display = 'flex';
+        btnGroup.style.gap = '10px';
 
-        // Summary counts
+        const copyReportBtn = document.createElement('button');
+        copyReportBtn.className = 'btn btn-success btn-sm';
+        copyReportBtn.innerHTML = '<i class="bi bi-envelope"></i> Copy for Outlook';
+        copyReportBtn.onclick = () => {
+            const reportHtml = this.generateEmailAuditReport({ 
+                rows: rows.filter(r => !r.isClosed), // only open centers
+                lowFacilities, lowPrograms, recentFacs, recentProgs, 
+                centersCount: centers.length,
+                closedCount: aggregates.closed
+            });
+            const blob = new Blob([reportHtml], { type: 'text/html' });
+            const data = [new ClipboardItem({ 'text/html': blob })];
+            navigator.clipboard.write(data).then(() => {
+                copyReportBtn.textContent = '✓ Copied to Clipboard!';
+                setTimeout(() => copyReportBtn.innerHTML = '<i class="bi bi-envelope"></i> Copy for Outlook', 2000);
+            });
+        };
+
+        const closeBtn = document.createElement('button');
+        closeBtn.className = 'btn btn-danger btn-sm';
+        closeBtn.textContent = 'Close';
+        closeBtn.onclick = () => modal.remove();
+
+        btnGroup.appendChild(copyReportBtn);
+        btnGroup.appendChild(closeBtn);
+        header.appendChild(btnGroup);
+        modalInner.appendChild(header);
+
+        // Narrative Section
+        const narrative = document.createElement('div');
+        narrative.style.cssText = 'background:#f0f7ff; border-left:4px solid #007bff; padding:16px; margin-bottom:24px; border-radius:4px; font-size:14px; line-height:1.6; color:#2c3e50;';
+        narrative.innerHTML = `<strong>Our Mission:</strong> We are currently auditing the Red Shield Youth Center territory-wide to ensure every location is accurately represented and fully ready for public promotion. This focus on data integrity ensures that when families, donors, and community partners visit <strong>redshieldyouth.org</strong>, they encounter a professional, complete, and locally relevant view of our ministry. By addressing the specific data points identified in this report, we can collectively strengthen our regional presence and ensure every center has the "digital front door" it deserves.`;
+        modalInner.appendChild(narrative);
+
+        // Summary Badges (Original Style)
         const summary = document.createElement('div');
         summary.style.display = 'flex';
         summary.style.gap = '12px';
         summary.style.flexWrap = 'wrap';
-        summary.style.marginBottom = '12px';
-        const makeBadge = (label, centersCount, itemsCount) => {
-            const itemsLine = (typeof itemsCount === 'number') ? `<div style='font-size:12px;color:#666;margin-top:4px'>${itemsCount} total</div>` : '';
-            return `<div style="background:#f8f9fa;border:1px solid #e9ecef;padding:8px 10px;border-radius:6px;min-width:140px;text-align:center;margin-bottom:6px;">
-                        <div style='font-size:12px;color:#666'>${label}</div>
-                        <div style='font-weight:700;font-size:16px'>${centersCount} centers</div>
-                        ${itemsLine}
-                    </div>`;
+        summary.style.marginBottom = '24px';
+        const makeBadge = (label, countLine, subline = '') => `
+            <div style="background:#f8f9fa; border:1px solid #e9ecef; padding:12px; border-radius:8px; min-width:140px; text-align:center;">
+                <div style="font-size:12px; color:#666; text-transform:uppercase; font-weight:600;">${label}</div>
+                <div style="font-weight:700; font-size:18px; margin:4px 0;">${countLine}</div>
+                ${subline ? `<div style="font-size:11px; color:#999;">${subline}</div>` : ''}
+            </div>`;
+        
+        summary.innerHTML = 
+            makeBadge('Centers', centers.length, `${aggregates.closed} closed`) +
+            makeBadge('About Tags', aggregates.about) +
+            makeBadge('Schedules', `${aggregates.schedules_centers} centers`, `${aggregates.schedules_items} total items`) +
+            makeBadge('Leaders', `${aggregates.leaders_centers} centers`, `${aggregates.leaders_items} total items`) +
+            makeBadge('Photos', `${aggregates.photos_centers} centers`, `${aggregates.photos_items} total images`) +
+            makeBadge('Hours', aggregates.hours);
+        modalInner.appendChild(summary);
+
+        // Helper to generate generic missing checklist for a row
+        const getMissingChecklist = (r) => {
+            const missing = [];
+            if (!r.hasAbout) missing.push("Missing 'About This Center' statement");
+            if (!r.hasStaff) missing.push("No Contact/Staff Info in schedules");
+            if (r.leaderCount === 0) missing.push("No Leaders listed");
+            if (r.schedCount === 0) missing.push("No Program Schedules");
+            if (r.photoCount === 0) missing.push("No Photos uploaded (Missing mandatory Exterior Photo)");
+            if (!r.hasFooterPhoto) missing.push("Missing Footer Photo");
+            if (!r.hasFooterScripture) missing.push("Missing Footer Scripture");
+            if (!r.hasSignUpUrl) missing.push("Missing Online Registration/Parent Sign-up URL");
+            if (!r.hasDonationUrl) missing.push("Missing Donation URL");
+            if (!r.hasVolunteer) missing.push("Missing Volunteer/Mentor signup info");
+            if (!r.hasHours) missing.push("Missing Custom Hours");
+            if (!r.hasExplainerVideo) missing.push("Missing Explainer/About Video");
+            return missing;
         };
 
-        summary.innerHTML =
-            makeBadge('About', aggregates.about) +
-            makeBadge('Schedules', aggregates.schedules_centers, aggregates.schedules_items) +
-            makeBadge('Leaders', aggregates.leaders_centers, aggregates.leaders_items) +
-            makeBadge('Volunteers', aggregates.volunteers) +
-            makeBadge('Photos', aggregates.photos_centers, aggregates.photos_items) +
-            makeBadge('Footer Photo', aggregates.footerPhoto) +
-            makeBadge('Footer Scripture', aggregates.footerScripture) +
-            makeBadge('Hours', aggregates.hours) +
-            // Facility Features: show distinct and total
-            `<div style="background:#f8f9fa;border:1px solid #e9ecef;padding:8px 10px;border-radius:6px;min-width:140px;text-align:center;margin-bottom:6px;">
-                        <div style='font-size:12px;color:#666'>Facility Features</div>
-                        <div style='font-weight:700;font-size:16px'>${aggregates.facilities_centers} centers</div>
-                        <div style='font-size:12px;color:#666;margin-top:4px'>${aggregates.facilities_distinct} distinct • ${aggregates.facilities_items} total</div>
-                    </div>` +
-            // Featured Programs
-            `<div style="background:#f8f9fa;border:1px solid #e9ecef;padding:8px 10px;border-radius:6px;min-width:140px;text-align:center;margin-bottom:6px;">
-                        <div style='font-size:12px;color:#666'>Featured Programs</div>
-                        <div style='font-weight:700;font-size:16px'>${aggregates.programs_centers} centers</div>
-                        <div style='font-size:12px;color:#666;margin-top:4px'>${aggregates.programs_distinct} distinct • ${aggregates.programs_items} total</div>
-                    </div>`;
+        // Grid for New Audits (Recent & Low Assoc)
+        const grid = document.createElement('div');
+        grid.style.cssText = 'display:grid; grid-template-columns:repeat(auto-fit, minmax(300px, 1fr)); gap:20px; margin-bottom:24px;';
+        
+        const newAuditSections = [
+            { title: '📅 Recently Created (90d)', items: [
+                { label: 'Facilities', rows: recentFacs.map(f => f.name) },
+                { label: 'Programs', rows: recentProgs.map(p => p.name) }
+            ]},
+            { title: '⚠️ Low Association (<30)', items: [
+                { label: 'Features', rows: lowFacilities.map(([n,c]) => `${n}: ${c}`) },
+                { label: 'Programs', rows: lowPrograms.map(([n,c]) => `${n}: ${c}`) }
+            ], footer: '💡 Important: Associate as many applicable features/programs as possible to ensure centers show on location page filters.' },
+            { title: '❌ Needs Attention (Open Centers)', items: [
+                { label: 'No About This Center statement', rows: missingAbout, count: missingAbout.length },
+                { label: 'No Photos (Missing Exterior Photo)', rows: missingPhotos, count: missingPhotos.length }
+            ]}
+        ];
 
-        // Table
-        const tableWrap = document.createElement('div');
-        tableWrap.style.maxHeight = '60vh';
-        tableWrap.style.overflow = 'auto';
-        tableWrap.style.border = '1px solid #e9ecef';
-        tableWrap.style.borderRadius = '6px';
-
-        const table = document.createElement('table');
-        table.className = 'table table-sm';
-        table.style.margin = '0';
-        const thead = document.createElement('thead');
-    thead.innerHTML = `<tr><th>Center</th><th>About</th><th>Schedules</th><th>Leaders</th><th>Volunteer</th><th>Photos</th><th>Footer Photo</th><th>Footer Scripture</th><th>Hours</th><th>Features</th><th>Programs</th></tr>`;
-        // Make header sticky so it stays visible while the table body scrolls
-        thead.style.position = 'sticky';
-        thead.style.top = '0';
-        thead.style.zIndex = '5';
-        thead.style.background = '#fff';
-        thead.style.boxShadow = '0 2px 4px rgba(0,0,0,0.04)';
-        // Ensure individual th cells also render with white background
-        Array.from(thead.querySelectorAll('th')).forEach(th => {
-            th.style.background = 'inherit';
-            th.style.position = 'relative';
+        newAuditSections.forEach(sec => {
+            const card = document.createElement('div');
+            card.style.cssText = 'border:1px solid #e0e0e0; border-radius:8px; padding:16px; background:#fcfcfc; display:flex; flex-direction:column;';
+            card.innerHTML = `<h6 style="margin:0 0 10px 0; border-bottom:1px solid #eee; padding-bottom:6px; font-weight:bold;">${sec.title}</h6>`;
+            sec.items.forEach(it => {
+                const badge = it.count !== undefined ? `<span style="background:#dc3545; color:white; padding:1px 5px; border-radius:8px; font-size:10px; margin-left:5px;">${it.count}</span>` : '';
+                card.innerHTML += `<div style="font-size:11px; font-weight:600; color:#666; margin-top:8px;">${it.label}${badge}</div>`;
+                if (it.rows.length === 0) card.innerHTML += `<div style="font-size:11px; color:#bbb; font-style:italic;">None</div>`;
+                else {
+                    const l = document.createElement('div');
+                    l.style.cssText = 'max-height:80px; overflow-y:auto; font-size:11px; color:#444; border:1px solid #eee; padding:4px; border-radius:4px; background:white; margin-top:2px; flex:1;';
+                    l.innerHTML = it.rows.slice(0, 15).map(r => `• ${esc(r)}`).join('<br>') + (it.rows.length > 15 ? `<br><i>+ ${it.rows.length - 15} more...</i>` : '');
+                    card.appendChild(l);
+                }
+            });
+            if (sec.footer) {
+                const f = document.createElement('div');
+                f.style.cssText = 'margin-top:10px; font-size:10px; color:#d93d3d; font-style:italic; line-height:1.2;';
+                f.textContent = sec.footer;
+                card.appendChild(f);
+            }
+            grid.appendChild(card);
         });
+        modalInner.appendChild(grid);
+        // Detailed Checklist (The "Outlook" view but live in the modal)
+        const detailedChecklistHeader = document.createElement('h5');
+        detailedChecklistHeader.style.margin = '24px 0 12px 0';
+        detailedChecklistHeader.textContent = 'Territorial Action List (Grouped by Division & Area Command)';
+        modalInner.appendChild(detailedChecklistHeader);
+
+        const auditGuide = document.createElement('div');
+        auditGuide.style.cssText = 'background:#fff9f9; border:1px solid #ffecec; border-radius:8px; padding:12px; margin-bottom:15px; font-size:12px; color:#666;';
+        auditGuide.innerHTML = `<strong>Data Requirements Guide:</strong><br>
+            • <b>Program Schedules:</b> List recurring programs (e.g., Afterschool, Youth Night, Dinner, Club 316, Music/Arts, Sunday Worship, Bible Study).<br>
+            • <b>Custom Hours:</b> Centers should have hours entered that differ from the 2PM-7:30PM School year and 7:30 AM-5:30 PM Summer defaults.<br>
+            • <b>Staff/Leaders:</b> Key staff members should be entered with profile photos and bios.`;
+        modalInner.appendChild(auditGuide);
+
+        const actionListWrap = document.createElement('div');
+        actionListWrap.style.cssText = 'max-height:400px; overflow:auto; border:1px solid #eee; border-radius:12px; padding:20px; background:#fafafa; margin-bottom:24px;';
+        
+        // Group by division and area command
+        const actionsByGroup = {};
+        rows.filter(r => !r.isClosed).forEach(r => {
+            const divName = (r.division || 'Unknown').trim().toUpperCase();
+            const acName = (r.areaCommand && r.areaCommand !== 'None') ? r.areaCommand.trim().toUpperCase() : 'GENERAL';
+            
+            if (!actionsByGroup[divName]) actionsByGroup[divName] = {};
+            if (!actionsByGroup[divName][acName]) actionsByGroup[divName][acName] = [];
+            
+            const missing = getMissingChecklist(r);
+            if (missing.length > 0) actionsByGroup[divName][acName].push({ name: r.name, liveUrl: r.liveUrl, missing });
+        });
+
+        Object.keys(actionsByGroup).sort().forEach(div => {
+            const divSec = document.createElement('div');
+            divSec.style.marginBottom = '20px';
+            divSec.innerHTML = `<div style="font-weight:bold; color:#d93d3d; border-bottom:1px solid #ddd; margin-bottom:10px; font-size:14px;">${div}</div>`;
+            
+            const acs = actionsByGroup[div];
+            Object.keys(acs).sort().forEach(ac => {
+                if (ac !== 'GENERAL') {
+                    divSec.innerHTML += `<div style="font-weight:bold; font-size:12px; color:#666; margin:10px 0 5px 10px; text-decoration: underline;">${ac}</div>`;
+                }
+                acs[ac].forEach(c => {
+                    const centerRow = document.createElement('div');
+                    centerRow.style.cssText = `margin-bottom:10px; margin-left: ${ac === 'GENERAL' ? '10px' : '20px'};`;
+                    centerRow.innerHTML = `<div style="font-weight:bold; font-size:12px;">📍 ${esc(c.name)} <a href="${c.liveUrl}" target="_blank" style="text-decoration:none; margin-left:5px;" onclick="event.stopPropagation();">🔗</a></div>`;
+                    c.missing.forEach(m => {
+                        centerRow.innerHTML += `<div style="font-size:11px; color:#666; margin-left:15px;">• ${m}</div>`;
+                    });
+                    divSec.appendChild(centerRow);
+                });
+            });
+            actionListWrap.appendChild(divSec);
+        });
+        modalInner.appendChild(actionListWrap);
+
+        // Detailed Status Table (Full Width)
+        const tableWrapHeader = document.createElement('h5');
+        tableWrapHeader.style.margin = '24px 0 12px 0';
+        tableWrapHeader.textContent = 'All Centers Status Detail (Table View)';
+        modalInner.appendChild(tableWrapHeader);
+
+        const tableWrap = document.createElement('div');
+        tableWrap.style.cssText = 'max-height:450px; overflow:auto; border:1px solid #eee; border-radius:8px;';
+        const table = document.createElement('table');
+        table.className = 'table table-hover table-sm';
+        table.style.margin = '0';
+        table.innerHTML = `<thead style="position:sticky; top:0; background:#f8f9fa; z-index:10; border-bottom:2px solid #dee2e6;">
+            <tr>
+                <th>Center Name</th>
+                <th style="text-align:center">Live</th>
+                <th style="text-align:center">About</th>
+                <th style="text-align:center">Staff</th>
+                <th style="text-align:center">Lead</th>
+                <th style="text-align:center">Sched</th>
+                <th style="text-align:center">Photo</th>
+                <th style="text-align:center">Hours</th>
+                <th style="text-align:center">Features</th>
+                <th style="text-align:center">Progs</th>
+                <th style="text-align:center">F-Photo</th>
+                <th style="text-align:center">F-Scrip</th>
+            </tr>
+        </thead>`;
         const tbody = document.createElement('tbody');
-
-        // small HTML-escape helper (avoid depending on template engine here)
-        const esc = (v) => {
-            if (v === null || v === undefined) return '';
-            return String(v)
-                .replace(/&/g, '&amp;')
-                .replace(/</g, '&lt;')
-                .replace(/>/g, '&gt;')
-                .replace(/"/g, '&quot;')
-                .replace(/'/g, '&#39;');
-        };
-
         rows.forEach(r => {
             const tr = document.createElement('tr');
-            // highlight currently selected center
-            if (this.currentCenter && (this.currentCenter.id == r.id || this.currentCenter.Id == r.id || this.currentCenter.sharePointId == r.sharePointId)) {
-                tr.style.background = '#f1f9ff';
-            }
+            if (r.isClosed) tr.style.background = '#fff5f5';
+            if (this.currentCenter && (this.currentCenter.id == r.id)) tr.style.background = '#f1f9ff';
             tr.style.cursor = 'pointer';
             tr.onclick = () => {
-                // Select center in dropdown and regenerate preview
                 const dd = document.getElementById('centerSelect');
-                if (dd) {
-                    dd.value = r.id;
-                    dd.dispatchEvent(new Event('change'));
-                }
+                if (dd) { dd.value = r.id; dd.dispatchEvent(new Event('change')); }
                 modal.remove();
             };
 
-            const yesNo = (v) => v ? '✓' : '';
+            const check = (v) => v ? '<span style="color:#28a745">✓</span>' : (r.isClosed ? '<span style="color:#bbb">-</span>' : '<span style="color:#dc3545">✗</span>');
+            const num = (v) => (v > 0) ? v : (r.isClosed ? '<span style="color:#bbb">0</span>' : '<span style="color:#dc3545">0</span>');
+            
             tr.innerHTML = `
-                <td style="min-width:220px;"><i class="bi bi-mouse2" style="margin-right:8px;color:#007bff;"></i>${esc(r.name)}</td>
-                <td style="text-align:center">${yesNo(r.hasAbout)}</td>
-                <td style="text-align:center">${r.schedCount || ''}</td>
-                <td style="text-align:center">${r.leaderCount || ''}</td>
-                <td style="text-align:center">${yesNo(r.hasVolunteer)}</td>
-                <td style="text-align:center">${r.photoCount || ''}</td>
-                <td style="text-align:center">${yesNo(r.hasFooterPhoto)}</td>
-                <td style="text-align:center">${yesNo(r.hasFooterScripture)}</td>
-                <td style="text-align:center">${yesNo(r.hasHours)}</td>
-                <td style="text-align:center">${r.facilityCount || ''}</td>
-                <td style="text-align:center">${r.programCount || ''}</td>
+                <td>${r.isClosed ? `<span style="color:#dc3545; font-size:10px; font-weight:bold;">[CLOSED]</span> ` : ''}${esc(r.name)}</td>
+                <td style="text-align:center"><a href="${r.liveUrl}" target="_blank" onclick="event.stopPropagation();">🔗</a></td>
+                <td style="text-align:center">${check(r.hasAbout)}</td>
+                <td style="text-align:center">${check(r.hasStaff)}</td>
+                <td style="text-align:center">${num(r.leaderCount)}</td>
+                <td style="text-align:center">${num(r.schedCount)}</td>
+                <td style="text-align:center">${num(r.photoCount)}</td>
+                <td style="text-align:center">${check(r.hasHours)}</td>
+                <td style="text-align:center">${r.facilityCount}</td>
+                <td style="text-align:center">${r.programCount}</td>
+                <td style="text-align:center">${check(r.hasFooterPhoto)}</td>
+                <td style="text-align:center">${check(r.hasFooterScripture)}</td>
             `;
             tbody.appendChild(tr);
         });
-
-        table.appendChild(thead);
         table.appendChild(tbody);
         tableWrap.appendChild(table);
-
-        // Footer note
-    const note = document.createElement('div');
-    note.style.marginTop = '10px';
-    note.style.color = '#666';
-    note.style.fontSize = '13px';
-    note.textContent = 'Click a row to select that center and open the live preview. Counts indicate presence or number of items in the dataset.';
-
-        modalInner.appendChild(header);
-        modalInner.appendChild(summary);
         modalInner.appendChild(tableWrap);
-        modalInner.appendChild(note);
+
+        // Strategic Messaging Context Section
+        const messagingHeader = document.createElement('h5');
+        messagingHeader.style.margin = '32px 0 16px 0';
+        messagingHeader.style.color = '#d93d3d';
+        messagingHeader.textContent = 'Strategic Messaging & Platform FAQ';
+        modalInner.appendChild(messagingHeader);
+
+        const messagingBody = document.createElement('div');
+        messagingBody.style.cssText = 'display:grid; grid-template-columns:repeat(auto-fit, minmax(300px, 1fr)); gap:20px; font-size:12px; line-height:1.5; color:#444; margin-bottom:20px;';
+        
+        const faqItems = [
+            { q: 'How does this integrate with our local website?', a: 'The new redshieldyouth.org site serves as a territorial hub. Local websites can link directly to specific center profiles. It complements local sites rather than replacing them.' },
+            { q: 'How does the information reflect local work?', a: 'Each profile is designed to highlight local ministry through custom schedules, hours, and staff profiles. The quality of the profile directly reflects the data entered.' },
+            { q: 'Who is the target audience?', a: 'Primarily parents, youth, donors, and community partners. It also provides a unified view for territorial leadership.' },
+            { q: 'Supporting Consistency', a: 'The site provides a shared structure while allowing each center to show its unique local identity and leadership expressions.' }
+        ];
+
+        faqItems.forEach(faq => {
+            const faqCard = document.createElement('div');
+            faqCard.style.cssText = 'background:#f8f9fa; border:1px solid #eee; padding:12px; border-radius:6px;';
+            faqCard.innerHTML = `<div style="font-weight:bold; color:#d93d3d; margin-bottom:6px;">${faq.q}</div><div>${faq.a}</div>`;
+            messagingBody.appendChild(faqCard);
+        });
+        modalInner.appendChild(messagingBody);
+
+        const footerNote = document.createElement('div');
+        footerNote.style.cssText = 'margin-top:12px; color:#999; font-size:12px; font-style:italic;';
+        footerNote.textContent = 'Note: Red items in table/cards indicate missing data for OPEN centers. Closed centers are excluded from "Needs Attention" counts but visible in the table.';
+        modalInner.appendChild(footerNote);
+
         modal.appendChild(modalInner);
         document.body.appendChild(modal);
+    }
+
+    generateEmailAuditReport(data) {
+        const { rows, lowFacilities, lowPrograms, recentFacs, recentProgs, centersCount, closedCount } = data;
+        
+        const sectionStyle = "margin-bottom: 60px; font-family: 'Segoe UI', Tahoma, sans-serif;";
+        const headerStyle = "background-color: #f4f4f4; padding: 14px; border-left: 6px solid #d93d3d; font-weight: bold; margin-bottom: 25px; font-size: 18px; color: #333; display: block; width: 100%;";
+        const subHeaderStyle = "font-weight: bold; font-size: 16px; color: #d93d3d; border-bottom: 3px solid #eee; padding-bottom: 8px; margin: 15px 0 20px 0; display: block; text-transform: uppercase;";
+        const listStyle = "margin: 0; padding-left: 20px; font-size: 13px; color: #444; line-height: 1.7;";
+        const centerNameStyle = "font-weight: bold; font-size: 13px; color: #000; margin-top: 20px; margin-bottom: 12px; display: block;";
+        const missingItemStyle = "font-size: 12px; color: #555; font-style: italic; margin-left: 15px; margin-bottom: 8px; display: block;";
+        const faqHeaderStyle = "font-weight: bold; color: #d93d3d; font-size: 14px; margin-bottom: 8px; display: block;";
+        const faqParaStyle = "font-size: 12px; color: #444; margin-bottom: 25px; line-height: 1.6; display: block;";
+        const pStyle = "font-size: 13px; color: #444; margin-bottom: 20px; display: block; line-height: 1.6;";
+        
+        // Group centers by division and area command
+        const grouped = {};
+        rows.forEach(r => {
+            const div = (r.division || 'Other').trim().toUpperCase();
+            const ac = (r.areaCommand && r.areaCommand !== 'None') ? r.areaCommand.trim().toUpperCase() : 'GENERAL';
+            
+            if (!grouped[div]) grouped[div] = {};
+            if (!grouped[div][ac]) grouped[div][ac] = [];
+            
+            const missing = [];
+            if (!r.hasAbout) missing.push("Missing 'About This Center' statement");
+            if (!r.hasStaff) missing.push("No Contact/Staff Info in schedules");
+            if (r.leaderCount === 0) missing.push("No Leaders listed");
+            if (r.schedCount === 0) missing.push("No Program Schedules");
+            if (r.photoCount === 0) missing.push("No Photos uploaded (Missing mandatory Exterior Photo)");
+            if (!r.hasFooterPhoto) missing.push("Missing Footer Photo");
+            if (!r.hasFooterScripture) missing.push("Missing Footer Scripture");
+            if (!r.hasSignUpUrl) missing.push("Missing Online Registration/Parent Sign-up URL");
+            if (!r.hasDonationUrl) missing.push("Missing Donation URL");
+            if (!r.hasVolunteer) missing.push("Missing Volunteer/Mentor signup info");
+            if (!r.hasHours) missing.push("Missing Custom Hours");
+            if (!r.hasExplainerVideo) missing.push("Missing Explainer/About Video");
+
+            if (missing.length > 0) {
+                grouped[div][ac].push({ name: r.name, liveUrl: r.liveUrl, missing });
+            }
+        });
+
+        const sortedDivs = Object.keys(grouped).sort();
+        
+        let missingContent = '';
+        sortedDivs.forEach(div => {
+            const areaCommands = grouped[div];
+            const areaCommandKeys = Object.keys(areaCommands).sort();
+            
+            let divHasData = false;
+            let divContent = `<div style="margin-bottom: 80px; padding-top: 20px; border-top: 1px dashed #ccc;">
+                                <hr style="border: none; border-top: 1px solid #ddd; margin: 30px 0 15px 0; display: block;">
+                                <div style="${subHeaderStyle}">${div}</div>`;
+            
+            areaCommandKeys.forEach(ac => {
+                const centers = areaCommands[ac];
+                if (centers.length === 0) return;
+                divHasData = true;
+                
+                if (ac !== 'GENERAL') {
+                    divContent += `<div style="font-size: 12px; font-weight: bold; color: #888; margin: 35px 0 15px 15px; text-decoration: underline; text-transform: uppercase; letter-spacing: 1px;">${ac}</div>`;
+                }
+                
+                centers.forEach(c => {
+                    divContent += `<hr style="border: none; border-top: 1px solid #f0f0f0; margin: 40px 0 10px 0; display: block;">`;
+                    divContent += `<div style="${centerNameStyle}; margin-left: ${ac === 'GENERAL' ? '15px' : '30px'};">📍 ${c.name} <a href="${c.liveUrl}" target="_blank" style="text-decoration:none; margin-left:5px;">🔗</a></div>`;
+                    c.missing.forEach(m => {
+                        divContent += `<div style="${missingItemStyle}; margin-left: ${ac === 'GENERAL' ? '30px' : '45px'};">• ${m}</div>`;
+                    });
+                });
+            });
+            
+            divContent += `</div>`; // Close division block
+            if (divHasData) missingContent += divContent;
+        });
+
+        if (!missingContent) missingContent = '<p style="font-size: 13px; color: #28a745; font-weight: bold;">🎉 All open centers have complete core data!</p>';
+
+        return `
+            <div style="font-family: 'Segoe UI', Tahoma, sans-serif; color: #333; max-width: 700px; line-height: 1.5;">
+                <h2 style="color: #d93d3d; margin-bottom: 30px; display: block;">RSYC Data Integrity Report</h2>
+                <p style="font-size: 14px; margin-top: 0; color: #666; margin-bottom: 25px; display: block;">Generated on ${new Date().toLocaleDateString()} • Analyzing ${centersCount} total centers (${closedCount} flagged as CLOSED)</p>
+                
+                <div style="background-color: #f0f7ff; border-left: 6px solid #007bff; padding: 20px; margin: 35px 0; border-radius: 4px; display: block;">
+                    <p style="margin: 0; font-size: 14px; line-height: 1.6; color: #2c3e50; display: block; margin-bottom: 10px;">
+                        <strong>Our Goal:</strong> We are currently auditing the Red Shield Youth Center territory-wide to ensure every location is accurately represented and fully ready for public promotion. This focus on data integrity ensures that when families, donors, and community partners visit <strong>redshieldyouth.org</strong>, they encounter a professional, complete, and locally relevant view of our ministry. By addressing the specific data points identified in this report, we can collectively strengthen our regional presence and ensure every center has the "digital front door" it deserves.
+                    </p>
+                </div>
+
+                <hr style="border: none; border-top: 1px solid #eee; margin: 40px 0; display: block;">
+
+                <div style="${sectionStyle}">
+                    <div style="${headerStyle}">🛠️ MISSING DATA BY DIVISION (OPEN CENTERS ONLY)</div>
+                    <hr style="border: none; border-top: 1px solid #ddd; margin: 10px 0 25px 0; display: block;">
+                    <div style="font-size: 12px; color: #666; background: #fff9f9; padding: 15px; border: 1px solid #ffecec; margin-bottom: 35px; border-radius: 6px; display: block; line-height: 1.6;">
+                        <strong>Field Requirements Guide:</strong><br>
+                        <div style="margin-top: 10px; margin-bottom: 10px; display: block;">• <strong>Program Schedules:</strong> List recurring programs (e.g., Afterschool, Youth Night, Dinner, Club 316, Music/Arts, Sunday Worship).</div>
+                        <div style="margin-bottom: 10px; display: block;">• <strong>Custom Hours:</strong> Centers should have hours entered that differ from the 2PM-7:30PM School year and 7:30 AM-5:30 PM Summer defaults.</div>
+                        <div style="display: block;">• <strong>Leaders:</strong> Include key staff profiles with photos and bios.</div>
+                    </div>
+                    ${missingContent}
+                </div>
+
+                <div style="${sectionStyle}">
+                    <div style="${headerStyle}">📅 RECENTLY CREATED (LAST 90 DAYS)</div>
+                    <hr style="border: none; border-top: 1px solid #ddd; margin: 10px 0 25px 0; display: block;">
+                    <div style="margin-left: 10px; display: block;">
+                        <p style="margin: 0 0 15px 0; font-weight: bold; font-size: 13px; display: block;">New Facilities:</p>
+                        ${recentFacs.length ? `<ul style="${listStyle}; margin-bottom: 25px;">${recentFacs.map(f => `<li>${f.name}</li>`).join('')}</ul>` : '<p style="font-size:12px; color: #999; margin-left:20px; margin-bottom: 25px; display: block;">None</p>'}
+                        <p style="margin: 0 0 15px 0; font-weight: bold; font-size: 13px; display: block;">New Programs:</p>
+                        ${recentProgs.length ? `<ul style="${listStyle}; margin-bottom: 25px;">${recentProgs.map(p => `<li>${p.name}</li>`).join('')}</ul>` : '<p style="font-size:12px; color: #999; margin-left:20px; margin-bottom: 25px; display: block;">None</p>'}
+                        <p style="font-size: 12px; color: #d93d3d; font-style: italic; margin-top: 25px; border-top: 1px solid #eee; padding-top: 20px; display: block; line-height: 1.6;">
+                            <strong>Note:</strong> It is critical to associate centers with as many applicable facility features and featured programs as possible to ensure they show on center location filters.
+                        </p>
+                    </div>
+                </div>
+
+                <div style="${sectionStyle}">
+                    <div style="${headerStyle}">💡 STRATEGIC MESSAGING & CONTEXT</div>
+                    <hr style="border: none; border-top: 1px solid #ddd; margin: 10px 0 25px 0; display: block;">
+                    <div style="margin-left: 10px; display: block;">
+                        <span style="${faqHeaderStyle}">How does this integrate with our local website?</span>
+                        <p style="${faqParaStyle}">
+                            The new site, <b>www.redshieldyouth.org</b>, serves as the territorial hub for all Red Shield Youth Centers. Each center has its own profile page, and Area Command–level pages are also being developed within the site.<br><br>
+                            Your Area Command, Division, and individual location websites can link directly to individual center profile pages (Launched) and Area Command pages (coming soon). Your existing Symphony/Zesty site can continue to host a dedicated RSYC ministry page if you prefer, or you may choose to link/redirect a menu item to your Area Command page on redshieldyouth.org once it is live.
+                        </p>
+
+                        <span style="${faqHeaderStyle}">How does the information reflect local work?</span>
+                        <p style="${faqParaStyle}">
+                            Each center profile is designed to highlight your local ministry through program schedules, custom operating hours, staff profiles, and localized photos. The accuracy and strength of each profile directly reflect the information entered—it’s a platform to elevate what is uniquely happening in your city.
+                        </p>
+
+                        <span style="${faqHeaderStyle}">Who is the target audience?</span>
+                        <p style="${faqParaStyle}">
+                            The content is designed primarily for parents/guardians, youth, donors, volunteers, and community partners. Secondarily, it gives leadership a clear, unified view of RSYC ministry across regions.
+                        </p>
+
+                        <span style="${faqHeaderStyle}">Is this an additional website?</span>
+                        <p style="${faqParaStyle}">
+                            Yes—redshieldyouth.org is a dedicated RSYC hub that <b>complements</b> your local Salvation Army websites rather than competing with them.
+                        </p>
+                    </div>
+                </div>
+
+                <div style="${sectionStyle}">
+                    <div style="${headerStyle}">🚀 CENTER PROFILE OPPORTUNITIES</div>
+                    <hr style="border: none; border-top: 1px solid #ddd; margin: 10px 0 25px 0; display: block;">
+                    <div style="margin-left: 10px; font-size: 12px; color: #444; line-height: 1.6; display: block;">
+                        <p style="margin-bottom: 20px; display: block;">As we prepare the Area Command presence, ensuring each location is fully represented is key. Shared opportunities include:</p>
+                        <ul style="${listStyle}; margin-bottom: 25px;">
+                            <li style="margin-bottom: 8px;">Adding program schedules and staff contact info within schedules</li>
+                            <li style="margin-bottom: 8px;">Entering key staff or leader profiles</li>
+                            <li style="margin-bottom: 8px;">Uploading required photos (Exterior and Footer)</li>
+                            <li style="margin-bottom: 8px;">Providing parent sign-up and online registration links</li>
+                            <li style="margin-bottom: 8px;">Adding donation and volunteer/mentor sign-up links</li>
+                            <li style="margin-bottom: 8px;">Setting custom hours that differ from territorial defaults</li>
+                        </ul>
+                        <p style="margin-top: 25px; font-weight: bold; color: #d93d3d; display: block;">Thanks for your help with this endeavor!</p>
+                    </div>
+                </div>
+
+                <p style="font-size: 11px; color: #999; margin-top: 80px; border-top: 1px solid #eee; padding-top: 30px; display: block;">
+                    This automated maintenance report was generated from the Center Profile Manager data at <a href="https://centerprofile.redshieldyouth.org">https://centerprofile.redshieldyouth.org</a> 
+                </p>
+            </div>
+        `;
     }
 
     createTemplateViewer(hasCenter = false) {

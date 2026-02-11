@@ -7,6 +7,12 @@
 (function() {
     console.log('[RSYCUnitInjector] Initializing...');
 
+    // Stop if in admin environment to prevent interference with CMS editor
+    if (window.location.href.includes('/admin/') || window.location.hostname.includes('webmanager')) {
+        console.log('[RSYCUnitInjector] Admin environment detected, skipping injection.');
+        return;
+    }
+
     /**
      * Global unit configuration
      */
@@ -15,18 +21,64 @@
     };
 
     /**
+     * Show loading skeleton for faster perceived performance
+     */
+    let loadingTimeoutId = null;
+    
+    function showLoadingSkeleton(targetElement, unitType, unitValue) {
+        // Only show text if it's not the "all" unit type
+        const showText = unitType !== 'all';
+        const titleText = showText ? `<h3 style="margin: 0; color: #333; font-family: sans-serif;">Loading ${unitType} Profile...</h3>` : '';
+        const subText = showText ? `<p style="color: #666; margin-top: 10px;">${unitValue}</p>` : '';
+
+        targetElement.innerHTML = `
+            <div class="rsyc-unit-skeleton" style="padding: 40px; text-align: center; background: #f8f9fa; border-radius: 12px; border: 1px solid #eee; margin: 20px 0;">
+                <div style="display: inline-block; width: 60px; height: 60px; border: 5px solid #f3f3f3; border-top: 5px solid #d93d3d; border-radius: 50%; animation: rsyc-spin 1s linear infinite; margin-bottom: 20px;"></div>
+                ${titleText}
+                ${subText}
+                <div style="margin-top: 30px; display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px;">
+                    <div style="height: 200px; background: #eee; border-radius: 8px; animation: rsyc-pulse 1.5s infinite;"></div>
+                    <div style="height: 200px; background: #eee; border-radius: 8px; animation: rsyc-pulse 1.5s infinite; animation-delay: 0.2s;"></div>
+                    <div style="height: 200px; background: #eee; border-radius: 8px; animation: rsyc-pulse 1.5s infinite; animation-delay: 0.4s;"></div>
+                </div>
+            </div>
+            <style>
+                @keyframes rsyc-spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+                @keyframes rsyc-pulse { 0% { opacity: 0.6; } 50% { opacity: 1; } 100% { opacity: 0.6; } }
+            </style>
+        `;
+    }
+
+    /**
+     * Clear any pending loading skeleton
+     */
+    function clearLoadingSkeleton() {
+        if (loadingTimeoutId) {
+            clearTimeout(loadingTimeoutId);
+            loadingTimeoutId = null;
+        }
+    }
+
+    /**
      * Load and render a unit page into a container
      */
     async function loadUnitPage(unitType, unitValue, targetElement) {
         try {
             console.log(`[RSYCUnitInjector] Loading ${unitType}: ${unitValue}`);
 
+            // Start timer for loading skeleton (only show after 600ms)
+            loadingTimeoutId = setTimeout(() => {
+                showLoadingSkeleton(targetElement, unitType, unitValue);
+            }, 600);
+
             // Determine base URL
             const baseUrl = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
                 ? window.location.origin
                 : 'https://thisishoperva.org';
 
-            const cacheBuster = `?v=${new Date().getTime()}`;
+            // Use hourly cache buster instead of millisecond for better performance
+            const hourlyVersion = Math.floor(Date.now() / 3600000);
+            const cacheBuster = `?v=${hourlyVersion}`;
 
             console.log('[RSYCUnitInjector] Loading scripts from:', baseUrl);
 
@@ -39,6 +91,11 @@
                 loadScript(`${baseUrl}/rsyc/rsyc-unit-templates.js${cacheBuster}`)
             ]);
             console.log('[RSYCUnitInjector] ✓ Loaded core scripts');
+            
+            // Load tracker in background
+            loadScript(`${baseUrl}/rsyc/rsyc-tracker.js${cacheBuster}`).catch(() => {
+                console.warn('[RSYCUnitInjector] Tracker script optional, continuing...');
+            });
 
             // Verify classes are available
             if (!window.RSYCDataLoader) {
@@ -57,37 +114,98 @@
             const dataLoader = new window.RSYCDataLoader();
             const unitDataLoader = new window.RSYCUnitDataLoader(dataLoader);
 
-            // Load all data
+            // 1. Load critical data (now includes Centers + Photos for grid)
             await dataLoader.loadCriticalData();
-            await dataLoader.loadOptionalData();
-            console.log('[RSYCUnitInjector] ✓ Center data loaded');
-
-            // Build unit hierarchy
-            const units = await unitDataLoader.buildUnitHierarchy();
-            console.log('[RSYCUnitInjector] ✓ Unit hierarchy built');
-
-            // Get the specific unit
-            const unit = unitDataLoader.getUnit(unitType, unitValue);
+            console.log('[RSYCUnitInjector] ✓ Critical data loaded');
+            
+            // 2. Build hierarchy and get the unit
+            console.log('[RSYCUnitInjector] 🏗️ Building unit hierarchy...');
+            await unitDataLoader.buildUnitHierarchy();
+            
+            // Normalize unitValue for all-case
+            const normalizedValue = unitValue.toLowerCase() === 'all' ? 'all' : unitValue;
+            let unit = unitDataLoader.getUnit(unitType, normalizedValue);
+            
             if (!unit) {
+                console.warn(`[RSYCUnitInjector] ⚠️ Unit not found: ${unitType} - ${normalizedValue}, loading optional data to retry...`);
+                // If not found after critical, wait for optional just in case, then check again
+                await dataLoader.loadOptionalData();
+                unit = unitDataLoader.getUnit(unitType, normalizedValue);
+                
+                if (!unit) {
+                    // Final attempt: If it's type 'all', and we still don't have a unit, 
+                    // check if building hierarchy failed despite having centers
+                    if (unitType === 'all' && dataLoader.cache.centers?.length > 0) {
+                        console.log('[RSYCUnitInjector] 🔄 Forcing "all" unit construction...');
+                        await unitDataLoader.buildUnitHierarchy();
+                        unit = unitDataLoader.getUnit('all', 'all');
+                    }
+                }
+            }
+
+            if (unit) {
+                // Clear skeleton
+                clearLoadingSkeleton();
+                
+                renderUnit(unit, targetElement, unitType, unitValue);
+                
+                // Then load optional data in background if not already loaded
+                if (!dataLoader.cache.schedules) {
+                    dataLoader.loadOptionalData().then(() => {
+                        console.log('[RSYCUnitInjector] 📦 Optional data loaded in background');
+                    });
+                }
+            } else {
+                clearLoadingSkeleton();
                 throw new Error(`Unit not found: ${unitType} - ${unitValue}`);
             }
 
-            console.log(`[RSYCUnitInjector] ✓ Unit found: ${unit.displayName} (${unit.centers.length} centers)`);
+        } catch (error) {
+            clearLoadingSkeleton();
+            console.error('[RSYCUnitInjector] Error:', error);
+            const errorDetails = `${error.message}<br><br><small style="opacity: 0.7;">Check browser console (F12) for detailed logs. Common causes:<br>• Script files not found (404 errors in Network tab)<br>• Center data not loading from SharePoint<br>• Missing dependencies</small>`;
+            targetElement.innerHTML = `<div style="padding: 20px; background: #ffe6e6; color: #990000; border-radius: 8px; border: 1px solid #ffcccc; font-size: 14px;">
+                <strong><i class="bi bi-exclamation-triangle"></i> Error loading unit page:</strong><br>${errorDetails}
+            </div>`;
+        }
+    }
 
-            // Generate unit page HTML
-            const templateEngine = new window.RSYCUnitTemplates();
-            const enabledSections = window.RSYCUnitConfig.enabledSections || ['hero', 'overview', 'centers', 'programs', 'resources', 'impact', 'giving', 'leaders', 'contact'];
-            
-            const html = templateEngine.generateUnitProfile(unit, enabledSections);
+    /**
+     * Render the unit page HTML and inject it
+     */
+    function renderUnit(unit, targetElement, unitType, unitValue) {
+        console.log(`[RSYCUnitInjector] Rendering unit: ${unit.displayName} (${unit.centers.length} centers)`);
 
-            // Inject custom styles once
-            if (!document.getElementById('rsyc-unit-injected-styles')) {
-                const styleEl = document.createElement('style');
-                styleEl.id = 'rsyc-unit-injected-styles';
-                styleEl.type = 'text/css';
-                styleEl.textContent = `
+        // Generate unit page HTML
+        const templateEngine = new window.RSYCUnitTemplates();
+        const enabledSections = window.RSYCUnitConfig.enabledSections || ['hero', 'overview', 'centers', 'programs', 'resources', 'impact', 'giving', 'leaders', 'contact'];
+        
+        const html = templateEngine.generateUnitProfile(unit, enabledSections);
+
+        // Inject custom styles once
+        if (!document.getElementById('rsyc-unit-injected-styles')) {
+            const styleEl = document.createElement('style');
+            styleEl.id = 'rsyc-unit-injected-styles';
+            styleEl.type = 'text/css';
+            styleEl.textContent = `
+/* Hide navigation from the CMS if it's interfering with the unit page */
+.localSites-website {
+  display: none !important;
+}
+
+/* CMS Height Fixes */
+#page, 
+.freeTextArea.u-centerBgImage.u-sa-whiteBg.u-coverBgImage,
+div #freeTextArea {
+  height: auto !important;
+  min-height: auto !important;
+  padding: 0 !important;
+  margin: 0 !important;
+}
+
 .rsyc-unit-page {
   width: 100%;
+  font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
 }
 
 .rsyc-unit-page .section {
@@ -127,35 +245,28 @@
   text-align: center;
 }
 `;
-                document.head.appendChild(styleEl);
-            }
-
-            // Render unit page
-            const container = document.createElement('div');
-            container.className = 'rsyc-unit-page';
-            container.id = `rsyc-unit-container-${unitType}-${_normalizeForId(unitValue)}`;
-            container.innerHTML = html;
-
-            // For 'all' type, append content; for others, replace content
-            if (unitType === 'all') {
-                targetElement.appendChild(container);
-            } else {
-                targetElement.innerHTML = '';
-                targetElement.appendChild(container);
-            }
-
-            // Load custom styles
-            loadCustomStyles();
-
-            console.log(`[RSYCUnitInjector] ✅ Unit page loaded: ${unit.displayName}`);
-
-        } catch (error) {
-            console.error('[RSYCUnitInjector] Error:', error);
-            const errorDetails = `${error.message}<br><br><small style="opacity: 0.7;">Check browser console (F12) for detailed logs. Common causes:<br>• Script files not found (404 errors in Network tab)<br>• Center data not loading from SharePoint<br>• Missing dependencies</small>`;
-            targetElement.innerHTML = `<div style="padding: 20px; background: #ffe6e6; color: #990000; border-radius: 8px; border: 1px solid #ffcccc; font-size: 14px;">
-                <strong><i class="bi bi-exclamation-triangle"></i> Error loading unit page:</strong><br>${errorDetails}
-            </div>`;
+            document.head.appendChild(styleEl);
         }
+
+        // Render unit page
+        const container = document.createElement('div');
+        container.className = 'rsyc-unit-page';
+        container.id = `rsyc-unit-container-${unitType}-${_normalizeForId(unitValue)}`;
+        container.innerHTML = html;
+
+        // For 'all' type, append content; for others, replace content
+        if (unitType === 'all') {
+            targetElement.innerHTML = ''; // Clear anyway if it's the first render
+            targetElement.appendChild(container);
+        } else {
+            targetElement.innerHTML = '';
+            targetElement.appendChild(container);
+        }
+
+        // Load custom styles
+        loadCustomStyles();
+
+        console.log(`[RSYCUnitInjector] ✅ Unit page rendered: ${unit.displayName}`);
     }
 
     /**
@@ -163,10 +274,11 @@
      */
     function loadScript(src) {
         return new Promise((resolve, reject) => {
-            // Check if already loaded
-            const existing = document.querySelector(`script[src="${src}"]`);
+            // Check if already loaded (ignore query string version)
+            const baseSrc = src.split('?')[0];
+            const existing = document.querySelector(`script[src^="${baseSrc}"]`);
             if (existing) {
-                console.log('[RSYCUnitInjector] Script already loaded:', src);
+                console.log('[RSYCUnitInjector] Script already loaded:', baseSrc);
                 resolve();
                 return;
             }
@@ -175,6 +287,7 @@
             console.log('[RSYCUnitInjector] Loading script:', shortSrc);
             const script = document.createElement('script');
             script.src = src;
+            script.crossOrigin = 'anonymous';
             script.onload = () => {
                 console.log('[RSYCUnitInjector] ✓ Loaded:', shortSrc);
                 resolve();
@@ -197,19 +310,23 @@
         }
 
         try {
-            const baseUrl = window.location.hostname === 'localhost'
+            const baseUrl = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
                 ? window.location.origin
                 : 'https://thisishoperva.org';
+
+            // Use hourly version
+            const hourlyVersion = Math.floor(Date.now() / 3600000);
+            const cacheBuster = `?v=${hourlyVersion}`;
 
             // Load main CSS
             const link = document.createElement('link');
             link.rel = 'stylesheet';
-            link.href = `${baseUrl}/rsyc/rsyc-generator-v2.css`;
+            link.href = `${baseUrl}/rsyc/rsyc-generator-v2.css${cacheBuster}`;
             document.head.appendChild(link);
 
             // Load custom styles
             try {
-                const response = await fetch(`${baseUrl}/rsyc/rsyc-custom-styles.html`);
+                const response = await fetch(`${baseUrl}/rsyc/rsyc-custom-styles.html${cacheBuster}`);
                 if (response.ok) {
                     const customStylesContent = await response.text();
                     const styleContainer = document.createElement('div');

@@ -7,7 +7,7 @@ const http = require('http');
 const fs = require('fs');
 
 const app = express();
-const PORT = 3001;
+const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3001;
 
 // Enable CORS
 app.use(cors());
@@ -42,8 +42,49 @@ async function fetchExternalJSON(filename) {
             let data = '';
             response.on('data', chunk => data += chunk);
             response.on('end', () => {
+                const tryRecoverParse = (str) => {
+                    const trimmed = str.trim();
+                    try {
+                        return JSON.parse(trimmed);
+                    } catch (e) {
+                        console.warn(`[RECOVERY] Parse failed for ${filename}: ${e.message}`);
+                        
+                        // Try position-based recovery
+                        const posMatch = e.message.match(/position (\d+)/);
+                        if (posMatch && posMatch[1]) {
+                            const pos = parseInt(posMatch[1], 10);
+                            try {
+                                return JSON.parse(trimmed.substring(0, pos));
+                            } catch (e2) {}
+                        }
+
+                        // Try backward search for valid closing brace/bracket
+                        const first = Math.min(
+                            str.indexOf('{') === -1 ? 9999999 : str.indexOf('{'),
+                            str.indexOf('[') === -1 ? 9999999 : str.indexOf('[')
+                        );
+                        const last = Math.max(str.lastIndexOf('}'), str.lastIndexOf(']'));
+                        
+                        if (first !== 9999999 && last !== -1 && last > first) {
+                            let currentLast = last;
+                            while (currentLast > first) {
+                                try {
+                                    const candidate = JSON.parse(str.substring(first, currentLast + 1));
+                                    console.log(`[RECOVERY] ✅ Successfully recovered ${filename} by truncation at ${currentLast}`);
+                                    return candidate;
+                                } catch (err) {
+                                    const nextBrace = str.lastIndexOf('}', currentLast - 1);
+                                    const nextBracket = str.lastIndexOf(']', currentLast - 1);
+                                    currentLast = Math.max(nextBrace, nextBracket);
+                                }
+                            }
+                        }
+                        throw e;
+                    }
+                };
+
                 try {
-                    const json = JSON.parse(data);
+                    const json = tryRecoverParse(data);
                     console.log(`[API] ✅ Loaded ${filename}`);
                     resolve(json);
                 } catch (e) {
@@ -134,12 +175,44 @@ function processSchedules(data) {
 }
 
 function processLeaders(data) {
-    return data.map(l => ({
-        id: l.ID,
-        centerIds: Array.isArray(l['Center#Id']) ? l['Center#Id'] : [l['Center#Id']],
-        name: l.PositionTitle || '',
-        role: l.RoleType ? l.RoleType.Value : ''
-    }));
+    return data.map(l => {
+        // Extract faceFocus
+        let faceFocus = '';
+        if (l.FaceFocus && l.FaceFocus.Value) {
+            faceFocus = String(l.FaceFocus.Value).trim();
+        } else if (l.FaceFocus && typeof l.FaceFocus === 'string') {
+            faceFocus = l.FaceFocus.trim();
+        }
+
+        // Extract zoomLevel
+        let zoomLevel = 1;
+        const zoomValue = l.ZoomLevel || l.Scale || l.PhotoZoom;
+        if (zoomValue) {
+            const parsed = parseFloat(zoomValue);
+            if (!isNaN(parsed) && parsed > 0) zoomLevel = parsed;
+        }
+
+        return {
+            id: l.ID,
+            centerIds: Array.isArray(l['Center#Id']) ? l['Center#Id'] : [l['Center#Id']],
+            // Mapping for generateStaff template
+            roleType: l.RoleType ? l.RoleType.Value : '',
+            positionTitle: l.PositionTitle || '',
+            alternateName: l.AlternateName || '',
+            biography: l.Biography || '',
+            Sort: l.Sort,
+            faceFocus: faceFocus,
+            zoomLevel: zoomLevel,
+            imageURL: l.ImageURL || l.ImageUrl || l.Photo || null,
+            person: l.Person ? {
+                name: l.Person.DisplayName,
+                email: l.Person.Email,
+                picture: l.Person.Picture || null,
+                department: l.Person.Department,
+                title: l.Person.JobTitle
+            } : null
+        };
+    });
 }
 
 function processPhotos(data) {
@@ -195,13 +268,52 @@ app.get('/api/cors-proxy', async (req, res) => {
             let data = '';
             response.on('data', chunk => data += chunk);
             response.on('end', () => {
+                const trimmedData = data.trim();
+                const tryRecover = (str, originalErr) => {
+                    // 1. Try position-based recovery (V8 error: "at position 123")
+                    const posMatch = originalErr.message.match(/position (\d+)/);
+                    if (posMatch && posMatch[1]) {
+                        const pos = parseInt(posMatch[1], 10);
+                        try {
+                            return JSON.parse(str.substring(0, pos));
+                        } catch (e2) {}
+                    }
+
+                    // 2. Structural recovery with backward search
+                    const first = Math.min(
+                        str.indexOf('{') === -1 ? Infinity : str.indexOf('{'),
+                        str.indexOf('[') === -1 ? Infinity : str.indexOf('[')
+                    );
+                    const last = Math.max(str.lastIndexOf('}'), str.lastIndexOf(']'));
+
+                    if (first !== Infinity && last !== -1 && last > first) {
+                        let searchPos = last;
+                        while (searchPos > first) {
+                            try {
+                                return JSON.parse(str.substring(first, searchPos + 1));
+                            } catch (err) {
+                                const nextBrace = str.lastIndexOf('}', searchPos - 1);
+                                const nextBracket = str.lastIndexOf(']', searchPos - 1);
+                                searchPos = Math.max(nextBrace, nextBracket);
+                            }
+                        }
+                    }
+                    throw originalErr;
+                };
+
                 try {
-                    const json = JSON.parse(data);
+                    const json = JSON.parse(trimmedData);
                     console.log(`[PROXY] Success: ${url}`);
                     res.json(json);
                 } catch (e) {
-                    console.error(`[PROXY] JSON parse error: ${url}`, e.message);
-                    res.status(500).json({ error: 'Invalid JSON response', details: e.message });
+                    try {
+                        const recovered = tryRecover(trimmedData, e);
+                        console.log(`[PROXY] ✅ Recovered JSON from corrupted stream: ${url}`);
+                        return res.json(recovered);
+                    } catch (recoveryError) {
+                        console.error(`[PROXY] JSON parse error: ${url}`, e.message);
+                        res.status(500).json({ error: 'Invalid JSON response', details: e.message });
+                    }
                 }
             });
         });
@@ -218,6 +330,12 @@ app.get('/api/cors-proxy', async (req, res) => {
 // Health check endpoint
 app.get('/api/health', (req, res) => {
     res.json({ status: 'ok', service: 'rsyc-profile-publisher' });
+});
+
+// Start server
+app.listen(PORT, () => {
+    console.log(`✅ RSYC Profile Publisher Server running at http://localhost:${PORT}`);
+    console.log(`📂 Open: http://localhost:${PORT}/rsyc/rsyc-profile-publisher.html`);
 });
 
 /**
@@ -312,7 +430,7 @@ function generateFullProfileWithSections(centerData, enabledSections) {
                     sectionHTML = generateHero(centerData);
                     break;
                 case 'about':
-                    sectionHTML = generateAbout(centerData);
+                    // About is now included in generateSchedules, skip it here
                     break;
                 case 'schedules':
                     sectionHTML = generateSchedules(centerData);
@@ -385,92 +503,219 @@ function generateHero(data) {
 }
 
 /**
- * About Section
- */
-function generateAbout(data) {
-    const { center, photos } = data;
-    const aboutImage = photos && photos.length > 1 && photos[1].exterior ? photos[1].exterior : 'https://via.placeholder.com/1200x400?text=About';
-    
-    return `<!-- About Section -->
-<section class="freeTextArea section u-positionRelative u-sa-whiteBg">
-    <div class="container" style="padding: 40px 20px;">
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 40px; align-items: center;">
-            <div><img src="${aboutImage}" alt="About" style="width: 100%; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1);"></div>
-            <div>
-                <h2 style="font-size: 32px; color: #1a4d7f; margin: 0 0 20px 0; font-weight: bold;">About This <span style="color: #17a2b8;">Center</span></h2>
-                <p style="font-size: 16px; color: #666; line-height: 1.8; margin: 0 0 15px 0;">${escapeHTML(center.missionStatement || 'We serve our community with compassion and care.')}</p>
-                <p style="font-size: 14px; color: #888; line-height: 1.6; margin: 0;">Located in ${escapeHTML(center.city)}, ${escapeHTML(center.state)}, we provide youth development, social services, and community support.</p>
-            </div>
-        </div>
-    </div>
-</section>`;
-}
-
-/**
- * Schedules Section - Matches Publisher Format with Modals
+ * Schedules Section - Tabbed Accordion with About + Social + Schedule
+ * NOTE: generateAbout is no longer separate - it's included in generateSchedules
  */
 function generateSchedules(data) {
     const { schedules, center } = data;
-    if (!schedules || schedules.length === 0) return '';
     
-    const scheduleCards = schedules.slice(0, 8).map((schedule, idx) => `
-<div class="schedule-card text-dark d-flex flex-column h-100" style="min-width:230px;padding:1rem;border-radius:8px;background:#fff;box-shadow:0 1px 4px rgba(0,0,0,0.06);">
-    <h5 class="fw-bold mb-1">${escapeHTML(schedule.title || 'Program')}</h5>
-    ${schedule.subtitle ? `<div class="text-muted small mb-1">${escapeHTML(schedule.subtitle)}</div>` : ''}
-    <p class="mb-0">
-        ${schedule.days ? `<strong>Days:</strong> <span class="d-inline-block">${escapeHTML(schedule.days.join(', '))}</span><br>` : ''}
-        ${schedule.time ? `<strong>Time:</strong> ${escapeHTML(schedule.time)}<br>` : ''}
-        <strong>Active:</strong> ${escapeHTML(schedule.months || 'Year-round')}
-    </p>
-    <div class="mt-2">
-        <button class="btn btn-outline-primary" style="font-size: 0.7rem; padding: 0.25rem 0.5rem;" onclick="showRSYCModal('schedule-${idx}', '${escapeHTML(schedule.title || 'Program')}')">
-            View Full Details
-        </button>
-    </div>
-</div>`).join('');
-
-    const modals = schedules.slice(0, 8).map((schedule, idx) => `
-<div id="rsyc-modal-schedule-${idx}" class="rsyc-modal" style="display:none;">
-    <div class="rsyc-modal-content">
-        <div class="rsyc-modal-header">
-            <h3>${escapeHTML(schedule.title || 'Program')}</h3>
-            <button class="rsyc-modal-close" onclick="closeRSYCModal('schedule-${idx}')">&times;</button>
-        </div>
-        <div class="rsyc-modal-body" style="color:#333;">
-            ${schedule.description ? `<div class="mb-4"><div style="font-size:1rem; line-height:1.6; color:#333;">${schedule.description}</div></div>` : ''}
-            <div class="row">
-                ${schedule.days ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Days:</strong><br>${escapeHTML(schedule.days.join(', '))}</div>` : ''}
-                ${schedule.time ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Time:</strong><br>${escapeHTML(schedule.time)}</div>` : ''}
-                <div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Time Zone:</strong><br>Eastern/America/New York</div>
-                ${schedule.months ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Active:</strong><br>${escapeHTML(schedule.months)}</div>` : ''}
+    // ============================================
+    // PART 1: Build About section if available
+    // ============================================
+    let aboutImageSection = '';
+    let aboutSection = '';
+    let socialSection = '';
+    
+    if (center.aboutText) {
+        // Get explainer video embed code
+        const explainerVideoEmbedCode = center.explainerVideoEmbedCode || center.ExplainerVideoEmbedCode || '';
+        const videoHTML = explainerVideoEmbedCode ? `
+                <div class="mt-4" style="border-radius: 12px; overflow: hidden;">
+                    ${explainerVideoEmbedCode}
+                </div>` : '';
+        
+        aboutSection = `
+    <div class="d-flex justify-content-center">
+        <div class="schedule-card w-100 text-dark" style="max-width:800px;width:100%;padding:1.5rem;border-radius:8px;background:#fff;box-shadow:0 1px 4px rgba(0,0,0,0.06);">
+            <h2 class="fw-bold mb-3 text-center">About This <em>Center</em></h2>
+            <p class="text-center mb-3"><strong>The Salvation Army ${escapeHTML(center.name || center.Title)}</strong></p>
+            <div class="about-content" style="font-family: inherit; font-size: 1rem; line-height: 1.6;">
+                ${center.aboutText}
             </div>
+            ${videoHTML}
         </div>
-    </div>
-</div>`).join('');
+    </div>`;
+    }
     
-    return `<!-- Program Schedules -->
-<div id="freeTextArea-schedules" class="freeTextArea u-centerBgImage section u-sa-tealBg u-coverBgImage">
-    <div class="u-positionRelative">
-        <div class="container">
-            <div class="my-5">
-                <h2 class="fw-bold mb-4 text-center">Program <em style="color:#20c997;">Schedule</em></h2>
+    // Build social network links
+    const hasFacebook = center.facebookURL;
+    const hasInstagram = center.instagramURL;
+    const hasTwitter = center.twitterURL;
+    const hasLinkedIn = center.linkedInURL;
+    const hasYouTube = center.youTubeURL;
+    
+    if (hasFacebook || hasInstagram || hasTwitter || hasLinkedIn || hasYouTube) {
+        const socialIcons = [];
+        if (hasFacebook) {
+            socialIcons.push(`<a class="text-white text-decoration-none" href="${escapeHTML(center.facebookURL)}" target="_blank"><i class="bi bi-facebook" style="font-size:1.45rem;"></i></a>`);
+        }
+        if (hasInstagram) {
+            socialIcons.push(`<a class="text-white text-decoration-none" href="${escapeHTML(center.instagramURL)}" target="_blank"><i class="bi bi-instagram" style="font-size:1.45rem;"></i></a>`);
+        }
+        if (hasLinkedIn) {
+            socialIcons.push(`<a class="text-white text-decoration-none" href="${escapeHTML(center.linkedInURL)}" target="_blank"><i class="bi bi-linkedin" style="font-size:1.45rem;"></i></a>`);
+        }
+        if (hasYouTube) {
+            socialIcons.push(`<a class="text-white text-decoration-none" href="${escapeHTML(center.youTubeURL)}" target="_blank"><i class="bi bi-youtube" style="font-size:1.45rem;"></i></a>`);
+        }
+        if (hasTwitter) {
+            socialIcons.push(`<a class="text-white text-decoration-none" href="${escapeHTML(center.twitterURL)}" target="_blank"><i class="bi bi-twitter" style="font-size:1.45rem;"></i></a>`);
+        }
+        
+        socialSection = `
+    <div class="mt-4 text-center">
+        <h4 class="fw-bold mb-3 text-white">Follow Us</h4>
+        <div class="d-flex justify-content-center gap-3 mb-4">
+            ${socialIcons.join(' ')}
+        </div>
+    </div>`;
+    }
+    
+    // ============================================
+    // PART 2: Build schedule accordion if available
+    // ============================================
+    let scheduleScrollSection = '';
+    
+    if (schedules && schedules.length > 0) {
+        let accordionHeaders = '';
+        let accordionPanels = '';
+        
+        schedules.forEach((schedule) => {
+            // Parse days
+            let daysText = '';
+            if (schedule.scheduleDays && Array.isArray(schedule.scheduleDays) && schedule.scheduleDays.length > 0) {
+                const days = schedule.scheduleDays;
+                const weekdays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
+                const allWeekdays = weekdays.every(day => days.includes(day));
                 
-                <div class="schedule-scroll-wrapper">
-                    <p class="text-center mb-n2">
-                        <small class="text-light">
-                            Scroll to view more 
-                            <i class="bi bi-arrow-right-circle" style="font-size: 0.85em; vertical-align: middle;"></i>
-                        </small>
-                    </p>
-                    <div class="horizontal-scroll " style="display:flex;gap:1rem;overflow-x:auto;overflow-y:visible;padding-bottom:0.5rem;align-items:stretch;">
-                        ${scheduleCards}
+                if (allWeekdays && days.length === 5) {
+                    daysText = 'Monday - Friday';
+                } else if (days.length === 1) {
+                    daysText = days[0];
+                } else if (days.length === 2) {
+                    daysText = days.join(' and ');
+                } else {
+                    daysText = days.join(', ');
+                }
+            }
+            
+            // Parse time
+            let timeText = '';
+            if (schedule.scheduleTime) {
+                timeText = schedule.scheduleTime;
+            }
+            
+            const scheduleId = `rsyc-schedule-${schedule.id}`;
+            
+            // Build accordion header button
+            accordionHeaders += `
+                <button class="rsyc-accordion-header-btn" data-schedule="${scheduleId}" onclick="window.showRSYCSchedulePanel('${scheduleId}')" style="padding: 1rem; border: 1px solid #e0e0e0; border-radius: 8px; background: #f8f9fa; cursor: pointer; flex: 1; min-width: 0; transition: all 0.3s ease; text-align: left;">
+                    <div style="color: #000; margin: 0;">
+                        <h5 class="fw-bold mb-1" style="margin: 0; color: #000; font-size: 0.95rem;">${escapeHTML(schedule.title)}</h5>
+                        ${schedule.subtitle ? `<div class="text-muted small" style="color: #666; font-size: 0.85rem;">${escapeHTML(schedule.subtitle)}</div>` : ''}
+                        <p class="mb-0 mt-2" style="font-size: 0.85rem; color: #000;">
+                            ${daysText ? `<strong>Days:</strong> ${escapeHTML(daysText)}<br>` : ''}
+                            ${timeText ? `<strong>Time:</strong> ${escapeHTML(timeText)}` : ''}
+                        </p>
                     </div>
-                </div>
+                </button>`;
+            
+            // Build accordion panel content
+            accordionPanels += `
+                <div class="rsyc-accordion-panel" id="${scheduleId}-panel" style="display: none; padding: 1.5rem; border: 1px solid #e0e0e0; border-top: 3px solid #20B3A8; background: white; color: #333; border-radius: 0 0 8px 8px;">
+                    <h3 style="margin: 0 0 1rem 0; color: #000;">${escapeHTML(schedule.title)}</h3>
+                    ${schedule.subtitle ? `<p style="color:#666; margin: 0 0 1rem 0; font-style:italic;">${escapeHTML(schedule.subtitle)}</p>` : ''}
+                    ${schedule.description ? `<p class="mb-3">${schedule.description}</p>` : ''}
+                    
+                    <div class="row">
+                        ${daysText ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Days:</strong><br>${escapeHTML(daysText)}</div>` : ''}
+                        ${timeText ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Time:</strong><br>${escapeHTML(timeText)}</div>` : ''}
+                        ${schedule.ageRange ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Age Range:</strong><br>${escapeHTML(schedule.ageRange)}</div>` : ''}
+                        ${schedule.cost ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Cost:</strong><br>${escapeHTML(schedule.cost)}</div>` : ''}
+                    </div>
+                </div>`;
+        });
+        
+        // Add global function to switch schedule panels
+        if (typeof window.showRSYCSchedulePanel === 'undefined') {
+            window.showRSYCSchedulePanel = function(scheduleId) {
+                document.querySelectorAll('.rsyc-accordion-panel').forEach(panel => {
+                    panel.style.display = 'none';
+                });
+                document.querySelectorAll('.rsyc-accordion-header-btn').forEach(btn => {
+                    btn.style.background = '#f8f9fa';
+                    btn.style.borderColor = '#e0e0e0';
+                    btn.classList.remove('active');
+                });
+                const selectedPanel = document.getElementById(scheduleId + '-panel');
+                if (selectedPanel) {
+                    selectedPanel.style.display = 'block';
+                }
+                const selectedBtn = document.querySelector(`[data-schedule="${scheduleId}"]`);
+                if (selectedBtn) {
+                    selectedBtn.style.background = '#e8f4f8';
+                    selectedBtn.style.borderColor = '#20B3A8';
+                    selectedBtn.classList.add('active');
+                }
+            };
+        }
+        
+        scheduleScrollSection = `
+    <div class="rsyc-tabbed-accordion" style="margin: 2rem 0; width: 100%;">
+        <div class="rsyc-accordion-headers" style="display: flex; gap: 0.75rem; margin-bottom: 0; flex-wrap: wrap; width: 100%;">
+            ${accordionHeaders}
+        </div>
+        <div class="rsyc-accordion-panels" style="margin-top: 0; width: 100%;">
+            ${accordionPanels}
+        </div>
+    </div>`;
+    }
+    
+    // ============================================
+    // PART 3: Build complete output with About + Schedules
+    // ============================================
+    let output = '';
+    
+    // Add About section first (in teal background)
+    if (aboutSection || socialSection) {
+        output += `<!-- About This Center -->
+<div id="freeTextArea-about" class="freeTextArea u-centerBgImage section u-sa-tealBg u-coverBgImage">
+    <div class="u-positionRelative">
+        <div class="container" style="margin: 0; padding: 0;">
+            <div class="mt-0 mb-5">
+                ${aboutImageSection}
+                ${aboutSection}
+                ${socialSection}
             </div>
         </div>
     </div>
 </div>
-${modals}`;
+
+`;
+    }
+    
+    // Add Schedule section if there are schedules (in white background)
+    if (scheduleScrollSection && scheduleScrollSection.trim() !== '') {
+        output += `<!-- Program Schedule Section -->
+<div class="freeTextArea section" style="background: white; padding: 3rem 0;">
+    <div class="u-positionRelative">
+        <div class="container" style="margin: 0; padding: 0;">
+            <h2 class="fw-bold mb-4 text-center">Program <em>Schedule</em></h2>
+            
+            <div class="schedule-scroll-wrapper" style="margin: 0;">
+                ${scheduleScrollSection}
+            </div>
+        </div>
+    </div>
+</div>`;
+    }
+    
+    // Return combined output or empty if nothing to display
+    if (!output || output.trim() === '') {
+        return '';
+    }
+    
+    return output;
 }
 
 /**

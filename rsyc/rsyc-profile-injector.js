@@ -8,6 +8,12 @@
 (function() {
     console.log('[RSYCProfileInjector] Initializing...');
 
+    // Stop if in admin environment to prevent interference with CMS editor
+    if (window.location.href.includes('/admin/') || window.location.hostname.includes('webmanager')) {
+        console.log('[RSYCProfileInjector] Admin environment detected, skipping injection.');
+        return;
+    }
+
     /**
      * Global sections configuration - can be set before loading profiles
      * Usage: window.RSYCProfileConfig.enabledSections = ['hero', 'about', 'schedules'];
@@ -31,7 +37,6 @@
                     100% { background-position: -200% 0; }
                 }
             </style>
-            <div style="padding: 0 4px; color: #999; font-size: 13px;">Loading ${centerName || 'profile'}...</div>
         `;
     }
 
@@ -60,7 +65,9 @@
                 ? window.location.origin
                 : 'https://thisishoperva.org';
 
-            const cacheBuster = `?v=${new Date().getTime()}`;
+            // Use hourly cache buster instead of millisecond for better performance
+            const hourlyVersion = Math.floor(Date.now() / 3600000);
+            const cacheBuster = `?v=${hourlyVersion}`;
 
             console.log('[RSYCProfileInjector] Loading scripts from:', baseUrl);
             
@@ -238,10 +245,11 @@ div #freeTextArea {
      */
     function loadScript(src) {
         return new Promise((resolve, reject) => {
-            // Check if script already in DOM
-            const existing = document.querySelector(`script[src="${src}"]`);
+            // Check if script already in DOM (ignore query string version)
+            const baseSrc = src.split('?')[0];
+            const existing = document.querySelector(`script[src^="${baseSrc}"]`);
             if (existing) {
-                console.log('[RSYCProfileInjector] Script already loaded:', src);
+                console.log('[RSYCProfileInjector] Script already loaded:', baseSrc);
                 resolve();
                 return;
             }
@@ -249,6 +257,7 @@ div #freeTextArea {
             console.log('[RSYCProfileInjector] Adding script tag:', src);
             const script = document.createElement('script');
             script.src = src;
+            script.crossOrigin = 'anonymous';
             script.onload = () => {
                 console.log('[RSYCProfileInjector] Script onload fired:', src);
                 // Minimal delay to ensure script initializes
