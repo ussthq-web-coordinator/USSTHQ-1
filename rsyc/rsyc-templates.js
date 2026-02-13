@@ -51,7 +51,7 @@ class RSYCTemplates {
         
         Object.keys(this.sections).forEach(sectionKey => {
             if (enabledSections.includes(sectionKey)) {
-                const html = this.generateSection(sectionKey, centerData);
+                const html = this.generateSection(sectionKey, { ...centerData, __enabledSections: enabledSections });
                 if (html) {
                     sections.push(html);
                 }
@@ -124,10 +124,53 @@ class RSYCTemplates {
         border-top-right-radius: 20px !important;
     }
 </style>
-<section class="rsyc-hero" style="background-color: #20B3A8; padding: 20px 0; display: flex; justify-content: center; align-items: center;">
+<section class="rsyc-hero" style="background-color: #00929C; padding: 20px 0; display: flex; justify-content: center; align-items: center;">
     <img src="${this.escapeHTML(exteriorPhoto)}" alt="${this.escapeHTML(center.name)} Exterior" 
          style="display: block; height: 500px; object-fit: cover; object-position: center; margin: 35px auto 0 auto; border-radius: 15px;">
 </section>`;
+    }
+
+    generateAbout(data) {
+        const { center, schedules, photos } = data;
+
+        if (!center || !center.aboutText) return '';
+
+        const hasSchedules = schedules && schedules.length > 0;
+        const bottomMarginClass = hasSchedules ? ' mb-5' : '';
+
+        const photoData = photos && photos.length > 0 ? photos[0] : null;
+        const exteriorPhoto = photoData?.urlExteriorPhoto || 'https://s3.amazonaws.com/uss-cache.salvationarmy.org/9150a418-1c58-4d01-bf81-5753d1c608ae_salvation+army+building+1.png';
+
+        const schedulesCacheKey = `schedules_${center.id || 'default'}`;
+        if (typeof window.RSYC_SCHEDULES !== 'undefined' && window.RSYC_SCHEDULES && window.RSYC_SCHEDULES[schedulesCacheKey]) {
+            window.RSYC_SCHEDULES[schedulesCacheKey].exteriorPhoto = exteriorPhoto;
+        }
+
+        const explainerVideoEmbedCode = center.explainerVideoEmbedCode || center.ExplainerVideoEmbedCode || '';
+        const videoHTML = explainerVideoEmbedCode ? `
+            <div class="mt-2" style="border-radius: 12px; overflow: hidden;">
+                ${explainerVideoEmbedCode}
+            </div>` : '';
+
+        return `<!-- About This Center -->
+<div id="freeTextArea-about" class="freeTextArea u-centerBgImage section u-sa-tealBg u-coverBgImage">
+    <div class="u-positionRelative">
+        <div class="container">
+            <div class="mt-0 mb-5">
+                <div class="d-flex justify-content-center${bottomMarginClass}">
+                    <div class="schedule-card w-100 text-dark" style="max-width:800px;width:100%;padding:1.5rem;border-radius:8px;background:#fff;box-shadow:0 1px 4px rgba(0,0,0,0.06);">
+                        <h2 class="fw-bold mb-3 text-center">About This <em>Center</em></h2>
+                        <p class="text-center mb-3"><strong>The Salvation Army ${this.escapeHTML(center.name || center.Title)}</strong></p>
+                        <div class="about-content" style="font-family: inherit; font-size: 1rem; line-height: 1.6;">
+                            ${center.aboutText}
+                        </div>
+                        ${videoHTML}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>`;
     }
 
     /**
@@ -267,8 +310,8 @@ ${modal}`;
     /**
      * Program Schedules Section
      */
-    generateSchedules(data) {
-        const { schedules, center } = data;
+    generateSchedules(data, enabledSections) {
+        const { center, schedules } = data;
         
         // Build schedule cards if available
         let scheduleCards = '';
@@ -280,7 +323,7 @@ ${modal}`;
         
         if (schedules && schedules.length > 0) {
             // Only show title if there are schedule items
-            scheduleTitleSection = `<h2 class="fw-bold mb-4 text-center">Program <em>Schedule</em></h2>`;
+            scheduleTitleSection = `<h2 class="fw-bold mb-4 text-center"><span style="color:#FCA200;">Program </span><em style="color:#ffffff;">Schedule</em></h2>`;
             
             // Sort schedules by proximity to current month
             const currentMonth = new Date().getMonth(); // 0-11
@@ -486,34 +529,41 @@ ${modal}`;
                 ${hasContent(schedule.location) ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Location:</strong><br>${this.escapeHTML(schedule.location)}</div>` : ''}
                 ${hasContent(schedule.cost) ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Cost:</strong><br>${this.escapeHTML(schedule.cost)}</div>` : ''}
                 ${hasContent(schedule.frequency) ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Frequency:</strong><br>${this.escapeHTML(schedule.frequency)}</div>` : ''}
+                ${hasContent(months) ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Program Runs In:</strong><br>${this.escapeHTML(months)}</div>` : ''}
+                ${hasContent(registrationMonths) ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Registration Opens:</strong><br>${this.escapeHTML(registrationMonths)}</div>` : ''}
+                ${hasContent(schedule.registrationDeadline) ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Registration Deadline:</strong><br>${this.escapeHTML(schedule.registrationDeadline)}</div>` : ''}
+                ${hasContent(schedule.registrationFee) ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Registration Fee:</strong><br>${this.escapeHTML(schedule.registrationFee)}</div>` : ''}
+                ${hasContent(schedule.cost) ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Cost:</strong><br>${this.escapeHTML(schedule.cost)}</div>` : ''}
+                ${hasContent(schedule.location) ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Location:</strong><br>${this.escapeHTML(schedule.location)}</div>` : ''}
                 ${hasContent(schedule.capacity) ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Capacity:</strong><br>${this.escapeHTML(schedule.capacity)}</div>` : ''}
-                ${hasContent(schedule.agesServed?.join(', ')) ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Ages Served:</strong><br>${this.escapeHTML(schedule.agesServed.join(', '))}</div>` : ''}
-            </div>
                 
-                ${hasContent(schedule.transportationFeeandDetails) ? `<div class="col-sm-12 mb-3 rsyc-transportation" style="background:#fff9ea; padding:1rem; border-radius:6px; border-left:3px solid #ffb300; color:#333;"><strong style="color:#030303;"><i class="bi bi-bus-front me-2"></i>Transportation:</strong><br><div class="mt-1 rsyc-transportation-value" style="font-size:0.95rem;">${this.preserveLineBreaks(schedule.transportationFeeandDetails)}</div></div>` : ''}
+                ${hasContent(schedule.agesServed?.join(', ')) ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Ages:</strong><br>${this.escapeHTML(schedule.agesServed.join(', '))}</div>` : ''}
+                ${hasContent(schedule.startDate) || hasContent(schedule.endDate) ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Program Dates:</strong><br>${hasContent(schedule.startDate) ? this.escapeHTML(schedule.startDate) : ''} ${hasContent(schedule.startDate) && hasContent(schedule.endDate) ? '-' : ''} ${hasContent(schedule.endDate) ? this.escapeHTML(schedule.endDate) : ''}</div>` : ''}
+                
+                ${hasContent(schedule.transportationFeeandDetails) ? `<div class="col-sm-12 mb-3 rsyc-transportation" style="background:#fff9ea; padding:1rem; border-radius:6px; border-left:3px solid #ffb300; color:#333;"><strong style="color:#e6a800;"><i class="bi bi-bus-front me-2"></i>Transportation:</strong><br><div class="mt-1 rsyc-transportation-value" style="font-size:0.95rem;">${this.preserveLineBreaks(schedule.transportationFeeandDetails)}</div></div>` : ''}
                 
                 ${hasContent(schedule.closedDates) ? `<div class="col-sm-12 mb-3" style="background:#ffe6e6; padding:1rem; border-radius:6px; border-left:3px solid #dc3545; color:#333;"><strong style="color:#dc3545;"><i class="bi bi-calendar-x me-2"></i>Closed Dates:</strong><br>${this.preserveLineBreaks(schedule.closedDates)}</div>` : ''}
                 ${hasContent(schedule.openHalfDayDates) ? `<div class="col-sm-12 mb-3" style="color:#333;"><strong>Open Half Days:</strong><br>${this.preserveLineBreaks(schedule.openHalfDayDates)}</div>` : ''}
                 ${hasContent(schedule.openFullDayDates) ? `<div class="col-sm-12 mb-3" style="color:#333;"><strong>Open Full Days:</strong><br>${this.preserveLineBreaks(schedule.openFullDayDates)}</div>` : ''}
                 
                 ${hasContent(schedule.orientationDetails) ? `
-                <div class="col-sm-12 mb-3 rsyc-orientation" style="background:#fffacd; padding:1rem; border-radius:6px; border-left:3px solid #ff8c00; color:#333;">
-                    <strong class="rsyc-orientation-title" style="color:#000;"><i class="bi bi-info-circle me-2"></i>Orientation Details:</strong>
-                    <div class="mt-2 rsyc-orientation-body" style="font-size:0.95rem; color:#000;">${this.preserveLineBreaks(schedule.orientationDetails)}</div>
+                <div class="col-sm-12 mb-3" style="background:#fffacd; padding:1rem; border-radius:6px; border-left:3px solid #ff8c00; color:#333;">
+                    <strong style="color:#000;"><i class="bi bi-info-circle me-2"></i>Orientation Details:</strong>
+                    <div class="mt-2" style="font-size:0.95rem; color:#000;">${this.preserveLineBreaks(schedule.orientationDetails)}</div>
                 </div>
                 ` : ''}
                 
                 ${hasContent(schedule.whatToBring) || hasContent(schedule.materialsProvided) ? `
                 <div class="col-sm-12 mb-3" style="background:#f0f8ff; padding:1rem; border-radius:6px; border-left:3px solid #4169e1; color:#333;">
-                    <strong style="color:#030303;"><i class="bi bi-backpack2 me-2"></i>What to Bring:</strong>
+                    <strong style="color:#4169e1;"><i class="bi bi-backpack2 me-2"></i>What to Bring:</strong>
                     ${hasContent(schedule.whatToBring) ? `<div class="mt-2">${this.preserveLineBreaks(schedule.whatToBring)}</div>` : ''}
                     ${hasContent(schedule.materialsProvided) ? `<div class="mt-2"><u>Materials Provided:</u><br>${this.preserveLineBreaks(schedule.materialsProvided)}</div>` : ''}
                 </div>
                 ` : ''}
                 
-                ${((schedule.contacts && schedule.contacts.length > 0) || hasContent(schedule.contactInfo)) ? `
-                <div class="col-sm-12 mb-3 rsyc-contacts p-4" style="background:#f0f7f7; border-radius:12px; border:1px solid #d1e7e7; color:#333;">
-                    <strong class="rsyc-contacts-title mb-3" style="color:#20B3A8; text-transform:uppercase; font-size:1.1rem; letter-spacing:0.05rem; display:block;">Point${schedule.contacts && schedule.contacts.length > 1 ? 's' : ''} of Contact</strong>
+                ${(schedule.contacts && schedule.contacts.length > 0) || hasContent(schedule.contactInfo) ? `
+                <div class="col-sm-12 mb-3 p-4" style="background:#f0f7f7; border-radius:12px; border:1px solid #d1e7e7; color:#333;">
+                    <strong style="color:#20B3A8; text-transform:uppercase; font-size:1.1rem; letter-spacing:0.05rem; display:block;">Point${schedule.contacts && schedule.contacts.length > 1 ? 's' : ''} of Contact</strong>
                     ${schedule.contacts && schedule.contacts.length > 0 ? schedule.contacts.map((contact, idx) => `
                         <div class="rsyc-contact-item"${idx > 0 ? ` style="margin-top:1.2rem; padding-top:1.2rem; border-top:1px solid rgba(32,179,168,0.2);"` : ''}>
                             ${hasContent(contact.name) ? `<div class="rsyc-contact-name" style="font-weight:700; font-size:1.25rem; color:#111;">${this.escapeHTML(contact.name)}</div>` : ''}
@@ -527,6 +577,16 @@ ${modal}`;
                 
                 ${hasContent(schedule.prerequisites) ? `<div class="col-sm-12 mb-3" style="color:#333;"><strong>Prerequisites:</strong><br>${this.preserveLineBreaks(schedule.prerequisites)}</div>` : ''}
                 ${hasContent(schedule.dropOffPickUp) ? `<div class="col-sm-12 mb-3" style="color:#333;"><strong>Drop-off/Pick-up Info:</strong><br>${this.preserveLineBreaks(schedule.dropOffPickUp)}</div>` : ''}
+            </div>
+                
+                ${(schedule.relatedPrograms && Array.isArray(schedule.relatedPrograms) && schedule.relatedPrograms.length > 0) ? `
+                <div class="col-sm-12 mb-3" style="background:#f5f5f5; padding:1rem; border-radius:6px; color:#333;">
+                    <strong style="color:#333; font-size:1.1rem; display:block; margin-bottom:0.75rem;"><i class="bi bi-link me-2" style="color:#20B3A8;"></i>Related Programs</strong>
+                    <div class="d-flex flex-wrap gap-2">
+                        ${schedule.relatedPrograms.map(p => `<span class="badge bg-primary">${this.escapeHTML(p.name)}</span>`).join('')}
+                    </div>
+                </div>
+                ` : ''}
             </div>
             
             ${(schedule.relatedPrograms && Array.isArray(schedule.relatedPrograms) && schedule.relatedPrograms.length > 0) ? `
@@ -619,7 +679,7 @@ ${modal}`;
                                 ${hasContent(schedule.materialsProvided) ? `<div class="mt-2"><u>Materials Provided:</u><br>${this.preserveLineBreaks(schedule.materialsProvided)}</div>` : ''}
                             </div>
                             ` : ''}
-
+                            
                             ${(schedule.contacts && schedule.contacts.length > 0) || hasContent(schedule.contactInfo) ? `
                             <div class="col-sm-12 mb-3 p-3" style="background:#f0f7f7; border-radius:10px; border:1px solid #d1e7e7; color:#333;">
                                 <strong style="color:#20B3A8; text-transform:uppercase; font-size:1.5rem; letter-spacing:0.05rem; display:block; margin-bottom:0.5rem;">Point${schedule.contacts && schedule.contacts.length > 1 ? 's' : ''} of Contact</strong>
@@ -714,51 +774,13 @@ ${modal}`;
     </div>
     
     <div class="text-center mt-4">
-        <button class="btn btn-outline-primary" onclick="printAllSchedules('${schedulesCacheKey}')">
+        <button class="btn btn-outline-primary" onclick="printAllSchedules('${schedulesCacheKey}')" style="border-color:#d3d3d3; color:#d3d3d3;">
             <i class="bi bi-printer me-2"></i>Print / Save all as PDF
         </button>
     </div>`;
         }
         
-        // Build About This Center section (always show if available) in white rounded card
-        let aboutSection = '';
-        let aboutImageSection = ''; // Image removed from about section
-        if (center.aboutText) {
-            // Get exterior photo from photos array (no longer used for aboutImageSection)
-            const photoData = data.photos && data.photos.length > 0 ? data.photos[0] : null;
-            const exteriorPhoto = photoData?.urlExteriorPhoto || 'https://s3.amazonaws.com/uss-cache.salvationarmy.org/9150a418-1c58-4d01-bf81-5753d1c608ae_salvation+army+building+1.png';
-            
-            // Update window.RSYC_SCHEDULES with exterior photo (prefers custom, falls back to default)
-            const schedulesCacheKey = `schedules_${center.id || 'default'}`;
-            if (window.RSYC_SCHEDULES && window.RSYC_SCHEDULES[schedulesCacheKey]) {
-                window.RSYC_SCHEDULES[schedulesCacheKey].exteriorPhoto = exteriorPhoto;
-            }
-            
-            // aboutImageSection is now empty - image removed per user request
-            
-            // Add bottom margin only if we have schedules to display below
-            const hasSchedules = schedules && schedules.length > 0;
-            const bottomMarginClass = hasSchedules ? ' mb-5' : '';
-            
-            // Get explainer video embed code
-            const explainerVideoEmbedCode = center.explainerVideoEmbedCode || center.ExplainerVideoEmbedCode || '';
-            const videoHTML = explainerVideoEmbedCode ? `
-                <div class="mt-2" style="border-radius: 12px; overflow: hidden;">
-                    ${explainerVideoEmbedCode}
-                </div>` : '';
-            
-            aboutSection = `
-    <div class="d-flex justify-content-center${bottomMarginClass}">
-        <div class="schedule-card w-100 text-dark" style="max-width:800px;width:100%;padding:1.5rem;border-radius:8px;background:#fff;box-shadow:0 1px 4px rgba(0,0,0,0.06);">
-            <h2 class="fw-bold mb-3 text-center">About This <em>Center</em></h2>
-            <p class="text-center mb-3"><strong>The Salvation Army ${this.escapeHTML(center.name || center.Title)}</strong></p>
-            <div class="about-content" style="font-family: inherit; font-size: 1rem; line-height: 1.6;">
-                ${center.aboutText}
-            </div>
-            ${videoHTML}
-        </div>
-    </div>`;
-        }
+        // About This Center renders via the dedicated 'about' section.
         
         // Build social network links
         let socialSection = '';
@@ -795,20 +817,16 @@ ${modal}`;
     </div>`;
         }
 
-        // If there is no schedules, no about content and no social links, don't render the entire section
-        if ((!scheduleCards || scheduleCards.trim() === '') && (!aboutSection || aboutSection.trim() === '') && (!socialSection || socialSection.trim() === '')) {
+        // If there is no schedules and no social links, don't render the entire section
+        if ((!scheduleCards || scheduleCards.trim() === '') && (!socialSection || socialSection.trim() === '')) {
             return '';
         }
 
         return `<!-- Program Schedules -->
-<div id="freeTextArea-schedules" class="freeTextArea u-centerBgImage section u-sa-tealBg u-coverBgImage">
+<div id="freeTextArea-schedules" class="freeTextArea u-centerBgImage section u-coverBgImage" style="background-color: #00929C;">
     <div class="u-positionRelative">
         <div class="container">
             <div class="mt-0 mb-5">
-                ${aboutImageSection}
-                
-                ${aboutSection}
-                
                 ${scheduleTitleSection}
                 
                 <div class="schedule-scroll-wrapper">
@@ -1322,9 +1340,9 @@ ${modal}`;
         // Conditionally show scroll hint if there are more than 3 leaders
         const scrollHint = sorted.length > 3 ? `
                     <p class="text-center mb-n2">
-                        <small class="text-muted">
+                        <small style="color:#eeeeee;">
                             Scroll to view more 
-                            <i class="bi bi-arrow-right-circle" style="font-size: 0.85em; vertical-align: middle;"></i>
+                            <i class="bi bi-arrow-right-circle" style="font-size: 0.85em; vertical-align: middle; color:#eeeeee;"></i>
                         </small>
                     </p>` : '';
         
@@ -1332,12 +1350,12 @@ ${modal}`;
         const justifyContent = sorted.length <= 3 ? 'justify-content-center' : '';
 
         return `<!-- Staff & Community Leaders -->
-<div id="freeTextArea-staff" class="freeTextArea u-centerBgImage section u-sa-goldBg u-coverBgImage">
+<div id="freeTextArea-staff" class="freeTextArea u-centerBgImage section u-coverBgImage" style="background-color: #F7A200;">
     <div class="u-positionRelative" style="padding-top: 5rem; padding-bottom: 5rem;">
         <div class="container">
             <div class="container" style="padding-top: 4.5rem; padding-bottom: 4.5rem;">
                 <div class="bg-area rounded p-4" id="profiles">
-                    <h2 class="fw-bold mb-4 text-center"><span style="color:#111111;">Staff &amp; <em>Community Leaders</em></span></h2>
+                    <h2 class="fw-bold mb-4 text-center"><span style="color:#ffffff;">Staff &amp; <em style="color:#ffffff;">Community Leaders</em></span></h2>
                     ${scrollHint}
                     
                     <div class="d-flex overflow-auto gap-4 py-2 ${justifyContent}" style="scroll-snap-type: x mandatory;">
@@ -1934,7 +1952,8 @@ div #freeTextArea-0 {
 }
   
 #freeTextArea-scripture .container {
-  padding-bottom: 100px !important;
+  padding-top: 75px !important;
+  padding-bottom: 140px !important;
   margin-bottom: 0 !important;
 }
 
@@ -1948,6 +1967,8 @@ div #freeTextArea-0 {
     <div class="u-positionRelative">
         <div class="container">
             
+            <p>&nbsp;</p><p>&nbsp;</p>
+            
             <h2 style="text-align: center; margin-bottom: 1.5rem;">
                 ${this.escapeHTML(center.name || center.Title)}
             </h2>
@@ -1959,6 +1980,7 @@ div #freeTextArea-0 {
             <p style="text-align: center; padding-bottom: 2rem;">
                 <strong><cite>-&nbsp;${this.escapeHTML(scriptureReference)}</cite></strong>
             </p>
+            <p>&nbsp;</p><p>&nbsp;</p>
         </div>
     </div>
 </div>`;

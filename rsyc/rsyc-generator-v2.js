@@ -1196,7 +1196,7 @@ class RSYCGeneratorV2 {
                     const nameCell = `
                         <div style="font-weight: 700; margin-bottom: 2px;">${esc(r.displayName)}</div>
                         <div style="color: #666;">${esc(r.title)}</div>
-                        ${r.liveUrl ? `<div style="margin-top: 6px;"><a href="${esc(r.liveUrl)}" style="color:#20B3A8; text-decoration: underline;">Open Center Profile</a></div>` : ''}
+                        ${r.liveUrl ? `<div style="margin-top: 6px;"><a href="${esc(r.liveUrl)}" style="color:#FCA200; text-decoration: underline;">Open Center Profile</a></div>` : ''}
                     `;
 
                     const bioCell = `<div>${esc(r.bio)}</div>`;
@@ -1212,7 +1212,7 @@ class RSYCGeneratorV2 {
                 return `
                     <div style="margin: 18px 0 22px 0;">
                         <br>
-                        <div style="background:#f4f4f4; padding: 12px 14px; border-left: 6px solid #20B3A8; font-weight: 800; font-size: 14px; color: #242424;">
+                        <div style="background:#f4f4f4; padding: 12px 14px; border-left: 6px solid #FCA200; font-weight: 800; font-size: 14px; color: #242424;">
                             ${esc(centerName)} <span style="font-weight:600; color:#666;">(${items.length})</span>
                         </div>
                         <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="border-collapse: collapse; width: 100%; font-size: 12px; table-layout: fixed;">
@@ -1500,7 +1500,7 @@ class RSYCGeneratorV2 {
                         <td valign="top" style="border: 1px solid #e5e5e5; padding: 8px; width: 220px;">
                             ${esc(r.center)}
                             ${loc ? `<div style=\"color:#666; font-size:11px; margin-top:2px;\">${esc(loc)}</div>` : ''}
-                            ${liveUrl ? `<div style=\"margin-top:6px;\"><a href=\"${esc(liveUrl)}\" style=\"color:#20B3A8; text-decoration: underline;\">Open Center Profile</a></div>` : ''}
+                            ${liveUrl ? `<div style=\"margin-top:6px;\"><a href=\"${esc(liveUrl)}\" style=\"color:#FCA200; text-decoration: underline;\">Open Center Profile</a></div>` : ''}
                         </td>
                         <td valign="top" style="border: 1px solid #e5e5e5; padding: 8px;">${editors || ''}</td>
                     </tr>
@@ -2273,13 +2273,12 @@ class RSYCGeneratorV2 {
                 <p style="font-size: 14px; margin-top: 0; color: #666; margin-bottom: 18px; display: block;">Division: <b>${esc(displayDivision)}</b> • Generated on ${new Date().toLocaleDateString()}</p>
                 ${howTo}
                 <br>
-                <div style="background-color: #f4f4f4; padding: 14px; border-left: 6px solid #0078d4; font-weight: bold; margin-bottom: 14px; font-size: 16px; color: #333; display: block; width: 100%;">Division + Center Editors</div>
                 ${divisionEditorsTable}
                 <br>
                 <div style="background-color: #f4f4f4; padding: 14px; border-left: 6px solid #d93d3d; font-weight: bold; margin-bottom: 14px; font-size: 16px; color: #333; display: block; width: 100%;">Division Action List</div>
                 ${actionList}
                 <br>
-                <div style="background-color: #f4f4f4; padding: 14px; border-left: 6px solid #20B3A8; font-weight: bold; margin-bottom: 14px; font-size: 16px; color: #333; display: block; width: 100%;">Divisional Staff &amp; Community Leaders</div>
+                <div style="background-color: #f4f4f4; padding: 14px; border-left: 6px solid #FCA200; font-weight: bold; margin-bottom: 14px; font-size: 16px; color: #333; display: block; width: 100%;">Divisional Staff &amp; Community Leaders</div>
                 ${divisionStaffTable}
             </div>
         `;
@@ -3474,6 +3473,28 @@ class RSYCGeneratorV2 {
                 editorsPreviewSection.innerHTML = '<div style="font-size:12px; color:#dc3545;">Failed to load editors.</div>';
             });
 
+        // Error Messages section
+        const errorMessagesSection = document.createElement('div');
+        errorMessagesSection.style.cssText = 'padding: 20px; font-family: "Segoe UI", Tahoma, sans-serif;';
+        errorMessagesSection.innerHTML = `
+            <div style="margin-bottom: 30px;">
+                <h4 style="color: #333; font-size: 16px; font-weight: 600; margin: 0 0 16px 0; border-bottom: 2px solid #e0e0e0; padding-bottom: 8px;">Center Profile Error Message</h4>
+                <div style="padding: 40px 20px; background: #ffffff; border-radius: 12px; border: 1px solid #e0e0e0; text-align: center; font-family: 'Segoe UI', Tahoma, sans-serif; max-width: 500px; margin: 0 auto;">
+                    <div style="font-size: 48px; margin-bottom: 16px;">👋</div>
+                    <h2 style="color: #333; font-size: 24px; font-weight: 600; margin: 0 0 12px 0;">Thanks for stopping by!</h2>
+                    <p style="color: #666; font-size: 16px; line-height: 1.6; margin: 0;">This Center Profile page did not load successfully. Please refresh and try again.</p>
+                </div>
+            </div>
+            <div>
+                <h4 style="color: #333; font-size: 16px; font-weight: 600; margin: 0 0 16px 0; border-bottom: 2px solid #e0e0e0; padding-bottom: 8px;">Unit Grid Error Message</h4>
+                <div style="padding: 40px 20px; background: #ffffff; border-radius: 12px; border: 1px solid #e0e0e0; text-align: center; font-family: 'Segoe UI', Tahoma, sans-serif; max-width: 500px; margin: 0 auto;">
+                    <div style="font-size: 48px; margin-bottom: 16px;">👋</div>
+                    <h2 style="color: #333; font-size: 24px; font-weight: 600; margin: 0 0 12px 0;">Thanks for stopping by!</h2>
+                    <p style="color: #666; font-size: 16px; line-height: 1.6; margin: 0;">This Unit Grid page did not load successfully. Please refresh and try again.</p>
+                </div>
+            </div>
+        `;
+
         accordion.appendChild(makeAccordionItem('status', 'All Centers Status Detail', statusTableSection, true));
         accordion.appendChild(makeAccordionItem('overview', 'Overview', overviewWrap, false));
         accordion.appendChild(makeAccordionItem('insights', 'Quick Insights', insightsWrap, false));
@@ -3482,6 +3503,7 @@ class RSYCGeneratorV2 {
         accordion.appendChild(makeAccordionItem('previewSchedules', 'Program Schedules (Preview)', schedulesPreviewSection, false));
         accordion.appendChild(makeAccordionItem('previewStaff', 'Staff Table (Preview)', staffPreviewSection, false));
         accordion.appendChild(makeAccordionItem('previewEditors', 'Editors (Preview)', editorsPreviewSection, false));
+        accordion.appendChild(makeAccordionItem('errorMessages', 'Front-End Error Messages', errorMessagesSection, false));
         accordion.appendChild(makeAccordionItem('footer', 'Notes', footerSection, false));
 
         modalInner.appendChild(accordion);

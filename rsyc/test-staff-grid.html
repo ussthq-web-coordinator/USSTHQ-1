@@ -8,10 +8,10 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-icons/1.10.0/font/bootstrap-icons.min.css">
     <link rel="stylesheet" href="rsyc-generator-v2.css">
     <style>
-        body { padding: 20px; background-color: black;}
+        body { padding: 20px; background-color: #F7A200;}
         .test-container { max-width: 1400px; margin: 0 auto; }
         .test-info { background: #f0f7f7; padding: 15px; border-radius: 8px; margin-bottom: 20px; }
-        .test-info h6 { color: #20B3A8; margin-bottom: 10px; }
+        .test-info h6 { color: #00929C; margin-bottom: 10px; }
     </style>
 </head>
 <body>
@@ -40,7 +40,7 @@
     <script>
         // Show status when page loads
         window.addEventListener('load', () => {
-            console.log('\n%c✨ Staff Grid Test Loaded ✨', 'font-size: 16px; color: #20B3A8; font-weight: bold;');
+            console.log('\n%c✨ Staff Grid Test Loaded ✨', 'font-size: 16px; color: #00929C; font-weight: bold;');
             console.log('Expected Features:');
             console.log('  • Centers grid at top');
             console.log('  • Staff & Leaders aggregated grid below');
@@ -104,7 +104,7 @@
                     const centerCell = `
                         <div style="font-weight: 600;">${escapeHTML(r.centerName)}</div>
                         <div style="color: #666;">${escapeHTML(r.location)}</div>
-                        ${r.link ? `<div style="margin-top: 6px;"><a href="${escapeHTML(r.link)}" style="color:#20B3A8; text-decoration: underline;">Open Center Profile</a></div>` : ''}
+                        ${r.link ? `<div style="margin-top: 6px;"><a href="${escapeHTML(r.link)}" style="color:#00929C; text-decoration: underline;">Open Center Profile</a></div>` : ''}
                     `;
 
                     const bioCell = `<div>${escapeHTML(r.bio)}</div>`;

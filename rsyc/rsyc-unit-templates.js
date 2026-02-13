@@ -606,7 +606,7 @@ class RSYCUnitTemplates {
 				<p style="margin-bottom: 0.75rem; font-size: 0.85rem; color: #999;">
 					<i class="bi bi-geo-alt" style="margin-right: 0.25rem;"></i>${this.escapeHTML(city)}${state ? ', ' + this.escapeHTML(state) : ''}
 				</p>
-				<a href="${centerUrl}" style="color: #20B3A8; text-decoration: underline; font-weight: 500; font-size: 0.875rem;">Open Center Profile →</a>
+				<a href="${centerUrl}" style="color: #00929C; text-decoration: underline; font-weight: 500; font-size: 0.875rem;">Open Center Profile →</a>
 				` : ''}
 			</div>
 		</div>`;
@@ -794,39 +794,41 @@ class RSYCUnitTemplates {
         };
 
         // Build scroll hint if there are many staff members
-        const staffCount = staffCards.split('<div class="staff-card').length - 1;
+        const staffCount = staffCards.split('<div class="card').length - 1;
         const scrollHint = staffCount > 3 ? `
             <p class="text-center mb-n2">
-              <small class="text-muted">
+              <small style="color:#eeeeee;">
                 Scroll to view more 
-                <i class="bi bi-arrow-right-circle" style="font-size: 0.85em; vertical-align: middle;"></i>
+                <i class="bi bi-arrow-right-circle" style="font-size: 0.85em; vertical-align: middle; color:#eeeeee;"></i>
               </small>
             </p>` : '';
-        
-                // Center cards if 3 or fewer, otherwise leave for scrolling
-                const justifyContent = staffCount <= 3 ? 'justify-content-center' : '';
 
-                // Options: gracefully handle defaults
-                const useBg = options && options.bg === false ? false : true;
-                const paddingOpt = options && options.padding ? String(options.padding) : 'default';
+        // Center cards if 3 or fewer, otherwise leave for scrolling
+        const justifyContent = staffCount <= 3 ? 'justify-content-center' : '';
 
-                const wrapperClass = `freeTextArea section${useBg ? ' u-sa-goldBg' : ''}`;
-                // Reduce vertical padding by 60% when compact is enabled (i.e. keep 40% of original)
-                const outerPadding = paddingOpt === 'compact' ? 'padding-top: 2rem; padding-bottom: 2rem;' : 'padding-top: 5rem; padding-bottom: 5rem;';
-                const innerPadding = paddingOpt === 'compact' ? 'padding-top: 1.8rem; padding-bottom: 1.8rem;' : 'padding-top: 4.5rem; padding-bottom: 4.5rem;';
-                const bgAreaClass = paddingOpt === 'compact' ? 'bg-area rounded p-3' : 'bg-area rounded p-4';
-                // When background is disabled, make the area transparent and remove visual chrome
-                let bgAreaStyle = useBg ? '' : 'background: transparent; box-shadow: none; border: none;';
-                // If compact padding requested, enforce smaller padding inline to override global classes
-                if (paddingOpt === 'compact') {
-                    bgAreaStyle = (bgAreaStyle ? bgAreaStyle + ' ' : '') + 'padding: 0.75rem;';
-                }
-                const viewportPadding = paddingOpt === 'compact' ? 'padding-left: 0.5rem; padding-right: 0.5rem;' : 'padding-left: 1rem; padding-right: 1rem;';
-                const trackPy = paddingOpt === 'compact' ? 'py-2' : 'py-3';
+        // Options: gracefully handle defaults
+        const useBg = options && options.bg === false ? false : true;
+        const paddingOpt = options && options.padding ? String(options.padding) : 'default';
 
-                return `${filterHTML}
+        const wrapperClass = `freeTextArea section`;
+        // Reduce vertical padding by 60% when compact is enabled (i.e. keep 40% of original)
+        const outerPadding = paddingOpt === 'compact' ? 'padding-top: 2rem; padding-bottom: 2rem;' : 'padding-top: 5rem; padding-bottom: 5rem;';
+        const innerPadding = paddingOpt === 'compact' ? 'padding-top: 1.8rem; padding-bottom: 1.8rem;' : 'padding-top: 4.5rem; padding-bottom: 4.5rem;';
+        const bgAreaClass = paddingOpt === 'compact' ? 'bg-area rounded p-3' : 'bg-area rounded p-4';
+        // When background is disabled, make the area transparent and remove visual chrome
+        let bgAreaStyle = useBg ? '' : 'background: transparent; box-shadow: none; border: none;';
+        // If compact padding requested, enforce smaller padding inline to override global classes
+        if (paddingOpt === 'compact') {
+            bgAreaStyle = (bgAreaStyle ? bgAreaStyle + ' ' : '') + 'padding: 0.75rem;';
+        }
+        const viewportPadding = paddingOpt === 'compact' ? 'padding-left: 0.5rem; padding-right: 0.5rem;' : 'padding-left: 1rem; padding-right: 1rem;';
+        const trackPy = paddingOpt === 'compact' ? 'py-2' : 'py-3';
+
+        const wrapperBgStyle = useBg ? 'background-color: #F7A200;' : '';
+
+        return `${filterHTML}
 <!-- All Staff & Community Leaders -->
-<div id="freeTextArea-staff" class="${wrapperClass}" style="margin: 0; width: 100vw; position: relative; left: 50%; right: 50%; margin-left: -50vw; margin-right: -50vw;">
+<div id="freeTextArea-staff" class="${wrapperClass}" style="${wrapperBgStyle} margin: 0; width: 100vw; position: relative; left: 50%; right: 50%; margin-left: -50vw; margin-right: -50vw;">
 
     <div class="u-positionRelative" style="${outerPadding}">
         <div class="container">
@@ -834,7 +836,7 @@ class RSYCUnitTemplates {
                 <div class="${bgAreaClass}" id="profiles" style="${bgAreaStyle}">
 
                     <h2 class="fw-bold mb-4 text-center">
-                        <span style="color:#111111;">Staff &amp; <em>Community Leaders</em></span>
+                        <span style="color:#ffffff;">Staff &amp; <em style="color:#ffffff;">Community Leaders</em></span>
                     </h2>
 
                     ${scrollHint}
@@ -902,7 +904,7 @@ class RSYCUnitTemplates {
         const message = inspiringMessages[unit.type] || 'Serving with purpose';
 
         return `<!-- Hero Section -->
-<section class="rsyc-hero" style="background: linear-gradient(135deg, #20B3A8 0%, #1A8F8A 100%); padding: 60px 20px; display: flex; justify-content: center; align-items: center; min-height: 400px; text-align: center;">
+<section class="rsyc-hero" style="background: linear-gradient(135deg, #00929C 0%, #1A8F8A 100%); padding: 60px 20px; display: flex; justify-content: center; align-items: center; min-height: 400px; text-align: center;">
     <div style="max-width: 600px; color: white; margin-top: 35px;">
         <h1 style="font-size: 2.5rem; font-weight: bold; margin-bottom: 1rem;">${this.escapeHTML(unit.displayName)}</h1>
         <p style="font-size: 1.25rem; margin-bottom: 2rem; opacity: 0.95;">${message}</p>
@@ -931,7 +933,7 @@ class RSYCUnitTemplates {
                     serving families, children, youth, and those in need with compassion and purpose.
                 </p>
                 <div class="mt-4">
-                    <a href="#centers" class="btn btn-primary" style="background-color: #20B3A8; border: none;">
+                    <a href="#centers" class="btn btn-primary" style="background-color: #00929C; border: none;">
                         Explore Our Centers
                     </a>
                 </div>
@@ -941,7 +943,7 @@ class RSYCUnitTemplates {
                     <div class="col-md-6 mb-3">
                         <div class="card border-0 shadow-sm" style="background: white;">
                             <div class="card-body text-center">
-                                <h3 class="text-primary" style="color: #20B3A8; font-size: 2rem; font-weight: bold;">
+                                <h3 class="text-primary" style="color: #00929C; font-size: 2rem; font-weight: bold;">
                                     ${stats.centerCount}
                                 </h3>
                                 <p class="card-text text-muted">Location${stats.centerCount !== 1 ? 's' : ''}</p>
@@ -951,7 +953,7 @@ class RSYCUnitTemplates {
                     <div class="col-md-6 mb-3">
                         <div class="card border-0 shadow-sm" style="background: white;">
                             <div class="card-body text-center">
-                                <h3 class="text-primary" style="color: #20B3A8; font-size: 2rem; font-weight: bold;">
+                                <h3 class="text-primary" style="color: #00929C; font-size: 2rem; font-weight: bold;">
                                     ${stats.programCount}
                                 </h3>
                                 <p class="card-text text-muted">Programs</p>
@@ -961,7 +963,7 @@ class RSYCUnitTemplates {
                     <div class="col-md-6 mb-3">
                         <div class="card border-0 shadow-sm" style="background: white;">
                             <div class="card-body text-center">
-                                <h3 class="text-primary" style="color: #20B3A8; font-size: 2rem; font-weight: bold;">
+                                <h3 class="text-primary" style="color: #00929C; font-size: 2rem; font-weight: bold;">
                                     ${stats.staffCount}
                                 </h3>
                                 <p class="card-text text-muted">Staff &amp; Leaders</p>
@@ -971,7 +973,7 @@ class RSYCUnitTemplates {
                     <div class="col-md-6 mb-3">
                         <div class="card border-0 shadow-sm" style="background: white;">
                             <div class="card-body text-center">
-                                <h3 class="text-primary" style="color: #20B3A8; font-size: 2rem; font-weight: bold;">
+                                <h3 class="text-primary" style="color: #00929C; font-size: 2rem; font-weight: bold;">
                                     ${this._formatNumber(stats.youthServed)}+
                                 </h3>
                                 <p class="card-text text-muted">Youth Served</p>
@@ -1005,18 +1007,18 @@ class RSYCUnitTemplates {
             <div class="col-sm-12 col-md-6 col-lg-4 mb-4">
                 <div class="card h-100 shadow-sm hover-card" style="border: none; border-radius: 12px; overflow: hidden; cursor: pointer;" onclick="if (typeof RSYCLoadProfile === 'function') RSYCLoadProfile('${centerId}', this.closest('.modal-body') || document.body); else window.location.hash='center/${centerId}';">
                     <div class="card-body" style="background: #fff; padding: 1.5rem;">
-                        <h5 class="card-title fw-bold mb-2" style="color: #20B3A8; font-size: 1.1rem;">
+                        <h5 class="card-title fw-bold mb-2" style="color: #00929C; font-size: 1.1rem;">
                             ${centerName}
                         </h5>
                         <p class="card-text text-muted mb-3" style="font-size: 0.95rem;">
                             <i class="bi bi-geo-alt me-1"></i>${city}${state ? ', ' + state : ''}
                         </p>
                         ${phone ? `<p class="card-text text-muted mb-3" style="font-size: 0.95rem;">
-                            <i class="bi bi-telephone me-1"></i><a href="tel:${phone.replace(/\D/g, '')}" style="color: #20B3A8; text-decoration: none;">${phone}</a>
+                            <i class="bi bi-telephone me-1"></i><a href="tel:${phone.replace(/\D/g, '')}" style="color: #00929C; text-decoration: none;">${phone}</a>
                         </p>` : ''}
                         <div class="d-flex justify-content-between align-items-center">
                             <span class="badge bg-light text-dark">${programCount} Program${programCount !== 1 ? 's' : ''}</span>
-                            <span style="color: #20B3A8; cursor: pointer;">Learn More →</span>
+                            <span style="color: #00929C; cursor: pointer;">Learn More →</span>
                         </div>
                     </div>
                 </div>
@@ -1071,7 +1073,7 @@ class RSYCUnitTemplates {
         const displayPrograms = allPrograms.slice(0, 8);
         const programItems = displayPrograms.map(program => {
             return `<div class="d-flex align-items-center mb-3" style="flex: 1 1 45%;">
-                <i class="bi ${this.escapeHTML(program.icon)} feature-icon me-2" style="color: #20B3A8; font-size: 1.5rem;"></i> 
+                <i class="bi ${this.escapeHTML(program.icon)} feature-icon me-2" style="color: #00929C; font-size: 1.5rem;"></i> 
                 <span>${this.escapeHTML(program.name)}</span>
             </div>`;
         }).join('');
@@ -1105,27 +1107,27 @@ class RSYCUnitTemplates {
         <h2 class="fw-bold mb-5 text-center">Resources for Families</h2>
         <div class="row">
             <div class="col-md-6 mb-4">
-                <div class="card border-0 shadow-sm" style="border-left: 4px solid #20B3A8;">
+                <div class="card border-0 shadow-sm" style="border-left: 4px solid #00929C;">
                     <div class="card-body">
                         <h5 class="card-title fw-bold mb-3">For Parents</h5>
                         <ul style="list-style: none; padding: 0;">
-                            <li class="mb-2"><i class="bi bi-check-circle" style="color: #20B3A8; margin-right: 0.5rem;"></i>Program schedules and registration</li>
-                            <li class="mb-2"><i class="bi bi-check-circle" style="color: #20B3A8; margin-right: 0.5rem;"></i>Family support services</li>
-                            <li class="mb-2"><i class="bi bi-check-circle" style="color: #20B3A8; margin-right: 0.5rem;"></i>Child safety and development</li>
-                            <li class="mb-2"><i class="bi bi-check-circle" style="color: #20B3A8; margin-right: 0.5rem;"></i>Financial assistance programs</li>
+                            <li class="mb-2"><i class="bi bi-check-circle" style="color: #00929C; margin-right: 0.5rem;"></i>Program schedules and registration</li>
+                            <li class="mb-2"><i class="bi bi-check-circle" style="color: #00929C; margin-right: 0.5rem;"></i>Family support services</li>
+                            <li class="mb-2"><i class="bi bi-check-circle" style="color: #00929C; margin-right: 0.5rem;"></i>Child safety and development</li>
+                            <li class="mb-2"><i class="bi bi-check-circle" style="color: #00929C; margin-right: 0.5rem;"></i>Financial assistance programs</li>
                         </ul>
                     </div>
                 </div>
             </div>
             <div class="col-md-6 mb-4">
-                <div class="card border-0 shadow-sm" style="border-left: 4px solid #20B3A8;">
+                <div class="card border-0 shadow-sm" style="border-left: 4px solid #00929C;">
                     <div class="card-body">
                         <h5 class="card-title fw-bold mb-3">For Youth</h5>
                         <ul style="list-style: none; padding: 0;">
-                            <li class="mb-2"><i class="bi bi-check-circle" style="color: #20B3A8; margin-right: 0.5rem;"></i>Leadership development programs</li>
-                            <li class="mb-2"><i class="bi bi-check-circle" style="color: #20B3A8; margin-right: 0.5rem;"></i>Summer camps and activities</li>
-                            <li class="mb-2"><i class="bi bi-check-circle" style="color: #20B3A8; margin-right: 0.5rem;"></i>Academic support and mentoring</li>
-                            <li class="mb-2"><i class="bi bi-check-circle" style="color: #20B3A8; margin-right: 0.5rem;"></i>Career and life skills training</li>
+                            <li class="mb-2"><i class="bi bi-check-circle" style="color: #00929C; margin-right: 0.5rem;"></i>Leadership development programs</li>
+                            <li class="mb-2"><i class="bi bi-check-circle" style="color: #00929C; margin-right: 0.5rem;"></i>Summer camps and activities</li>
+                            <li class="mb-2"><i class="bi bi-check-circle" style="color: #00929C; margin-right: 0.5rem;"></i>Academic support and mentoring</li>
+                            <li class="mb-2"><i class="bi bi-check-circle" style="color: #00929C; margin-right: 0.5rem;"></i>Career and life skills training</li>
                         </ul>
                     </div>
                 </div>
@@ -1142,7 +1144,7 @@ class RSYCUnitTemplates {
         const stats = unit.stats;
         
         return `<!-- Impact & Growth -->
-<div class="section" style="background: linear-gradient(135deg, #20B3A8 0%, #1A8F8A 100%); padding: 60px 20px; color: white;">
+<div class="section" style="background: linear-gradient(135deg, #00929C 0%, #1A8F8A 100%); padding: 60px 20px; color: white;">
     <div class="container">
         <h2 class="fw-bold mb-5 text-center">Our Impact</h2>
         <div class="row">
@@ -1210,14 +1212,14 @@ class RSYCUnitTemplates {
                                 <div class="p-3" style="background: #f0f0f0; border-radius: 8px;">
                                     <h6 class="fw-bold mb-2">$25</h6>
                                     <p class="text-muted small mb-3">Provides supplies for 10 youth in our programs</p>
-                                    <a href="#" class="btn btn-sm" style="background-color: #20B3A8; color: white; border: none;">Give $25</a>
+                                    <a href="#" class="btn btn-sm" style="background-color: #00929C; color: white; border: none;">Give $25</a>
                                 </div>
                             </div>
                             <div class="col-md-6 mb-3">
                                 <div class="p-3" style="background: #f0f0f0; border-radius: 8px;">
                                     <h6 class="fw-bold mb-2">$50</h6>
                                     <p class="text-muted small mb-3">Funds a week of after-school activities</p>
-                                    <a href="#" class="btn btn-sm" style="background-color: #20B3A8; color: white; border: none;">Give $50</a>
+                                    <a href="#" class="btn btn-sm" style="background-color: #00929C; color: white; border: none;">Give $50</a>
                                 </div>
                             </div>
                         </div>
@@ -1226,14 +1228,14 @@ class RSYCUnitTemplates {
                                 <div class="p-3" style="background: #f0f0f0; border-radius: 8px;">
                                     <h6 class="fw-bold mb-2">$100</h6>
                                     <p class="text-muted small mb-3">Supports a month of youth mentoring</p>
-                                    <a href="#" class="btn btn-sm" style="background-color: #20B3A8; color: white; border: none;">Give $100</a>
+                                    <a href="#" class="btn btn-sm" style="background-color: #00929C; color: white; border: none;">Give $100</a>
                                 </div>
                             </div>
                             <div class="col-md-6 mb-3">
                                 <div class="p-3" style="background: #f0f0f0; border-radius: 8px;">
                                     <h6 class="fw-bold mb-2">Custom Amount</h6>
                                     <p class="text-muted small mb-3">Give what you can to help our mission</p>
-                                    <a href="#" class="btn btn-sm" style="background-color: #20B3A8; color: white; border: none;">Give Now</a>
+                                    <a href="#" class="btn btn-sm" style="background-color: #00929C; color: white; border: none;">Give Now</a>
                                 </div>
                             </div>
                         </div>
@@ -1297,10 +1299,10 @@ class RSYCUnitTemplates {
                     and discover how you can make a difference.
                 </p>
                 <div class="d-flex gap-3 justify-content-center flex-wrap">
-                    <a href="#centers" class="btn btn-primary" style="background-color: #20B3A8; border: none; padding: 0.75rem 2rem;">
+                    <a href="#centers" class="btn btn-primary" style="background-color: #00929C; border: none; padding: 0.75rem 2rem;">
                         <i class="bi bi-geo-alt me-2"></i>Visit Our Centers
                     </a>
-                    <a href="#giving" class="btn btn-outline-primary" style="color: #20B3A8; border-color: #20B3A8; padding: 0.75rem 2rem;">
+                    <a href="#giving" class="btn btn-outline-primary" style="color: #00929C; border-color: #00929C; padding: 0.75rem 2rem;">
                         <i class="bi bi-heart me-2"></i>Support Our Mission
                     </a>
                     <a href="https://www.salvationarmyusa.org" target="_blank" class="btn btn-outline-secondary" style="padding: 0.75rem 2rem;">
@@ -1311,10 +1313,10 @@ class RSYCUnitTemplates {
                 <div class="mt-5 pt-4 border-top">
                     <h6 class="fw-bold mb-3">Connect With Us</h6>
                     <div class="d-flex gap-3 justify-content-center">
-                        <a href="#" class="text-decoration-none" style="color: #20B3A8;"><i class="bi bi-facebook" style="font-size: 1.5rem;"></i></a>
-                        <a href="#" class="text-decoration-none" style="color: #20B3A8;"><i class="bi bi-instagram" style="font-size: 1.5rem;"></i></a>
-                        <a href="#" class="text-decoration-none" style="color: #20B3A8;"><i class="bi bi-youtube" style="font-size: 1.5rem;"></i></a>
-                        <a href="#" class="text-decoration-none" style="color: #20B3A8;"><i class="bi bi-twitter" style="font-size: 1.5rem;"></i></a>
+                        <a href="#" class="text-decoration-none" style="color: #00929C;"><i class="bi bi-facebook" style="font-size: 1.5rem;"></i></a>
+                        <a href="#" class="text-decoration-none" style="color: #00929C;"><i class="bi bi-instagram" style="font-size: 1.5rem;"></i></a>
+                        <a href="#" class="text-decoration-none" style="color: #00929C;"><i class="bi bi-youtube" style="font-size: 1.5rem;"></i></a>
+                        <a href="#" class="text-decoration-none" style="color: #00929C;"><i class="bi bi-twitter" style="font-size: 1.5rem;"></i></a>
                     </div>
                 </div>
             </div>

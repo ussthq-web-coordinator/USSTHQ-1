@@ -10,7 +10,7 @@
     function log(section, message, data = null) {
         const timestamp = new Date().toLocaleTimeString();
         const style = `
-            color: #20B3A8;
+            color: #00929C;
             font-weight: bold;
             background: rgba(32, 179, 168, 0.1);
             padding: 2px 6px;

@@ -154,12 +154,41 @@
 #page {
   height: auto !important;
   min-height: auto !important;
+  margin-bottom: 0 !important;
+  padding-bottom: 0 !important;
+}
+
+/* Ensure the injected profile wrapper does not add extra space at the bottom */
+.rsyc-profile {
+  margin-bottom: 0 !important;
+  padding-bottom: 0 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  min-height: 100vh !important;
+}
+
+/* Let the footer photo grow to fill remaining viewport space on short profiles */
+#freeTextArea-footerPhoto {
+  flex-grow: 1 !important;
+}
+
+#freeTextArea-footerPhoto .u-positionRelative {
+  min-height: 100% !important;
 }
 
 /* Override the huge freeTextArea height and padding */
 .freeTextArea.u-centerBgImage.u-sa-whiteBg.u-coverBgImage {
   height: auto !important;
   min-height: auto !important;
+  padding: 0 !important;
+  margin: 0 !important;
+}
+
+/* Remove the empty placeholder block that can appear between footer scripture and the global footer */
+#freeTextArea-0 {
+  display: none !important;
+  height: 0 !important;
+  min-height: 0 !important;
   padding: 0 !important;
   margin: 0 !important;
 }
@@ -181,6 +210,7 @@ div #freeTextArea {
   align-items: center !important;
   justify-content: center !important;
   padding: 60px 20px !important;
+  margin-bottom: 0 !important;
 }
 
 #freeTextArea-scripture .u-positionRelative {
@@ -234,8 +264,10 @@ div #freeTextArea {
             // Clear loading skeleton on error
             clearLoadingSkeleton();
             
-            targetElement.innerHTML = `<div style="padding: 20px; background: #ffe6e6; color: #990000; border-radius: 8px; border: 1px solid #ffcccc;">
-                <strong>Error loading profile:</strong> ${error.message}
+            targetElement.innerHTML = `<div style="padding: 40px 20px; background: #ffffff; border-radius: 12px; border: 1px solid #e0e0e0; text-align: center; font-family: 'Segoe UI', Tahoma, sans-serif; max-width: 500px; margin: 40px auto;">
+                <div style="font-size: 48px; margin-bottom: 16px;">👋</div>
+                <h2 style="color: #333; font-size: 24px; font-weight: 600; margin: 0 0 12px 0;">Thanks for stopping by!</h2>
+                <p style="color: #666; font-size: 16px; line-height: 1.6; margin: 0;">This Center Profile page did not load successfully. Please refresh and try again.</p>
             </div>`;
         }
     }

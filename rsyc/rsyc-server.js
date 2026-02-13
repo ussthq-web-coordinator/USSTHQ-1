@@ -622,7 +622,7 @@ function generateSchedules(data) {
             
             // Build accordion panel content
             accordionPanels += `
-                <div class="rsyc-accordion-panel" id="${scheduleId}-panel" style="display: none; padding: 1.5rem; border: 1px solid #e0e0e0; border-top: 3px solid #20B3A8; background: white; color: #333; border-radius: 0 0 8px 8px;">
+                <div class="rsyc-accordion-panel" id="${scheduleId}-panel" style="display: none; padding: 1.5rem; border: 1px solid #e0e0e0; border-top: 3px solid #00929C; background: white; color: #333; border-radius: 0 0 8px 8px;">
                     <h3 style="margin: 0 0 1rem 0; color: #000;">${escapeHTML(schedule.title)}</h3>
                     ${schedule.subtitle ? `<p style="color:#666; margin: 0 0 1rem 0; font-style:italic;">${escapeHTML(schedule.subtitle)}</p>` : ''}
                     ${schedule.description ? `<p class="mb-3">${schedule.description}</p>` : ''}
@@ -654,7 +654,7 @@ function generateSchedules(data) {
                 const selectedBtn = document.querySelector(`[data-schedule="${scheduleId}"]`);
                 if (selectedBtn) {
                     selectedBtn.style.background = '#e8f4f8';
-                    selectedBtn.style.borderColor = '#20B3A8';
+                    selectedBtn.style.borderColor = '#00929C';
                     selectedBtn.classList.add('active');
                 }
             };
@@ -905,15 +905,15 @@ function generateStaff(data) {
 </div>`).join('');
     
     return `<!-- Staff & Community Leaders -->
-<div id="freeTextArea-staff" class="freeTextArea u-centerBgImage section u-sa-goldBg u-coverBgImage">
+<div id="freeTextArea-staff" class="freeTextArea u-centerBgImage section u-coverBgImage" style="background-color: #F7A200;">
     <div class="u-positionRelative">
         <div class="container">
             <div class="bg-area rounded p-4" id="profiles">
-                <h2 class="fw-bold mb-4"><span style="color:#111111;">Staff &amp; <em style="color:#20c997;">Community Leaders</em></span></h2>
+                <h2 class="fw-bold mb-4"><span style="color:#ffffff;">Staff &amp; <em style="color:#ffffff;">Community Leaders</em></span></h2>
                 <p class="mb-n2">
-                    <small class="text-muted">
+                    <small style="color:#eeeeee;">
                         Scroll to view more 
-                        <i class="bi bi-arrow-right-circle" style="font-size: 0.85em; vertical-align: middle;"></i>
+                        <i class="bi bi-arrow-right-circle" style="font-size: 0.85em; vertical-align: middle; color:#eeeeee;"></i>
                     </small>
                 </p>
                 <div class="d-flex overflow-auto gap-4 py-2" style="scroll-snap-type: x mandatory;">

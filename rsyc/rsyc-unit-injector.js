@@ -202,9 +202,10 @@
         } catch (error) {
             clearLoadingSkeleton();
             console.error('[RSYCUnitInjector] Error:', error);
-            const errorDetails = `${error.message}<br><br><small style="opacity: 0.7;">Check browser console (F12) for detailed logs. Common causes:<br>• Script files not found (404 errors in Network tab)<br>• Center data not loading from SharePoint<br>• Missing dependencies</small>`;
-            targetElement.innerHTML = `<div style="padding: 20px; background: #ffe6e6; color: #990000; border-radius: 8px; border: 1px solid #ffcccc; font-size: 14px;">
-                <strong><i class="bi bi-exclamation-triangle"></i> Error loading unit page:</strong><br>${errorDetails}
+            targetElement.innerHTML = `<div style="padding: 40px 20px; background: #ffffff; border-radius: 12px; border: 1px solid #e0e0e0; text-align: center; font-family: 'Segoe UI', Tahoma, sans-serif; max-width: 500px; margin: 40px auto;">
+                <div style="font-size: 48px; margin-bottom: 16px;">👋</div>
+                <h2 style="color: #333; font-size: 24px; font-weight: 600; margin: 0 0 12px 0;">Thanks for stopping by!</h2>
+                <p style="color: #666; font-size: 16px; line-height: 1.6; margin: 0;">This Unit Grid page did not load successfully. Please refresh and try again.</p>
             </div>`;
         }
     }

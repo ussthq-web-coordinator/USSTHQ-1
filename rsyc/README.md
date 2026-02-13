@@ -165,16 +165,23 @@ The generated HTML includes Bootstrap Icons classes. Add your own CSS in your CM
 The app uses Salvation Army brand colors:
 - **Primary Red**: `#C8102E`
 - **Navy**: `#003F87`
-- **Gold**: `#FDB913`
+- **Teal**: `#00929C` (RGB: 0, 149, 158 | CMYK: 93, 19, 39, 1)
+- **Gold**: `#FCA200` (RGB: 252, 167, 0 | CMYK: 0, 39, 100, 0)
 
 Customize colors in `rsyc-generator.css` CSS variables:
 ```css
 :root {
     --sa-red: #C8102E;
     --sa-navy: #003F87;
-    --sa-gold: #FDB913;
+    --sa-teal: #00929C;
+    --sa-gold: #FCA200;
 }
 ```
+
+### Color History
+**Previous colors (replaced February 2026):**
+- **Old Teal**: `#20B3A8` (RGB: 32, 179, 168)
+- **Old Gold**: `#FDB913` (RGB: 253, 185, 19)
 
 ## 🔍 Troubleshooting
 
