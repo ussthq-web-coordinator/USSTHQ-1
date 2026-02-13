@@ -24,6 +24,41 @@
      * Show loading skeleton for faster perceived performance
      */
     let loadingTimeoutId = null;
+
+    // Resolve where assets are served from.
+    // - Production: https://thisishoperva.org/rsyc
+    // - Local dev: sometimes from the web root, sometimes from /rsyc (depending on server/proxy)
+    let _resolvedAssetBaseUrlPromise = null;
+    async function resolveAssetBaseUrl() {
+        if (_resolvedAssetBaseUrlPromise) return _resolvedAssetBaseUrlPromise;
+
+        _resolvedAssetBaseUrlPromise = (async () => {
+            const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+            if (!isLocal) return 'https://thisishoperva.org/rsyc';
+
+            const origin = window.location.origin;
+            const hourlyVersion = Math.floor(Date.now() / 3600000);
+            const cacheBuster = `?v=${hourlyVersion}`;
+
+            const candidates = [
+                `${origin}`,
+                `${origin}/rsyc`
+            ];
+
+            for (const base of candidates) {
+                try {
+                    const resp = await fetch(`${base}/rsyc-data.js${cacheBuster}`, { method: 'GET' });
+                    if (resp && resp.ok) return base;
+                } catch (e) {
+                    // ignore and try next
+                }
+            }
+
+            return origin;
+        })();
+
+        return _resolvedAssetBaseUrlPromise;
+    }
     
     function showLoadingSkeleton(targetElement, unitType, unitValue) {
         // Only show text if it's not the "all" unit type
@@ -71,29 +106,26 @@
                 showLoadingSkeleton(targetElement, unitType, unitValue);
             }, 600);
 
-            // Determine base URL
-            const baseUrl = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
-                ? window.location.origin
-                : 'https://thisishoperva.org';
-
             // Use hourly cache buster instead of millisecond for better performance
             const hourlyVersion = Math.floor(Date.now() / 3600000);
             const cacheBuster = `?v=${hourlyVersion}`;
 
-            console.log('[RSYCUnitInjector] Loading scripts from:', baseUrl);
+            const assetBaseUrl = await resolveAssetBaseUrl();
+
+            console.log('[RSYCUnitInjector] Loading scripts from:', assetBaseUrl);
 
             // Load required scripts in parallel
             await Promise.all([
-                loadScript(`${baseUrl}/rsyc/rsyc-staff-order.js${cacheBuster}`),
-                loadScript(`${baseUrl}/rsyc/rsyc-data.js${cacheBuster}`),
-                loadScript(`${baseUrl}/rsyc/rsyc-cms-publisher.js${cacheBuster}`),
-                loadScript(`${baseUrl}/rsyc/rsyc-unit-data.js${cacheBuster}`),
-                loadScript(`${baseUrl}/rsyc/rsyc-unit-templates.js${cacheBuster}`)
+                loadScript(`${assetBaseUrl}/rsyc-staff-order.js${cacheBuster}`),
+                loadScript(`${assetBaseUrl}/rsyc-data.js${cacheBuster}`),
+                loadScript(`${assetBaseUrl}/rsyc-cms-publisher.js${cacheBuster}`),
+                loadScript(`${assetBaseUrl}/rsyc-unit-data.js${cacheBuster}`),
+                loadScript(`${assetBaseUrl}/rsyc-unit-templates.js${cacheBuster}`)
             ]);
             console.log('[RSYCUnitInjector] ✓ Loaded core scripts');
             
             // Load tracker in background
-            loadScript(`${baseUrl}/rsyc/rsyc-tracker.js${cacheBuster}`).catch(() => {
+            loadScript(`${assetBaseUrl}/rsyc-tracker.js${cacheBuster}`).catch(() => {
                 console.warn('[RSYCUnitInjector] Tracker script optional, continuing...');
             });
 
@@ -336,23 +368,21 @@ div #freeTextArea {
         }
 
         try {
-            const baseUrl = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
-                ? window.location.origin
-                : 'https://thisishoperva.org';
-
             // Use hourly version
             const hourlyVersion = Math.floor(Date.now() / 3600000);
             const cacheBuster = `?v=${hourlyVersion}`;
 
+            const assetBaseUrl = await resolveAssetBaseUrl();
+
             // Load main CSS
             const link = document.createElement('link');
             link.rel = 'stylesheet';
-            link.href = `${baseUrl}/rsyc/rsyc-generator-v2.css${cacheBuster}`;
+            link.href = `${assetBaseUrl}/rsyc-generator-v2.css${cacheBuster}`;
             document.head.appendChild(link);
 
             // Load custom styles
             try {
-                const response = await fetch(`${baseUrl}/rsyc/rsyc-custom-styles.html${cacheBuster}`);
+                const response = await fetch(`${assetBaseUrl}/rsyc-custom-styles.html${cacheBuster}`);
                 if (response.ok) {
                     const customStylesContent = await response.text();
                     const styleContainer = document.createElement('div');
