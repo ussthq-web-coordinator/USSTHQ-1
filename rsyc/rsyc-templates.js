@@ -100,7 +100,7 @@ class RSYCTemplates {
         
         // Get exterior photo from photos array
         const photoData = photos && photos.length > 0 ? photos[0] : null;
-        const exteriorPhoto = photoData?.urlExteriorPhoto || '';
+        const exteriorPhoto = photoData?.urlExteriorPhoto || 'https://s3.amazonaws.com/uss-cache.salvationarmy.org/9150a418-1c58-4d01-bf81-5753d1c608ae_salvation+army+building+1.png';
         
         if (!exteriorPhoto) return ''; // No hero without photo
         
@@ -149,35 +149,52 @@ class RSYCTemplates {
         let modal = '';
 
         if (hasPrograms) {
-            const totalPrograms = programDetails.length;
-            const showViewAll = totalPrograms > 8;
-            const displayPrograms = showViewAll ? programDetails.slice(0, 8) : programDetails;
+            // Alphabetically sort programs by name
+            const sortedPrograms = [...programDetails].sort((a, b) => 
+                (a.name || '').localeCompare(b.name || '')
+            );
 
+            const totalPrograms = sortedPrograms.length;
+            const threshold = 8;
+            const hasManyPrograms = totalPrograms > threshold;
+            const displayPrograms = hasManyPrograms ? sortedPrograms.slice(0, threshold) : sortedPrograms;
+
+            // Button text: "View All [N] Programs" if > 8, else "View More Details"
+            const buttonLabel = hasManyPrograms ? `View All ${totalPrograms} Programs` : 'View More Details';
+            
             programItems = displayPrograms.map(program => {
                 const icon = program.iconClass || 'bi-star';
                 return `
-                    <div class="d-flex align-items-center" style="flex: 1 1 45%;">
-                        <i class="bi ${this.escapeHTML(icon)} feature-icon"></i> ${this.escapeHTML(program.name)}
+                    <div class="d-flex align-items-center rsyc-feature-item" style="flex: 1 1 45%;">
+                        <i class="bi ${this.escapeHTML(icon)} feature-icon"></i> 
+                        <span class="ms-1">${this.escapeHTML(program.name)}</span>
                     </div>`;
             }).join('');
 
-            // All programs for modal
-            const allProgramItems = programDetails.map(program => {
+            // All programs for modal (sorted)
+            const allProgramItems = sortedPrograms.map(program => {
                 const icon = program.iconClass || 'bi-star';
+                const description = program.description || '';
                 return `
-                    <div class="col-sm-12 col-md-6 d-flex align-items-center mb-3">
-                        <i class="bi ${this.escapeHTML(icon)} feature-icon me-2"></i> ${this.escapeHTML(program.name)}
+                    <div class="col-sm-12 col-md-6 mb-4">
+                        <div class="d-flex align-items-start">
+                            <i class="bi ${this.escapeHTML(icon)} feature-icon me-3 mt-1" style="font-size: 1.5rem;"></i>
+                            <div>
+                                <div class="fw-bold" style="font-size: 1.1rem;">${this.escapeHTML(program.name)}</div>
+                                ${description ? `<div class="text-muted small mt-1" style="line-height: 1.4;">${this.escapeHTML(description)}</div>` : ''}
+                            </div>
+                        </div>
                     </div>`;
             }).join('');
 
-            viewAllButton = showViewAll ? `
+            viewAllButton = `
                             <div class="text-center mt-3">
                                 <button class="btn btn-outline-primary btn-sm" onclick="showRSYCModal('programs', '${this.escapeHTML(center.name, true)}')">
-                                    View All ${totalPrograms} Programs
+                                    ${buttonLabel}
                                 </button>
-                            </div>` : '';
+                            </div>`;
 
-            modal = showViewAll ? `
+            modal = `
 <!-- Modal for All Programs -->
 <div id="rsyc-modal-programs" class="rsyc-modal" style="display:none;">
     <div class="rsyc-modal-content">
@@ -191,7 +208,7 @@ class RSYCTemplates {
             </div>
         </div>
     </div>
-</div>` : '';
+</div>`;
         }
 
         return `<!-- Featured Programs -->
@@ -206,9 +223,9 @@ class RSYCTemplates {
     }
 </style>
 <div id="freeTextArea-programs" class="freeTextArea u-centerBgImage section u-sa-whiteBg u-coverBgImage">
-    <div class="u-positionRelative">
+    <div class="u-positionRelative" style="padding-top: 5rem; padding-bottom: 5rem;">
         <div class="container">
-            <div class="container my-5">
+            <div class="container" style="padding-top: 4.5rem; padding-bottom: 4.5rem;">
                 <div class="row align-items-stretch">
                     <!-- Left block: Photo (5 columns) -->
                     <div class="col-lg-5 d-flex">
@@ -433,9 +450,9 @@ ${modal}`;
     <div class="rsyc-modal-content">
         <div class="rsyc-modal-header" style="display:flex; justify-content:space-between; align-items:center;">
             <h3>What's Happening</h3>
-            <div style="display:flex; gap:0.5rem; align-items:center;">
-                <button class="rsyc-modal-print" onclick="printRSYCModal('schedule-${schedule.id}')" style="background:none; border:none; cursor:pointer; font-size:1.2rem; padding:0.5rem; color:#333;" title="Print"><i class="bi bi-printer"></i></button>
-                <button class="rsyc-modal-close" onclick="closeRSYCModal('schedule-${schedule.id}')">&times;</button>
+            <div style="display:flex; gap:0.25rem; align-items:center;">
+                <button class="rsyc-modal-print" onclick="printRSYCModal('schedule-${schedule.id}')" style="background:none; border:none; cursor:pointer; font-size:1.1rem; padding:0.4rem; color:#333;" title="Print or Save as PDF"><i class="bi bi-printer"></i></button>
+                <button class="rsyc-modal-close" onclick="closeRSYCModal('schedule-${schedule.id}')" style="font-size:1.5rem; padding:0 0.5rem;">&times;</button>
             </div>
         </div>
         <div class="rsyc-modal-body" style="color:#333;">
@@ -681,7 +698,7 @@ ${modal}`;
             }
             const schedulesCacheKey = `schedules_${center.id || 'default'}`;
             const photoData = data.photos && data.photos.length > 0 ? data.photos[0] : null;
-            const exteriorPhoto = photoData?.urlExteriorPhoto || '';
+            const exteriorPhoto = photoData?.urlExteriorPhoto || 'https://s3.amazonaws.com/uss-cache.salvationarmy.org/9150a418-1c58-4d01-bf81-5753d1c608ae_salvation+army+building+1.png';
             window.RSYC_SCHEDULES[schedulesCacheKey] = {
                 centerName: center.name || center.Title,
                 aboutText: center.aboutText || '',
@@ -698,7 +715,7 @@ ${modal}`;
     
     <div class="text-center mt-4">
         <button class="btn btn-outline-primary" onclick="printAllSchedules('${schedulesCacheKey}')">
-            <i class="bi bi-printer me-2"></i>Print All Schedules
+            <i class="bi bi-printer me-2"></i>Print / Save all as PDF
         </button>
     </div>`;
         }
@@ -707,9 +724,15 @@ ${modal}`;
         let aboutSection = '';
         let aboutImageSection = ''; // Image removed from about section
         if (center.aboutText) {
-            // Get exterior photo from photos array (no longer used)
-            // const photoData = data.photos && data.photos.length > 0 ? data.photos[0] : null;
-            // const exteriorPhoto = photoData?.urlExteriorPhoto || '';
+            // Get exterior photo from photos array (no longer used for aboutImageSection)
+            const photoData = data.photos && data.photos.length > 0 ? data.photos[0] : null;
+            const exteriorPhoto = photoData?.urlExteriorPhoto || 'https://s3.amazonaws.com/uss-cache.salvationarmy.org/9150a418-1c58-4d01-bf81-5753d1c608ae_salvation+army+building+1.png';
+            
+            // Update window.RSYC_SCHEDULES with exterior photo (prefers custom, falls back to default)
+            const schedulesCacheKey = `schedules_${center.id || 'default'}`;
+            if (window.RSYC_SCHEDULES && window.RSYC_SCHEDULES[schedulesCacheKey]) {
+                window.RSYC_SCHEDULES[schedulesCacheKey].exteriorPhoto = exteriorPhoto;
+            }
             
             // aboutImageSection is now empty - image removed per user request
             
@@ -720,7 +743,7 @@ ${modal}`;
             // Get explainer video embed code
             const explainerVideoEmbedCode = center.explainerVideoEmbedCode || center.ExplainerVideoEmbedCode || '';
             const videoHTML = explainerVideoEmbedCode ? `
-                <div class="mt-4" style="border-radius: 12px; overflow: hidden;">
+                <div class="mt-2" style="border-radius: 12px; overflow: hidden;">
                     ${explainerVideoEmbedCode}
                 </div>` : '';
             
@@ -791,9 +814,9 @@ ${modal}`;
                 <div class="schedule-scroll-wrapper">
                     ${scheduleScrollSection}
                 </div>
-                ${scheduleModals}
                 
                 ${socialSection}
+                ${scheduleModals}
             </div>
         </div>
     </div>
@@ -1028,35 +1051,51 @@ ${summerSection}
         let modal = '';
 
         if (hasFeatures) {
-            const totalFeatures = facilityFeatures.length;
-            const showViewAll = totalFeatures > 8;
-            const displayFeatures = showViewAll ? facilityFeatures.slice(0, 8) : facilityFeatures;
+            // Alphabetically sort facility features by name
+            const sortedFeatures = [...facilityFeatures].sort((a, b) => 
+                (a.name || '').localeCompare(b.name || '')
+            );
+
+            const totalFeatures = sortedFeatures.length;
+            const threshold = 8;
+            const hasManyFeatures = totalFeatures > threshold;
+            const displayFeatures = hasManyFeatures ? sortedFeatures.slice(0, threshold) : sortedFeatures;
+
+            const buttonLabel = hasManyFeatures ? `View All ${totalFeatures} Features` : 'View More Details';
 
             featuresHTML = displayFeatures.map(feature => {
                 const icon = feature.biClass || 'bi-check-circle';
                 return `
-          <div class="d-flex align-items-center mb-3" style="flex:1 1 45%;">
-            <i class="bi ${this.escapeHTML(icon)} feature-icon me-2"></i> ${this.escapeHTML(feature.name)}
+          <div class="d-flex align-items-center mb-3 rsyc-feature-item" style="flex:1 1 45%;">
+            <i class="bi ${this.escapeHTML(icon)} feature-icon me-2"></i> 
+            <span>${this.escapeHTML(feature.name)}</span>
           </div>`;
             }).join('');
 
-            // All features for modal
-            const allFeaturesHTML = facilityFeatures.map(feature => {
+            // All features for modal (sorted)
+            const allFeaturesHTML = sortedFeatures.map(feature => {
                 const icon = feature.biClass || 'bi-check-circle';
+                const description = feature.description || '';
                 return `
-          <div class="col-sm-12 col-md-6 d-flex align-items-center mb-3">
-            <i class="bi ${this.escapeHTML(icon)} feature-icon me-2"></i> ${this.escapeHTML(feature.name)}
+          <div class="col-sm-12 col-md-6 mb-4">
+            <div class="d-flex align-items-start">
+                <i class="bi ${this.escapeHTML(icon)} feature-icon me-3 mt-1" style="font-size: 1.5rem;"></i>
+                <div>
+                    <div class="fw-bold" style="font-size: 1.1rem;">${this.escapeHTML(feature.name)}</div>
+                    ${description ? `<div class="text-muted small mt-1" style="line-height: 1.4;">${this.escapeHTML(description)}</div>` : ''}
+                </div>
+            </div>
           </div>`;
             }).join('');
 
-            viewAllButton = showViewAll ? `
+            viewAllButton = `
                             <div class="text-center mt-3">
                                 <button class="btn btn-outline-primary btn-sm" onclick="showRSYCModal('facilities', '${this.escapeHTML(center.name, true)}')">
-                                    View All ${totalFeatures} Features
+                                    ${buttonLabel}
                                 </button>
-                            </div>` : '';
+                            </div>`;
 
-            modal = showViewAll ? `
+            modal = `
 <!-- Modal for All Facilities -->
 <div id="rsyc-modal-facilities" class="rsyc-modal" style="display:none;">
     <div class="rsyc-modal-content">
@@ -1070,14 +1109,14 @@ ${summerSection}
             </div>
         </div>
     </div>
-</div>` : '';
+</div>`;
         }
 
         return `<!-- Facility Features -->
 <div id="freeTextArea-facilities" class="freeTextArea u-centerBgImage section u-sa-creamBg u-coverBgImage">
-    <div class="u-positionRelative">
+    <div class="u-positionRelative" style="padding-top: 5rem; padding-bottom: 5rem;">
         <div class="container">
-            <div class="container my-5">
+            <div class="container" style="padding-top: 4.5rem; padding-bottom: 4.5rem;">
                 <div class="row align-items-stretch">
                     <!-- Left block: Facility Features (7 columns) -->
                     <div class="col-lg-7 d-flex order-2 order-lg-1">
@@ -1278,21 +1317,32 @@ ${modal}`;
 				</p>
 			</div>
 		</div>`;
-        }).join('\n');        return `<!-- Staff & Community Leaders -->
+        }).join('\n');
+
+        // Conditionally show scroll hint if there are more than 3 leaders
+        const scrollHint = sorted.length > 3 ? `
+                    <p class="text-center mb-n2">
+                        <small class="text-muted">
+                            Scroll to view more 
+                            <i class="bi bi-arrow-right-circle" style="font-size: 0.85em; vertical-align: middle;"></i>
+                        </small>
+                    </p>` : '';
+        
+        // Center cards if 3 or fewer, otherwise leave for scrolling
+        const justifyContent = sorted.length <= 3 ? 'justify-content-center' : '';
+
+        return `<!-- Staff & Community Leaders -->
 <div id="freeTextArea-staff" class="freeTextArea u-centerBgImage section u-sa-goldBg u-coverBgImage">
-    <div class="u-positionRelative">
+    <div class="u-positionRelative" style="padding-top: 5rem; padding-bottom: 5rem;">
         <div class="container">
-            <div class="bg-area rounded p-4" id="profiles">
-                <h2 class="fw-bold mb-4"><span style="color:#111111;">Staff &amp; <em>Community Leaders</em></span></h2>
-                <p class="mb-n2">
-                    <small class="text-muted">
-                        Scroll to view more 
-                        <i class="bi bi-arrow-right-circle" style="font-size: 0.85em; vertical-align: middle;"></i>
-                    </small>
-                </p>
-                
-                <div class="d-flex overflow-auto gap-4 py-2" style="scroll-snap-type: x mandatory;">
-                    ${staffCards}
+            <div class="container" style="padding-top: 4.5rem; padding-bottom: 4.5rem;">
+                <div class="bg-area rounded p-4" id="profiles">
+                    <h2 class="fw-bold mb-4 text-center"><span style="color:#111111;">Staff &amp; <em>Community Leaders</em></span></h2>
+                    ${scrollHint}
+                    
+                    <div class="d-flex overflow-auto gap-4 py-2 ${justifyContent}" style="scroll-snap-type: x mandatory;">
+                        ${staffCards}
+                    </div>
                 </div>
             </div>
         </div>
@@ -1312,9 +1362,9 @@ ${modal}`;
         
         return `<!-- Nearby Salvation Army Centers -->
 <div id="freeTextArea-nearby" class="freeTextArea u-centerBgImage section u-sa-greyVeryLightBg u-coverBgImage">
-    <div class="u-positionRelative">
+    <div class="u-positionRelative" style="padding-top: 5rem; padding-bottom: 5rem;">
         <div class="container">
-            <div class="container my-5">
+            <div class="container" style="padding-top: 4.5rem; padding-bottom: 4.5rem;">
                 <div class="row align-items-stretch flex-column-reverse flex-md-row">
                     <!-- Left block: Nearby Centers card (7 columns) -->
                     <div class="col-md-7 d-flex mb-4 mb-md-0">
@@ -1374,7 +1424,7 @@ ${modal}`;
                             </div>
                             
                             <a class="btn btn-outline-primary btn-sm mt-3" 
-                               href="https://www.salvationarmyusa.org/location-finder/?address=${zipCode}" 
+                               href="https://www.salvationarmyusa.org/location-finder/?address=${zipCode}&services=" 
                                target="_blank">
                                 <i class="bi bi-map me-2"></i> Get More Details
                             </a>
@@ -1457,10 +1507,10 @@ ${modal}`;
         
         return `<!-- For Parents -->
 <div id="freeTextArea-parents" class="freeTextArea u-centerBgImage section u-sa-whiteBg u-coverBgImage">
-    <div class="u-positionRelative">
+    <div class="u-positionRelative" style="padding-top: 5rem; padding-bottom: 5rem;">
         <div class="container">
             ${growthModal}
-            <div class="container my-5">
+            <div class="container" style="padding-top: 4.5rem; padding-bottom: 4.5rem;">
                 <div class="row align-items-stretch">
                     <!-- Left block: Photo (5 columns) -->
                     <div class="col-lg-5 d-flex">
@@ -1527,9 +1577,9 @@ ${modal}`;
 
         const html = `
 <div id="freeTextArea-youth" data-index="7" class="freeTextArea u-centerBgImage section u-sa-creamBg u-coverBgImage">
-    <div class="u-positionRelative">
+    <div class="u-positionRelative" style="padding-top: 5rem; padding-bottom: 5rem;">
         <div class="container">
-            <div class="container my-5">
+            <div class="container" style="padding-top: 4.5rem; padding-bottom: 4.5rem;">
                 <div class="row align-items-stretch">
                     <!-- Left block: Hover card (7 columns) -->
                     <div class="col-lg-7 d-flex order-2 order-lg-1">
@@ -1572,7 +1622,7 @@ ${modal}`;
         
         // Use postal code from center data
         const postalCode = center.zip || '27107';
-        const locationFinderUrl = `https://www.salvationarmyusa.org/location-finder/?address=${postalCode}`;
+        const locationFinderUrl = `https://www.salvationarmyusa.org/location-finder/?address=${postalCode}&services=`;
         
         // Get nearby centers photo from photos array, fallback to default
         const photoData = photos && photos.length > 0 ? photos[0] : null;
@@ -1580,9 +1630,9 @@ ${modal}`;
 
         return `<!-- Nearby Salvation Army Centers -->
 <div id="freeTextArea-nearby" class="freeTextArea u-centerBgImage section u-sa-greyVeryLightBg u-coverBgImage">
-    <div class="u-positionRelative">
+    <div class="u-positionRelative" style="padding-top: 5rem; padding-bottom: 5rem;">
         <div class="container">
-            <div class="container my-5">
+            <div class="container" style="padding-top: 4.5rem; padding-bottom: 4.5rem;">
                 <div class="row align-items-stretch flex-column-reverse flex-lg-row">
                     <!-- Left block: Nearby Centers card (7 columns) -->
                     <div class="col-lg-7 d-flex mb-4 mb-lg-0">
@@ -1725,9 +1775,9 @@ ${modal}`;
 
         const html = `
 <div id="freeTextArea-volunteer" data-index="8" class="freeTextArea u-centerBgImage section u-sa-whiteBg u-coverBgImage">
-    <div class="u-positionRelative">
+    <div class="u-positionRelative" style="padding-top: 5rem; padding-bottom: 5rem;">
         <div class="container">
-            <div class="container my-5">
+            <div class="container" style="padding-top: 4.5rem; padding-bottom: 4.5rem;">
                 <div class="row align-items-stretch">
                     <!-- Left block: Photo (5 columns) -->
                     <div class="col-lg-5 d-flex">
@@ -2264,8 +2314,8 @@ async function printRSYCModal(modalId) {
         logoSvgHtml = `<img src="${logoUrl}" style="height:auto; width:220px; display:block;" />`;
     }
 
-    const printWindow = window.open('', '', 'height=900,width=1200');
-    if (!printWindow) {
+    const printWindow = /Android/i.test(navigator.userAgent) ? null : window.open('', '', 'height=900,width=1200');
+    if (!printWindow && !/Android/i.test(navigator.userAgent)) {
         alert('Pop-up blocked. Please allow pop-ups for this site.');
         return;
     }
@@ -2425,15 +2475,45 @@ async function printRSYCModal(modalId) {
 </body>
 </html>`;
 
+    const isAndroid = /Android/i.test(navigator.userAgent);
+    
     try {
-        printWindow.document.open();
-        printWindow.document.write(htmlContent);
-        printWindow.document.close();
-        
-        setTimeout(() => {
-            printWindow.print();
-            setTimeout(() => { printWindow.close(); }, 500);
-        }, 800);
+        if (isAndroid) {
+            // Android-specific reliable printing via iframe and Blob
+            const blob = new Blob([htmlContent], { type: 'text/html' });
+            const blobUrl = URL.createObjectURL(blob);
+            
+            const iframe = document.createElement('iframe');
+            iframe.style.visibility = 'hidden';
+            iframe.style.position = 'fixed';
+            iframe.style.right = '0';
+            iframe.style.bottom = '0';
+            iframe.src = blobUrl;
+            
+            document.body.appendChild(iframe);
+            
+            iframe.onload = () => {
+                setTimeout(() => {
+                    iframe.contentWindow.focus();
+                    iframe.contentWindow.print();
+                    // Cleanup
+                    setTimeout(() => {
+                        URL.revokeObjectURL(blobUrl);
+                        document.body.removeChild(iframe);
+                    }, 5000);
+                }, 1000); // Give Android extra time to render the blob
+            };
+        } else {
+            // Desktop/iOS standard behavior
+            printWindow.document.open();
+            printWindow.document.write(htmlContent);
+            printWindow.document.close();
+            
+            setTimeout(() => {
+                printWindow.print();
+                setTimeout(() => { printWindow.close(); }, 500);
+            }, 800);
+        }
     } catch(e) {
         console.error('Print error:', e);
     }
@@ -2454,17 +2534,22 @@ async function printAllSchedules(cacheKey) {
     
     // Conditionally reduce aboutText font if very long
     const isAboutLong = aboutText && aboutText.length > 800;
-    const aboutFontSize = isAboutLong ? '7.5pt' : '8.5pt';
+    const aboutFontSize = isAboutLong ? '6.8pt' : '7.8pt';
     
     if (!schedules || schedules.length === 0) {
         alert('No schedules to print');
         return;
     }
     
-    // Create print window
-    const printWindow = window.open('', '', 'height=900,width=1200');
+    // Check if we should generate a direct PDF (consistent and reliable download)
+    // We'll use the native print logic for now as it's been updated for Android reliability,
+    // but we can add a PDF generator here in the future if needed.
     
-    if (!printWindow) {
+    // Create print window (except on Android)
+    const isAndroid = /Android/i.test(navigator.userAgent);
+    const printWindow = isAndroid ? null : window.open('', '', 'height=900,width=1200');
+    
+    if (!printWindow && !isAndroid) {
         alert('Unable to open print window. Your browser may have popup blocking enabled.');
         return;
     }
@@ -2617,7 +2702,7 @@ async function printAllSchedules(cacheKey) {
             overflow: auto;
         }
         
-        .about-text { font-size: ${aboutFontSize}; line-height: 1.4; text-align: justify; }
+        .about-text { font-size: ${aboutFontSize}; line-height: 1.3; text-align: justify; }
         .about-photo { 
             float: right;
             width: 200pt; 
@@ -2716,16 +2801,48 @@ ${(aboutText || exteriorPhoto) ? `
 </body>
 </html>`;
     
+    const dateStamp = `<div class="date-stamp">Printed on ${printDate}</div>`;
+    
+    // Final check on logo injection
+    const finalHtml = htmlContent.replace('${logoSvgHtml || \'\'}', logoSvgHtml || '');
+
     try {
-        printWindow.document.open();
-        printWindow.document.write(htmlContent);
-        printWindow.document.close();
-        
-        // Wait for fonts and SVG to be fully ready
-        setTimeout(() => {
-            printWindow.print();
-            setTimeout(() => { printWindow.close(); }, 500);
-        }, 800);
+        if (isAndroid) {
+            // Android-specific reliable printing via iframe and Blob
+            const blob = new Blob([finalHtml], { type: 'text/html' });
+            const blobUrl = URL.createObjectURL(blob);
+            
+            const iframe = document.createElement('iframe');
+            iframe.style.visibility = 'hidden';
+            iframe.style.position = 'fixed';
+            iframe.style.right = '0';
+            iframe.style.bottom = '0';
+            iframe.src = blobUrl;
+            
+            document.body.appendChild(iframe);
+            
+            iframe.onload = () => {
+                setTimeout(() => {
+                    iframe.contentWindow.focus();
+                    iframe.contentWindow.print();
+                    // Cleanup
+                    setTimeout(() => {
+                        URL.revokeObjectURL(blobUrl);
+                        document.body.removeChild(iframe);
+                    }, 5000);
+                }, 1000);
+            };
+        } else {
+            printWindow.document.open();
+            printWindow.document.write(finalHtml);
+            printWindow.document.close();
+            
+            // Wait for fonts and SVG to be fully ready
+            setTimeout(() => {
+                printWindow.print();
+                setTimeout(() => { printWindow.close(); }, 500);
+            }, 800);
+        }
     } catch(e) {
         alert('Unable to print. Please use the Print button in the preview window.');
         console.error('Print error:', e);

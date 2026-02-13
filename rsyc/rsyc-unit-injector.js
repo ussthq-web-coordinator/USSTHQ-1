@@ -62,7 +62,7 @@
     /**
      * Load and render a unit page into a container
      */
-    async function loadUnitPage(unitType, unitValue, targetElement) {
+    async function loadUnitPage(unitType, unitValue, targetElement, unitSection = 'all') {
         try {
             console.log(`[RSYCUnitInjector] Loading ${unitType}: ${unitValue}`);
 
@@ -114,16 +114,23 @@
             const dataLoader = new window.RSYCDataLoader();
             const unitDataLoader = new window.RSYCUnitDataLoader(dataLoader);
 
-            // 1. Load critical data (now includes Centers + Photos for grid)
+            // 1. Load critical data (centers + photos)
             await dataLoader.loadCriticalData();
             console.log('[RSYCUnitInjector] ✓ Critical data loaded');
             
-            // 2. Build hierarchy and get the unit
+            // 2. Load optional data EARLY if this is an "all" unit (needed for staff grid)
+            const normalizedValue = unitValue.toLowerCase() === 'all' ? 'all' : unitValue;
+            if (unitType === 'all') {
+                console.log('[RSYCUnitInjector] 📦 Pre-loading optional data for "all" unit (includes staff)...');
+                await dataLoader.loadOptionalData();
+                console.log('[RSYCUnitInjector] ✓ Optional data pre-loaded for all unit');
+            }
+            
+            // 3. Build hierarchy (now has leaders available if "all" unit)
             console.log('[RSYCUnitInjector] 🏗️ Building unit hierarchy...');
             await unitDataLoader.buildUnitHierarchy();
             
-            // Normalize unitValue for all-case
-            const normalizedValue = unitValue.toLowerCase() === 'all' ? 'all' : unitValue;
+            // Get the unit
             let unit = unitDataLoader.getUnit(unitType, normalizedValue);
             
             if (!unit) {
@@ -147,7 +154,7 @@
                 // Clear skeleton
                 clearLoadingSkeleton();
                 
-                renderUnit(unit, targetElement, unitType, unitValue);
+                renderUnit(unit, targetElement, unitType, unitValue, unitSection);
                 
                 // Then load optional data in background if not already loaded
                 if (!dataLoader.cache.schedules) {
@@ -173,14 +180,33 @@
     /**
      * Render the unit page HTML and inject it
      */
-    function renderUnit(unit, targetElement, unitType, unitValue) {
-        console.log(`[RSYCUnitInjector] Rendering unit: ${unit.displayName} (${unit.centers.length} centers)`);
+    function renderUnit(unit, targetElement, unitType, unitValue, unitSection = 'all') {
+        console.log(`[RSYCUnitInjector] Rendering unit: ${unit.displayName} (${unit.centers.length} centers, section: ${unitSection})`);
 
         // Generate unit page HTML
         const templateEngine = new window.RSYCUnitTemplates();
-        const enabledSections = window.RSYCUnitConfig.enabledSections || ['hero', 'overview', 'centers', 'programs', 'resources', 'impact', 'giving', 'leaders', 'contact'];
+        let html = '';
         
-        const html = templateEngine.generateUnitProfile(unit, enabledSections);
+        if (unitSection === 'staff') {
+            // Read options from the target element's data attributes
+            const ds = targetElement.dataset || {};
+            const opts = {
+                filters: ds.rsycStaffFilters === undefined ? true : String(ds.rsycStaffFilters) !== 'false',
+                bg: ds.rsycStaffBg === undefined ? true : String(ds.rsycStaffBg) !== 'false',
+                padding: ds.rsycStaffPadding || 'default'
+            };
+
+            // Show only staff grid, passing options
+            html = templateEngine.generateStaffGridOnly(unit, opts);
+        } else if (unitSection === 'centers') {
+            // Show only centers grid
+            const enabledSections = [];
+            html = templateEngine.generateUnitProfile(unit, enabledSections);
+        } else {
+            // Show all sections (default)
+            const enabledSections = window.RSYCUnitConfig.enabledSections || ['hero', 'overview', 'centers', 'programs', 'resources', 'impact', 'giving', 'leaders', 'contact'];
+            html = templateEngine.generateUnitProfile(unit, enabledSections);
+        }
 
         // Inject custom styles once
         if (!document.getElementById('rsyc-unit-injected-styles')) {
@@ -358,10 +384,11 @@ div #freeTextArea {
         document.querySelectorAll('[data-rsyc-unit-type]').forEach((container) => {
             const unitType = container.dataset.rsycUnitType;
             const unitValue = container.dataset.rsycUnitValue;
+            const unitSection = container.dataset.rsycUnitSection || 'all';
 
             if (unitType && unitValue) {
-                console.log(`[RSYCUnitInjector] Found unit page: ${unitType} - ${unitValue}`);
-                loadUnitPage(unitType, unitValue, container);
+                console.log(`[RSYCUnitInjector] Found unit page: ${unitType} - ${unitValue} (section: ${unitSection})`);
+                loadUnitPage(unitType, unitValue, container, unitSection);
             }
         });
     }

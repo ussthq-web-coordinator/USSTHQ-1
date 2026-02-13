@@ -1427,7 +1427,7 @@ class RSYCGeneratorV2 {
         const header = document.createElement('div');
         header.style.cssText = 'display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #eee; padding-bottom:16px; margin-bottom:24px;';
         header.innerHTML = `<div>
-            <h2 style="margin:0; color:#333;">RSYC Data Integrity Audit</h2>
+            <h2 style="margin:0; color:#333;">RSYC Profile Audit</h2>
             <p style="margin:4px 0 0 0; color:#666; font-size:14px;">Audit date: ${new Date().toLocaleDateString()} • ${centers.length} Centers (${aggregates.closed} Closed)</p>
         </div>`;
         
@@ -1440,7 +1440,7 @@ class RSYCGeneratorV2 {
         copyReportBtn.innerHTML = '<i class="bi bi-envelope"></i> Copy for Outlook';
         copyReportBtn.onclick = () => {
             const reportHtml = this.generateEmailAuditReport({ 
-                rows: rows.filter(r => !r.isClosed), // only open centers
+                rows: rows, // Include all rows (including closed)
                 lowFacilities, lowPrograms, recentFacs, recentProgs, 
                 centersCount: centers.length,
                 closedCount: aggregates.closed
@@ -1466,7 +1466,7 @@ class RSYCGeneratorV2 {
         // Narrative Section
         const narrative = document.createElement('div');
         narrative.style.cssText = 'background:#f0f7ff; border-left:4px solid #007bff; padding:16px; margin-bottom:24px; border-radius:4px; font-size:14px; line-height:1.6; color:#2c3e50;';
-        narrative.innerHTML = `<strong>Our Mission:</strong> We are currently auditing the Red Shield Youth Center territory-wide to ensure every location is accurately represented and fully ready for public promotion. This focus on data integrity ensures that when families, donors, and community partners visit <strong>redshieldyouth.org</strong>, they encounter a professional, complete, and locally relevant view of our ministry. By addressing the specific data points identified in this report, we can collectively strengthen our regional presence and ensure every center has the "digital front door" it deserves.`;
+        narrative.innerHTML = `<strong>Our Goal:</strong> We are currently auditing the Red Shield Youth Center territory-wide to ensure every location is accurately represented and fully ready for public promotion. This focus on profile readiness ensures that when families, donors, and community partners visit <strong>redshieldyouth.org</strong>, they encounter a professional, complete, and locally relevant view of our ministry. By addressing the specific data points identified in this report, we can collectively strengthen our regional presence and ensure every center has the "digital front door" it deserves.`;
         modalInner.appendChild(narrative);
 
         // Summary Badges (Original Style)
@@ -1494,18 +1494,29 @@ class RSYCGeneratorV2 {
         // Helper to generate generic missing checklist for a row
         const getMissingChecklist = (r) => {
             const missing = [];
-            if (!r.hasAbout) missing.push("Missing 'About This Center' statement");
-            if (!r.hasStaff) missing.push("No Contact/Staff Info in schedules");
-            if (r.leaderCount === 0) missing.push("No Leaders listed");
-            if (r.schedCount === 0) missing.push("No Program Schedules");
-            if (r.photoCount === 0) missing.push("No Photos uploaded (Missing mandatory Exterior Photo)");
-            if (!r.hasFooterPhoto) missing.push("Missing Footer Photo");
-            if (!r.hasFooterScripture) missing.push("Missing Footer Scripture");
-            if (!r.hasSignUpUrl) missing.push("Missing Online Registration/Parent Sign-up URL");
-            if (!r.hasDonationUrl) missing.push("Missing Donation URL");
-            if (!r.hasVolunteer) missing.push("Missing Volunteer/Mentor signup info");
-            if (!r.hasHours) missing.push("Missing Custom Hours");
-            if (!r.hasExplainerVideo) missing.push("Missing Explainer/About Video");
+            // Priority 1: Hours
+            if (!r.hasHours) missing.push("Missing Custom Hours (Check Year-Round vs Summer)");
+            
+            // Priority 2: Staff & Community Leaders
+            if (!r.hasStaff && r.leaderCount === 0) missing.push("Missing Staff & Community Leaders (Photos/Bios)");
+            
+            // Priority 3: Schedules
+            if (r.schedCount === 0) missing.push("Missing Program Schedules (Recurring Weekly, Camps, Afterschool Time Breakdown)");
+            
+            // Priority 4: Engagement Links
+            if (!r.hasDonationUrl || !r.hasSignUpUrl || !r.hasVolunteer) {
+                missing.push("Missing Engagement Links (Classy Studio, Parent Portal, or Volunteer/Recruitment)");
+            }
+
+            // Priority 5: Profile Context
+            if (!r.hasAbout) missing.push("Missing 'About This Center' (Local Narrative)");
+            if (!r.hasExplainerVideo) missing.push("Missing Explainer Video (Using Territorial Placeholder)");
+            if (r.photoCount === 0) missing.push("Missing Mandatory Site Photos (Exterior/Facility)");
+            
+            // Priority 6: Footer Integrity
+            if (!r.hasFooterPhoto) missing.push("Missing Local Footer Photo (Building/Staff/Community)");
+            if (!r.hasFooterScripture) missing.push("Missing Footer Scripture Reference");
+            
             return missing;
         };
 
@@ -1514,15 +1525,15 @@ class RSYCGeneratorV2 {
         grid.style.cssText = 'display:grid; grid-template-columns:repeat(auto-fit, minmax(300px, 1fr)); gap:20px; margin-bottom:24px;';
         
         const newAuditSections = [
-            { title: '📅 Recently Created (90d)', items: [
-                { label: 'Facilities', rows: recentFacs.map(f => f.name) },
-                { label: 'Programs', rows: recentProgs.map(p => p.name) }
+            { title: '📅 Recently Created Filter Options (90d)', items: [
+                { label: 'New Facility Features', rows: recentFacs.map(f => f.name) },
+                { label: 'New Featured Programs', rows: recentProgs.map(p => p.name) }
             ]},
-            { title: '⚠️ Low Association (<30)', items: [
-                { label: 'Features', rows: lowFacilities.map(([n,c]) => `${n}: ${c}`) },
+            { title: '⚠️ Low Filter Association (<30)', items: [
+                { label: 'Low Facility Features', rows: lowFacilities.map(([n,c]) => `${n}: ${c}`) },
                 { label: 'Programs', rows: lowPrograms.map(([n,c]) => `${n}: ${c}`) }
             ], footer: '💡 Important: Associate as many applicable features/programs as possible to ensure centers show on location page filters.' },
-            { title: '❌ Needs Attention (Open Centers)', items: [
+            { title: '❌ Center Profile Needs Attention', items: [
                 { label: 'No About This Center statement', rows: missingAbout, count: missingAbout.length },
                 { label: 'No Photos (Missing Exterior Photo)', rows: missingPhotos, count: missingPhotos.length }
             ]}
@@ -1552,19 +1563,222 @@ class RSYCGeneratorV2 {
             grid.appendChild(card);
         });
         modalInner.appendChild(grid);
+
+        // New Educational Guidance Section (One-Stop Shop)
+        const instructionWrapper = document.createElement('div');
+        instructionWrapper.style.cssText = 'background:#fafafa; border:1px solid #e0e0e0; border-radius:12px; padding:24px; margin-bottom:30px; font-family:Segoe UI, sans-serif;';
+        
+        instructionWrapper.innerHTML = `
+            <div style="margin-bottom:24px; border-bottom:2px solid #eee; padding-bottom:20px;">
+                <h4 style="font-size:20px; font-weight:700; color:#242424; margin:0 0 8px 0;">RSYC Center Profile Master Command Center</h4>
+                <p style="font-size:14px; color:#444; line-height:1.6; margin:0 0 15px 0;">
+                    To ensure each location is represented well for our upcoming launch, use this dashboard to manage all local content. Final launch dates will be set once profiles are reviewed and marked "Ready to Publish."
+                </p>
+                
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:20px; margin-bottom:15px;">
+                    <div style="background:#fff; border:1px solid #d0e3ff; border-radius:10px; padding:15px; border-left:5px solid #0078d4;">
+                        <div style="font-weight:700; color:#0056b3; font-size:12px; text-transform:uppercase; margin-bottom:8px;">🚀 Primary Profile Editor</div>
+                        <a href="https://centerprofile.redshieldyouth.org" target="_blank" style="font-size:16px; color:#0078d4; text-decoration:none; font-weight:700; display:block;">centerprofile.redshieldyouth.org</a>
+                        <div style="font-size:12px; color:#666; margin-top:6px;">Main portal for editing About, Contact, Hours, and Mandatory Fields.</div>
+                    </div>
+                    <div style="background:#fff; border:1px solid #eee; border-radius:10px; padding:15px; border-left:5px solid #666;">
+                        <div style="font-weight:700; color:#666; font-size:12px; text-transform:uppercase; margin-bottom:8px;">📚 Training & Support</div>
+                        <a href="https://sauss.sharepoint.com/sites/ConnectCommunications/SitePages/Manage-Youth-Center-Web-Profile.aspx" target="_blank" style="font-size:13px; color:#0078d4; text-decoration:underline; font-weight:600; display:block; margin-bottom:4px;">View Detailed User Guide</a>
+                        <a href="https://southernusa.salvationarmy.org/redshieldyouth/center-locations" target="_blank" style="font-size:13px; color:#0078d4; text-decoration:underline; font-weight:600; display:block;">Live Profiles Filter Site</a>
+                    </div>
+                </div>
+
+                <div style="font-size:13px; color:#444; background-color:#fff8e1; border-left:5px solid #f2c200; padding:15px; line-height:1.6; border-radius:6px; margin-bottom:15px;">
+                    <b>💡 Dashboard Pro-Tips:</b><br>
+                    • <b>Seamless Editing:</b> Click directly beneath each field label to select options or enter text; work is saved automatically when you click away.<br>
+                    • <b>Launch Process:</b> When updates are finished, set the status to <b>"Ready to Publish"</b> and @mention <b>@Shared THQ Web and Social Media</b> in the sidebar comments.
+                </div>
+            </div>
+
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:35px; margin-bottom:28px;">
+                <div>
+                    <h5 style="font-size:15px; font-weight:700; color:#d93d3d; margin:0 0 15px 0; display:flex; align-items:center;">
+                        <span style="background:#d93d3d; color:white; width:24px; height:24px; border-radius:50%; display:inline-flex; align-items:center; justify-content:center; margin-right:8px; font-size:12px;">1</span> High-Priority Content Updates
+                    </h5>
+                    <div style="display:grid; grid-template-columns:1fr; gap:10px;">
+                        <div style="background:white; border:1px solid #eee; border-radius:8px; padding:10px; display:flex; justify-content:space-between; align-items:center;">
+                            <span style="font-size:13px; font-weight:500;">📅 Operating Hours</span>
+                            <a href="https://hoursreview-rsyc.usscommunications.org/" target="_blank" style="font-size:11px; background:#0078d4; color:white; padding:4px 10px; border-radius:4px; text-decoration:none;">Manage →</a>
+                        </div>
+                        <div style="background:white; border:1px solid #eee; border-radius:8px; padding:10px; display:flex; justify-content:space-between; align-items:center;">
+                            <span style="font-size:13px; font-weight:500;">🖼️ Center Exterior Photos</span>
+                            <a href="https://photos1review-rsyc.usscommunications.org/" target="_blank" style="font-size:11px; background:#0078d4; color:white; padding:4px 10px; border-radius:4px; text-decoration:none;">Manage →</a>
+                        </div>
+                        <div style="background:white; border:1px solid #eee; border-radius:8px; padding:10px; display:flex; flex-direction:column; gap:6px;">
+                            <div style="display:flex; justify-content:space-between; align-items:center;">
+                                <span style="font-size:13px; font-weight:500;">📋 Program Schedules</span>
+                                <a href="https://submitschedules-rsyc.usscommunications.org/" target="_blank" style="font-size:11px; background:#28a745; color:white; padding:4px 10px; border-radius:4px; text-decoration:none;">Add New →</a>
+                            </div>
+                            <a href="https://schedulesreview-rsyc.usscommunications.org/" target="_blank" style="font-size:10px; color:#0078d4; text-decoration:underline; font-weight:600; margin-left:2px;">Edit/Review Existing Schedules</a>
+                        </div>
+                        <div style="background:white; border:1px solid #eee; border-radius:8px; padding:10px; display:flex; flex-direction:column; gap:6px;">
+                            <div style="display:flex; justify-content:space-between; align-items:center;">
+                                <span style="font-size:13px; font-weight:500;">👥 Staff & Local Leaders</span>
+                                <a href="https://submitstaff-rsyc.usscommunications.org/" target="_blank" style="font-size:11px; background:#28a745; color:white; padding:4px 10px; border-radius:4px; text-decoration:none;">Add New →</a>
+                            </div>
+                            <a href="https://staffreview-rsyc.usscommunications.org/" target="_blank" style="font-size:10px; color:#0078d4; text-decoration:underline; font-weight:600; margin-left:2px;">Edit/Review Existing Staff</a>
+                        </div>
+                        <div style="background:white; border:1px solid #eee; border-radius:8px; padding:10px; display:flex; flex-direction:column; gap:6px;">
+                            <div style="display:flex; justify-content:space-between; align-items:center;">
+                                <span style="font-size:13px; font-weight:500;">🎭 Hero / Theatre Slides</span>
+                                <a href="https://submitslides-rsyc.usscommunications.org/" target="_blank" style="font-size:11px; background:#28a745; color:white; padding:4px 10px; border-radius:4px; text-decoration:none;">Add New →</a>
+                            </div>
+                            <a href="https://slidesreview-rsyc.usscommunications.org/" target="_blank" style="font-size:10px; color:#0078d4; text-decoration:underline; font-weight:600; margin-left:2px;">Edit/Review Existing Slides</a>
+                        </div>
+                        <div style="background:white; border:1px solid #eee; border-radius:8px; padding:10px; display:flex; flex-direction:column; gap:6px;">
+                            <div style="display:flex; justify-content:space-between; align-items:center;">
+                                <span style="font-size:13px; font-weight:500;">📰 Stories</span>
+                                <a href="https://submitstories-rsyc.usscommunications.org/" target="_blank" style="font-size:11px; background:#28a745; color:white; padding:4px 10px; border-radius:4px; text-decoration:none;">Add New →</a>
+                            </div>
+                            <a href="https://storiesreview-rsyc.usscommunications.org/" target="_blank" style="font-size:10px; color:#0078d4; text-decoration:underline; font-weight:600; margin-left:2px;">Edit/Review Existing Stories</a>
+                        </div>
+                        <div style="background:white; border:1px solid #eee; border-radius:8px; padding:10px; display:flex; flex-direction:column; gap:6px;">
+                            <div style="display:flex; justify-content:space-between; align-items:center;">
+                                <span style="font-size:13px; font-weight:500;">📣 Events</span>
+                                <a href="https://submitevents-rsyc.usscommunications.org/" target="_blank" style="font-size:11px; background:#28a745; color:white; padding:4px 10px; border-radius:4px; text-decoration:none;">Add New →</a>
+                            </div>
+                            <a href="https://eventsreview-rsyc.usscommunications.org/" target="_blank" style="font-size:10px; color:#0078d4; text-decoration:underline; font-weight:600; margin-left:2px;">Edit/Review Existing Events</a>
+                        </div>
+                        <div style="background:white; border:1px solid #eee; border-radius:8px; padding:10px; display:flex; flex-direction:column; gap:6px;">
+                            <div style="display:flex; justify-content:space-between; align-items:center;">
+                                <span style="font-size:13px; font-weight:500;">📄 Info Pages</span>
+                                <a href="https://submitinfopage-rsyc.usscommunications.org/" target="_blank" style="font-size:11px; background:#28a745; color:white; padding:4px 10px; border-radius:4px; text-decoration:none;">Add New →</a>
+                            </div>
+                            <a href="https://infopagereview-rsyc.usscommunications.org/" target="_blank" style="font-size:10px; color:#0078d4; text-decoration:underline; font-weight:600; margin-left:2px;">Edit/Review Existing Info Pages</a>
+                        </div>
+                    </div>
+                </div>
+                <div>
+                    <h5 style="font-size:15px; font-weight:700; color:#242424; margin:0 0 15px 0; display:flex; align-items:center;">
+                        <span style="background:#242424; color:white; width:24px; height:24px; border-radius:50%; display:inline-flex; align-items:center; justify-content:center; margin-right:8px; font-size:12px;">2</span> Required Profile Data
+                    </h5>
+                    <div style="font-size:13px; color:#555; line-height:1.7;">
+                        <div style="background:#fff; border:1px solid #eee; padding:12px; border-radius:8px; margin-bottom:12px;">
+                            <b style="color:#333;">Category Maintenance:</b><br>
+                            • Facility Features: <a href="https://sauss.sharepoint.com/sites/THQITDWeb/Lists/RSYCFacilityFeatures/AllItems.aspx?env=WebViewList" target="_blank" style="color:#0078d4; font-weight:600;">View Pick List</a> | <a href="https://forms.office.com/r/DtqymAM3Vu" target="_blank" style="color:#0078d4; font-weight:600;">Submit Missing Feature</a><br>
+                            • Featured Programs: <a href="https://sauss.sharepoint.com/sites/THQITDWeb/Lists/RSYCPrograms/AllItems.aspx?env=WebViewList" target="_blank" style="color:#0078d4; font-weight:600;">View Pick List</a> | <a href="https://forms.office.com/r/9AwuTKQ3fE" target="_blank" style="color:#0078d4; font-weight:600;">Submit Missing Program</a><br>
+                            <span style="font-size:11px; color:#777; font-style:italic;">Use these if your center offers something not in current pick-lists.</span>
+                        </div>
+                        <div style="background:#f0f7ff; border:1px solid #cfe2ff; padding:12px; border-radius:8px;">
+                            <b style="color:#004085;">Mandatory Narrative Fields:</b><br>
+                            • Overall "About This Center" History/Story<br>
+                            • Parent/Guardian Registration Link<br>
+                            • Classy Donation Link (for Youth Ministry)<br>
+                            • Volunteer/Mentor Contact Instructions<br>
+                            • Local Footer Scripture Verse
+                        </div>
+                        <div style="background:#fff; border:1px solid #eee; padding:12px; border-radius:8px; margin-top:12px;">
+                            <b style="color:#333;">Best Practices From Live Profiles:</b><br>
+                            • About: who you serve (ages/grades) + core programs (after-school, camps, tutoring, arts/sports)
+                            • About: outcomes (academic support, character/leadership, life skills, faith/values)
+                            • Schedules: title + optional subtitle, days, time range, timezone, and frequency
+                            • Schedules: include season details (start/end dates or months running) and registration opens
+                            • Schedules: add ages served, fees, transportation notes, and holiday/closure disclaimers when relevant
+                            • Schedules narrative: describe activities, meals/snacks, transportation, and family expectations
+                            • Volunteer: include contact name, email/phone, and required steps (background check, Safe From Harm, orientation)
+                            • Other fields: parent sign-up link and donation link
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:35px; border-top:1px solid #eee; padding-top:28px;">
+                 <div>
+                    <h5 style="font-size:15px; font-weight:700; color:#242424; margin:0 0 15px 0;">🔐 Permissions & User Access</h5>
+                    <div style="font-size:13px; color:#555; line-height:1.6;">
+                        <p style="margin-bottom:12px;">Divisional Communications Directors and Authorized Web Teams can grant edit permissions directly:</p>
+                        <div style="display:flex; flex-direction:column; gap:8px;">
+                            <a href="https://sauss.sharepoint.com/sites/ConnectCommunications/_layouts/15/user.aspx?obj=%7B681BC933-4712-4B2E-893C-8A6136B28795%7D%2C0%2CIcon" target="_blank" style="background:#f8f9fa; border:1px solid #ddd; padding:8px 12px; border-radius:6px; color:#0078d4; text-decoration:none; font-weight:600; font-size:12px;">Grant Permissions to RSYC Manager</a>
+                            <div style="display:flex; gap:10px;">
+                                <a href="https://sauss.sharepoint.com/sites/THQITDWeb/Lists/RSYCPermissions/AllItems.aspx?env=WebViewList" target="_blank" style="color:#0078d4; font-size:11px; text-decoration:underline;">View Center Profile Permissions</a>
+                                <a href="https://sauss.sharepoint.com/sites/THQITDWeb/Lists/RSYCDivisionPermissions/AllItems.aspx?env=WebViewList" target="_blank" style="color:#0078d4; font-size:11px; text-decoration:underline;">View Division Profile Permissions</a>
+                            </div>
+                        </div>
+                        <p style="font-size:11px; color:#888; margin-top:12px;">Need Help? Email <a href="mailto:THQ.Web.SocialMedia@uss.salvationarmy.org" style="color:#0078d4;">Shared THQ Web and Social Media</a></p>
+                    </div>
+                </div>
+                <div>
+                     <h5 style="font-size:14px; font-weight:700; color:#242424; margin:0 0 12px 0;">📋 Program Schedule Example:</h5>
+                     <div style="background:white; border:1px solid #eee; border-radius:8px; overflow:hidden;">
+                        <table style="width:100%; border-collapse:collapse; font-size:11px; line-height:1.1;">
+                            <thead style="background:#f1f1f1; border-bottom:1px solid #ddd;">
+                                <tr>
+                                    <th style="padding:6px; text-align:left;">Program Title</th>
+                                    <th style="padding:6px; text-align:left;">Local Schedule Info</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr style="border-bottom:1px solid #f9f9f9;">
+                                    <td style="padding:6px; font-weight:600;">After-School Program</td>
+                                    <td style="padding:6px; color:#666;">Mon-Fri, 2:00PM - 6:00PM</td>
+                                </tr>
+                                <tr style="border-bottom:1px solid #f9f9f9;">
+                                    <td style="padding:6px; font-weight:600;">Cooking Class</td>
+                                    <td style="padding:6px; color:#666;">Mondays, 5:30PM - 7:00PM</td>
+                                </tr>
+                                <tr style="border-bottom:1px solid #f9f9f9;">
+                                    <td style="padding:6px; font-weight:600;">Music Fundamentals</td>
+                                    <td style="padding:6px; color:#666;">Tue/Thu, 4:00PM - 5:30PM</td>
+                                </tr>
+                                <tr style="border-bottom:1px solid #f9f9f9;">
+                                    <td style="padding:6px; font-weight:600;">Basketball League</td>
+                                    <td style="padding:6px; color:#666;">Tue, 5:00PM - 8:00PM</td>
+                                </tr>
+                                <tr style="border-bottom:1px solid #f9f9f9;">
+                                    <td style="padding:6px; font-weight:600;">Midweek Study + Supper</td>
+                                    <td style="padding:6px; color:#666;">Tuesdays, 5:30PM - 7:30PM</td>
+                                </tr>
+                                <tr style="border-bottom:1px solid #f9f9f9;">
+                                    <td style="padding:6px; font-weight:600;">Karate (All Levels)</td>
+                                    <td style="padding:6px; color:#666;">Tue & Thu, 6:30PM - 7:30PM</td>
+                                </tr>
+                                <tr style="border-bottom:1px solid #f9f9f9;">
+                                    <td style="padding:6px; font-weight:600;">Youth Creative Arts</td>
+                                    <td style="padding:6px; color:#666;">Wednesdays, 5:00PM - 6:30PM</td>
+                                </tr>
+                                <tr style="border-bottom:1px solid #f9f9f9;">
+                                    <td style="padding:6px; font-weight:600;">Senior Gathering</td>
+                                    <td style="padding:6px; color:#666;">Second Fri, 10:00AM - 12:00PM</td>
+                                </tr>
+                                <tr style="border-bottom:1px solid #f9f9f9;">
+                                    <td style="padding:6px; font-weight:600;">Teen Night</td>
+                                    <td style="padding:6px; color:#666;">Fridays, 6:00PM - 9:00PM</td>
+                                </tr>
+                                <tr style="border-bottom:1px solid #f9f9f9;">
+                                    <td style="padding:6px; font-weight:600;">Community Garden</td>
+                                    <td style="padding:6px; color:#666;">Saturdays, 9:00AM - 11:00AM</td>
+                                </tr>
+                                <tr style="border-bottom:1px solid #f9f9f9;">
+                                    <td style="padding:6px; font-weight:600;">SAT/ACT Prep</td>
+                                    <td style="padding:6px; color:#666;">Saturdays, 10:00AM - 1:00PM</td>
+                                </tr>
+                                <tr style="border-bottom:1px solid #f9f9f9;">
+                                    <td style="padding:6px; font-weight:600;">Sunday Morning Class</td>
+                                    <td style="padding:6px; color:#666;">Sundays, 10:00AM</td>
+                                </tr>
+                                <tr style="border-bottom:1px solid #f9f9f9;">
+                                    <td style="padding:6px; font-weight:600;">Sunday Worship Gathering</td>
+                                    <td style="padding:6px; color:#666;">Sundays, 11:00AM</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                     </div>
+                     <div style="font-size:10px; color:#999; margin-top:8px; font-style:italic;">Use consistent formatting to help families browse activities.</div>
+                </div>
+            </div>
+        `;
+        modalInner.appendChild(instructionWrapper);
+
         // Detailed Checklist (The "Outlook" view but live in the modal)
         const detailedChecklistHeader = document.createElement('h5');
         detailedChecklistHeader.style.margin = '24px 0 12px 0';
         detailedChecklistHeader.textContent = 'Territorial Action List (Grouped by Division & Area Command)';
         modalInner.appendChild(detailedChecklistHeader);
-
-        const auditGuide = document.createElement('div');
-        auditGuide.style.cssText = 'background:#fff9f9; border:1px solid #ffecec; border-radius:8px; padding:12px; margin-bottom:15px; font-size:12px; color:#666;';
-        auditGuide.innerHTML = `<strong>Data Requirements Guide:</strong><br>
-            • <b>Program Schedules:</b> List recurring programs (e.g., Afterschool, Youth Night, Dinner, Club 316, Music/Arts, Sunday Worship, Bible Study).<br>
-            • <b>Custom Hours:</b> Centers should have hours entered that differ from the 2PM-7:30PM School year and 7:30 AM-5:30 PM Summer defaults.<br>
-            • <b>Staff/Leaders:</b> Key staff members should be entered with profile photos and bios.`;
-        modalInner.appendChild(auditGuide);
 
         const actionListWrap = document.createElement('div');
         actionListWrap.style.cssText = 'max-height:400px; overflow:auto; border:1px solid #eee; border-radius:12px; padding:20px; background:#fafafa; margin-bottom:24px;';
@@ -1668,34 +1882,14 @@ class RSYCGeneratorV2 {
         tableWrap.appendChild(table);
         modalInner.appendChild(tableWrap);
 
-        // Strategic Messaging Context Section
-        const messagingHeader = document.createElement('h5');
-        messagingHeader.style.margin = '32px 0 16px 0';
-        messagingHeader.style.color = '#d93d3d';
-        messagingHeader.textContent = 'Strategic Messaging & Platform FAQ';
-        modalInner.appendChild(messagingHeader);
-
-        const messagingBody = document.createElement('div');
-        messagingBody.style.cssText = 'display:grid; grid-template-columns:repeat(auto-fit, minmax(300px, 1fr)); gap:20px; font-size:12px; line-height:1.5; color:#444; margin-bottom:20px;';
-        
-        const faqItems = [
-            { q: 'How does this integrate with our local website?', a: 'The new redshieldyouth.org site serves as a territorial hub. Local websites can link directly to specific center profiles. It complements local sites rather than replacing them.' },
-            { q: 'How does the information reflect local work?', a: 'Each profile is designed to highlight local ministry through custom schedules, hours, and staff profiles. The quality of the profile directly reflects the data entered.' },
-            { q: 'Who is the target audience?', a: 'Primarily parents, youth, donors, and community partners. It also provides a unified view for territorial leadership.' },
-            { q: 'Supporting Consistency', a: 'The site provides a shared structure while allowing each center to show its unique local identity and leadership expressions.' }
-        ];
-
-        faqItems.forEach(faq => {
-            const faqCard = document.createElement('div');
-            faqCard.style.cssText = 'background:#f8f9fa; border:1px solid #eee; padding:12px; border-radius:6px;';
-            faqCard.innerHTML = `<div style="font-weight:bold; color:#d93d3d; margin-bottom:6px;">${faq.q}</div><div>${faq.a}</div>`;
-            messagingBody.appendChild(faqCard);
-        });
-        modalInner.appendChild(messagingBody);
-
         const footerNote = document.createElement('div');
-        footerNote.style.cssText = 'margin-top:12px; color:#999; font-size:12px; font-style:italic;';
-        footerNote.textContent = 'Note: Red items in table/cards indicate missing data for OPEN centers. Closed centers are excluded from "Needs Attention" counts but visible in the table.';
+        footerNote.style.cssText = 'margin-top:24px; padding:15px; background:#f8f9fa; border:1px solid #eee; border-radius:8px; color:#666; font-size:12px; font-style:italic; line-height:1.5;';
+        footerNote.innerHTML = `
+            <b>Status Key:</b><br>
+            • Red (✗) items indicate missing data for <b>OPEN</b> centers that require immediate attention.<br>
+            • Light red rows indicate centers currently marked as <b>CLOSED</b> (excluded from "Needs Attention" counts).<br>
+            • Use the <b>Command Center</b> at the top of this modal for direct links to all management portals.
+        `;
         modalInner.appendChild(footerNote);
 
         modal.appendChild(modalInner);
@@ -1707,13 +1901,17 @@ class RSYCGeneratorV2 {
         
         const sectionStyle = "margin-bottom: 60px; font-family: 'Segoe UI', Tahoma, sans-serif;";
         const headerStyle = "background-color: #f4f4f4; padding: 14px; border-left: 6px solid #d93d3d; font-weight: bold; margin-bottom: 25px; font-size: 18px; color: #333; display: block; width: 100%;";
-        const subHeaderStyle = "font-weight: bold; font-size: 16px; color: #d93d3d; border-bottom: 3px solid #eee; padding-bottom: 8px; margin: 15px 0 20px 0; display: block; text-transform: uppercase;";
+        const subHeaderStyle = "font-weight: bold; font-size: 16px; color: #d93d3d; border-bottom: 3px solid #eee; padding-bottom: 8px; margin: 15px 0 20px 0; display: block; text-transform: uppercase; width: 100%;";
         const listStyle = "margin: 0; padding-left: 20px; font-size: 13px; color: #444; line-height: 1.7;";
         const centerNameStyle = "font-weight: bold; font-size: 13px; color: #000; margin-top: 20px; margin-bottom: 12px; display: block;";
         const missingItemStyle = "font-size: 12px; color: #555; font-style: italic; margin-left: 15px; margin-bottom: 8px; display: block;";
         const faqHeaderStyle = "font-weight: bold; color: #d93d3d; font-size: 14px; margin-bottom: 8px; display: block;";
         const faqParaStyle = "font-size: 12px; color: #444; margin-bottom: 25px; line-height: 1.6; display: block;";
         const pStyle = "font-size: 13px; color: #444; margin-bottom: 20px; display: block; line-height: 1.6;";
+        
+        // Email Safe Section Styling
+        const divisionContainerStyle = "background-color: #fafafa; border: 1px solid #eee; border-radius: 8px; padding: 20px; margin-bottom: 40px; display: block;";
+        const acContainerStyle = "background-color: #ffffff; border-left: 4px solid #ddd; padding: 10px 15px; margin: 20px 0 20px 10px; display: block;";
         
         // Group centers by division and area command
         const grouped = {};
@@ -1725,35 +1923,52 @@ class RSYCGeneratorV2 {
             if (!grouped[div][ac]) grouped[div][ac] = [];
             
             const missing = [];
-            if (!r.hasAbout) missing.push("Missing 'About This Center' statement");
-            if (!r.hasStaff) missing.push("No Contact/Staff Info in schedules");
-            if (r.leaderCount === 0) missing.push("No Leaders listed");
-            if (r.schedCount === 0) missing.push("No Program Schedules");
-            if (r.photoCount === 0) missing.push("No Photos uploaded (Missing mandatory Exterior Photo)");
-            if (!r.hasFooterPhoto) missing.push("Missing Footer Photo");
-            if (!r.hasFooterScripture) missing.push("Missing Footer Scripture");
-            if (!r.hasSignUpUrl) missing.push("Missing Online Registration/Parent Sign-up URL");
-            if (!r.hasDonationUrl) missing.push("Missing Donation URL");
-            if (!r.hasVolunteer) missing.push("Missing Volunteer/Mentor signup info");
-            if (!r.hasHours) missing.push("Missing Custom Hours");
-            if (!r.hasExplainerVideo) missing.push("Missing Explainer/About Video");
+            // Priority 1: Hours
+            if (!r.hasHours) missing.push("Missing Custom Hours (Check Year-Round vs Summer)");
+            
+            // Priority 2: Staff & Community Leaders
+            if (!r.hasStaff && r.leaderCount === 0) missing.push("Missing Staff & Community Leaders (Photos/Bios)");
+            
+            // Priority 3: Schedules
+            if (r.schedCount === 0) missing.push("Missing Program Schedules (Recurring Weekly)");
+            
+            // Priority 4: Engagement Links
+            if (!r.hasDonationUrl || !r.hasSignUpUrl || !r.hasVolunteer) {
+                missing.push("Missing Engagement Links (Classy Studio, Parent Portal, or Volunteer/Recruitment)");
+            }
 
-            if (missing.length > 0) {
-                grouped[div][ac].push({ name: r.name, liveUrl: r.liveUrl, missing });
+            // Priority 5: Profile Context
+            if (!r.hasAbout) missing.push("Missing 'About This Center' (Local Narrative)");
+            if (!r.hasExplainerVideo) missing.push("Missing Explainer Video (Using Territorial Placeholder)");
+            if (r.photoCount === 0) missing.push("Missing Mandatory Site Photos (Exterior/Facility)");
+            
+            // Priority 6: Footer Integrity
+            if (!r.hasFooterPhoto) missing.push("Missing Local Footer Photo (Building/Staff/Community)");
+            if (!r.hasFooterScripture) missing.push("Missing Regional Scripture Reference");
+
+            if (missing.length > 0 || r.isClosed) {
+                grouped[div][ac].push({ 
+                    name: r.name, 
+                    liveUrl: r.liveUrl, 
+                    missing: r.isClosed ? [] : missing, 
+                    isClosed: r.isClosed 
+                });
             }
         });
 
         const sortedDivs = Object.keys(grouped).sort();
         
         let missingContent = '';
+
         sortedDivs.forEach(div => {
             const areaCommands = grouped[div];
             const areaCommandKeys = Object.keys(areaCommands).sort();
             
             let divHasData = false;
-            let divContent = `<div style="margin-bottom: 80px; padding-top: 20px; border-top: 1px dashed #ccc;">
-                                <hr style="border: none; border-top: 1px solid #ddd; margin: 30px 0 15px 0; display: block;">
-                                <div style="${subHeaderStyle}">${div}</div>`;
+            let divContent = `<!-- Bold Divider Above Each Division -->
+                                <hr style="border: none; border-top: 3px solid #d93d3d; margin: 40px 0 20px 0; display: block;">
+                                <div style="${divisionContainerStyle}">
+                                <div style="${subHeaderStyle}">📂 DIVISION: ${div}</div>`;
             
             areaCommandKeys.forEach(ac => {
                 const centers = areaCommands[ac];
@@ -1761,19 +1976,33 @@ class RSYCGeneratorV2 {
                 divHasData = true;
                 
                 if (ac !== 'GENERAL') {
-                    divContent += `<div style="font-size: 12px; font-weight: bold; color: #888; margin: 35px 0 15px 15px; text-decoration: underline; text-transform: uppercase; letter-spacing: 1px;">${ac}</div>`;
+                    divContent += `<hr style="border: none; border-top: 1px dashed #ccc; margin: 35px 0 10px 10px; display: block; width: 100%;">
+                                   <div style="${acContainerStyle}">
+                                    <div style="font-size: 13px; font-weight: bold; color: #666; margin-bottom: 10px; text-transform: uppercase;">📁 AREA COMMAND: ${ac}</div>`;
+                } else {
+                    divContent += `<div style="margin-top: 15px; display: block;">`;
                 }
                 
-                centers.forEach(c => {
-                    divContent += `<hr style="border: none; border-top: 1px solid #f0f0f0; margin: 40px 0 10px 0; display: block;">`;
-                    divContent += `<div style="${centerNameStyle}; margin-left: ${ac === 'GENERAL' ? '15px' : '30px'};">📍 ${c.name} <a href="${c.liveUrl}" target="_blank" style="text-decoration:none; margin-left:5px;">🔗</a></div>`;
-                    c.missing.forEach(m => {
-                        divContent += `<div style="${missingItemStyle}; margin-left: ${ac === 'GENERAL' ? '30px' : '45px'};">• ${m}</div>`;
-                    });
+                centers.forEach((c, idx) => {
+                    // HR above EACH center
+                    divContent += `<hr style="border: none; border-top: 1px solid #eee; margin: 30px 0 20px 0; display: block;">`;
+                    
+                    const closedMark = c.isClosed ? `<span style="color:#dc3545; font-size:10px; font-weight:bold;">[CLOSED]</span> ` : '';
+                    divContent += `<div style="${centerNameStyle}">📍 ${closedMark}${c.name} <a href="${c.liveUrl}" target="_blank" style="text-decoration:none; margin-left:5px;">🔗</a></div>`;
+                    
+                    if (c.isClosed) {
+                        divContent += `<div style="${missingItemStyle};">• This center is currently flagged as CLOSED and excluded from active audit requirements.</div>`;
+                    } else {
+                        c.missing.forEach(m => {
+                            divContent += `<div style="${missingItemStyle};">• ${m}</div>`;
+                        });
+                    }
                 });
+
+                divContent += `</div>`; // Close AC container or spacing div
             });
             
-            divContent += `</div>`; // Close division block
+            divContent += `</div>`; // Close division container
             if (divHasData) missingContent += divContent;
         });
 
@@ -1781,36 +2010,91 @@ class RSYCGeneratorV2 {
 
         return `
             <div style="font-family: 'Segoe UI', Tahoma, sans-serif; color: #333; max-width: 700px; line-height: 1.5;">
-                <h2 style="color: #d93d3d; margin-bottom: 30px; display: block;">RSYC Data Integrity Report</h2>
+                <h2 style="color: #d93d3d; margin-bottom: 30px; display: block;">RSYC Profile Audit</h2>
                 <p style="font-size: 14px; margin-top: 0; color: #666; margin-bottom: 25px; display: block;">Generated on ${new Date().toLocaleDateString()} • Analyzing ${centersCount} total centers (${closedCount} flagged as CLOSED)</p>
                 
                 <div style="background-color: #f0f7ff; border-left: 6px solid #007bff; padding: 20px; margin: 35px 0; border-radius: 4px; display: block;">
                     <p style="margin: 0; font-size: 14px; line-height: 1.6; color: #2c3e50; display: block; margin-bottom: 10px;">
-                        <strong>Our Goal:</strong> We are currently auditing the Red Shield Youth Center territory-wide to ensure every location is accurately represented and fully ready for public promotion. This focus on data integrity ensures that when families, donors, and community partners visit <strong>redshieldyouth.org</strong>, they encounter a professional, complete, and locally relevant view of our ministry. By addressing the specific data points identified in this report, we can collectively strengthen our regional presence and ensure every center has the "digital front door" it deserves.
+                        <strong>Our Goal:</strong> We are currently auditing the Red Shield Youth Center territory-wide to ensure every location is accurately represented and fully ready for public promotion. This focus on profile readiness ensures that when families, donors, and community partners visit <strong>redshieldyouth.org</strong>, they encounter a professional, complete, and locally relevant view of our ministry. By addressing the specific data points identified in this report, we can collectively strengthen our regional presence and ensure every center has the "digital front door" it deserves.
                     </p>
+                </div>
+
+                <!-- Educational Guidance Section for Outlook -->
+                <div style="background-color: #fafafa; border: 1px solid #e0e0e0; border-radius: 8px; padding: 25px; margin-bottom: 35px; font-family: 'Segoe UI', Tahoma, sans-serif;">
+                    <h3 style="font-size: 18px; font-weight: 600; color: #242424; margin: 0 0 10px 0;">RSYC Center Profile Instructions</h3>
+                    <p style="font-size: 14px; color: #333; line-height: 1.5; margin: 0 0 15px 0;">
+                        Changes to your center profile are managed through the SharePoint Profile Manager. Changes are saved when you click out of a field, and sync to the live site within minutes.
+                    </p>
+                    <div style="margin-bottom: 20px;">
+                        <a href="https://sauss.sharepoint.com/sites/ConnectCommunications/SitePages/Manage-Youth-Center-Web-Profile.aspx#center-profile-manager" style="font-size: 13px; color: #0078d4; margin-right: 15px;">Learn more</a>
+                        <a href="https://southernusa.salvationarmy.org/redshieldyouth/center-locations" style="font-size: 13px; color: #0078d4;">View Your Profile</a>
+                    </div>
+                    
+                    <div style="font-size: 13px; color: #444; background-color: #fff8e1; border-left: 4px solid #f2c200; padding: 12px; margin-bottom: 25px; line-height: 1.5;">
+                        💬 <b>REQUIRED ACTION FOR PHOTOS:</b> For changes to photos, please @mention our team in the SharePoint comments: <i>"@Shared THQ Web and Social Media, We have added new center photos, staff photos, hero slides, stories, events, info pages that are ready to publish."</i>
+                    </div>
+
+                    <table cellpadding="0" cellspacing="0" border="0" width="100%">
+                        <tr>
+                            <td width="55%" valign="top" style="padding-right: 15px;">
+                                <h4 style="font-size: 15px; color: #242424; border-bottom: 1px solid #ddd; padding-bottom: 5px; margin-bottom: 15px;">🚀 Completion Order</h4>
+                                <div style="font-size: 12px; line-height: 2;">
+                                    • <b>Hours:</b> <a href="https://hoursreview-rsyc.usscommunications.org/" style="color: #0078d4;">Review/Edit</a><br>
+                                    • <b>Photos:</b> <a href="https://photos1review-rsyc.usscommunications.org/" style="color: #0078d4;">Manage Photos</a><br>
+                                    • <b>Schedules:</b> <a href="https://submitschedules-rsyc.usscommunications.org/" style="color: #0078d4;">Add New</a> | <a href="https://schedulesreview-rsyc.usscommunications.org/" style="color: #0078d4;">Edit Existing</a><br>
+                                    • <b>Staff & Leaders:</b> <a href="https://submitstaff-rsyc.usscommunications.org/" style="color: #0078d4;">Add New</a> | <a href="https://staffreview-rsyc.usscommunications.org/" style="color: #0078d4;">Edit Existing</a><br>
+                                    • <b>Hero Slides:</b> <a href="https://submitslides-rsyc.usscommunications.org/" style="color: #0078d4;">Add New</a> | <a href="https://slidesreview-rsyc.usscommunications.org/" style="color: #0078d4;">Edit Existing</a><br>
+                                    • <b>Stories:</b> <a href="https://submitstories-rsyc.usscommunications.org/" style="color: #0078d4;">Add New</a> | <a href="https://storiesreview-rsyc.usscommunications.org/" style="color: #0078d4;">Edit Existing</a><br>
+                                    • <b>Events:</b> <a href="https://submitevents-rsyc.usscommunications.org/" style="color: #0078d4;">Add New</a> | <a href="https://eventsreview-rsyc.usscommunications.org/" style="color: #0078d4;">Edit Existing</a><br>
+                                    • <b>Info Pages:</b> <a href="https://submitinfopage-rsyc.usscommunications.org/" style="color: #0078d4;">Add New</a> | <a href="https://infopagereview-rsyc.usscommunications.org/" style="color: #0078d4;">Edit Existing</a>
+                                </div>
+                            </td>
+                            <td width="45%" valign="top">
+                                <h4 style="font-size: 15px; color: #242424; border-bottom: 1px solid #ddd; padding-bottom: 5px; margin-bottom: 15px;">💡 Best Practices</h4>
+                                <div style="font-size: 12px; line-height: 1.6; color: #555;">
+                                    <b>Schedules:</b> List recurring programs separately (ACT Prep, Karate, Afterschool).<br>
+                                    <b>Season:</b> Add start/end dates or months running plus registration opens.<br>
+                                    <b>Details:</b> Add ages served, fees, transportation notes, and holiday/closure disclaimers when relevant.<br>
+                                    <b>Narrative:</b> Include activities, meals/snacks, transportation, and expectations (orientation, required forms).
+                                </div>
+                            </td>
+                        </tr>
+                    </table>
                 </div>
 
                 <hr style="border: none; border-top: 1px solid #eee; margin: 40px 0; display: block;">
 
                 <div style="${sectionStyle}">
-                    <div style="${headerStyle}">🛠️ MISSING DATA BY DIVISION (OPEN CENTERS ONLY)</div>
+                    <div style="${headerStyle}">🛠️ TERRITORIAL PROFILE AUDIT BY DIVISION</div>
                     <hr style="border: none; border-top: 1px solid #ddd; margin: 10px 0 25px 0; display: block;">
+                    
                     <div style="font-size: 12px; color: #666; background: #fff9f9; padding: 15px; border: 1px solid #ffecec; margin-bottom: 35px; border-radius: 6px; display: block; line-height: 1.6;">
                         <strong>Field Requirements Guide:</strong><br>
-                        <div style="margin-top: 10px; margin-bottom: 10px; display: block;">• <strong>Program Schedules:</strong> List recurring programs (e.g., Afterschool, Youth Night, Dinner, Club 316, Music/Arts, Sunday Worship).</div>
-                        <div style="margin-bottom: 10px; display: block;">• <strong>Custom Hours:</strong> Centers should have hours entered that differ from the 2PM-7:30PM School year and 7:30 AM-5:30 PM Summer defaults.</div>
-                        <div style="display: block;">• <strong>Leaders:</strong> Include key staff profiles with photos and bios.</div>
+                        <div style="margin-top: 10px; margin-bottom: 10px; display: block;">• <strong>Custom Hours:</strong> Centers should have hours entered that differ from the 2:00 PM-7:30 PM School year and 7:30 AM-5:30 PM Summer defaults.</div>
+                        <div style="margin-bottom: 10px; display: block;">• <strong>Staff and Community Leaders:</strong> Include most staff profiles with photos and bios.</div>
+                        <div style="margin-bottom: 10px; display: block;">• <strong>Program Schedules:</strong> List recurring programs (e.g., Afterschool, Youth Night, Dinner, Club 316, Music/Arts, Sunday Worship).</div>
+                        <div style="margin-bottom: 10px; display: block;">• <strong>Engagement Links (CRITICAL):</strong> Every profile must include a direct **Online Registration/Parent Sign-up Link**, a **Classy Studio Donation Form Link**, and **Volunteer Sign Up Information**.</div>
+                        <div style="margin-bottom: 10px; display: block;">• <strong>Explainer/About Video:</strong> A territorial promotional video is provided as the default until a local video is uploaded.</div>
+                        <div style="display: block;">• <strong>Footer Content:</strong> Local footer photos and scripture provide a unique city-specific touch and can be updated as often as desired to keep the site fresh.</div>
+                        <div style="margin-top: 12px; display: block;"><strong>Best Practices From Live Profiles:</strong></div>
+                        <div style="margin-top: 6px; display: block;">• <strong>About This Center:</strong> lead with who you serve (ages/grades) and core programs (after-school, camps, tutoring, arts/sports), then outcomes (academic support, character/leadership, life skills, faith/values).</div>
+                        <div style="margin-top: 6px; display: block;">• <strong>Program Schedules:</strong> list each program separately with title/subtitle, days, time range, timezone, and frequency.</div>
+                        <div style="margin-top: 6px; display: block;">• <strong>Season & Registration:</strong> include start/end dates or months running plus when registration typically opens.</div>
+                        <div style="margin-top: 6px; display: block;">• <strong>Details That Help Families:</strong> ages served, fees, transportation notes, and holiday/closure disclaimers when applicable.</div>
+                        <div style="margin-top: 6px; display: block;">• <strong>Schedule Narrative:</strong> include activities offered, meals/snacks, transportation, and any expectations (orientation, required forms).</div>
+                        <div style="margin-top: 6px; display: block;">• <strong>Volunteer/Mentor:</strong> include a named contact with email/phone plus steps (interest form, background check, Safe From Harm, orientation).</div>
                     </div>
+
                     ${missingContent}
                 </div>
 
                 <div style="${sectionStyle}">
-                    <div style="${headerStyle}">📅 RECENTLY CREATED (LAST 90 DAYS)</div>
                     <hr style="border: none; border-top: 1px solid #ddd; margin: 10px 0 25px 0; display: block;">
+                    <div style="${headerStyle}">📅 RECENTLY CREATED FILTER OPTIONS (LAST 90 DAYS)</div>
                     <div style="margin-left: 10px; display: block;">
-                        <p style="margin: 0 0 15px 0; font-weight: bold; font-size: 13px; display: block;">New Facilities:</p>
+                        <p style="margin: 0 0 15px 0; font-weight: bold; font-size: 13px; display: block;">New Facility Features:</p>
                         ${recentFacs.length ? `<ul style="${listStyle}; margin-bottom: 25px;">${recentFacs.map(f => `<li>${f.name}</li>`).join('')}</ul>` : '<p style="font-size:12px; color: #999; margin-left:20px; margin-bottom: 25px; display: block;">None</p>'}
-                        <p style="margin: 0 0 15px 0; font-weight: bold; font-size: 13px; display: block;">New Programs:</p>
+                        <p style="margin: 0 0 15px 0; font-weight: bold; font-size: 13px; display: block;">New Featured Programs:</p>
                         ${recentProgs.length ? `<ul style="${listStyle}; margin-bottom: 25px;">${recentProgs.map(p => `<li>${p.name}</li>`).join('')}</ul>` : '<p style="font-size:12px; color: #999; margin-left:20px; margin-bottom: 25px; display: block;">None</p>'}
                         <p style="font-size: 12px; color: #d93d3d; font-style: italic; margin-top: 25px; border-top: 1px solid #eee; padding-top: 20px; display: block; line-height: 1.6;">
                             <strong>Note:</strong> It is critical to associate centers with as many applicable facility features and featured programs as possible to ensure they show on center location filters.
@@ -1819,46 +2103,76 @@ class RSYCGeneratorV2 {
                 </div>
 
                 <div style="${sectionStyle}">
-                    <div style="${headerStyle}">💡 STRATEGIC MESSAGING & CONTEXT</div>
+                    <div style="${headerStyle}">💡 MASTER INSTRUCTIONS & FIELD SUPPORT</div>
                     <hr style="border: none; border-top: 1px solid #ddd; margin: 10px 0 25px 0; display: block;">
                     <div style="margin-left: 10px; display: block;">
-                        <span style="${faqHeaderStyle}">How does this integrate with our local website?</span>
+                        <span style="${faqHeaderStyle}">How to complete your profile?</span>
                         <p style="${faqParaStyle}">
-                            The new site, <b>www.redshieldyouth.org</b>, serves as the territorial hub for all Red Shield Youth Centers. Each center has its own profile page, and Area Command–level pages are also being developed within the site.<br><br>
-                            Your Area Command, Division, and individual location websites can link directly to individual center profile pages (Launched) and Area Command pages (coming soon). Your existing Symphony/Zesty site can continue to host a dedicated RSYC ministry page if you prefer, or you may choose to link/redirect a menu item to your Area Command page on redshieldyouth.org once it is live.
+                            Go to <a href="https://centerprofile.redshieldyouth.org">centerprofile.redshieldyouth.org</a> to edit your center's About, Contact, and mandatory links. Use the @mention feature <b>@Shared THQ Web and Social Media</b> in the sidebar comments to notify the team when your updates are ready to publish.
                         </p>
 
-                        <span style="${faqHeaderStyle}">How does the information reflect local work?</span>
-                        <p style="${faqParaStyle}">
-                            Each center profile is designed to highlight your local ministry through program schedules, custom operating hours, staff profiles, and localized photos. The accuracy and strength of each profile directly reflect the information entered—it’s a platform to elevate what is uniquely happening in your city.
-                        </p>
+                        <span style="${faqHeaderStyle}">Priority Completion Order</span>
+                        <div style="font-size: 13px; line-height: 1.6; color: #444; margin-bottom: 25px;">
+                            <strong>1.</strong> Manage <a href="https://hoursreview-rsyc.usscommunications.org/">Operating Hours</a><br>
+                            <strong>2.</strong> Review <a href="https://photos1review-rsyc.usscommunications.org/">Center Exterior Photos</a><br>
+                            <strong>3.</strong> Program Schedules: <a href="https://submitschedules-rsyc.usscommunications.org/">Add New</a> | <a href="https://schedulesreview-rsyc.usscommunications.org/">Edit Existing</a><br>
+                            <strong>4.</strong> Staff & Leaders: <a href="https://submitstaff-rsyc.usscommunications.org/">Add New</a> | <a href="https://staffreview-rsyc.usscommunications.org/">Edit Existing</a><br>
+                            <strong>5.</strong> Hero/Theatre Slides: <a href="https://submitslides-rsyc.usscommunications.org/">Add New</a> | <a href="https://slidesreview-rsyc.usscommunications.org/">Edit Existing</a><br>
+                            <strong>6.</strong> Stories: <a href="https://submitstories-rsyc.usscommunications.org/">Add New</a> | <a href="https://storiesreview-rsyc.usscommunications.org/">Edit Existing</a><br>
+                            <strong>7.</strong> Events: <a href="https://submitevents-rsyc.usscommunications.org/">Add New</a> | <a href="https://eventsreview-rsyc.usscommunications.org/">Edit Existing</a><br>
+                            <strong>8.</strong> Info Pages: <a href="https://submitinfopage-rsyc.usscommunications.org/">Add New</a> | <a href="https://infopagereview-rsyc.usscommunications.org/">Edit Existing</a>
+                        </div>
 
-                        <span style="${faqHeaderStyle}">Who is the target audience?</span>
-                        <p style="${faqParaStyle}">
-                            The content is designed primarily for parents/guardians, youth, donors, volunteers, and community partners. Secondarily, it gives leadership a clear, unified view of RSYC ministry across regions.
-                        </p>
-
-                        <span style="${faqHeaderStyle}">Is this an additional website?</span>
-                        <p style="${faqParaStyle}">
-                            Yes—redshieldyouth.org is a dedicated RSYC hub that <b>complements</b> your local Salvation Army websites rather than competing with them.
+                         <span style="${faqHeaderStyle}">Pick-List Maintenance</span>
+                         <p style="${faqParaStyle}">
+                            Associate centers with as many applicable facility features and featured programs as possible to ensure they show on filters. If a feature or program is missing, submit it here:<br>
+                            • <a href="https://sauss.sharepoint.com/sites/THQITDWeb/Lists/RSYCFacilityFeatures/AllItems.aspx?env=WebViewList">View Facility Features Pick List</a> | <a href="https://forms.office.com/r/DtqymAM3Vu">Submit Missing Feature</a><br>
+                            • <a href="https://sauss.sharepoint.com/sites/THQITDWeb/Lists/RSYCPrograms/AllItems.aspx?env=WebViewList">View Featured Programs Pick List</a> | <a href="https://forms.office.com/r/9AwuTKQ3fE">Submit Missing Program</a>
                         </p>
                     </div>
                 </div>
 
                 <div style="${sectionStyle}">
-                    <div style="${headerStyle}">🚀 CENTER PROFILE OPPORTUNITIES</div>
+                    <div style="${headerStyle}">📑 PROGRAM SCHEDULE EXAMPLE</div>
+                    <hr style="border: none; border-top: 1px solid #ddd; margin: 10px 0 25px 0; display: block;">
+                    <div style="margin-left: 10px; display: block;">
+                        <p style="font-size: 13px; color: #444; line-height: 1.6; margin-bottom: 15px;">
+                            Example of formatted program schedule data to ensure consistency for parents and families:
+                        </p>
+                        <table style="width: 100%; border-collapse: collapse; font-family: Segoe UI, sans-serif; font-size: 12px; margin-bottom: 25px;">
+                            <thead style="background: #f1f1f1;">
+                                <tr>
+                                    <th style="padding: 10px; text-align: left; border: 1px solid #ddd;">Program</th>
+                                    <th style="padding: 10px; text-align: left; border: 1px solid #ddd;">Schedule Detail</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr><td style="padding: 10px; border: 1px solid #ddd; font-weight: 600;">After-School Program</td><td style="padding: 10px; border: 1px solid #ddd;">Mon-Fri, 2:30PM - 6:00PM</td></tr>
+                                <tr><td style="padding: 10px; border: 1px solid #ddd; font-weight: 600;">Karate (All Levels)</td><td style="padding: 10px; border: 1px solid #ddd;">Tue & Thu, 6:30PM - 7:30PM</td></tr>
+                                <tr><td style="padding: 10px; border: 1px solid #ddd; font-weight: 600;">Youth Creative Arts</td><td style="padding: 10px; border: 1px solid #ddd;">Wednesdays, 5:00PM - 6:30PM</td></tr>
+                                <tr><td style="padding: 10px; border: 1px solid #ddd; font-weight: 600;">Adult Pickleball</td><td style="padding: 10px; border: 1px solid #ddd;">Mon & Wed, 9:00AM - 12:00PM</td></tr>
+                                <tr><td style="padding: 10px; border: 1px solid #ddd; font-weight: 600;">SAT/ACT Prep</td><td style="padding: 10px; border: 1px solid #ddd;">Saturdays, 10:00AM - 1:00PM</td></tr>
+                                <tr><td style="padding: 10px; border: 1px solid #ddd; font-weight: 600;">Teen Night</td><td style="padding: 10px; border: 1px solid #ddd;">Fridays, 6:00PM - 9:00PM</td></tr>
+                                <tr><td style="padding: 10px; border: 1px solid #ddd; font-weight: 600;">Music Fundamentals</td><td style="padding: 10px; border: 1px solid #ddd;">Tue/Thu, 4:00PM - 5:30PM</td></tr>
+                                <tr><td style="padding: 10px; border: 1px solid #ddd; font-weight: 600;">Cooking Class</td><td style="padding: 10px; border: 1px solid #ddd;">Mondays, 5:30PM - 7:00PM</td></tr>
+                                <tr><td style="padding: 10px; border: 1px solid #ddd; font-weight: 600;">Basketball League</td><td style="padding: 10px; border: 1px solid #ddd;">Tue, 5:00PM - 8:00PM</td></tr>
+                                <tr><td style="padding: 10px; border: 1px solid #ddd; font-weight: 600;">Community Garden</td><td style="padding: 10px; border: 1px solid #ddd;">Saturdays, 9:00AM - 11:00AM</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div style="${sectionStyle}">
+                    <div style="${headerStyle}">🚀 LAUNCH READINESS & ACCESS</div>
                     <hr style="border: none; border-top: 1px solid #ddd; margin: 10px 0 25px 0; display: block;">
                     <div style="margin-left: 10px; font-size: 12px; color: #444; line-height: 1.6; display: block;">
-                        <p style="margin-bottom: 20px; display: block;">As we prepare the Area Command presence, ensuring each location is fully represented is key. Shared opportunities include:</p>
-                        <ul style="${listStyle}; margin-bottom: 25px;">
-                            <li style="margin-bottom: 8px;">Adding program schedules and staff contact info within schedules</li>
-                            <li style="margin-bottom: 8px;">Entering key staff or leader profiles</li>
-                            <li style="margin-bottom: 8px;">Uploading required photos (Exterior and Footer)</li>
-                            <li style="margin-bottom: 8px;">Providing parent sign-up and online registration links</li>
-                            <li style="margin-bottom: 8px;">Adding donation and volunteer/mentor sign-up links</li>
-                            <li style="margin-bottom: 8px;">Setting custom hours that differ from territorial defaults</li>
-                        </ul>
-                        <p style="margin-top: 25px; font-weight: bold; color: #d93d3d; display: block;">Thanks for your help with this endeavor!</p>
+                        <p style="margin-bottom: 15px;">
+                            For technical support or to request permissions for local staff, please contact the Territorial Web Team. Authorized divisional leadership can grant access directly using the <b>Permissions Site</b> links in the Master Resources guide.
+                        </p>
+                        <div style="background: #f9f9f9; padding: 15px; border-radius: 6px; border: 1px solid #eee;">
+                            <strong>Strategic Context:</strong> This hub complements local websites by providing a unified, territory-wide view of our youth ministry. Your local sites should link to your center profile on <b>redshieldyouth.org</b> to ensure families have the most current program and schedule information.
+                        </div>
+                        <p style="margin-top: 25px; font-weight: bold; color: #d93d3d; display: block;">Thanks for your partnership in making this launch a success!</p>
                     </div>
                 </div>
 
@@ -1877,7 +2191,7 @@ class RSYCGeneratorV2 {
             { key: 'hours', name: 'Hours of Operation' },
             { key: 'facilities', name: 'Facility Features' },
             { key: 'programs', name: 'Featured Programs' },
-            { key: 'staff', name: 'Staff & Leadership' },
+            { key: 'staff', name: 'Staff & Community Leaders' },
             { key: 'nearby', name: 'Nearby Centers' },
             { key: 'parents', name: 'For Parents' },
             { key: 'youth', name: 'For Youth' },
@@ -2289,7 +2603,7 @@ ${JSON.stringify(this.currentCenter, null, 2)}
         output.push('');
         
         // Leaders
-        output.push(`--- STAFF & LEADERS (data.leaders) - ${(centerData.leaders || []).length} items ---`);
+        output.push(`--- STAFF & COMMUNITY LEADERS (data.leaders) - ${(centerData.leaders || []).length} items ---`);
         if (centerData.leaders && centerData.leaders.length > 0) {
             output.push(JSON.stringify(centerData.leaders, null, 2));
         } else {

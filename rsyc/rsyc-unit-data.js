@@ -41,11 +41,14 @@ class RSYCUnitDataLoader {
                 return {};
             }
 
-            // Enrich centers with photos before building hierarchy so all unit types (division, all, etc) have images
+            // Enrich centers with photos and leaders before building hierarchy
+            // so all unit types (division, all, etc) have images and staff
             const photos = this.dataLoader.cache.photos || [];
+            const leaders = this.dataLoader.cache.leaders || [];
             const centers = this.dataLoader.cache.centers.map(center => ({
                 ...center,
-                photos: photos.filter(p => p.centerId === center.sharePointId)
+                photos: photos.filter(p => p.centerId === center.sharePointId),
+                leaders: leaders.filter(l => l.centerIds && l.centerIds.includes(center.sharePointId))
             }));
             
             // Index centers by organizational attributes

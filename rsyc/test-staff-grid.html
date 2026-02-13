@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Staff Grid Test - Local Test</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-icons/1.10.0/font/bootstrap-icons.min.css">
+    <link rel="stylesheet" href="rsyc-generator-v2.css">
+    <style>
+        body { padding: 20px; background-color: black;}
+        .test-container { max-width: 1400px; margin: 0 auto; }
+        .test-info { background: #f0f7f7; padding: 15px; border-radius: 8px; margin-bottom: 20px; }
+        .test-info h6 { color: #20B3A8; margin-bottom: 10px; }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <div class="test-info">
+            <h6><i class="bi bi-info-circle"></i> Staff & Community Leaders Grid Test</h6>
+            <p class="mb-0 small">Testing the new aggregated staff and community leaders display with center information and bios</p>
+        </div>
+
+           <!-- Staff & Community Leaders Grid Only -->
+           <div id="unit-page" data-rsyc-unit-type="all" data-rsyc-unit-value="all" data-rsyc-unit-section="staff"
+               data-rsyc-staff-filters="false" data-rsyc-staff-bg="false" data-rsyc-staff-padding="compact"></div>
+    </div>
+
+    <!-- Only load the injector - it will load all dependencies -->
+    <script src="rsyc-unit-injector.js"></script>
+
+    <!-- Debug helper (optional - remove in production) -->
+    <script src="rsyc-unit-debug.js"></script>
+
+    <script>
+        // Show status when page loads
+        window.addEventListener('load', () => {
+            console.log('\n%c✨ Staff Grid Test Loaded ✨', 'font-size: 16px; color: #20B3A8; font-weight: bold;');
+            console.log('Expected Features:');
+            console.log('  • Centers grid at top');
+            console.log('  • Staff & Leaders aggregated grid below');
+            console.log('  • Staff cards with: Photo, Name, Title, Center, City, State, Bio');
+            console.log('  • Filters for State, City, Position Type');
+            console.log('  • Filterable by center location and role');
+            setTimeout(() => {
+                if (document.querySelectorAll('.staff-card').length > 0) {
+                    console.log('✓ Staff cards rendered successfully!');
+                    console.log('✓ Staff grid count:', document.querySelectorAll('.staff-card').length);
+                }
+            }, 2000);
+        });
+    </script>
+</body>
+</html>

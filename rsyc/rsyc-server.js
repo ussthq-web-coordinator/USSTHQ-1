@@ -779,7 +779,13 @@ function generateFacilities(data) {
     const { center, photos } = data;
     const facilityImage = photos && photos.length > 1 && photos[1].exterior ? photos[1].exterior : 'https://via.placeholder.com/600x600';
     
-    const features = center.facilities || [];
+    // Sort facilities alphabetically
+    const features = [...(center.facilities || [])].sort((a, b) => {
+        const nameA = a.name || a;
+        const nameB = b.name || b;
+        return nameA.localeCompare(nameB);
+    });
+    
     const featureList = features.slice(0, 10).map(f => `
         <div class="d-flex align-items-center mb-3" style="flex:1 1 45%;">
             <i class="bi bi-check-circle feature-icon me-2" style="color:#1a4d7f; font-size:1.3rem;"></i> ${escapeHTML(f.name || f)}
@@ -819,7 +825,13 @@ function generatePrograms(data) {
     const { center, photos } = data;
     const programImage = photos && photos.length > 2 && photos[2].exterior ? photos[2].exterior : 'https://via.placeholder.com/600x600';
     
-    const programs = center.programs || [];
+    // Sort programs alphabetically
+    const programs = [...(center.programs || [])].sort((a, b) => {
+        const nameA = a.name || a;
+        const nameB = b.name || b;
+        return nameA.localeCompare(nameB);
+    });
+    
     const programList = programs.slice(0, 8).map(p => `
         <div class="d-flex align-items-center" style="flex: 1 1 45%;">
             <i class="bi bi-star feature-icon" style="color:#f57c00; font-size:1.3rem; margin-right:0.5rem;"></i> ${escapeHTML(p.name || p)}

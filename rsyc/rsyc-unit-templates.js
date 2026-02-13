@@ -380,12 +380,477 @@ class RSYCUnitTemplates {
             </div>
         </div>`;
 
-        return `${filterHTML}
+        const centersGridHTML = `
 <!-- All Centers Grid -->
 <div class="section" style="background-color: white; padding: 40px 20px 60px 20px; min-height: 500px;">
     <div style="max-width: 1200px; margin: 0 auto;">
+        <h2 class="fw-bold mb-4" style="margin-top: 0;">Our Centers</h2>
         <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 24px;" id="centers-grid">
             ${centerCards}
+        </div>
+    </div>
+</div>`;
+
+        return filterHTML + centersGridHTML;
+    }
+
+    /**
+     * Generate ONLY the staff grid (without centers grid)
+     */
+    generateStaffGridOnly(unit, options = {}) {
+        // Options: { filters: true|false, bg: true|false, padding: 'default'|'compact'|'none' }
+        return this.generateAllStaffGrid(unit, options);
+    }
+
+    /**
+     * Generate staff and community leaders grid for all centers
+     */
+    generateAllStaffGrid(unit, options = {}) {
+        if (!unit.centers || unit.centers.length === 0) {
+            return '<div class="container py-5"><p class="text-center text-muted">No centers found</p></div>';
+        }
+
+        console.log('[RSYCUnitTemplates] Generating staff grid for', unit.centers.length, 'centers');
+        console.log('[RSYCUnitTemplates] Sample center leaders:', unit.centers[0] ? unit.centers[0].leaders : 'N/A');
+
+        // Aggregate all staff from all centers
+        const allStaff = [];
+        const staffMap = new Map(); // To avoid duplicates by ID
+        
+        const activeCenters = unit.centers.filter(center => {
+            const fullName = (center.name || '').toLowerCase();
+            const shortName = (center.shortName || '').toLowerCase();
+            const title = (center.Title || '').toLowerCase();
+            return !fullName.includes('closed') && !shortName.includes('closed') && !title.includes('closed');
+        });
+
+        let leaderCount = 0;
+        activeCenters.forEach(center => {
+            if (center.leaders && Array.isArray(center.leaders)) {
+                leaderCount += center.leaders.length;
+                center.leaders.forEach(leader => {
+                    const staffId = `${leader.id}-${center.id}`;
+                    if (!staffMap.has(staffId)) {
+                        staffMap.set(staffId, {
+                            ...leader,
+                            centerName: center.name || center.Title,
+                            centerCity: center.city || '',
+                            centerState: center.state || ''
+                        });
+                    }
+                });
+            }
+        });
+
+        console.log('[RSYCUnitTemplates] Found', leaderCount, 'total leaders across', activeCenters.length, 'active centers');
+
+        // Use role priority sorting like center profiles
+        const priorityRoles = (function(){
+            try{
+                if(window.RSYC && Array.isArray(window.RSYC.roleOrder) && window.RSYC.roleOrder.length) return window.RSYC.roleOrder.slice();
+                const raw = localStorage.getItem('rsycRoleOrder');
+                if(raw){
+                    const parsed = JSON.parse(raw);
+                    if(Array.isArray(parsed) && parsed.length) return parsed;
+                }
+            }catch(e){ /* ignore and fall back to defaults */ }
+            return [
+                'Area Commander',
+                'Corps Officer',
+                'Area Executive Director',
+                'Area Director',
+                'Executive Director',
+                'Center Director',
+                'Program Manager',
+                'Program Coordinator',
+                'Youth Development Professional',
+                'Administrative Clerk',
+                'Membership Clerk',
+                'Other'
+            ];
+        })();
+
+        const getPriority = (role) => {
+            if (!role) return priorityRoles.length;
+            const r = role.toString().toLowerCase().trim();
+            const exactIdx = priorityRoles.findIndex(pr => pr.toLowerCase() === r);
+            if (exactIdx !== -1) return exactIdx;
+            const roleTokens = r.split(/[^a-z0-9]+/).filter(Boolean);
+            if (!roleTokens.length) return priorityRoles.length;
+            const base = roleTokens[roleTokens.length - 1];
+            const baseMatchIdx = priorityRoles.findIndex(pr => {
+                const prTokens = pr.toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
+                return prTokens.includes(base);
+            });
+            if (baseMatchIdx !== -1) return baseMatchIdx;
+            const substringIdx = priorityRoles.findIndex(pr => {
+                const prTokens = pr.toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
+                return prTokens.some(t => roleTokens.includes(t));
+            });
+            if (substringIdx !== -1) return substringIdx;
+            return priorityRoles.length;
+        };
+
+        const sortedStaff = Array.from(staffMap.values()).sort((a, b) => {
+            // 1) Explicit Sort order (higher priority than roles)
+            const rawA = parseFloat(a.Sort);
+            const rawB = parseFloat(b.Sort);
+            const sortA = !isNaN(rawA) ? rawA : 1000;
+            const sortB = !isNaN(rawB) ? rawB : 1000;
+            if (sortA !== sortB) return sortA - sortB;
+
+            // 2) Sort by role priority
+            const rawRoleA = (a.roleType || '').toString();
+            let roleA = '';
+            if (rawRoleA && !/\bother\b/i.test(rawRoleA)) {
+                roleA = rawRoleA;
+            } else {
+                roleA = (a.positionTitle || rawRoleA || '').toString();
+            }
+
+            const rawRoleB = (b.roleType || '').toString();
+            let roleB = '';
+            if (rawRoleB && !/\bother\b/i.test(rawRoleB)) {
+                roleB = rawRoleB;
+            } else {
+                roleB = (b.positionTitle || rawRoleB || '').toString();
+            }
+
+            const pA = getPriority(roleA);
+            const pB = getPriority(roleB);
+            if (pA !== pB) return pA - pB;
+
+            // 3) If same priority, sort by person name
+            const person_a = a.person || {};
+            const person_b = b.person || {};
+            const nameA = ((person_a && (person_a.name || '')) || (a.alternateName || '')).toString();
+            const nameB = ((person_b && (person_b.name || '')) || (b.alternateName || '')).toString();
+            return nameA.localeCompare(nameB);
+        });
+
+        if (sortedStaff.length === 0) {
+            console.warn('[RSYCUnitTemplates] WARNING: No staff members found! Check if leaders were loaded and attached to centers.');
+            return '<div class="container py-5"><p class="text-center text-muted">No staff members found</p></div>';
+        }
+
+        console.log('[RSYCUnitTemplates] Aggregated', sortedStaff.length, 'staff members');
+
+        // Extract unique filter values
+        const cities = [...new Set(sortedStaff.map(s => s.centerCity).filter(c => c))].sort();
+        const states = [...new Set(sortedStaff.map(s => s.centerState).filter(s => s))].sort();
+        const roles = [...new Set(sortedStaff.map(s => s.roleType).filter(r => r))].sort();
+
+        // Generate staff cards using exact same template as center profiles
+        const defaultPhoto = 'https://8hxvw8tw.media.zestyio.com/SAL_Leaders_Desktop-2.png';
+        const staffCards = sortedStaff.map(staff => {
+            const person = staff.person || {};
+            const primaryName = person.name || '';
+            const alternate = staff.alternateName || '';
+
+            // Display: "Primary Name (Alternate)" when both present and different
+            let displayName = primaryName || alternate || 'Firstname Lastname';
+            if (primaryName && alternate && primaryName.trim() !== alternate.trim()) {
+                displayName = `${primaryName} (${alternate})`;
+            }
+
+            const title = staff.positionTitle || staff.roleType || 'Role or Title';
+            const bio = staff.biography || 'Staff member of the Salvation Army';
+
+            // Prefer leader-specific image fields when available, fall back to person-level fields, then default
+            const photo = (
+                staff.imageURL || staff.ImageURL || staff.imageUrl || staff.image || staff.photo || staff.photoUrl || staff.photoURL ||
+                (person && (person.picture || person.imageURL || person.imageUrl || person.photo || person.photoUrl || person.image)) ||
+                defaultPhoto
+            );
+
+            // Smart crop: Use normalized faceFocus from data loader
+            const faceFocus = staff.faceFocus || 'top center';
+            const zoomLevel = staff.zoomLevel || 1;
+            const scaleStyle = zoomLevel !== 1 ? `transform:scale(${zoomLevel});` : '';
+            const objectPositionStyle = `object-position:${faceFocus};`;
+
+            const city = staff.centerCity || '';
+            const state = staff.centerState || '';
+            const roleType = staff.roleType || '';
+            const centerName = staff.centerName || '';
+
+            // Generate center URL slug like in centers grid
+            let slugName = centerName || '';
+            slugName = slugName
+                .replace(/^red\s+shield\s+youth\s+centers?\s+of\s+/i, '')
+                .replace(/^rsyc\s+/i, '');
+            
+            const centerSlug = slugName
+                .toLowerCase()
+                .replace(/\s+/g, '-')           // Replace spaces with dashes
+                .replace(/-+/g, '-')            // Collapse multiple dashes to single dash
+                .replace(/[^\w\-]/g, '');       // Remove special characters except dashes
+            const centerUrl = `/redshieldyouth/${centerSlug}`;
+
+            return `
+		<div class="card shadow border rounded-3 flex-shrink-0 staff-card" style="width: 280px; scroll-snap-align: start; border: 1px solid #dee2e6; overflow:hidden;" data-city="${city}" data-state="${state}" data-role="${roleType}" data-center="${centerName}">
+			<div style="width:100%; aspect-ratio:1/1; overflow:hidden; background:#f0f0f0;">
+				<img alt="${this.escapeHTML(displayName)}" class="card-img-top" src="${this.escapeHTML(photo)}" style="width:100%; height:100%; object-fit:cover; ${objectPositionStyle} ${scaleStyle} display:block;">
+			</div>
+			<div class="card-body d-flex flex-column">
+				<div class="fw-bold mb-1" style="font-size: 1.1rem; line-height: 1.3;">${this.escapeHTML(displayName)}</div>
+				<div class="text-muted mb-2" style="font-size: 0.95rem;">${this.escapeHTML(title)}</div>
+				<p class="card-text" style="flex-grow:1; font-size: 0.875rem; line-height: 1.5;">
+					${this.escapeHTML(bio)}
+				</p>
+				${centerName ? `
+				<hr style="margin: 0.75rem 0; border: none; border-top: 1px solid #e0e0e0;">
+				<p style="margin-bottom: 0.5rem; font-size: 0.85rem; color: #666;">
+					<i class="bi bi-building" style="margin-right: 0.25rem;"></i>${this.escapeHTML(centerName)}
+				</p>
+				<p style="margin-bottom: 0.75rem; font-size: 0.85rem; color: #999;">
+					<i class="bi bi-geo-alt" style="margin-right: 0.25rem;"></i>${this.escapeHTML(city)}${state ? ', ' + this.escapeHTML(state) : ''}
+				</p>
+				<a href="${centerUrl}" style="color: #20B3A8; text-decoration: underline; font-weight: 500; font-size: 0.875rem;">Open Center Profile →</a>
+				` : ''}
+			</div>
+		</div>`;
+        }).join('\n');
+
+        console.log('[RSYCUnitTemplates] Generated', staffCards.length, 'staff card HTML strings');
+
+        // Build filter dropdown options
+        const centers = [...new Set(sortedStaff.map(s => s.centerName).filter(c => c))].sort();
+        const cityOptions = cities.map(c => `<option value="${this.escapeHTML(c)}">${this.escapeHTML(c)}</option>`).join('');
+        const stateOptions = states.map(s => `<option value="${s}">${this.escapeHTML(this.stateNames[s] || s)}</option>`).join('');
+        const centerOptions = centers.map(c => {
+            let displayName = c;
+            displayName = displayName
+                .replace(/^red\s+shield\s+youth\s+centers?\s+of\s+/i, '')
+                .replace(/^rsyc\s+/i, '');
+            return `<option value="${this.escapeHTML(c)}">${this.escapeHTML(displayName)}</option>`;
+        }).join('');
+        const roleOptions = roles.map(r => `<option value="${this.escapeHTML(r)}">${this.escapeHTML(r)}</option>`).join('');
+
+        // Build filter HTML for staff (only if filters enabled)
+        const showFilters = options.filters === false ? false : true;
+        const filterHTML = showFilters ? `
+        <div id="all-staff-filters" style="background-color: #f8f9fa; padding: 25px 20px 30px 20px; border-bottom: 1px solid #e0e0e0; margin-top: 0;">
+            <div class="container">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem;">
+                    <h5 class="fw-bold mb-0" style="margin-top: 0;">Filter Staff & Leaders</h5>
+                    <button onclick="window.clearAllStaffFilters()" style="background-color: #6c757d; color: white; border: none; padding: 0.5rem 1.25rem; border-radius: 6px; cursor: pointer; font-weight: 500; font-size: 0.9rem; transition: background-color 0.2s ease;" onmouseover="this.style.backgroundColor='#5a6268'" onmouseout="this.style.backgroundColor='#6c757d'">
+                        Clear All Filters
+                    </button>
+                </div>
+                <div class="row g-3">
+                    <div class="col-md-6 col-lg-3">
+                        <label class="form-label fw-500 mb-2">Center</label>
+                        <select class="form-select form-select-sm filter-select" id="staff-center-filter" data-filter-type="center" onchange="window.applyAllStaffFilters()">
+                            <option value="">All Centers</option>
+                            ${centerOptions}
+                        </select>
+                    </div>
+                    <div class="col-md-6 col-lg-3">
+                        <label class="form-label fw-500 mb-2">State</label>
+                        <select class="form-select form-select-sm filter-select" id="staff-state-filter" data-filter-type="state" onchange="window.applyAllStaffFilters()">
+                            <option value="">All States</option>
+                            ${stateOptions}
+                        </select>
+                    </div>
+                    <div class="col-md-6 col-lg-3">
+                        <label class="form-label fw-500 mb-2">City</label>
+                        <select class="form-select form-select-sm filter-select" id="staff-city-filter" data-filter-type="city" onchange="window.applyAllStaffFilters()">
+                            <option value="">All Cities</option>
+                            ${cityOptions}
+                        </select>
+                    </div>
+                    <div class="col-md-6 col-lg-3">
+                        <label class="form-label fw-500 mb-2">Position Type</label>
+                        <select class="form-select form-select-sm filter-select" id="staff-role-filter" data-filter-type="role" onchange="window.applyAllStaffFilters()">
+                            <option value="">All Positions</option>
+                            ${roleOptions}
+                        </select>
+                    </div>
+                </div>
+            </div>
+        </div>` : '';
+
+        // Define filter functions globally (cooperative filters like unit grid)
+        window.applyAllStaffFilters = function() {
+            const cards = document.querySelectorAll('.staff-card');
+            const centerVal = document.getElementById('staff-center-filter')?.value || '';
+            const cityVal = document.getElementById('staff-city-filter')?.value || '';
+            const stateVal = document.getElementById('staff-state-filter')?.value || '';
+            const roleVal = document.getElementById('staff-role-filter')?.value || '';
+            
+            const visible = [];
+            cards.forEach(card => {
+                const matchCenter = !centerVal || card.dataset.center === centerVal;
+                const matchCity = !cityVal || card.dataset.city === cityVal;
+                const matchState = !stateVal || card.dataset.state === stateVal;
+                const matchRole = !roleVal || card.dataset.role === roleVal;
+
+                const show = matchCenter && matchCity && matchState && matchRole;
+                card.style.display = show ? '' : 'none';
+                if (show) visible.push(card);
+            });
+
+            // Update other filter option lists based on currently visible cards
+            window.updateStaffFilterOptions(visible);
+        };
+
+        // Reset all staff filters
+        window.clearAllStaffFilters = function() {
+            const c1 = document.getElementById('staff-center-filter'); if (c1) c1.value = '';
+            const c2 = document.getElementById('staff-city-filter'); if (c2) c2.value = '';
+            const c3 = document.getElementById('staff-state-filter'); if (c3) c3.value = '';
+            const c4 = document.getElementById('staff-role-filter'); if (c4) c4.value = '';
+            window.applyAllStaffFilters();
+        };
+
+        // Rebuild filter option lists so filters reflect only available choices (cooperative filtering)
+        window.updateStaffFilterOptions = function(visibleCards) {
+            const allCards = document.querySelectorAll('.staff-card');
+
+            // Current values
+            const centerVal = document.getElementById('staff-center-filter')?.value || '';
+            const cityVal = document.getElementById('staff-city-filter')?.value || '';
+            const stateVal = document.getElementById('staff-state-filter')?.value || '';
+            const roleVal = document.getElementById('staff-role-filter')?.value || '';
+
+            const getAvailable = (exclude) => {
+                const available = { centers: new Set(), cities: new Set(), states: new Set(), roles: new Set() };
+                allCards.forEach(card => {
+                    const matchCenter = exclude === 'center' || !centerVal || card.dataset.center === centerVal;
+                    const matchCity = exclude === 'city' || !cityVal || card.dataset.city === cityVal;
+                    const matchState = exclude === 'state' || !stateVal || card.dataset.state === stateVal;
+                    const matchRole = exclude === 'role' || !roleVal || card.dataset.role === roleVal;
+
+                    if (matchCenter && matchCity && matchState && matchRole) {
+                        if (card.dataset.center) available.centers.add(card.dataset.center);
+                        if (card.dataset.city) available.cities.add(card.dataset.city);
+                        if (card.dataset.state) available.states.add(card.dataset.state);
+                        if (card.dataset.role) available.roles.add(card.dataset.role);
+                    }
+                });
+                return available;
+            };
+
+            // Rebuild Center options
+            const centerSelect = document.getElementById('staff-center-filter');
+            if (centerSelect) {
+                const allCenters = [...new Set(Array.from(allCards).map(c => c.dataset.center).filter(Boolean))].sort();
+                const available = getAvailable('center');
+                const opts = ['<option value="">All Centers</option>'];
+                allCenters.forEach(c => {
+                    if (available.centers.has(c)) {
+                        const sel = c === centerVal ? ' selected' : '';
+                        opts.push(`<option value="${c}"${sel}>${c}</option>`);
+                    }
+                });
+                centerSelect.innerHTML = opts.join('');
+            }
+
+            // Rebuild City options
+            const citySelect = document.getElementById('staff-city-filter');
+            if (citySelect) {
+                const allCities = [...new Set(Array.from(allCards).map(c => c.dataset.city).filter(Boolean))].sort();
+                const available = getAvailable('city');
+                const opts = ['<option value="">All Cities</option>'];
+                allCities.forEach(ct => {
+                    if (available.cities.has(ct)) {
+                        const sel = ct === cityVal ? ' selected' : '';
+                        opts.push(`<option value="${ct}"${sel}>${ct}</option>`);
+                    }
+                });
+                citySelect.innerHTML = opts.join('');
+            }
+
+            // Rebuild State options
+            const stateSelect = document.getElementById('staff-state-filter');
+            if (stateSelect) {
+                const allStates = [...new Set(Array.from(allCards).map(c => c.dataset.state).filter(Boolean))].sort();
+                const available = getAvailable('state');
+                const opts = ['<option value="">All States</option>'];
+                allStates.forEach(st => {
+                    if (available.states.has(st)) {
+                        const sel = st === stateVal ? ' selected' : '';
+                        opts.push(`<option value="${st}"${sel}>${this.stateNames && this.stateNames[st] ? this.stateNames[st] : st}</option>`);
+                    }
+                });
+                stateSelect.innerHTML = opts.join('');
+            }
+
+            // Rebuild Role options
+            const roleSelect = document.getElementById('staff-role-filter');
+            if (roleSelect) {
+                const allRoles = [...new Set(Array.from(allCards).map(c => c.dataset.role).filter(Boolean))].sort();
+                const available = getAvailable('role');
+                const opts = ['<option value="">All Positions</option>'];
+                allRoles.forEach(r => {
+                    if (available.roles.has(r)) {
+                        const sel = r === roleVal ? ' selected' : '';
+                        opts.push(`<option value="${r}"${sel}>${r}</option>`);
+                    }
+                });
+                roleSelect.innerHTML = opts.join('');
+            }
+        };
+
+        // Build scroll hint if there are many staff members
+        const staffCount = staffCards.split('<div class="staff-card').length - 1;
+        const scrollHint = staffCount > 3 ? `
+            <p class="text-center mb-n2">
+              <small class="text-muted">
+                Scroll to view more 
+                <i class="bi bi-arrow-right-circle" style="font-size: 0.85em; vertical-align: middle;"></i>
+              </small>
+            </p>` : '';
+        
+                // Center cards if 3 or fewer, otherwise leave for scrolling
+                const justifyContent = staffCount <= 3 ? 'justify-content-center' : '';
+
+                // Options: gracefully handle defaults
+                const useBg = options && options.bg === false ? false : true;
+                const paddingOpt = options && options.padding ? String(options.padding) : 'default';
+
+                const wrapperClass = `freeTextArea section${useBg ? ' u-sa-goldBg' : ''}`;
+                // Reduce vertical padding by 60% when compact is enabled (i.e. keep 40% of original)
+                const outerPadding = paddingOpt === 'compact' ? 'padding-top: 2rem; padding-bottom: 2rem;' : 'padding-top: 5rem; padding-bottom: 5rem;';
+                const innerPadding = paddingOpt === 'compact' ? 'padding-top: 1.8rem; padding-bottom: 1.8rem;' : 'padding-top: 4.5rem; padding-bottom: 4.5rem;';
+                const bgAreaClass = paddingOpt === 'compact' ? 'bg-area rounded p-3' : 'bg-area rounded p-4';
+                // When background is disabled, make the area transparent and remove visual chrome
+                let bgAreaStyle = useBg ? '' : 'background: transparent; box-shadow: none; border: none;';
+                // If compact padding requested, enforce smaller padding inline to override global classes
+                if (paddingOpt === 'compact') {
+                    bgAreaStyle = (bgAreaStyle ? bgAreaStyle + ' ' : '') + 'padding: 0.75rem;';
+                }
+                const viewportPadding = paddingOpt === 'compact' ? 'padding-left: 0.5rem; padding-right: 0.5rem;' : 'padding-left: 1rem; padding-right: 1rem;';
+                const trackPy = paddingOpt === 'compact' ? 'py-2' : 'py-3';
+
+                return `${filterHTML}
+<!-- All Staff & Community Leaders -->
+<div id="freeTextArea-staff" class="${wrapperClass}" style="margin: 0; width: 100vw; position: relative; left: 50%; right: 50%; margin-left: -50vw; margin-right: -50vw;">
+
+    <div class="u-positionRelative" style="${outerPadding}">
+        <div class="container">
+            <div class="container" style="${innerPadding}">
+                <div class="${bgAreaClass}" id="profiles" style="${bgAreaStyle}">
+
+                    <h2 class="fw-bold mb-4 text-center">
+                        <span style="color:#111111;">Staff &amp; <em>Community Leaders</em></span>
+                    </h2>
+
+                    ${scrollHint}
+
+                    <!-- SCROLL VIEWPORT -->
+                    <div class="profiles-scroll" style="overflow-x: auto; overflow-y: hidden; scroll-snap-type: x mandatory; ${viewportPadding}">
+
+                        <!-- SCROLL TRACK -->
+                        <div class="d-flex gap-4 ${trackPy} profiles-track" style="width: max-content; ${justifyContent ? 'justify-content: flex-start;' : ''}">
+                            ${staffCards}
+                        </div>
+
+                    </div>
+
+                </div>
+            </div>
         </div>
     </div>
 </div>`;
@@ -599,6 +1064,9 @@ class RSYCUnitTemplates {
         if (allPrograms.length === 0) {
             return '';
         }
+
+        // Sort programs alphabetically by name
+        allPrograms.sort((a, b) => a.name.localeCompare(b.name));
 
         const displayPrograms = allPrograms.slice(0, 8);
         const programItems = displayPrograms.map(program => {

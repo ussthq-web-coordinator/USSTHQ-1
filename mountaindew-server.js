@@ -23,6 +23,11 @@ const dbConfig = {
     charset: 'utf8mb4'
 };
 
+const [rows] = await connection.query('SELECT VERSION() AS version');
+console.log(rows[0].version);
+
+await connection.end();
+
 // Create connection pool
 const pool = mysql.createPool(dbConfig);
 
