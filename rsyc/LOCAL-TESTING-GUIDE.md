@@ -54,7 +54,7 @@
 **Possible Cause**: Center data from SharePoint didn't load or Texas doesn't have centers
 
 **How to Fix**:
-1. Check that centers in your data have `Division: "TEX"`
+1. Check that centers in your data have `Division: "Texas"`
 2. Test with different unit values
 3. Check SharePoint connection in rsyc-data.js
 
@@ -62,7 +62,7 @@
 
 ```html
 <!-- Division Page -->
-<div data-rsyc-unit-type="division" data-rsyc-unit-value="TEX"></div>
+<div data-rsyc-unit-type="division" data-rsyc-unit-value="Texas"></div>
 
 <!-- State Page -->
 <div data-rsyc-unit-type="state" data-rsyc-unit-value="North Carolina"></div>

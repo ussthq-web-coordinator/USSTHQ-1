@@ -4,18 +4,22 @@
  */
 
 // Global helper to safely extract string values from potentially complex SharePoint data structures
-const getVal = (v) => {
-    if (v === null || v === undefined) return '';
-    if (typeof v === 'object') {
-        if (v.Value !== undefined) return String(v.Value).trim();
-        if (v.Email !== undefined) return String(v.Email).trim();
-        if (v.TermGuid !== undefined && v.Label !== undefined) return String(v.Label).trim();
-        // If it's an object but none of the known keys match, try to stringify or return empty
-        return '';
-    }
-    return String(v).trim();
-};
+if (typeof window.getVal === 'undefined') {
+    window.getVal = (v) => {
+        if (v === null || v === undefined) return '';
+        if (typeof v === 'object') {
+            if (v.Value !== undefined) return String(v.Value).trim();
+            if (v.Email !== undefined) return String(v.Email).trim();
+            if (v.TermGuid !== undefined && v.Label !== undefined) return String(v.Label).trim();
+            // If it's an object but none of the known keys match, try to stringify or return empty
+            return '';
+        }
+        return String(v).trim();
+    };
+}
+const getVal = window.getVal;
 
+if (typeof window.RSYCDataLoader === 'undefined') {
 class RSYCDataLoader {
     constructor() {
         // CORS / fetch configuration
@@ -39,6 +43,8 @@ class RSYCDataLoader {
             programs: null,
             schedules: null,
             leaders: null,
+            events: null,
+            stories: null,
             photos: null,
             hours: null,
             facilities: null,
@@ -58,6 +64,8 @@ class RSYCDataLoader {
             programs: null,
             schedules: null,
             leaders: null,
+            events: null,
+            stories: null,
             photos: null,
             hours: null,
             facilities: null,
@@ -126,7 +134,7 @@ class RSYCDataLoader {
         try {
             console.log('📦 Loading optional data...');
             
-            const [schedules, leaders, facilities, featuredPrograms] = await Promise.all([
+            const [schedules, leaders, facilities, featuredPrograms, events, stories] = await Promise.all([
                 this.fetchJSON('RSYCProgramSchedules.json').catch(e => {
                     console.warn('Schedules data unavailable:', e.message);
                     return [];
@@ -142,6 +150,14 @@ class RSYCDataLoader {
                 this.fetchJSON('RSYCPrograms.json').catch(e => {
                     console.warn('Programs data unavailable:', e.message);
                     return [];
+                }),
+                this.fetchJSON('RSYCEvents.json').catch(e => {
+                    console.warn('Events data unavailable:', e.message);
+                    return [];
+                }),
+                this.fetchJSON('RSYCStories.json').catch(e => {
+                    console.warn('Stories data unavailable:', e.message);
+                    return [];
                 })
             ]);
 
@@ -149,10 +165,14 @@ class RSYCDataLoader {
             this.cache.leaders = this.processLeaders(leaders);
             this.cache.facilities = this.processFacilities(facilities);
             this.cache.featuredPrograms = this.processPrograms(featuredPrograms);
+            this.cache.events = this.processEvents(events);
+            this.cache.stories = this.processStories(stories);
 
             console.log('📦 Optional data loaded:', {
                 schedules: this.cache.schedules.length,
                 leaders: this.cache.leaders.length,
+                events: this.cache.events.length,
+                stories: this.cache.stories.length,
                 facilities: this.cache.facilities.length,
                 programs: this.cache.featuredPrograms.length
             });
@@ -174,7 +194,7 @@ class RSYCDataLoader {
             
             // Load critical data first, then optional data
             // Some files may be empty or missing - that's OK
-            const [centers, schedules, leaders, hours, facilities, featuredPrograms] = await Promise.all([
+            const [centers, schedules, leaders, hours, facilities, featuredPrograms, events, stories] = await Promise.all([
                 this.fetchJSON('units-rsyc-profiles.json').catch(e => {
                     console.error('Failed to load centers:', e.message);
                     return [];
@@ -198,6 +218,14 @@ class RSYCDataLoader {
                 this.fetchJSON('RSYCPrograms.json').catch(e => {
                     console.warn('Programs data unavailable:', e.message);
                     return [];
+                }),
+                this.fetchJSON('RSYCEvents.json').catch(e => {
+                    console.warn('Events data unavailable:', e.message);
+                    return [];
+                }),
+                this.fetchJSON('RSYCStories.json').catch(e => {
+                    console.warn('Stories data unavailable:', e.message);
+                    return [];
                 })
             ]);
 
@@ -214,6 +242,8 @@ class RSYCDataLoader {
             this.cache.centers = this.processCenters(centers);
             this.cache.schedules = this.processSchedules(schedules);
             this.cache.leaders = this.processLeaders(leaders);
+            this.cache.events = this.processEvents(events);
+            this.cache.stories = this.processStories(stories);
             this.cache.photos = this.processPhotos(photos);
             this.cache.hours = this.processHours(hours);
             this.cache.facilities = this.processFacilities(facilities);
@@ -229,6 +259,8 @@ class RSYCDataLoader {
                 centers: this.cache.centers.length,
                 schedules: this.cache.schedules.length,
                 leaders: this.cache.leaders.length,
+                events: this.cache.events.length,
+                stories: this.cache.stories.length,
                 photos: this.cache.photos.length,
                 hours: this.cache.hours.length,
                 facilities: this.cache.facilities.length,
@@ -239,6 +271,7 @@ class RSYCDataLoader {
                 centers: this.cache.centers,
                 schedules: this.cache.schedules,
                 leaders: this.cache.leaders,
+                events: this.cache.events,
                 photos: this.cache.photos,
                 hours: this.cache.hours,
                 facilities: this.cache.facilities,
@@ -664,6 +697,129 @@ class RSYCDataLoader {
     }
 
     /**
+     * Process events
+     */
+    processEvents(data) {
+        const parseDateCandidate = (v) => {
+            if (!v) return null;
+            try {
+                if (typeof v === 'object') v = v.Value || v.Date || '';
+                const s = String(v).trim();
+                if (!s) return null;
+                const t = Date.parse(s);
+                if (!isNaN(t)) return t;
+                return null;
+            } catch (e) {
+                return null;
+            }
+        };
+
+        const toBool = (v) => {
+            if (v === true) return true;
+            if (v === false) return false;
+            if (typeof v === 'number') return v !== 0;
+            if (typeof v === 'string') {
+                const s = v.trim().toLowerCase();
+                return s === 'true' || s === 'yes' || s === 'y' || s === 'on sale' || s === 'onsale' || s === 'on-sell' || s === 'onsell';
+            }
+            if (typeof v === 'object' && v && v.Value !== undefined) return toBool(v.Value);
+            return false;
+        };
+
+        return (data || []).map((evt) => {
+            const startTs = parseDateCandidate(evt.StartDateandTime || evt.StartDateTime || evt.Start);
+            const endTs = parseDateCandidate(evt.EndDateandTime || evt.EndDateTime || evt.End);
+
+            const eventType = getVal(evt.EventType) || (evt.EventType && evt.EventType.Value ? String(evt.EventType.Value).trim() : '') || getVal(evt.Type) || '';
+            const subtitle = getVal(evt.EventSubtitle) || getVal(evt.Subtitle) || getVal(evt.EventSubTitle) || '';
+
+            const primaryButtonText = getVal(evt.PrimaryButtonText) || 'Learn More';
+            const primaryButtonUrl = getVal(evt.PrimaryButtonURL) || getVal(evt.URLPrimaryButton) || getVal(evt.PrimaryButtonLink) || getVal(evt.PrimaryButtonHref) || getVal(evt.RegistrationURL) || getVal(evt.RegistrationLink) || getVal(evt.URLRegistration) || getVal(evt.EventURL) || getVal(evt.URL) || '';
+            const secondaryButtonText = getVal(evt.SecondaryButtonText) || '';
+            const secondaryButtonUrl = getVal(evt.SecondaryButtonURL) || getVal(evt.URLSecondaryButton) || getVal(evt.SecondaryButtonLink) || getVal(evt.SecondaryButtonHref) || '';
+            const facebookEventUrl = getVal(evt.FacebookEventLink) || getVal(evt.FacebookEventURL) || getVal(evt.URLFacebookEvent) || '';
+
+            const onSaleCandidates = [
+                evt.OnSale,
+                evt.OnSell,
+                evt.IsOnSale,
+                evt.IsOnSell,
+                evt.TicketsOnSale,
+                evt.OnSaleTag,
+                evt.SalesStatus,
+                evt.Status && evt.Status.Value
+            ];
+            let isOnSale = false;
+            for (const c of onSaleCandidates) {
+                if (toBool(c)) { isOnSale = true; break; }
+                if (typeof c === 'string' && c.toLowerCase().includes('sale')) { isOnSale = true; break; }
+            }
+
+            return {
+                id: evt.ID,
+                centerId: evt['Center#Id'],
+                title: getVal(evt.EventTitle) || getVal(evt.Title) || 'Event',
+                eventType: eventType,
+                subtitle: subtitle,
+                status: evt.Status?.Value || '',
+                startDateTime: evt.StartDateandTime || evt.StartDateTime || '',
+                endDateTime: evt.EndDateandTime || evt.EndDateTime || '',
+                _startTimestamp: startTs,
+                _endTimestamp: endTs,
+                cost: getVal(evt.Cost),
+                primaryButtonText: primaryButtonText,
+                primaryButtonUrl: primaryButtonUrl,
+                secondaryButtonText: secondaryButtonText,
+                secondaryButtonUrl: secondaryButtonUrl,
+                facebookEventUrl: facebookEventUrl,
+                imageUrl: getVal(evt.URLEventImage),
+                thumbnailUrl: getVal(evt.URLEventThumbnail),
+                description: evt.EventDescription || '',
+                contactName: getVal(evt.ContactPersonName),
+                contactEmail: getVal(evt.ContactEmail),
+                contactNumber: getVal(evt.ContactNumber),
+                street: getVal(evt.Street),
+                city: getVal(evt.City),
+                state: getVal(evt.State),
+                postalCode: getVal(evt.PostalCode),
+                isOnSale: isOnSale,
+                extendedCareTimes: getVal(evt.ExtendedCareTimes),
+                specialFeatures: getVal(evt.SpecialFeatures),
+                __type: 'event'
+            };
+        });
+    }
+
+    /**
+     * Process stories
+     */
+    processStories(data) {
+        return (data || []).map((story) => {
+            const storyDate = story.Storydate ? new Date(story.Storydate) : null;
+            const storyDateTs = storyDate ? storyDate.getTime() : null;
+
+            return {
+                id: story.ID,
+                centerId: story['Center#Id'],
+                title: getVal(story.StoryTitle) || 'Story',
+                excerpt: getVal(story.Excerpt) || '',
+                body: story.Body ? String(story.Body).trim() : '',
+                author: getVal(story.Author0) || (story.Author && story.Author.DisplayName) || 'Author',
+                storyDate: story.Storydate || '',
+                _storyDateTs: storyDateTs,
+                primaryCTAName: getVal(story.PrimaryCTAName) || '',
+                primaryCTALink: getVal(story.PrimaryCTALink) || '',
+                secondaryCTAName: getVal(story.SecondaryCTAName) || '',
+                secondaryCTALink: getVal(story.SecondaryCTALink) || '',
+                externalUrl: getVal(story.ExternalURL) || '',
+                thumbnailImage: getVal(story.URLThumbnailImage) || '',
+                mainImage: getVal(story.URLMainImage) || '',
+                __type: 'story'
+            };
+        });
+    }
+
+    /**
      * Process leaders/staff
      */
     processLeaders(data) {
@@ -880,8 +1036,7 @@ class RSYCDataLoader {
         const hours = this.cache.hours.find(h => h.centerId == center.sharePointId);
         console.log('🔍 Hours lookup: center.sharePointId', center.sharePointId, 'Type:', typeof center.sharePointId, '| Found:', hours ? 'YES ✅' : 'NO ❌');
         if (!hours) {
-            console.log('🔍 Sample hours centerIds:', this.cache.hours.slice(0, 5).map(h => `${h.centerId}(${typeof h.centerId})`).join(', '));
-            console.log('🔍 All hours centerIds:', this.cache.hours.map(h => h.centerId).sort((a,b) => a-b).join(', '));
+            // Hours are optional; templates will handle empty values
         }
 
         // Filter and sort schedules: primary by first day index, secondary by start time
@@ -954,6 +1109,8 @@ class RSYCDataLoader {
             center,
             schedules: schedulesForCenter,
             leaders: (this.cache.leaders || []).filter(l => l.centerIds.includes(center.sharePointId)),
+            stories: (this.cache.stories || []).filter(s => s.centerId === center.sharePointId),
+            events: (this.cache.events || []).filter(e => e.centerId === center.sharePointId),
             photos: (this.cache.photos || []).filter(p => p.centerId === center.sharePointId),
             hours,
             facilityFeatures,  // Use the mapped version with biClass
@@ -978,6 +1135,9 @@ class RSYCDataLoader {
 
 // Export class to global scope
 window.RSYCDataLoader = RSYCDataLoader;
+} // End if RSYCDataLoader undefined
 
 // Create global instance
-window.rsycData = new RSYCDataLoader();
+if (!window.rsycData) {
+    window.rsycData = new window.RSYCDataLoader();
+}

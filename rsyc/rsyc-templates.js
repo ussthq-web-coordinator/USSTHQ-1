@@ -3,13 +3,97 @@
  * Generates modular HTML sections for center profiles
  */
 
-// Global toggle function for RSYC accordions
+// ============================================
+// CRITICAL: Define all modal/UI functions BEFORE templates are used
+// These are called from generated HTML onclick handlers
+// ============================================
+
+/**
+ * Modal display function - must be globally available
+ */
+window.showRSYCModal = function(type, centerName) {
+    console.log('[RSYC] showRSYCModal:', type);
+    const modal = document.getElementById('rsyc-modal-' + type);
+    if (modal) {
+        modal.style.display = 'flex';
+        document.body.style.overflow = 'hidden';
+    } else {
+        console.warn('[RSYC] Modal not found:', 'rsyc-modal-' + type);
+    }
+};
+
+/**
+ * Modal close function - must be globally available
+ */
+window.closeRSYCModal = function(type) {
+    console.log('[RSYC] closeRSYCModal:', type);
+    const modal = document.getElementById('rsyc-modal-' + type);
+    if (modal) {
+        modal.style.display = 'none';
+        document.body.style.overflow = '';
+    } else {
+        console.warn('[RSYC] Modal not found:', 'rsyc-modal-' + type);
+    }
+};
+
+/**
+ * Staff modal navigation - handles previous/next through staff list
+ */
+window.rsycNavigateStaffModal = function(groupKey, currentIndex, delta) {
+    try {
+        const modals = Array.from(document.querySelectorAll(`.rsyc-modal[data-rsyc-staff-group="${groupKey}"]`));
+        if (!modals.length) {
+            console.warn('[RSYC] No staff modals found for group:', groupKey);
+            return;
+        }
+
+        const items = modals
+            .map(m => ({
+                el: m,
+                idx: Number(m.dataset.rsycStaffIndex),
+                type: m.id ? m.id.replace('rsyc-modal-', '') : ''
+            }))
+            .filter(x => Number.isFinite(x.idx) && x.type);
+
+        if (items.length <= 1) return;
+        items.sort((a, b) => a.idx - b.idx);
+
+        const curPos = items.findIndex(x => x.idx === Number(currentIndex));
+        if (curPos === -1) {
+            console.warn('[RSYC] Current staff index not found:', currentIndex);
+            return;
+        }
+
+        const nextPos = (curPos + delta + items.length) % items.length;
+        const current = items[curPos];
+        const next = items[nextPos];
+
+        if (current && current.type) {
+            const curEl = document.getElementById('rsyc-modal-' + current.type);
+            if (curEl) curEl.style.display = 'none';
+        }
+
+        if (next && next.type) {
+            const nextEl = document.getElementById('rsyc-modal-' + next.type);
+            if (nextEl) {
+                nextEl.style.display = 'flex';
+                document.body.style.overflow = 'hidden';
+            }
+        }
+    } catch (e) {
+        console.error('[RSYC] Staff navigation failed:', e);
+    }
+};
+
+/**
+ * Global toggle function for RSYC accordions
+ */
 window.toggleRSYCAccordion = function(accordionId) {
     const content = document.getElementById(accordionId);
     const icon = document.getElementById(accordionId + '-icon');
     
     if (!content) {
-        console.warn(`Accordion content not found: ${accordionId}`);
+        console.warn(`[RSYC] Accordion content not found: ${accordionId}`);
         return;
     }
     
@@ -22,6 +106,52 @@ window.toggleRSYCAccordion = function(accordionId) {
     }
 };
 
+/**
+ * Toggle schedule accordion (for mobile/iPad)
+ */
+window.toggleScheduleInfo = function(scheduleId) {
+    const content = document.getElementById(scheduleId);
+    const icon = document.getElementById(scheduleId + '-icon');
+    
+    if (!content) {
+        console.warn(`[RSYC] Schedule content not found: ${scheduleId}`);
+        return;
+    }
+    
+    if (content.style.display === 'none' || content.style.display === '') {
+        content.style.display = 'block';
+        if (icon) icon.style.transform = 'rotate(180deg)';
+    } else {
+        content.style.display = 'none';
+        if (icon) icon.style.transform = 'rotate(0deg)';
+    }
+};
+
+/**
+ * Close modal when clicking outside content
+ */
+document.addEventListener('click', function(e) {
+    if (e.target.classList && e.target.classList.contains('rsyc-modal')) {
+        const modalId = e.target.id;
+        const type = modalId.replace('rsyc-modal-', '');
+        window.closeRSYCModal(type);
+    }
+}, false);
+
+/**
+ * Close modal with Escape key
+ */
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        const openModals = document.querySelectorAll('.rsyc-modal[style*="display: flex"]');
+        openModals.forEach(modal => {
+            const type = modal.id.replace('rsyc-modal-', '');
+            window.closeRSYCModal(type);
+        });
+    }
+}, false);
+
+if (typeof window.RSYCTemplates === 'undefined') {
 class RSYCTemplates {
     constructor() {
         this.sections = {
@@ -34,12 +164,14 @@ class RSYCTemplates {
             'programs': { name: 'Featured Programs', enabled: true, order: 6 },
             // Staff immediately after Featured Programs
             'staff': { name: 'Staff & Leadership', enabled: true, order: 7 },
-            'nearby': { name: 'Nearby Centers', enabled: true, order: 8 },
-            'parents': { name: 'For Parents', enabled: true, order: 9 },
-            'youth': { name: 'For Youth', enabled: true, order: 10 },
-            'volunteer': { name: 'Volunteer Opportunities', enabled: true, order: 11 },
-            'footerPhoto': { name: 'Footer Photo', enabled: true, order: 12 },
-            'contact': { name: 'Contact & Donate', enabled: true, order: 13 }
+            'events': { name: 'Events', enabled: true, order: 8 },
+            'stories': { name: 'Stories', enabled: true, order: 9 },
+            'nearby': { name: 'Nearby Centers', enabled: true, order: 10 },
+            'parents': { name: 'For Parents', enabled: true, order: 11 },
+            'youth': { name: 'For Youth', enabled: true, order: 12 },
+            'volunteer': { name: 'Volunteer Opportunities', enabled: true, order: 13 },
+            'footerPhoto': { name: 'Footer Photo', enabled: true, order: 14 },
+            'contact': { name: 'Contact & Donate', enabled: true, order: 15 }
         };
     }
 
@@ -65,31 +197,44 @@ class RSYCTemplates {
      * Generate individual section
      */
     generateSection(sectionKey, data) {
-        const methods = {
-            'hero': this.generateHero,
-            'about': this.generateAbout,
-            'schedules': this.generateSchedules,
-            'hours': this.generateHours,
-            'programs': this.generatePrograms,
-            'facilities': this.generateFacilities,
-            'staff': this.generateStaff,
-            'nearby': this.generateNearby,
-            'parents': this.generateParents,
-            'youth': this.generateYouth,
-            'volunteer': this.generateVolunteer,
-            // Sort schedules primarily by start time, then by first day, then by proximity to current month
-            'footerPhoto': this.generateFooterPhoto,
-            'contact': this.generateContact
-        };
+        try {
+            const methods = {
+                'hero': this.generateHero,
+                'about': this.generateAbout,
+                'schedules': this.generateSchedules,
+                'hours': this.generateHours,
+                'programs': this.generatePrograms,
+                'facilities': this.generateFacilities,
+                'staff': this.generateStaff,
+                'events': this.generateEvents,
+                'stories': this.generateStories,
+                'nearby': this.generateNearby,
+                'parents': this.generateParents,
+                'youth': this.generateYouth,
+                'volunteer': this.generateVolunteer,
+                // Sort schedules primarily by start time, then by first day, then by proximity to current month
+                'footerPhoto': this.generateFooterPhoto,
+                'contact': this.generateContact
+            };
 
-        const method = methods[sectionKey];
-        if (method) {
-            const result = method.call(this, data);
-            console.log(`🔍 Section "${sectionKey}":`, result ? `${result.length} chars` : 'EMPTY/NULL');
-            return result;
+            const method = methods[sectionKey];
+            if (method) {
+                try {
+                    const result = method.call(this, data);
+                    console.log(`🔍 Section "${sectionKey}":`, result ? `${result.length} chars` : 'EMPTY/NULL');
+                    return result || '';
+                } catch (err) {
+                    console.error(`[RSYC] Error generating "${sectionKey}" section:`, err);
+                    // Return empty string instead of failing to allow other sections to render
+                    return '';
+                }
+            }
+            console.warn(`⚠️ No method found for section: ${sectionKey}`);
+            return '';
+        } catch (err) {
+            console.error(`[RSYC] Critical error in generateSection:`, err);
+            return '';
         }
-        console.warn(`⚠️ No method found for section: ${sectionKey}`);
-        return '';
     }
 
     /**
@@ -107,7 +252,8 @@ class RSYCTemplates {
         return `<!-- Hero Section -->
 <style>
     .rsyc-hero img {
-        width: 100% !important;
+        width: 96% !important;
+        margin-top: 75px !important;
     }
     @media (min-width: 992px) {
         .rsyc-hero img {
@@ -123,8 +269,56 @@ class RSYCTemplates {
         border-top-left-radius: 20px !important;
         border-top-right-radius: 20px !important;
     }
+    
+    /* CRITICAL: Force RSYC container and all children to be visible */
+    [data-rsyc-center-id] {
+        display: block !important;
+        visibility: visible !important;
+        height: auto !important;
+        min-height: 100px !important;
+        max-height: none !important;
+        overflow: visible !important;
+        opacity: 1 !important;
+        position: relative !important;
+        clear: both !important;
+        float: none !important;
+    }
+    
+    /* Force all direct children to display */
+    [data-rsyc-center-id] > * {
+        display: block !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+    }
+    
+    /* Ensure RSYC sections are visible - only target within RSYC containers */
+    [data-rsyc-center-id] .rsyc-hero,
+    [data-rsyc-center-id] .freeTextArea,
+    [data-rsyc-center-id] .section,
+    [data-rsyc-center-id] .u-centerBgImage,
+    [data-rsyc-center-id] .u-sa-tealBg,
+    [data-rsyc-center-id] .u-sa-whiteBg,
+    [data-rsyc-center-id] .u-sa-creamBg,
+    [data-rsyc-center-id] .u-sa-greyVeryLightBg,
+    [data-rsyc-center-id] .u-sa-goldBg {
+        display: block !important;
+        visibility: visible !important;
+        height: auto !important;
+        min-height: 50px !important;
+        max-height: none !important;
+        overflow: visible !important;
+        opacity: 1 !important;
+    }
+    
+    /* Ensure images don't collapse the container */
+    [data-rsyc-center-id] .rsyc-hero img,
+    [data-rsyc-center-id] .freeTextArea img {
+        max-width: 100%;
+        height: auto;
+    }
+    }
 </style>
-<section class="rsyc-hero" style="background-color: #00929C; padding: 20px 0; display: flex; justify-content: center; align-items: center;">
+<section class="rsyc-hero" style="background-color: #00929C; padding: 20px 0; display: flex !important; justify-content: center; align-items: center; visibility: visible !important; opacity: 1 !important; height: auto !important;">
     <img src="${this.escapeHTML(exteriorPhoto)}" alt="${this.escapeHTML(center.name)} Exterior" 
          style="display: block; height: 500px; object-fit: cover; object-position: center; margin: 35px auto 0 auto; border-radius: 15px;">
 </section>`;
@@ -153,9 +347,9 @@ class RSYCTemplates {
             </div>` : '';
 
         return `<!-- About This Center -->
-<div id="freeTextArea-about" class="freeTextArea u-centerBgImage section u-sa-tealBg u-coverBgImage">
-    <div class="u-positionRelative">
-        <div class="container">
+<div id="freeTextArea-about" class="freeTextArea u-centerBgImage section u-sa-tealBg u-coverBgImage" style="display: block !important; visibility: visible !important; opacity: 1 !important; height: auto !important;">
+    <div class="u-positionRelative" style="display: block !important; visibility: visible !important; opacity: 1 !important;">
+        <div class="container" style="display: block !important; visibility: visible !important; opacity: 1 !important;">
             <div class="mt-0 mb-5">
                 <div class="d-flex justify-content-center${bottomMarginClass}">
                     <div class="schedule-card w-100 text-dark" style="max-width:800px;width:100%;padding:1.5rem;border-radius:8px;background:#fff;box-shadow:0 1px 4px rgba(0,0,0,0.06);">
@@ -171,6 +365,379 @@ class RSYCTemplates {
         </div>
     </div>
 </div>`;
+    }
+
+    /**
+     * Events Section
+     */
+    generateEvents(data) {
+        try {
+            const { center, events } = data;
+            if (!events || !Array.isArray(events) || events.length === 0) return '';
+
+            const formatEventDateTimeParts = (event) => {
+                try {
+                    const startTs = Number.isFinite(event._startTimestamp) ? event._startTimestamp : Date.parse(String(event.startDateTime || ''));
+                    const endTs = Number.isFinite(event._endTimestamp) ? event._endTimestamp : Date.parse(String(event.endDateTime || ''));
+                    const hasStart = startTs && !isNaN(startTs);
+                    const hasEnd = endTs && !isNaN(endTs);
+                    const start = hasStart ? new Date(startTs) : null;
+                    const end = hasEnd ? new Date(endTs) : null;
+
+                    const dateFmt = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+                    const timeFmt = new Intl.DateTimeFormat('en-US', { hour: 'numeric', minute: '2-digit' });
+
+                    if (start && end) {
+                        const sameDay = start.toDateString() === end.toDateString();
+                        return {
+                            dateText: sameDay ? dateFmt.format(start) : `${dateFmt.format(start)} - ${dateFmt.format(end)}`,
+                            timeText: `${timeFmt.format(start)} - ${timeFmt.format(end)}`
+                        };
+                    }
+                    if (start) {
+                        return { dateText: dateFmt.format(start), timeText: timeFmt.format(start) };
+                    }
+                    return { dateText: '', timeText: '' };
+                } catch (e) {
+                    console.warn('[RSYC] Error formatting event dates:', e);
+                    return { dateText: '', timeText: '' };
+                }
+            };
+
+        const sortedEvents = [...events].sort((a, b) => {
+            const aStart = Number.isFinite(a._startTimestamp) ? a._startTimestamp : null;
+            const bStart = Number.isFinite(b._startTimestamp) ? b._startTimestamp : null;
+            if (aStart && bStart) return aStart - bStart;
+            if (aStart && !bStart) return -1;
+            if (!aStart && bStart) return 1;
+            return 0;
+        });
+
+        let eventModals = '';
+        const eventCards = sortedEvents.map(evt => {
+            const eventTypeText = evt.eventType || '';
+            const eventSubtitleText = evt.subtitle || '';
+            const eventCardSubtitleText = eventSubtitleText || eventTypeText;
+            const dt = formatEventDateTimeParts(evt);
+            const dateText = dt.dateText || '';
+            const timeText = dt.timeText || '';
+            const addressText = [evt.street, evt.city, evt.state, evt.postalCode].filter(Boolean).join(', ');
+            const directionsUrl = addressText ? `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(addressText)}` : '';
+            const onSaleTag = evt.isOnSale ? `
+                <div style="position:absolute; top: 10px; right: 10px; background:#dc3545; color:#fff; font-weight:700; font-size: 0.7rem; padding: 0.25rem 0.5rem; border-radius: 999px; letter-spacing: 0.02em;">
+                    On Sale
+                </div>` : '';
+
+            const modalType = `event-${evt.id}`;
+
+            const eventModal = `
+<!-- Modal for Event Details -->
+<div id="rsyc-modal-${modalType}" class="rsyc-modal" style="display:none;">
+    <div class="rsyc-modal-content">
+        <div class="rsyc-modal-header" style="display:flex; justify-content:space-between; align-items:flex-start; gap: 1rem;">
+            <div style="min-width:0; flex: 1;">
+                <h2 style="margin:0;">${this.escapeHTML(evt.title)}</h2>
+            </div>
+            <button class="rsyc-modal-close" onclick="closeRSYCModal('${modalType}')" style="background:none; border:none; cursor:pointer; font-size: 1.5rem; padding:0.25rem; color:#333; flex-shrink:0;">&times;</button>
+        </div>
+        
+        ${(evt.primaryButtonUrl || evt.secondaryButtonUrl || evt.facebookEventUrl) ? `
+        <div class="rsyc-modal-actions" style="display:flex; gap:0.5rem; flex-wrap:wrap; justify-content:center; align-items:center; margin-bottom:1rem; padding:0.75rem; background:#f8f9fa; border-radius:8px; border:1px solid #e0e0e0;">
+            ${evt.primaryButtonUrl ? `<a class="btn btn-primary" href="${this.escapeHTML(evt.primaryButtonUrl)}" target="_blank" style="background-color:#00929C; border:none; font-size: 0.9rem; padding:0.5rem 1rem;">${this.escapeHTML(evt.primaryButtonText || 'Learn More')}</a>` : ''}
+            ${evt.secondaryButtonUrl ? `<a class="btn btn-outline-primary" href="${this.escapeHTML(evt.secondaryButtonUrl)}" target="_blank" style="font-size: 0.9rem; padding:0.5rem 1rem;">${this.escapeHTML(evt.secondaryButtonText || 'More Info')}</a>` : ''}
+            ${evt.facebookEventUrl ? `<a href="${this.escapeHTML(evt.facebookEventUrl)}" target="_blank" style="background:none; border:none; cursor:pointer; font-size: 1.2rem; padding:0.5rem; color:#1877F2; text-decoration:none;" title="View Facebook Event"><i class="bi bi-facebook"></i></a>` : ''}
+            <button class="rsyc-modal-print" onclick="printRSYCModal('event-${evt.id}')" style="background:none; border:none; cursor:pointer; font-size: 1.2rem; padding:0.5rem; color:#333;" title="Print or Save as PDF"><i class="bi bi-printer"></i></button>
+        </div>
+        ` : ''}
+        <div class="rsyc-modal-body" style="color:#333;">
+            ${evt.imageUrl ? `
+                <div class="mb-4">
+                    <img alt="${this.escapeHTML(evt.title)}" src="${this.escapeHTML(evt.imageUrl)}" style="width:100%; height:auto; border-radius: 12px; display:block;" />
+                </div>
+            ` : ''}
+
+            <div class="mb-3" style="display:flex;align-items:center;justify-content:space-between;gap:0.75rem;">
+                <div style="font-size: 1.1rem; font-weight:600; color:#0C0C0C;"><strong>${this.escapeHTML(center.name || center.Title)}</strong></div>
+                <img src="https://thisishoperva.org/rsyc/Red+Shield+Youth+Centers+Logo+-+Color.svg" alt="Red Shield Youth Centers Logo" style="height:42px; max-width:120px; width:auto; object-fit:contain; display:block;" />
+            </div>
+
+            ${(eventTypeText || eventSubtitleText) ? `<div class="mb-3 rsyc-event-cost" style="font-size: 1rem; color:#333;">
+                ${eventTypeText ? `<div class="rsyc-event-cost"><strong>Type:</strong><br>${this.escapeHTML(eventTypeText)}</div>` : ''}
+                ${eventSubtitleText ? `<div style="margin-top:0.5rem;"><strong>Subtitle:</strong><br>${this.escapeHTML(eventSubtitleText)}</div>` : ''}
+            </div>` : ''}
+            ${evt.isOnSale ? `<div class="mb-3"><span class="badge" style="background:#dc3545;">On Sale</span></div>` : ''}
+            ${(dateText || timeText) ? `<div class="mb-3" style="font-size: 1rem; color:#333;">
+                ${dateText ? `<div><strong>Date:</strong><br>${this.escapeHTML(dateText)}</div>` : ''}
+                ${timeText ? `<div style="margin-top:0.5rem;" class="rsyc-event-cost"><strong>Time:</strong><br>${this.escapeHTML(timeText)}</div>` : ''}
+            </div>` : ''}
+            ${evt.cost ? `<div class="mb-3 rsyc-event-cost" style="font-size: 1rem; color:#333;"><strong>Cost:</strong><br>${this.escapeHTML(evt.cost)}</div>` : ''}
+            ${evt.extendedCareTimes ? `<div class="mb-3 rsyc-event-extended-care" style="font-size: 1rem; color:#333;"><strong>Extended Care Times:</strong><br>${this.escapeHTML(evt.extendedCareTimes)}</div>` : ''}
+
+            ${evt.specialFeatures ? `<div class="mb-3 rsyc-event-cost" style="font-size: 1rem; color:#333;">
+                <strong>What you can expect:</strong><br>
+                ${this.escapeHTML(evt.specialFeatures)}
+            </div>` : ''}
+
+            ${evt.description ? `<div class="mb-3 rsyc-event-cost" style="font-size: 1.1rem; line-height: 1.7; color:#333;">${evt.description}</div>` : ''}
+
+            ${addressText ? `
+            <div class="mb-3 rsyc-event-location" style="background:#f8f9fa; padding:1rem; border-radius:8px; border:1px solid #e0e0e0;">
+                <div style="display:flex; align-items:flex-start; justify-content:space-between; gap: 0.75rem;">
+                    <div style="min-width:0;">
+                        <strong style="display:block; margin-bottom:0.35rem;"><i class="bi bi-geo-alt me-2"></i>Location</strong>
+                        <div>${this.escapeHTML(addressText)}</div>
+                    </div>
+                    ${directionsUrl ? `<a class="btn btn-outline-secondary btn-sm" href="${directionsUrl}" target="_blank" style="font-size: 0.8rem; padding:0.25rem 0.5rem; flex-shrink:0;"><i class="bi bi-sign-turn-right me-1"></i>Directions</a>` : ''}
+                </div>
+            </div>
+            ` : ''}
+
+            ${(evt.contactName || evt.contactEmail || evt.contactNumber) ? `
+            <div class="mb-3" style="background:#f0f7f7; padding:1rem; border-radius:8px; border:1px solid #d1e7e7;">
+                <strong style="display:block; margin-bottom:0.35rem; color:#20B3A8;"><i class="bi bi-person-lines-fill me-2"></i>Contact</strong>
+                ${evt.contactName ? `<div><strong>${this.escapeHTML(evt.contactName)}</strong></div>` : ''}
+                ${evt.contactEmail ? `<div><a href="mailto:${this.escapeHTML(evt.contactEmail)}" style="color:#2F4857; text-decoration:underline;">${this.escapeHTML(evt.contactEmail)}</a></div>` : ''}
+                ${evt.contactNumber ? `<div>${this.escapeHTML(evt.contactNumber)}</div>` : ''}
+            </div>
+            ` : ''}
+        </div>
+    </div>
+</div>`;
+
+            eventModals += eventModal;
+
+            return `
+                <div class="card shadow border rounded-3 flex-shrink-0" style="width: 280px; scroll-snap-align: start; border: 1px solid #dee2e6; overflow:hidden; position:relative;">
+                    ${onSaleTag}
+                    <div style="width:100%; aspect-ratio:1/1; overflow:hidden; background:#f0f0f0; cursor:pointer;" onclick="showRSYCModal('${modalType}', '${this.escapeHTML(center.name || center.Title, true)}')">
+                        <img alt="${this.escapeHTML(evt.title)}" src="${this.escapeHTML(evt.thumbnailUrl || evt.imageUrl || '')}" style="width:100%; height:100%; object-fit:cover; display:block;" onerror="this.style.display='none';" />
+                    </div>
+                    <div class="card-body d-flex flex-column">
+                        <div class="fw-bold mb-1" style="font-size: 1.05rem; line-height: 1.3;">${this.escapeHTML(evt.title)}</div>
+                        ${eventCardSubtitleText ? `<div class="text-muted mb-2" style="font-size: 0.9rem;">${this.escapeHTML(eventCardSubtitleText)}</div>` : ''}
+                        <div style="flex-grow:1; font-size: 0.9rem; line-height: 1.5;">
+                            ${dateText ? `<div><strong>Date:</strong> ${this.escapeHTML(dateText)}</div>` : ''}
+                            ${timeText ? `<div><strong>Time:</strong> ${this.escapeHTML(timeText)}</div>` : ''}
+                        </div>
+                        <button type="button" class="btn btn-outline-primary btn-sm mt-2" onclick="showRSYCModal('${modalType}', '${this.escapeHTML(center.name || center.Title, true)}')">View Details</button>
+                    </div>
+                </div>
+            `;
+        }).join('');
+
+        const scrollHint = sortedEvents.length > 3 ? `
+            <p class="text-center mb-n2">
+                <small class="text-muted" style="color:rgba(255,255,255,0.85);">
+                    Scroll to view more
+                    <i class="bi bi-arrow-right-circle" style="font-size: 0.85em; vertical-align: middle;"></i>
+                </small>
+            </p>` : '';
+
+        const justifyContent = 'justify-content-center';
+
+        return `<!-- Events -->
+<div id="freeTextArea-events" class="freeTextArea section" style="background-color: #cb2e3d; display: block !important; visibility: visible !important; opacity: 1 !important; height: auto !important;">
+    <div class="u-positionRelative" style="padding-top: 4rem; padding-bottom: 4rem; display: block !important; visibility: visible !important; opacity: 1 !important;">
+        <div class="container" style="display: block !important; visibility: visible !important; opacity: 1 !important;">
+            <div class="container" style="padding-top: 4.5rem; padding-bottom: 4.5rem; display: block !important; visibility: visible !important; opacity: 1 !important;">
+                <div class="bg-area rounded p-4">
+                    <h2 class="fw-bold mb-4 text-center" style="color:#fff;">Upcoming <em style="color:#fff;">Events</em></h2>
+                    ${scrollHint}
+                    <div class="horizontal-scroll ${justifyContent} overflow-auto gap-4 py-2" style="scroll-snap-type: x mandatory; justify-content:center; align-items:stretch;">
+                        ${eventCards}
+                    </div>
+                    ${eventModals}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>`;
+        } catch (err) {
+            console.error('[RSYC] Error generating events section:', err);
+            return '';
+        }
+    }
+
+    /**
+     * Stories Section
+     */
+    generateStories(data) {
+        try {
+            const { center, stories } = data;
+            if (!stories || !Array.isArray(stories) || stories.length === 0) return '';
+
+            const sortedStories = [...stories].sort((a, b) => {
+                const aTs = Number.isFinite(a._storyDateTs) ? a._storyDateTs : null;
+                const bTs = Number.isFinite(b._storyDateTs) ? b._storyDateTs : null;
+                // Sort by date descending (newest first)
+                if (aTs && bTs) return bTs - aTs;
+                if (aTs && !bTs) return -1;
+                if (!aTs && bTs) return 1;
+                return 0;
+            });
+
+            let storyModals = '';
+            const storyCards = sortedStories.map(story => {
+                const storyDateObj = story.storyDate ? new Date(story.storyDate) : null;
+                const storyDateFormatted = storyDateObj ? new Intl.DateTimeFormat('en-US', { 
+                    month: 'short', 
+                    day: 'numeric', 
+                    year: 'numeric' 
+                }).format(storyDateObj) : '';
+
+                const modalType = `story-${story.id}`;
+
+                const storyModal = `
+<!-- Modal for Story Details -->
+<div id="rsyc-modal-${modalType}" class="rsyc-modal" style="display:none;">
+    <div class="rsyc-modal-content">
+        ${story.mainImage ? `
+        <div style="width:100%; max-height:400px; overflow:hidden; margin-bottom:1.5rem; border-radius:8px;">
+            <img src="${this.escapeHTML(story.mainImage)}" alt="${this.escapeHTML(story.title)}" style="width:100%; height:100%; object-fit:cover; object-position:center;" />
+        </div>
+        ` : ''}
+        <div class="rsyc-modal-header" style="display:flex; justify-content:space-between; align-items:flex-start; gap: 1rem;">
+            <div style="min-width:0; flex: 1;">
+                <h2 style="margin:0;">${this.escapeHTML(story.title)}</h2>
+            </div>
+            <button class="rsyc-modal-close" onclick="closeRSYCModal('${modalType}')" style="background:none; border:none; cursor:pointer; font-size: 1.5rem; padding:0.25rem; color:#333; flex-shrink:0;">&times;</button>
+        </div>
+        
+        <div class="rsyc-modal-actions" style="display:flex; gap:0.5rem; flex-wrap:wrap; justify-content:center; align-items:center; margin-bottom:1rem; padding:0.75rem; background:#f8f9fa; border-radius:8px; border:1px solid #e0e0e0;">
+            ${story.primaryCTALink ? `<a class="btn btn-primary" href="${this.escapeHTML(story.primaryCTALink)}" target="_blank" style="background-color:#00929C; border:none; font-size: 0.9rem; padding:0.5rem 1rem;">${this.escapeHTML(story.primaryCTAName || 'Learn More')}</a>` : ''}
+            ${story.secondaryCTALink ? `<a class="btn btn-outline-primary" href="${this.escapeHTML(story.secondaryCTALink)}" target="_blank" style="font-size: 0.9rem; padding:0.5rem 1rem;">${this.escapeHTML(story.secondaryCTAName || 'More Info')}</a>` : ''}
+            ${story.externalUrl ? `<a class="btn btn-outline-secondary" href="${this.escapeHTML(story.externalUrl)}" target="_blank" style="font-size: 0.9rem; padding:0.5rem 1rem;"><i class="bi bi-box-arrow-up-right me-1"></i>Read Full Story</a>` : ''}
+            <button class="rsyc-modal-print" onclick="printStoryModal('story-${story.id}')" style="background:none; border:none; cursor:pointer; font-size: 1.2rem; padding:0.5rem; color:#333;" title="Print or Save as PDF"><i class="bi bi-printer"></i></button>
+        </div>
+        <div class="rsyc-modal-body" style="color:#333;">
+            <div class="mb-3" style="display:flex;align-items:center;justify-content:space-between;gap:0.75rem;">
+                <div>
+                    <div style="font-size: 1.1rem; font-weight:600; color:#0C0C0C;"><strong>${this.escapeHTML(center.name || center.Title)}</strong></div>
+                    ${storyDateFormatted ? `<div class="text-muted" style="font-size: 0.9rem;">${storyDateFormatted}</div>` : ''}
+                </div>
+                <img src="https://thisishoperva.org/rsyc/Red+Shield+Youth+Centers+Logo+-+Color.svg" alt="Red Shield Youth Centers Logo" style="height:42px; max-width:120px; width:auto; object-fit:contain; display:block;" />
+            </div>
+
+            ${story.author ? `<div class="mb-3" style="font-size: 0.95rem; font-style: italic; color:#666;">By ${this.escapeHTML(story.author)}</div>` : ''}
+            
+            ${story.body ? `<div class="mb-3 rsyc-story-body" style="font-size: 1rem; line-height: 1.7; color:#333;">${story.body}</div>` : ''}
+        </div>
+    </div>
+</div>`;
+
+                storyModals += storyModal;
+
+                return `
+                <div class="card shadow border rounded-3 flex-shrink-0" style="width: 280px; scroll-snap-align: start; border: 1px solid #dee2e6; overflow:hidden; position:relative;">
+                    <div style="width:100%; aspect-ratio:1/1; overflow:hidden; background:#f0f0f0; cursor:pointer;" onclick="showRSYCModal('${modalType}', '${this.escapeHTML(center.name || center.Title, true)}')">
+                        ${story.thumbnailImage ? `
+                        <img src="${this.escapeHTML(story.thumbnailImage)}" alt="${this.escapeHTML(story.title)}" style="width:100%; height:100%; object-fit:cover; object-position:center;" />
+                        ` : `
+                        <div style="width:100%; height:100%; display:flex; align-items:center; justify-content:center; background:linear-gradient(135deg, #20B3A8 0%, #2F4857 100%); color:white; font-size:2rem;">
+                            <i class="bi bi-book"></i>
+                        </div>
+                        `}
+                    </div>
+                    <div class="card-body d-flex flex-column">
+                        <div class="fw-bold mb-1" style="font-size: 1.05rem; line-height: 1.3;">${this.escapeHTML(story.title)}</div>
+                        ${storyDateFormatted ? `<div class="text-muted mb-2" style="font-size: 0.9rem;">${storyDateFormatted}</div>` : ''}
+                        <div style="flex-grow:1; font-size: 0.9rem; line-height: 1.5;">
+                            ${story.excerpt ? `<div>${this.escapeHTML(story.excerpt.substring(0, 100))}${story.excerpt.length > 100 ? '...' : ''}</div>` : ''}
+                        </div>
+                        <button type="button" class="btn btn-outline-primary btn-sm mt-2" onclick="showRSYCModal('${modalType}', '${this.escapeHTML(center.name || center.Title, true)}')">Read Story</button>
+                    </div>
+                </div>
+            `;
+        }).join('');
+
+        const scrollHint = sortedStories.length > 3 ? `
+            <p class="text-center mb-n2">
+                <small class="text-muted" style="color:rgba(255,255,255,0.85);">
+                    Scroll to view more
+                    <i class="bi bi-arrow-right-circle" style="font-size: 0.85em; vertical-align: middle;"></i>
+                </small>
+            </p>` : '';
+
+        const justifyContent = 'justify-content-center';
+
+        return `<!-- Stories -->
+<style>
+    #freeTextArea-stories .stories-container {
+        display: flex;
+        gap: 1rem;
+        padding: 0.5rem 0;
+        align-items: stretch;
+    }
+    
+    #freeTextArea-stories .card {
+        width: 280px;
+        border: 1px solid #dee2e6;
+        overflow: hidden;
+        position: relative;
+    }
+    
+    #freeTextArea-stories .card-body {
+        display: flex;
+        flex-direction: column;
+    }
+    
+    @media (min-width: 992px) {
+        #freeTextArea-stories .stories-container {
+            overflow-x: auto;
+            overflow-y: hidden;
+            scroll-snap-type: x mandatory;
+            flex-wrap: nowrap;
+            justify-content: center;
+        }
+        #freeTextArea-stories .stories-container > div {
+            scroll-snap-align: start;
+            flex-shrink: 0;
+        }
+    }
+    
+    @media (max-width: 991px) {
+        #freeTextArea-stories .stories-container {
+            flex-wrap: wrap;
+            justify-content: center;
+            overflow: visible;
+            gap: 1.5rem;
+        }
+        #freeTextArea-stories .stories-container > div {
+            flex-shrink: 0;
+            width: 100%;
+            max-width: 340px;
+        }
+        #freeTextArea-stories .card {
+            width: 100%;
+        }
+        #freeTextArea-stories .card-body {
+            padding: 0.75rem;
+        }
+        #freeTextArea-stories .card-body > div:nth-child(n+2) {
+            font-size: 0.85rem;
+        }
+    }
+</style>
+<div id="freeTextArea-stories" class="freeTextArea section" style="background-color: #20B3A8; display: block !important; visibility: visible !important; opacity: 1 !important; height: auto !important;">
+    <div class="u-positionRelative" style="padding-top: 4rem; padding-bottom: 4rem; display: block !important; visibility: visible !important; opacity: 1 !important;">
+        <div class="container" style="display: block !important; visibility: visible !important; opacity: 1 !important;">
+            <div class="container" style="padding-top: 4.5rem; padding-bottom: 4.5rem; display: block !important; visibility: visible !important; opacity: 1 !important;">
+                <div class="bg-area rounded p-4">
+                    <h2 class="fw-bold mb-4 text-center" style="color:#fff;">Recent <em style="color:#fff;">Stories</em></h2>
+                    ${scrollHint}
+                    <div class="stories-container">
+                        ${storyCards}
+                    </div>
+                    ${storyModals}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>`;
+        } catch (err) {
+            console.error('[RSYC] Error generating stories section:', err);
+            return '';
+        }
     }
 
     /**
@@ -265,10 +832,10 @@ class RSYCTemplates {
         border-top-right-radius: 20px !important;
     }
 </style>
-<div id="freeTextArea-programs" class="freeTextArea u-centerBgImage section u-sa-whiteBg u-coverBgImage">
-    <div class="u-positionRelative" style="padding-top: 5rem; padding-bottom: 5rem;">
-        <div class="container">
-            <div class="container" style="padding-top: 4.5rem; padding-bottom: 4.5rem;">
+<div id="freeTextArea-programs" class="freeTextArea u-centerBgImage section u-sa-whiteBg u-coverBgImage" style="display: block !important; visibility: visible !important; opacity: 1 !important; height: auto !important;">
+    <div class="u-positionRelative" style="padding-top: 5rem; padding-bottom: 5rem; display: block !important; visibility: visible !important; opacity: 1 !important;">
+        <div class="container" style="display: block !important; visibility: visible !important; opacity: 1 !important;">
+            <div class="container" style="padding-top: 4.5rem; padding-bottom: 4.5rem; display: block !important; visibility: visible !important; opacity: 1 !important;">
                 <div class="row align-items-stretch">
                     <!-- Left block: Photo (5 columns) -->
                     <div class="col-lg-5 d-flex">
@@ -311,7 +878,35 @@ ${modal}`;
      * Program Schedules Section
      */
     generateSchedules(data, enabledSections) {
-        const { center, schedules } = data;
+        const { center, schedules, events } = data;
+
+        const formatEventDateTimeParts = (event) => {
+            try {
+                const startTs = Number.isFinite(event._startTimestamp) ? event._startTimestamp : Date.parse(String(event.startDateTime || ''));
+                const endTs = Number.isFinite(event._endTimestamp) ? event._endTimestamp : Date.parse(String(event.endDateTime || ''));
+                const hasStart = startTs && !isNaN(startTs);
+                const hasEnd = endTs && !isNaN(endTs);
+                const start = hasStart ? new Date(startTs) : null;
+                const end = hasEnd ? new Date(endTs) : null;
+
+                const dateFmt = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+                const timeFmt = new Intl.DateTimeFormat('en-US', { hour: 'numeric', minute: '2-digit' });
+
+                if (start && end) {
+                    const sameDay = start.toDateString() === end.toDateString();
+                    return {
+                        dateText: sameDay ? dateFmt.format(start) : `${dateFmt.format(start)} - ${dateFmt.format(end)}`,
+                        timeText: `${timeFmt.format(start)} - ${timeFmt.format(end)}`
+                    };
+                }
+                if (start) {
+                    return { dateText: dateFmt.format(start), timeText: timeFmt.format(start) };
+                }
+                return { dateText: '', timeText: '' };
+            } catch (e) {
+                return { dateText: '', timeText: '' };
+            }
+        };
         
         // Build schedule cards if available
         let scheduleCards = '';
@@ -321,7 +916,14 @@ ${modal}`;
         let scheduleScrollSection = '';
         let scheduleTitleSection = '';
         
-        if (schedules && schedules.length > 0) {
+        const eventCardsSource = Array.isArray(events) ? events : [];
+        const scheduleCardsSource = Array.isArray(schedules) ? schedules : [];
+
+        // Merge events into the same card scroller (Program Schedule cards)
+        // Events are tagged by __type==='event' and have _startTimestamp for sorting.
+        const mergedSchedules = [...scheduleCardsSource, ...eventCardsSource];
+
+        if (mergedSchedules && mergedSchedules.length > 0) {
             // Only show title if there are schedule items
             scheduleTitleSection = `<h2 class="fw-bold mb-4 text-center"><span style="color:#FCA200;">Program </span><em style="color:#ffffff;">Schedule</em></h2>`;
             
@@ -353,7 +955,7 @@ ${modal}`;
             // 4) Start time
             // 5) Fewer days (more specific)
             // 6) End timestamp (earlier end first)
-            const sortedSchedules = [...schedules].sort((a, b) => {
+            const sortedSchedules = [...mergedSchedules].sort((a, b) => {
                 const aStart = Number.isFinite(a._startTimestamp) ? a._startTimestamp : null;
                 const bStart = Number.isFinite(b._startTimestamp) ? b._startTimestamp : null;
                 if (aStart && bStart) {
@@ -390,6 +992,19 @@ ${modal}`;
             });
             
             scheduleCards = sortedSchedules.map(schedule => {
+                const isEvent = schedule && schedule.__type === 'event';
+
+                const eventDateTimeParts = isEvent ? formatEventDateTimeParts(schedule) : { dateText: '', timeText: '' };
+                const eventDateText = eventDateTimeParts.dateText || '';
+                const eventTimeText = eventDateTimeParts.timeText || '';
+                const eventTypeText = isEvent ? (schedule.eventType || '') : '';
+                const eventSubtitleText = isEvent ? (schedule.subtitle || '') : '';
+                const eventCardSubtitleText = isEvent ? (eventSubtitleText || eventTypeText) : '';
+                const onSaleTag = (isEvent && schedule.isOnSale) ? `
+                    <div style="position:absolute; top: 10px; right: 10px; background:#dc3545; color:#fff; font-weight:700; font-size: 0.7rem; padding: 0.25rem 0.5rem; border-radius: 999px; letter-spacing: 0.02em;">
+                        On Sale
+                    </div>` : '';
+
                 // Parse days - format as "Monday - Friday" or list individual days
                 let daysText = '';
                 if (schedule.scheduleDays && Array.isArray(schedule.scheduleDays) && schedule.scheduleDays.length > 0) {
@@ -472,13 +1087,15 @@ ${modal}`;
                 const hasAdditionalInfo = months || registrationMonths || disclaimer;
                 const scheduleId = `schedule-${schedule.id}`;
                 
+                const modalType = isEvent ? `event-${schedule.id}` : `schedule-${schedule.id}`;
+
                 const expandableInfo = `
                     <div class="mt-2" style="display: flex; gap: 0.5rem;">
-                        <button class="btn btn-outline-primary rsyc-details-btn-desktop view-all-btn" data-modal="rsyc-modal-schedule-${schedule.id}" style="font-size: 0.7rem; padding: 0.25rem 0.5rem; display: none;" onclick="showRSYCModal('schedule-${schedule.id}', '${this.escapeHTML(schedule.title, true)}')">
+                        <button class="btn btn-outline-primary rsyc-details-btn-desktop view-all-btn" data-modal="rsyc-modal-${modalType}" style="font-size: 0.7rem; padding: 0.25rem 0.5rem; display: none;" onclick="showRSYCModal('${modalType}', '${this.escapeHTML(center.name || center.Title, true)}')">
                             View Full Details
                         </button>
-                        <button class="btn btn-outline-primary rsyc-details-btn-mobile" style="font-size: 0.7rem; padding: 0.25rem 0.5rem; display: none;" onclick="toggleRSYCAccordion('rsyc-accordion-${schedule.id}')">
-                            <i class="bi bi-chevron-down"></i> More Info
+                        <button class="btn btn-outline-primary rsyc-details-btn-mobile" style="font-size: 0.7rem; padding: 0.25rem 0.5rem; display: none;" onclick="showRSYCModal('${modalType}', '${this.escapeHTML(center.name || center.Title, true)}')">
+                            View Full Details
                         </button>
                     </div>
                 `;
@@ -507,18 +1124,34 @@ ${modal}`;
                 </div>
             ` : ''}
             ${schedule.centerName ? `<div class="mb-3" style="display:flex;align-items:center;justify-content:space-between;gap:0.75rem;">
-                <div style="font-size:1.1rem; font-weight:600; color:#0C0C0C;"><strong>The Salvation Army ${this.escapeHTML(center.name || center.Title)}</strong></div>
+                <div style="font-size:1.1rem; font-weight:600; color:#0C0C0C;"><strong>${this.escapeHTML(center.name || center.Title)}</strong></div>
                 <img src="https://thisishoperva.org/rsyc/Red+Shield+Youth+Centers+Logo+-+Color.svg" alt="Red Shield Youth Centers Logo" style="height:42px; max-width:120px; width:auto; object-fit:contain; display:block;" />
             </div>` : ''}
             ${schedule.title ? `<h3 class="mb-2" style="color:#333;">${this.escapeHTML(schedule.title)}</h3>` : ''}
-            ${schedule.subtitle ? `<p class="mb-3" style="color:#666; font-style:italic;">${this.escapeHTML(schedule.subtitle)}</p>` : ''}
+            ${isEvent && (eventTypeText || eventSubtitleText) ? `<div class="mb-3" style="font-size: 1.1rem; color:#333;">
+                ${eventTypeText ? `<div><strong>Type:</strong><br>${this.escapeHTML(eventTypeText)}</div>` : ''}
+                ${eventSubtitleText ? `<div style="margin-top:0.5rem;"><strong>Subtitle:</strong><br>${this.escapeHTML(eventSubtitleText)}</div>` : ''}
+            </div>` : ''}
+            ${(!isEvent && schedule.subtitle) ? `<p class="mb-3" style="color:#666; font-style:italic;">${this.escapeHTML(schedule.subtitle)}</p>` : ''}
             ${schedule.description ? `<p class="mb-1 rsyc-description">${schedule.description}</p>` : ''}
+            ${isEvent && (eventDateText || eventTimeText) ? `<div class="mb-3" style="font-size: 1.1rem; color:#333;">
+                ${eventDateText ? `<div><strong>Date:</strong><br>${this.escapeHTML(eventDateText)}</div>` : ''}
+                ${eventTimeText ? `<div style="margin-top:0.5rem;"><strong>Time:</strong><br>${this.escapeHTML(eventTimeText)}</div>` : ''}
+            </div>` : ''}
+            ${isEvent && schedule.cost ? `<div class="mb-3" style="font-size: 1.1rem; color:#333;"><strong>Cost:</strong><br>${this.escapeHTML(schedule.cost)}</div>` : ''}
+
+            ${isEvent && (schedule.primaryButtonUrl || schedule.secondaryButtonUrl) ? `
+            <div class="mb-4" style="display:flex; gap:0.5rem; flex-wrap:wrap; align-items:center;">
+                ${schedule.primaryButtonUrl ? `<a class="btn btn-primary" href="${this.escapeHTML(schedule.primaryButtonUrl)}" target="_blank" rel="noopener noreferrer" style="background-color:#00929C; border:none;">${this.escapeHTML(schedule.primaryButtonText || 'Learn More')}</a>` : ''}
+                ${schedule.secondaryButtonUrl ? `<a class="btn btn-outline-primary" href="${this.escapeHTML(schedule.secondaryButtonUrl)}" target="_blank" rel="noopener noreferrer">${this.escapeHTML(schedule.secondaryButtonText || 'More Info')}</a>` : ''}
+            </div>
+            ` : ''}
             
             ${hasContent(schedule.scheduleDisclaimer) ? `<div class="mb-4 rsyc-important-dates" style="background:#fff3cd; padding:1rem; border-radius:6px; border-left:3px solid #ff6b6b; color:#000;"><strong class="rsyc-important-dates-title" style="color:#000;"><i class="bi bi-exclamation-triangle me-2"></i>Important Dates/Closures:</strong><br><div class="mt-2 rsyc-important-dates-body" style="font-size:0.95rem;">${this.escapeHTML(schedule.scheduleDisclaimer)}</div></div>` : ''}
             
             <div class="row">
-                ${hasContent(daysText) ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Days:</strong><br>${this.escapeHTML(daysText)}</div>` : ''}
-                ${hasContent(timeText) ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Time:</strong><br>${this.escapeHTML(timeText)}</div>` : ''}
+                ${(!isEvent && hasContent(daysText)) ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Days:</strong><br>${this.escapeHTML(daysText)}</div>` : ''}
+                ${(!isEvent && hasContent(timeText)) ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Time:</strong><br>${this.escapeHTML(timeText)}</div>` : ''}
                 ${hasContent(months) ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Program Runs In:</strong><br>${this.escapeHTML(months)}</div>` : ''}
                 ${hasContent(registrationMonths) ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Registration Opens:</strong><br>${this.escapeHTML(registrationMonths)}</div>` : ''}
                 ${hasContent(schedule.registrationFee) ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Registration Fee:</strong><br>${this.escapeHTML(schedule.registrationFee)}</div>` : ''}
@@ -526,15 +1159,15 @@ ${modal}`;
                 ${hasContent(schedule.startDate) || hasContent(schedule.endDate) ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Program Dates:</strong><br>${hasContent(schedule.startDate) ? this.escapeHTML(schedule.startDate) : ''} ${hasContent(schedule.startDate) && hasContent(schedule.endDate) ? '-' : ''} ${hasContent(schedule.endDate) ? this.escapeHTML(schedule.endDate) : ''}</div>` : ''}
                 
                 ${hasContent(schedule.registrationDeadline) ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Registration Deadline:</strong><br>${this.escapeHTML(schedule.registrationDeadline)}</div>` : ''}
-                ${hasContent(schedule.location) ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Location:</strong><br>${this.escapeHTML(schedule.location)}</div>` : ''}
-                ${hasContent(schedule.cost) ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Cost:</strong><br>${this.escapeHTML(schedule.cost)}</div>` : ''}
+                ${(!isEvent && hasContent(schedule.location)) ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Location:</strong><br>${this.escapeHTML(schedule.location)}</div>` : ''}
+                ${(!isEvent && hasContent(schedule.cost)) ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Cost:</strong><br>${this.escapeHTML(schedule.cost)}</div>` : ''}
                 ${hasContent(schedule.frequency) ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Frequency:</strong><br>${this.escapeHTML(schedule.frequency)}</div>` : ''}
                 ${hasContent(months) ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Program Runs In:</strong><br>${this.escapeHTML(months)}</div>` : ''}
                 ${hasContent(registrationMonths) ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Registration Opens:</strong><br>${this.escapeHTML(registrationMonths)}</div>` : ''}
                 ${hasContent(schedule.registrationDeadline) ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Registration Deadline:</strong><br>${this.escapeHTML(schedule.registrationDeadline)}</div>` : ''}
                 ${hasContent(schedule.registrationFee) ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Registration Fee:</strong><br>${this.escapeHTML(schedule.registrationFee)}</div>` : ''}
-                ${hasContent(schedule.cost) ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Cost:</strong><br>${this.escapeHTML(schedule.cost)}</div>` : ''}
-                ${hasContent(schedule.location) ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Location:</strong><br>${this.escapeHTML(schedule.location)}</div>` : ''}
+                ${(!isEvent && hasContent(schedule.cost)) ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Cost:</strong><br>${this.escapeHTML(schedule.cost)}</div>` : ''}
+                ${(!isEvent && hasContent(schedule.location)) ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Location:</strong><br>${this.escapeHTML(schedule.location)}</div>` : ''}
                 ${hasContent(schedule.capacity) ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Capacity:</strong><br>${this.escapeHTML(schedule.capacity)}</div>` : ''}
                 
                 ${hasContent(schedule.agesServed?.join(', ')) ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Ages:</strong><br>${this.escapeHTML(schedule.agesServed.join(', '))}</div>` : ''}
@@ -608,7 +1241,7 @@ ${modal}`;
 
                 // Build accordion version for small screens/iPad with same content as modal
                 const accordionId = `rsyc-accordion-${schedule.id}`;
-                const scheduleAccordion = `
+                const scheduleAccordion = isEvent ? '' : `
                 <div class="rsyc-schedule-accordion" style="width: 100%; margin-bottom: 1rem; border-radius: 8px; overflow: hidden; border: 1px solid #e0e0e0; background: white;">
                     <div class="accordion-header" style="padding: 1rem; cursor: pointer; display: flex; justify-content: space-between; align-items: center; background: #f8f9fa; border-bottom: 1px solid #e0e0e0; color: #000;" onclick="window.toggleRSYCAccordion('${accordionId}')">
                         <div style="color: #000;">
@@ -633,7 +1266,7 @@ ${modal}`;
                             </div>
                         ` : ''}
                         ${schedule.centerName ? `<div class="mb-3" style="display:flex;align-items:center;justify-content:space-between;gap:0.75rem;">
-                            <div style="font-size:1.1rem; font-weight:600; color:#0C0C0C;"><strong>The Salvation Army ${this.escapeHTML(center.name || center.Title)}</strong></div>
+                            <div style="font-size:1.1rem; font-weight:600; color:#0C0C0C;"><strong>${this.escapeHTML(center.name || center.Title)}</strong></div>
                             <img src="https://thisishoperva.org/rsyc/Red+Shield+Youth+Centers+Logo+-+Color.svg" alt="Red Shield Youth Centers Logo" style="height:36px; max-width:100px; width:auto; object-fit:contain; display:block;" />
                         </div>` : ''}
                         ${schedule.title ? `<h3 class="mb-2" style="color:#333;">${this.escapeHTML(schedule.title)}</h3>` : ''}
@@ -710,21 +1343,28 @@ ${modal}`;
                 </div>
                 `;
                 
-                // append the modal markup to the accumulated modals
-                scheduleModals += scheduleModal;
+                // Only append schedule modals for non-events.
+                // Events reuse the shared event modal defined in the Events section.
+                if (!isEvent) {
+                    scheduleModals += scheduleModal;
+                }
 
                 return `
                     <div>
                         <!-- Desktop Card Version -->
-                        <div class="schedule-card rsyc-schedule-card-desktop text-dark" style="min-width:230px;padding:1rem;border-radius:8px;background:#fff;box-shadow:0 1px 4px rgba(0,0,0,0.06);display:flex;flex-direction:column;height:100%;gap:0.75rem;">
+                        <div class="schedule-card rsyc-schedule-card-desktop text-dark" style="min-width:230px;padding:1rem;border-radius:8px;background:#fff;box-shadow:0 1px 4px rgba(0,0,0,0.06);display:flex;flex-direction:column;height:100%;gap:0.75rem; position:relative;">
+                            ${onSaleTag}
                             <div style="flex-shrink:0;">
                                 <h5 class="fw-bold mb-1">${this.escapeHTML(schedule.title)}</h5>
-                                ${schedule.subtitle ? `<div class="text-muted small">${this.escapeHTML(schedule.subtitle)}</div>` : ''}
+                                ${isEvent && eventCardSubtitleText ? `<div class="text-muted small">${this.escapeHTML(eventCardSubtitleText)}</div>` : ''}
+                                ${!isEvent && schedule.subtitle ? `<div class="text-muted small">${this.escapeHTML(schedule.subtitle)}</div>` : ''}
                             </div>
                             <div style="flex-grow:1;display:flex;flex-direction:column;">
                                 <p class="mb-0">
-                                    ${daysText ? `<strong>Days:</strong> <span class="d-inline-block">${this.escapeHTML(daysText)}</span><br>` : ''}
-                                    ${timeText ? `<strong>Time:</strong> ${this.escapeHTML(timeText)}<br>` : ''}
+                                    ${isEvent && eventDateText ? `<strong>Date:</strong> ${this.escapeHTML(eventDateText)}<br>` : ''}
+                                    ${isEvent && eventTimeText ? `<strong>Time:</strong> ${this.escapeHTML(eventTimeText)}<br>` : ''}
+                                    ${!isEvent && daysText ? `<strong>Days:</strong> <span class="d-inline-block">${this.escapeHTML(daysText)}</span><br>` : ''}
+                                    ${!isEvent && timeText ? `<strong>Time:</strong> ${this.escapeHTML(timeText)}<br>` : ''}
                                 </p>
                             </div>
                             <div style="flex-shrink:0;">
@@ -743,8 +1383,8 @@ ${modal}`;
             }).join('');
             
             // Conditionally center if 3 or fewer cards, otherwise left-align for proper scrolling
-            const justifyContent = schedules.length <= 3 ? 'justify-content-center' : '';
-            const scrollHint = schedules.length > 3 ? `
+            const justifyContent = mergedSchedules.length <= 3 ? 'justify-content-center' : '';
+            const scrollHint = mergedSchedules.length > 3 ? `
     <p class="text-center mb-n2">
         <small class="text-light">
             Scroll to view more 
@@ -823,9 +1463,9 @@ ${modal}`;
         }
 
         return `<!-- Program Schedules -->
-<div id="freeTextArea-schedules" class="freeTextArea u-centerBgImage section u-coverBgImage" style="background-color: #00929C;">
-    <div class="u-positionRelative">
-        <div class="container">
+<div id="freeTextArea-schedules" class="freeTextArea u-centerBgImage section u-coverBgImage" style="background-color: #00929C; display: block !important; visibility: visible !important; opacity: 1 !important; height: auto !important;">
+    <div class="u-positionRelative" style="display: block !important; visibility: visible !important; opacity: 1 !important;">
+        <div class="container" style="display: block !important; visibility: visible !important; opacity: 1 !important;">
             <div class="mt-0 mb-5">
                 ${scheduleTitleSection}
                 
@@ -1017,9 +1657,9 @@ ${summerHoursLines}
 		symphony.operationHoursSections = symphony.operationHoursSections || [];
 	</script>
 
-    <div class="section operationHoursAdvanced-container">
+    <div class="section operationHoursAdvanced-container" style="display: block !important; visibility: visible !important; opacity: 1 !important; height: auto !important;">
 
-		<div class="container">
+		<div class="container" style="display: block !important; visibility: visible !important; opacity: 1 !important;">
 
 						<div id="operationHoursAdvanced-${regularId}" class="operationHoursAdvanced-featured">
 							<div class="operationHoursAdvanced-head" style="background-image:url(https://s3.amazonaws.com/uss-cache.salvationarmy.org/cf37a78a-dde2-45fb-8f51-3440812a0bc1_School+Books+Background.jpg)"></div>
@@ -1131,10 +1771,10 @@ ${summerSection}
         }
 
         return `<!-- Facility Features -->
-<div id="freeTextArea-facilities" class="freeTextArea u-centerBgImage section u-sa-creamBg u-coverBgImage">
-    <div class="u-positionRelative" style="padding-top: 5rem; padding-bottom: 5rem;">
-        <div class="container">
-            <div class="container" style="padding-top: 4.5rem; padding-bottom: 4.5rem;">
+<div id="freeTextArea-facilities" class="freeTextArea u-centerBgImage section u-sa-creamBg u-coverBgImage" style="display: block !important; visibility: visible !important; opacity: 1 !important; height: auto !important;">
+    <div class="u-positionRelative" style="padding-top: 5rem; padding-bottom: 5rem; display: block !important; visibility: visible !important; opacity: 1 !important;">
+        <div class="container" style="display: block !important; visibility: visible !important; opacity: 1 !important;">
+            <div class="container" style="padding-top: 4.5rem; padding-bottom: 4.5rem; display: block !important; visibility: visible !important; opacity: 1 !important;">
                 <div class="row align-items-stretch">
                     <!-- Left block: Facility Features (7 columns) -->
                     <div class="col-lg-7 d-flex order-2 order-lg-1">
@@ -1176,11 +1816,12 @@ ${modal}`;
      * Staff & Leadership Section
      */
     generateStaff(data) {
-        const { leaders } = data;
-        if (!leaders || leaders.length === 0) return '';
+        try {
+            const { leaders, center } = data;
+            if (!leaders || leaders.length === 0) return '';
 
-        // Default photo for all staff - will be manually replaced later
-        const defaultPhoto = 'https://8hxvw8tw.media.zestyio.com/SAL_Leaders_Desktop-2.png';
+            // Default photo for all staff - will be manually replaced later
+            const defaultPhoto = 'https://8hxvw8tw.media.zestyio.com/SAL_Leaders_Desktop-2.png';
 
         // Order staff by prioritized role types. This list is configurable from the publisher UI
         // and is saved to localStorage under 'rsycRoleOrder'. The UI script (rsyc-staff-order.js)
@@ -1308,6 +1949,8 @@ ${modal}`;
 
             const title = leader.positionTitle || leader.roleType || 'Role or Title';
             const bio = leader.biography || 'This is a short description or contact info placeholder text. Keep it concise so all cards align perfectly.';
+            const staffId = leader.id || this.slugify(`${displayName}-${title}`);
+            const modalType = `staff-${this.escapeHTML(String(staffId), true)}`;
 
             // Prefer leader-specific image fields when available, fall back to person-level fields (including person.picture), then default
             const photo = (
@@ -1324,17 +1967,103 @@ ${modal}`;
 
             return `
 		<div class="card shadow border rounded-3 flex-shrink-0" style="width: 280px; scroll-snap-align: start; border: 1px solid #dee2e6; overflow:hidden;">
-			<div style="width:100%; aspect-ratio:1/1; overflow:hidden; background:#f0f0f0;">
+			<div style="width:100%; aspect-ratio:1/1; overflow:hidden; background:#f0f0f0; cursor:pointer;" onclick="showRSYCModal('${modalType}', '${this.escapeHTML(center.name || center.Title, true)}')">
 				<img alt="${this.escapeHTML(displayName)}" class="card-img-top" src="${this.escapeHTML(photo)}" style="width:100%; height:100%; object-fit:cover; ${objectPositionStyle} ${scaleStyle} display:block;">
 			</div>
 			<div class="card-body d-flex flex-column">
 				<div class="fw-bold mb-1" style="font-size: 1.1rem; line-height: 1.3;">${this.escapeHTML(displayName)}</div>
 				<div class="text-muted mb-2" style="font-size: 0.95rem;">${this.escapeHTML(title)}</div>
-				<p class="card-text" style="flex-grow:1; font-size: 0.875rem; line-height: 1.5;">
-					${this.escapeHTML(bio)}
-				</p>
+				<div style="flex-grow:1;"></div>
+				<button type="button" class="btn btn-outline-primary btn-sm mt-2" onclick="showRSYCModal('${modalType}', '${this.escapeHTML(center.name || center.Title, true)}')">View Bio</button>
 			</div>
 		</div>`;
+        }).join('\n');
+
+        const staffModalGroupKey = (data && data.center && (data.center.id || data.center.sharePointId))
+            ? `center-${this.escapeHTML(String(data.center.id || data.center.sharePointId), true)}`
+            : `center-${this.slugify((data && data.center && (data.center.name || data.center.Title)) ? (data.center.name || data.center.Title) : 'center')}`;
+
+        const showStaffNav = sorted.length > 1;
+
+        const staffModals = sorted.map((leader, idx) => {
+            const person = leader.person || {};
+            const primaryName = person.name || '';
+            const alternate = leader.alternateName || '';
+
+            let displayName = primaryName || alternate || 'Firstname Lastname';
+            if (primaryName && alternate && primaryName.trim() !== alternate.trim()) {
+                displayName = `${primaryName} (${alternate})`;
+            }
+
+            const title = leader.positionTitle || leader.roleType || 'Role or Title';
+            const bio = leader.biography || '';
+
+            const staffId = leader.id || this.slugify(`${displayName}-${title}`);
+            const modalType = `staff-${this.escapeHTML(String(staffId), true)}`;
+
+            const defaultPhoto = 'https://8hxvw8tw.media.zestyio.com/SAL_Leaders_Desktop-2.png';
+            const photo = (
+                leader.imageURL || leader.ImageURL || leader.imageUrl || leader.image || leader.photo || leader.photoUrl || leader.photoURL ||
+                (person && (person.picture || person.imageURL || person.imageUrl || person.photo || person.photoUrl || person.image)) ||
+                defaultPhoto
+            );
+
+            const faceFocus = leader.faceFocus || 'top center';
+            const zoomLevel = leader.zoomLevel || 1;
+            const scaleStyle = zoomLevel !== 1 ? `transform:scale(${zoomLevel});` : '';
+            const objectPositionStyle = `object-position:${faceFocus};`;
+
+            const safeBio = bio && bio.trim() ? bio : 'Staff member of The Salvation Army.';
+
+            const centerName = (data && data.center && (data.center.name || data.center.Title)) ? (data.center.name || data.center.Title) : '';
+            const centerCity = (data && data.center && data.center.city) ? data.center.city : '';
+            const centerState = (data && data.center && data.center.state) ? data.center.state : '';
+            const centerLocation = centerCity ? `${centerCity}${centerState ? ', ' + centerState : ''}` : (centerState || '');
+
+            return `
+<div id="rsyc-modal-${modalType}" class="rsyc-modal" style="display:none;" data-rsyc-staff-group="${staffModalGroupKey}" data-rsyc-staff-index="${idx}">
+    <div class="rsyc-modal-content">
+        <div class="rsyc-modal-header">
+            <h3>${this.escapeHTML(displayName)}</h3>
+            <button class="rsyc-modal-close" onclick="closeRSYCModal('${modalType}')">&times;</button>
+        </div>
+        <div class="rsyc-modal-body" style="background-color:#F7A200; position:relative; padding-left: clamp(28px, 7vw, 84px); padding-right: clamp(28px, 7vw, 84px);">
+            ${showStaffNav ? `
+            <button type="button" aria-label="Previous staff" onclick="rsycNavigateStaffModal('${staffModalGroupKey}', ${idx}, -1)" style="position:absolute; left: 14px; top: 50%; transform: translateY(-50%); width: 48px; height: 48px; padding: 10px; border-radius: 50%; border: 1px solid rgba(255,255,255,0.65); background: rgba(0,0,0,0.18); color: #fff; display:flex; align-items:center; justify-content:center; z-index: 1000002; cursor:pointer; pointer-events:auto;">
+                <i class="bi bi-chevron-left"></i>
+            </button>
+            <button type="button" aria-label="Next staff" onclick="rsycNavigateStaffModal('${staffModalGroupKey}', ${idx}, 1)" style="position:absolute; right: 14px; top: 50%; transform: translateY(-50%); width: 48px; height: 48px; padding: 10px; border-radius: 50%; border: 1px solid rgba(255,255,255,0.65); background: rgba(0,0,0,0.18); color: #fff; display:flex; align-items:center; justify-content:center; z-index: 1000002; cursor:pointer; pointer-events:auto;">
+                <i class="bi bi-chevron-right"></i>
+            </button>
+            ` : ''}
+            <div class="row g-4 align-items-start">
+                <div class="col-12 col-lg-5">
+                    <div class="card shadow border rounded-3" style="border: 1px solid #dee2e6; overflow:hidden;">
+                        <div style="width:100%; aspect-ratio:1/1; overflow:hidden; background:#f0f0f0;">
+                            <img alt="${this.escapeHTML(displayName)}" class="card-img-top" src="${this.escapeHTML(photo)}" style="width:100%; height:100%; object-fit:cover; ${objectPositionStyle} ${scaleStyle} display:block;">
+                        </div>
+                        <div class="card-body">
+                            <div class="fw-bold mb-1" style="font-size: 1.1rem; line-height: 1.3;">${this.escapeHTML(displayName)}</div>
+                            <div class="text-muted" style="font-size: 0.95rem;">${this.escapeHTML(title)}</div>
+                            ${centerName ? `<div class="text-muted" style="margin-top: 0.75rem; font-size: 0.9rem; line-height: 1.4;">
+                                <div><i class="bi bi-building" style="margin-right: 0.35rem;"></i>${this.escapeHTML(centerName)}</div>
+                                ${centerLocation ? `<div><i class="bi bi-geo-alt" style="margin-right: 0.35rem;"></i>${this.escapeHTML(centerLocation)}</div>` : ''}
+                            </div>` : ''}
+                        </div>
+                    </div>
+                </div>
+                <div class="col-12 col-lg-7">
+                    <div class="card border rounded-3" style="border: 1px solid #dee2e6;">
+                        <div class="card-body">
+                            <div class="fw-bold mb-2" style="font-size: 1.1rem;">Bio</div>
+                            <div style="white-space: pre-wrap; font-size: 1rem; line-height: 1.7;">${this.escapeHTML(safeBio)}</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>`;
         }).join('\n');
 
         // Conditionally show scroll hint if there are more than 3 leaders
@@ -1350,10 +2079,10 @@ ${modal}`;
         const justifyContent = sorted.length <= 3 ? 'justify-content-center' : '';
 
         return `<!-- Staff & Community Leaders -->
-<div id="freeTextArea-staff" class="freeTextArea u-centerBgImage section u-coverBgImage" style="background-color: #F7A200;">
-    <div class="u-positionRelative" style="padding-top: 5rem; padding-bottom: 5rem;">
-        <div class="container">
-            <div class="container" style="padding-top: 4.5rem; padding-bottom: 4.5rem;">
+<div id="freeTextArea-staff" class="freeTextArea u-centerBgImage section u-coverBgImage" style="background-color: #F7A200; display: block !important; visibility: visible !important; opacity: 1 !important; height: auto !important;">
+    <div class="u-positionRelative" style="padding-top: 5rem; padding-bottom: 5rem; display: block !important; visibility: visible !important; opacity: 1 !important;">
+        <div class="container" style="display: block !important; visibility: visible !important; opacity: 1 !important;">
+            <div class="container" style="padding-top: 4.5rem; padding-bottom: 4.5rem; display: block !important; visibility: visible !important; opacity: 1 !important;">
                 <div class="bg-area rounded p-4" id="profiles">
                     <h2 class="fw-bold mb-4 text-center"><span style="color:#ffffff;">Staff &amp; <em style="color:#ffffff;">Community Leaders</em></span></h2>
                     ${scrollHint}
@@ -1361,11 +2090,17 @@ ${modal}`;
                     <div class="d-flex overflow-auto gap-4 py-2 ${justifyContent}" style="scroll-snap-type: x mandatory;">
                         ${staffCards}
                     </div>
+
+                    ${staffModals}
                 </div>
             </div>
         </div>
     </div>
 </div>`;
+        } catch (err) {
+            console.error('[RSYC] Error generating staff section:', err);
+            return '';
+        }
     }
 
     /**
@@ -1379,10 +2114,10 @@ ${modal}`;
         const zipCode = center.zip || '27107';
         
         return `<!-- Nearby Salvation Army Centers -->
-<div id="freeTextArea-nearby" class="freeTextArea u-centerBgImage section u-sa-greyVeryLightBg u-coverBgImage">
+<div id="freeTextArea-nearby" class="freeTextArea u-centerBgImage section u-sa-greyVeryLightBg u-coverBgImage" style="display: block !important; visibility: visible !important; opacity: 1 !important; height: auto !important;">
     <div class="u-positionRelative" style="padding-top: 5rem; padding-bottom: 5rem;">
         <div class="container">
-            <div class="container" style="padding-top: 4.5rem; padding-bottom: 4.5rem;">
+            <div class="container" style="padding-top: 4.5rem; padding-bottom: 4.5rem; display: block !important; visibility: visible !important; opacity: 1 !important;">
                 <div class="row align-items-stretch flex-column-reverse flex-md-row">
                     <!-- Left block: Nearby Centers card (7 columns) -->
                     <div class="col-md-7 d-flex mb-4 mb-md-0">
@@ -1524,11 +2259,11 @@ ${modal}`;
 </div>`;
         
         return `<!-- For Parents -->
-<div id="freeTextArea-parents" class="freeTextArea u-centerBgImage section u-sa-whiteBg u-coverBgImage">
-    <div class="u-positionRelative" style="padding-top: 5rem; padding-bottom: 5rem;">
-        <div class="container">
+<div id="freeTextArea-parents" class="freeTextArea u-centerBgImage section u-sa-whiteBg u-coverBgImage" style="display: block !important; visibility: visible !important; opacity: 1 !important; height: auto !important;">
+    <div class="u-positionRelative" style="padding-top: 5rem; padding-bottom: 5rem; display: block !important; visibility: visible !important; opacity: 1 !important;">
+        <div class="container" style="display: block !important; visibility: visible !important; opacity: 1 !important;">
             ${growthModal}
-            <div class="container" style="padding-top: 4.5rem; padding-bottom: 4.5rem;">
+            <div class="container" style="padding-top: 4.5rem; padding-bottom: 4.5rem; display: block !important; visibility: visible !important; opacity: 1 !important;">
                 <div class="row align-items-stretch">
                     <!-- Left block: Photo (5 columns) -->
                     <div class="col-lg-5 d-flex">
@@ -1594,9 +2329,9 @@ ${modal}`;
         const searchURL = registrationURL.replace(/#\/dashboard$/, '#/search');
 
         const html = `
-<div id="freeTextArea-youth" data-index="7" class="freeTextArea u-centerBgImage section u-sa-creamBg u-coverBgImage">
-    <div class="u-positionRelative" style="padding-top: 5rem; padding-bottom: 5rem;">
-        <div class="container">
+<div id="freeTextArea-youth" data-index="7" class="freeTextArea u-centerBgImage section u-sa-creamBg u-coverBgImage" style="display: block !important; visibility: visible !important; opacity: 1 !important; height: auto !important;">
+    <div class="u-positionRelative" style="padding-top: 5rem; padding-bottom: 5rem; display: block !important; visibility: visible !important; opacity: 1 !important;">
+        <div class="container" style="display: block !important; visibility: visible !important; opacity: 1 !important;">
             <div class="container" style="padding-top: 4.5rem; padding-bottom: 4.5rem;">
                 <div class="row align-items-stretch">
                     <!-- Left block: Hover card (7 columns) -->
@@ -1647,10 +2382,10 @@ ${modal}`;
         const nearbyPhoto = photoData?.urlNearbyCentersPhoto || 'https://s3.amazonaws.com/uss-cache.salvationarmy.org/71fe3cd2-5a53-4557-91ea-bb40ab76e2f5_nearby-corps-1.jpg';
 
         return `<!-- Nearby Salvation Army Centers -->
-<div id="freeTextArea-nearby" class="freeTextArea u-centerBgImage section u-sa-greyVeryLightBg u-coverBgImage">
-    <div class="u-positionRelative" style="padding-top: 5rem; padding-bottom: 5rem;">
-        <div class="container">
-            <div class="container" style="padding-top: 4.5rem; padding-bottom: 4.5rem;">
+<div id="freeTextArea-nearby" class="freeTextArea u-centerBgImage section u-sa-greyVeryLightBg u-coverBgImage" style="display: block !important; visibility: visible !important; opacity: 1 !important; height: auto !important;">
+    <div class="u-positionRelative" style="padding-top: 5rem; padding-bottom: 5rem; display: block !important; visibility: visible !important; opacity: 1 !important;">
+        <div class="container" style="display: block !important; visibility: visible !important; opacity: 1 !important;">
+            <div class="container" style="padding-top: 4.5rem; padding-bottom: 4.5rem; display: block !important; visibility: visible !important; opacity: 1 !important;">
                 <div class="row align-items-stretch flex-column-reverse flex-lg-row">
                     <!-- Left block: Nearby Centers card (7 columns) -->
                     <div class="col-lg-7 d-flex mb-4 mb-lg-0">
@@ -1792,9 +2527,9 @@ ${modal}`;
 </div>`;
 
         const html = `
-<div id="freeTextArea-volunteer" data-index="8" class="freeTextArea u-centerBgImage section u-sa-whiteBg u-coverBgImage">
-    <div class="u-positionRelative" style="padding-top: 5rem; padding-bottom: 5rem;">
-        <div class="container">
+<div id="freeTextArea-volunteer" data-index="8" class="freeTextArea u-centerBgImage section u-sa-whiteBg u-coverBgImage" style="display: block !important; visibility: visible !important; opacity: 1 !important; height: auto !important;">
+    <div class="u-positionRelative" style="padding-top: 5rem; padding-bottom: 5rem; display: block !important; visibility: visible !important; opacity: 1 !important;">
+        <div class="container" style="display: block !important; visibility: visible !important; opacity: 1 !important;">
             <div class="container" style="padding-top: 4.5rem; padding-bottom: 4.5rem;">
                 <div class="row align-items-stretch">
                     <!-- Left block: Photo (5 columns) -->
@@ -1894,8 +2629,8 @@ ${legacyModal}
         }
 
         return `<!-- Footer Photo Section -->
-<section id="freeTextArea-footerPhoto" class="freeTextArea u-centerBgImage section u-coverBgImage" style="min-height: 400px; background-image: url('${this.escapeHTML(footerPhoto)}'); background-size: cover; background-position: ${bgPosition} !important;">
-    <div class="u-positionRelative" style="min-height: 400px;">
+<section id="freeTextArea-footerPhoto" class="freeTextArea u-centerBgImage section u-coverBgImage" style="min-height: 400px; background-image: url('${this.escapeHTML(footerPhoto)}'); background-size: cover; background-position: ${bgPosition} !important; display: block !important; visibility: visible !important; opacity: 1 !important;">
+    <div class="u-positionRelative" style="min-height: 400px; display: block !important; visibility: visible !important; opacity: 1 !important;">
         <!-- Empty content - just showing the photo -->
     </div>
 </section>`;
@@ -1963,9 +2698,9 @@ div #freeTextArea-0 {
 }
 </style>
 
-<div id="freeTextArea-scripture" data-index="10" class="freeTextArea u-centerBgImage section u-sa-tealBg u-coverBgImage">
-    <div class="u-positionRelative">
-        <div class="container">
+<div id="freeTextArea-scripture" data-index="10" class="freeTextArea u-centerBgImage section u-sa-tealBg u-coverBgImage" style="display: block !important; visibility: visible !important; opacity: 1 !important; height: auto !important;">
+    <div class="u-positionRelative" style="display: block !important; visibility: visible !important; opacity: 1 !important;">
+        <div class="container" style="display: block !important; visibility: visible !important; opacity: 1 !important;">
             
             <p>&nbsp;</p><p>&nbsp;</p>
             
@@ -2221,12 +2956,19 @@ div #freeTextArea-0 {
 
     /**
      * Escape HTML to prevent XSS
+     * @param {string} str - The string to escape
+     * @param {boolean} forAttribute - If true, return a version safe for HTML attributes (removes quotes for onclick compatibility)
      */
-    escapeHTML(str) {
+    escapeHTML(str, forAttribute = false) {
         if (!str) return '';
         const div = document.createElement('div');
         div.textContent = str;
-        return div.innerHTML;
+        let escaped = div.innerHTML;
+        // If for use in HTML attributes, remove problematic characters that could break onclick handlers
+        if (forAttribute) {
+            escaped = escaped.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+        }
+        return escaped;
     }
 
     /**
@@ -2286,9 +3028,12 @@ div #freeTextArea-0 {
 
 // Export class to global scope
 window.RSYCTemplates = RSYCTemplates;
+} // End if RSYCTemplates undefined
 
 // Create global instance
-window.rsycTemplates = new RSYCTemplates();
+if (!window.rsycTemplates) {
+    window.rsycTemplates = new window.RSYCTemplates();
+}
 
 // Print function for modal content - Mobile-friendly with fallback
 async function printRSYCModal(modalId) {
@@ -2297,15 +3042,18 @@ async function printRSYCModal(modalId) {
     
     const printDate = new Date().toLocaleDateString('en-US');
     
-    // Extract schedule title and center name from modal
-    const titleElement = modal.querySelector('.rsyc-modal-body h3');
-    const scheduleTitle = titleElement ? titleElement.textContent.trim() : 'Schedule';
-    
-    const centerElement = modal.querySelector('.rsyc-modal-body > div:first-child');
-    const centerName = centerElement ? centerElement.textContent.trim().replace('The Salvation Army ', '') : '';
+    // Extract title and center name from modal
+    const isEventModal = typeof modalId === 'string' && modalId.startsWith('event-');
+    const titleElement = isEventModal
+        ? modal.querySelector('.rsyc-modal-header h3')
+        : modal.querySelector('.rsyc-modal-body h3');
+    const scheduleTitle = isEventModal ? 'Event Details' : (titleElement ? titleElement.textContent.trim() : 'Schedule');
+
+    const centerStrong = modal.querySelector('.rsyc-modal-body strong');
+    const centerName = centerStrong ? centerStrong.textContent.trim() : '';
     
     // Create print window title
-    const printTitle = centerName ? `${scheduleTitle} - ${centerName} - ${printDate}` : `${scheduleTitle} - ${printDate}`;
+    const printTitle = isEventModal ? `${scheduleTitle} - ${printDate}` : (centerName ? `${scheduleTitle} - ${centerName} - ${printDate}` : `${scheduleTitle} - ${printDate}`);
     
     // Get modal content and clone it
     const modalContent = modal.querySelector('.rsyc-modal-content');
@@ -2321,6 +3069,14 @@ async function printRSYCModal(modalId) {
     // Clean up cloned content
     const existingLogoEl = printContent.querySelector('img[alt="Red Shield Youth Centers Logo"]');
     if (existingLogoEl) existingLogoEl.remove();
+    
+    // For event modals, remove the center name div from body (it's in the header)
+    if (isEventModal) {
+        const centerNameDiv = printContent.querySelector('.rsyc-modal-body > div.mb-3');
+        if (centerNameDiv && centerNameDiv.querySelector('strong') && centerNameDiv.textContent.includes(centerName)) {
+            centerNameDiv.remove();
+        }
+    }
 
     // Fetch logo for injection
     let logoSvgHtml = '';
@@ -2342,6 +3098,40 @@ async function printRSYCModal(modalId) {
         return;
     }
     
+    const hideRedundantRule = isEventModal
+        ? ''
+        : `
+
+        /* Hide redundant titles already in header */
+        .rsyc-modal-body > div:first-of-type,
+        .rsyc-modal-body > h3:first-of-type { display: none !important; }
+        `;
+
+    const eventImageRule = isEventModal
+        ? `
+
+        /* EVENT PRINT LAYOUT: keep image compact and allow details to flow beside it */
+        .rsyc-modal-body img {
+            float: right;
+            width: 190pt !important;
+            max-width: 40% !important;
+            height: auto !important;
+            max-height: 220pt !important;
+            object-fit: contain !important;
+            border-radius: 6pt !important;
+            margin: 0 0 10pt 12pt !important;
+        }
+
+        /* Prevent the floated image from forcing awkward breaks */
+        .rsyc-modal-body::after { content: ""; display: block; clear: both; }
+
+        /* Give key blocks breathing room */
+        .rsyc-event-location { margin-top: 10pt !important; margin-bottom: 12pt !important; }
+        .rsyc-event-cost { margin-bottom: 10pt !important; }
+        .rsyc-event-extended-care { margin-bottom: 10pt !important; }
+        `
+        : '';
+
     const htmlContent = `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -2385,14 +3175,14 @@ async function printRSYCModal(modalId) {
 
         .header-text { text-align: left; }
         .header-text h1 { color: var(--rsyc-teal); font-size: 16pt; margin-bottom: 2pt; }
-        .header-text p { font-size: 10pt; color: #666; font-style: italic; }
+        .header-text p { font-size: 14pt; color: #666; font-style: italic; font-weight: 600; }
 
         /* BODY CONTENT */
         .rsyc-modal-body { width: 100%; }
         
-        /* Hide redundant titles already in header */
-        .rsyc-modal-body > div:first-of-type,
-        .rsyc-modal-body > h3:first-of-type { display: none !important; }
+        ${hideRedundantRule}
+
+        ${eventImageRule}
 
         .rsyc-modal-body h3 { 
             color: var(--rsyc-navy); 
@@ -2461,7 +3251,7 @@ async function printRSYCModal(modalId) {
         .col-md-6 { width: 50% !important; flex: 0 0 50% !important; padding: 0 5pt !important; margin-bottom: 10pt !important; box-sizing: border-box !important; }
 
         /* Hide UI elements */
-        .rsyc-modal-close, .rsyc-modal-print, .btn { display: none !important; }
+        .rsyc-modal-close, .rsyc-modal-print, .rsyc-modal-actions, .btn { display: none !important; }
 
         @media print {
             body { margin: 0.4in; }
@@ -2481,7 +3271,7 @@ async function printRSYCModal(modalId) {
     <header class="header">
         <div class="header-text">
             <h1>${scheduleTitle}</h1>
-            <p>The Salvation Army ${centerName}</p>
+           <div class="center-name">The Salvation Army ${centerName}</div>
         </div>
         <div class="header-logo">${logoSvgHtml}</div>
     </header>
@@ -2598,7 +3388,36 @@ async function printAllSchedules(cacheKey) {
 
     // Build schedules content
     let schedulesHTML = '';
+    const formatEventDateTimeParts = (event) => {
+        try {
+            const startTs = Number.isFinite(event._startTimestamp) ? event._startTimestamp : Date.parse(String(event.startDateTime || ''));
+            const endTs = Number.isFinite(event._endTimestamp) ? event._endTimestamp : Date.parse(String(event.endDateTime || ''));
+            const hasStart = startTs && !isNaN(startTs);
+            const hasEnd = endTs && !isNaN(endTs);
+            const start = hasStart ? new Date(startTs) : null;
+            const end = hasEnd ? new Date(endTs) : null;
+
+            const dateFmt = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+            const timeFmt = new Intl.DateTimeFormat('en-US', { hour: 'numeric', minute: '2-digit' });
+
+            if (start && end) {
+                const sameDay = start.toDateString() === end.toDateString();
+                return {
+                    dateText: sameDay ? dateFmt.format(start) : `${dateFmt.format(start)} - ${dateFmt.format(end)}`,
+                    timeText: `${timeFmt.format(start)} - ${timeFmt.format(end)}`
+                };
+            }
+            if (start) {
+                return { dateText: dateFmt.format(start), timeText: timeFmt.format(start) };
+            }
+            return { dateText: '', timeText: '' };
+        } catch (e) {
+            return { dateText: '', timeText: '' };
+        }
+    };
+
     schedules.forEach((schedule, index) => {
+        const isEvent = schedule && schedule.__type === 'event';
         const daysText = schedule.scheduleDays && Array.isArray(schedule.scheduleDays) && schedule.scheduleDays.length > 0
             ? schedule.scheduleDays.join(', ')
             : '';
@@ -2635,21 +3454,33 @@ async function printAllSchedules(cacheKey) {
             ? `${schedule.startDate || ''} ${schedule.startDate && schedule.endDate ? '-' : ''} ${schedule.endDate || ''}`.trim()
             : '';
         
+        const eventDt = isEvent ? formatEventDateTimeParts(schedule) : { dateText: '', timeText: '' };
+        const eventDateText = eventDt.dateText || '';
+        const eventTimeText = eventDt.timeText || '';
+        const eventTypeText = isEvent ? (schedule.eventType || '') : '';
+        const eventSubtitleText = isEvent ? (schedule.subtitle || '') : '';
+        const eventCardSubtitleText = isEvent ? (eventSubtitleText || eventTypeText) : '';
+        const eventThumb = isEvent ? (schedule.thumbnailUrl || schedule.imageUrl || '') : '';
+
         schedulesHTML += `
         <div class="schedule-item">
-            <h4>${schedule.title || 'Program'}</h4>
-            ${schedule.subtitle ? `<p class="subtitle">${schedule.subtitle}</p>` : ''}
+            <h4>${schedule.title || (isEvent ? 'Event' : 'Program')}</h4>
+            ${isEvent && eventCardSubtitleText ? `<p class="subtitle">${eventCardSubtitleText}</p>` : ''}
+            ${(!isEvent && schedule.subtitle) ? `<p class="subtitle">${schedule.subtitle}</p>` : ''}
+            ${isEvent && eventThumb ? `<img src="${eventThumb}" alt="${schedule.title || 'Event'}" style="width:100%; height:auto; border-radius: 4pt; margin: 6pt 0; display:block;" />` : ''}
             
             <div class="details">
-                ${daysText ? `<div><strong>Days:</strong> ${daysText}</div>` : ''}
-                ${timeText ? `<div><strong>Time:</strong> ${timeText}</div>` : ''}
+                ${isEvent && eventDateText ? `<div><strong>Date:</strong> ${eventDateText}</div>` : ''}
+                ${isEvent && eventTimeText ? `<div><strong>Time:</strong> ${eventTimeText}</div>` : ''}
+                ${!isEvent && daysText ? `<div><strong>Days:</strong> ${daysText}</div>` : ''}
+                ${!isEvent && timeText ? `<div><strong>Time:</strong> ${timeText}</div>` : ''}
                 ${months ? `<div><strong>Program Runs In:</strong> ${months}</div>` : ''}
                 ${registrationOpens ? `<div><strong>Registration Opens:</strong> ${registrationOpens}</div>` : ''}
                 ${registrationFee ? `<div><strong>Registration Fee:</strong> ${registrationFee}</div>` : ''}
                 ${ageRange ? `<div><strong>Ages:</strong> ${ageRange}</div>` : ''}
                 ${programDates ? `<div><strong>Program Dates:</strong> ${programDates}</div>` : ''}
                 
-                ${location ? `<div><strong>Location:</strong> ${location}</div>` : ''}
+                ${(!isEvent && location) ? `<div><strong>Location:</strong> ${location}</div>` : ''}
                 ${cost ? `<div><strong>Cost:</strong> ${cost}</div>` : ''}
                 ${registrationDeadline ? `<div><strong>Registration Deadline:</strong> ${registrationDeadline}</div>` : ''}
             </div>
@@ -2870,3 +3701,228 @@ ${(aboutText || exteriorPhoto) ? `
         console.error('Print error:', e);
     }
 }
+
+/**
+ * Print story modal content - Mobile-friendly with fallback
+ */
+async function printStoryModal(storyId) {
+    const modal = document.getElementById(`rsyc-modal-${storyId}`);
+    if (!modal) return;
+    
+    const printDate = new Date().toLocaleDateString('en-US');
+    
+    // Extract title and story content
+    const titleElement = modal.querySelector('.rsyc-modal-header h2');
+    const storyTitle = titleElement ? titleElement.textContent.trim() : 'Story';
+    const centerNameEl = modal.querySelector('.rsyc-modal-body strong');
+    const centerName = centerNameEl ? centerNameEl.textContent.trim() : '';
+    
+    // Get story content and clone it
+    const modalContent = modal.querySelector('.rsyc-modal-content');
+    const printContent = modalContent.cloneNode(true);
+
+    // Clean up cloned content - remove buttons, close button, image, header, and duplicate logo/center info
+    const closeBtn = printContent.querySelector('.rsyc-modal-close');
+    if (closeBtn) closeBtn.remove();
+    const actionsDiv = printContent.querySelector('.rsyc-modal-actions');
+    if (actionsDiv) actionsDiv.remove();
+    const headerDiv = printContent.querySelector('.rsyc-modal-header');
+    if (headerDiv) headerDiv.remove();
+    // Remove main image from cloned content
+    const mainImageContainer = printContent.querySelector('div[style*="max-height:400px"]');
+    if (mainImageContainer) mainImageContainer.remove();
+    // Remove the duplicate center name and logo from modal body (the first flex div with center info)
+    const centerLogoSection = printContent.querySelector('.rsyc-modal-body > div');
+    if (centerLogoSection) centerLogoSection.remove();
+
+    // Fetch logo for injection
+    let logoSvgHtml = '';
+    const logoUrl = 'https://thisishoperva.org/rsyc/Red+Shield+Youth+Centers+Logo+-+Color.svg';
+    try {
+        const resp = await fetch(logoUrl);
+        if (resp.ok) { logoSvgHtml = await resp.text(); }
+        else { logoSvgHtml = `<img src="${logoUrl}" style="height:auto; width:220px; display:block;" />`; }
+    } catch (e) {
+        logoSvgHtml = `<img src="${logoUrl}" style="height:auto; width:220px; display:block;" />`;
+    }
+
+    const printWindow = /Android/i.test(navigator.userAgent) ? null : window.open('', '', 'height=900,width=1200');
+    if (!printWindow && !/Android/i.test(navigator.userAgent)) {
+        alert('Pop-up blocked. Please allow pop-ups for this site.');
+        return;
+    }
+
+    const htmlContent = `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>${storyTitle} - ${printDate}</title>
+    <style>
+        :root {
+            --rsyc-teal: #20B3A8;
+            --rsyc-navy: #2F4857;
+        }
+
+        * { 
+            margin: 0; 
+            padding: 0; 
+            box-sizing: border-box; 
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+            color-adjust: exact !important;
+        }
+
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+            margin: 0.4in; 
+            font-size: 10pt; 
+            line-height: 1.4; 
+            color: #222; 
+        }
+
+        /* HEADER */
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15pt;
+            border-bottom: 1.5pt solid var(--rsyc-teal);
+            padding-bottom: 10pt;
+        }
+
+        .header-logo { width: 160pt; flex: 0 0 160pt; }
+        .header-logo svg, .header-logo img { width: 100%; height: auto; display: block; }
+
+        .header-text { text-align: left; }
+        .header-text h1 { color: var(--rsyc-teal); font-size: 16pt; margin-bottom: 2pt; }
+        .header-text p { font-size: 14pt; color: #666; font-style: italic; font-weight: 600; }
+
+        /* BODY CONTENT */
+        .rsyc-modal-body { width: 100%; }
+        
+        .rsyc-modal-header { 
+            margin-bottom: 10pt;
+            display: none;
+        }
+
+        .rsyc-modal-body h2 { 
+            color: var(--rsyc-navy); 
+            font-size: 14pt; 
+            margin: 10pt 0 8pt 0; 
+            border-bottom: 1px solid #eee;
+            padding-bottom: 4pt;
+        }
+
+        .rsyc-modal-body h3 { 
+            color: var(--rsyc-teal); 
+            font-size: 11pt; 
+            margin: 8pt 0 4pt 0; 
+        }
+
+        .rsyc-story-body {
+            font-size: 9.5pt !important;
+            line-height: 1.5 !important;
+        }
+
+        /* Normalize User Content */
+        p { font-size: 9.5pt !important; margin-bottom: 6pt !important; }
+        strong { font-weight: 600; color: #000; }
+        
+        /* Hide UI elements */
+        .rsyc-modal-close, .rsyc-modal-print, .rsyc-modal-actions, .btn { display: none !important; }
+
+        @media print {
+            body { margin: 0.4in; }
+        }
+
+        .date-stamp {
+            position: fixed;
+            bottom: 10pt;
+            right: 10pt;
+            font-size: 7pt;
+            color: #bbb;
+            z-index: 9999;
+        }
+    </style>
+</head>
+<body>
+    <header class="header">
+        <div class="header-text">
+            <h1>${storyTitle}</h1>
+            ${centerName ? `<div class="center-name">The Salvation Army ${centerName}</div>` : ''}
+        </div>
+        <div class="header-logo">${logoSvgHtml}</div>
+    </header>
+
+    <main class="rsyc-modal-body">
+        ${printContent.innerHTML}
+    </main>
+
+    <footer style="margin-top: 40pt; padding-top: 15pt; border-top: 1px solid #eee; text-align: center; font-size: 10pt; color: #777;">
+        <p>Learn more about our center and stories at <strong>www.redshieldyouth.org</strong></p>
+    </footer>
+    <div class="date-stamp">Printed on ${printDate}</div>
+</body>
+</html>`;
+
+    const isAndroid = /Android/i.test(navigator.userAgent);
+    
+    try {
+        if (isAndroid) {
+            // Android - use blob URL approach
+            const blob = new Blob([htmlContent], { type: 'text/html' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `story-${storyId}-${Date.now()}.html`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            setTimeout(() => URL.revokeObjectURL(url), 100);
+        } else {
+            // Desktop - use print window
+            printWindow.document.open();
+            printWindow.document.write(htmlContent);
+            printWindow.document.close();
+            setTimeout(() => {
+                printWindow.print();
+                setTimeout(() => { printWindow.close(); }, 500);
+            }, 800);
+        }
+    } catch(e) {
+        alert('Unable to print. Please use the browser Print function.');
+        console.error('Print error:', e);
+    }
+}
+
+// Modal display functions
+function showRSYCModal(type, centerName) {
+    const modal = document.getElementById('rsyc-modal-' + type);
+    if (modal) {
+        modal.style.display = 'flex';
+        document.body.style.overflow = 'hidden'; // Prevent background scroll
+    }
+}
+
+function closeRSYCModal(type) {
+    const modal = document.getElementById('rsyc-modal-' + type);
+    if (modal) {
+        modal.style.display = 'none';
+        document.body.style.overflow = ''; // Restore scroll
+    }
+}
+
+// Make functions globally available
+window.showRSYCModal = showRSYCModal;
+window.closeRSYCModal = closeRSYCModal;
+window.printRSYCModal = printRSYCModal;
+window.printStoryModal = printStoryModal;
+
+// Close modal when clicking outside content
+document.addEventListener('click', function(e) {
+    if (e.target.classList.contains('rsyc-modal')) {
+        const modalId = e.target.id;
+        const type = modalId.replace('rsyc-modal-', '');
+        closeRSYCModal(type);
+    }
+});

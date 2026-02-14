@@ -19,7 +19,7 @@
      * Usage: window.RSYCProfileConfig.enabledSections = ['hero', 'about', 'schedules'];
      */
     window.RSYCProfileConfig = window.RSYCProfileConfig || {
-        enabledSections: ['hero', 'about', 'schedules', 'hours', 'facilities', 'programs', 'staff', 'nearby', 'parents', 'youth', 'volunteer', 'footerPhoto', 'contact']
+        enabledSections: ['hero', 'about', 'schedules', 'hours', 'facilities', 'programs', 'staff', 'events', 'stories', 'nearby', 'parents', 'youth', 'volunteer', 'footerPhoto', 'contact']
     };
 
     /**
@@ -51,10 +51,120 @@
     }
 
     /**
+     * Ensure modal functions are available
+     * These are called from generated HTML onclick handlers
+     */
+    function ensureModalFunctions() {
+        if (!window.showRSYCModal) {
+            window.showRSYCModal = function(type, centerName) {
+                console.log('[RSYCProfileInjector] showRSYCModal:', type);
+                const modal = document.getElementById('rsyc-modal-' + type);
+                if (modal) {
+                    modal.style.display = 'flex';
+                    document.body.style.overflow = 'hidden';
+                } else {
+                    console.warn('[RSYCProfileInjector] Modal not found:', 'rsyc-modal-' + type);
+                }
+            };
+        }
+        if (!window.closeRSYCModal) {
+            window.closeRSYCModal = function(type) {
+                console.log('[RSYCProfileInjector] closeRSYCModal:', type);
+                const modal = document.getElementById('rsyc-modal-' + type);
+                if (modal) {
+                    modal.style.display = 'none';
+                    document.body.style.overflow = '';
+                } else {
+                    console.warn('[RSYCProfileInjector] Modal not found:', 'rsyc-modal-' + type);
+                }
+            };
+        }
+        if (!window.rsycNavigateStaffModal) {
+            window.rsycNavigateStaffModal = function(groupKey, currentIndex, delta) {
+                try {
+                    const modals = Array.from(document.querySelectorAll(`.rsyc-modal[data-rsyc-staff-group="${groupKey}"]`));
+                    if (!modals.length) {
+                        console.warn('[RSYCProfileInjector] No staff modals found for group:', groupKey);
+                        return;
+                    }
+                    const items = modals
+                        .map(m => ({
+                            el: m,
+                            idx: Number(m.dataset.rsycStaffIndex),
+                            type: m.id ? m.id.replace('rsyc-modal-', '') : ''
+                        }))
+                        .filter(x => Number.isFinite(x.idx) && x.type);
+                    if (items.length <= 1) return;
+                    items.sort((a, b) => a.idx - b.idx);
+                    const curPos = items.findIndex(x => x.idx === Number(currentIndex));
+                    if (curPos === -1) {
+                        console.warn('[RSYCProfileInjector] Current staff index not found:', currentIndex);
+                        return;
+                    }
+                    const nextPos = (curPos + delta + items.length) % items.length;
+                    const current = items[curPos];
+                    const next = items[nextPos];
+                    if (current && current.type) {
+                        const curEl = document.getElementById('rsyc-modal-' + current.type);
+                        if (curEl) curEl.style.display = 'none';
+                    }
+                    if (next && next.type) {
+                        const nextEl = document.getElementById('rsyc-modal-' + next.type);
+                        if (nextEl) {
+                            nextEl.style.display = 'flex';
+                            document.body.style.overflow = 'hidden';
+                        }
+                    }
+                } catch (e) {
+                    console.error('[RSYCProfileInjector] Staff navigation failed:', e);
+                }
+            };
+        }
+        if (!window.toggleRSYCAccordion) {
+            window.toggleRSYCAccordion = function(accordionId) {
+                const content = document.getElementById(accordionId);
+                const icon = document.getElementById(accordionId + '-icon');
+                if (!content) {
+                    console.warn('[RSYCProfileInjector] Accordion content not found:', accordionId);
+                    return;
+                }
+                if (content.style.display === 'none' || content.style.display === '') {
+                    content.style.display = 'block';
+                    if (icon) icon.style.transform = 'rotate(180deg)';
+                } else {
+                    content.style.display = 'none';
+                    if (icon) icon.style.transform = 'rotate(0deg)';
+                }
+            };
+        }
+        if (!window.toggleScheduleInfo) {
+            window.toggleScheduleInfo = function(scheduleId) {
+                const content = document.getElementById(scheduleId);
+                const icon = document.getElementById(scheduleId + '-icon');
+                if (!content) {
+                    console.warn('[RSYCProfileInjector] Schedule content not found:', scheduleId);
+                    return;
+                }
+                if (content.style.display === 'none' || content.style.display === '') {
+                    content.style.display = 'block';
+                    if (icon) icon.style.transform = 'rotate(180deg)';
+                } else {
+                    content.style.display = 'none';
+                    if (icon) icon.style.transform = 'rotate(0deg)';
+                }
+            };
+        }
+        console.log('[RSYCProfileInjector] ✓ Modal functions ensured');
+    }
+
+    /**
      * Load and render a profile into a container (optimized)
      */
     async function loadProfile(centerId, targetElement, enabledSections = null) {
         try {
+            // START: Ensure modal functions are available IMMEDIATELY
+            ensureModalFunctions();
+            
             // Start timer for loading skeleton (only show after 1.5 seconds)
             loadingTimeoutId = setTimeout(() => {
                 showLoadingSkeleton(targetElement);
@@ -154,41 +264,12 @@
 #page {
   height: auto !important;
   min-height: auto !important;
-  margin-bottom: 0 !important;
-  padding-bottom: 0 !important;
-}
-
-/* Ensure the injected profile wrapper does not add extra space at the bottom */
-.rsyc-profile {
-  margin-bottom: 0 !important;
-  padding-bottom: 0 !important;
-  display: flex !important;
-  flex-direction: column !important;
-  min-height: 100vh !important;
-}
-
-/* Let the footer photo grow to fill remaining viewport space on short profiles */
-#freeTextArea-footerPhoto {
-  flex-grow: 1 !important;
-}
-
-#freeTextArea-footerPhoto .u-positionRelative {
-  min-height: 100% !important;
 }
 
 /* Override the huge freeTextArea height and padding */
 .freeTextArea.u-centerBgImage.u-sa-whiteBg.u-coverBgImage {
   height: auto !important;
   min-height: auto !important;
-  padding: 0 !important;
-  margin: 0 !important;
-}
-
-/* Remove the empty placeholder block that can appear between footer scripture and the global footer */
-#freeTextArea-0 {
-  display: none !important;
-  height: 0 !important;
-  min-height: 0 !important;
   padding: 0 !important;
   margin: 0 !important;
 }
@@ -210,7 +291,6 @@ div #freeTextArea {
   align-items: center !important;
   justify-content: center !important;
   padding: 60px 20px !important;
-  margin-bottom: 0 !important;
 }
 
 #freeTextArea-scripture .u-positionRelative {
@@ -264,10 +344,8 @@ div #freeTextArea {
             // Clear loading skeleton on error
             clearLoadingSkeleton();
             
-            targetElement.innerHTML = `<div style="padding: 40px 20px; background: #ffffff; border-radius: 12px; border: 1px solid #e0e0e0; text-align: center; font-family: 'Segoe UI', Tahoma, sans-serif; max-width: 500px; margin: 40px auto;">
-                <div style="font-size: 48px; margin-bottom: 16px;">👋</div>
-                <h2 style="color: #333; font-size: 24px; font-weight: 600; margin: 0 0 12px 0;">Thanks for stopping by!</h2>
-                <p style="color: #666; font-size: 16px; line-height: 1.6; margin: 0;">This Center Profile page did not load successfully. Please refresh and try again.</p>
+            targetElement.innerHTML = `<div style="padding: 20px; background: #ffe6e6; color: #990000; border-radius: 8px; border: 1px solid #ffcccc;">
+                <strong>Error loading profile:</strong> ${error.message}
             </div>`;
         }
     }

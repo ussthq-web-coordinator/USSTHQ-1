@@ -952,6 +952,52 @@ class RSYCGeneratorV2 {
             }
         };
 
+        // Staff modal navigation helper (prev/next arrows)
+        // Needs to exist in the publisher preview context because injected HTML uses inline onclick handlers.
+        window.rsycNavigateStaffModal = (groupKey, currentIndex, delta) => {
+            try {
+                const selector = `.rsyc-modal[data-rsyc-staff-group="${groupKey}"]`;
+                const getItems = (root) => {
+                    const list = Array.from(root.querySelectorAll(selector));
+                    return list
+                        .map(m => ({
+                            idx: Number(m.getAttribute('data-rsyc-staff-index')),
+                            type: (m.id || '').replace('rsyc-modal-', ''),
+                            el: m
+                        }))
+                        .filter(x => Number.isFinite(x.idx) && x.type);
+                };
+
+                // Prefer previewContainer, fall back to document
+                let items = getItems(previewContainer);
+                if (!items.length) items = getItems(document);
+                if (items.length <= 1) return;
+
+                items.sort((a, b) => a.idx - b.idx);
+                const curPos = items.findIndex(x => x.idx === Number(currentIndex));
+                if (curPos === -1) return;
+
+                const nextPos = (curPos + Number(delta) + items.length) % items.length;
+                const curType = items[curPos].type;
+                const nextType = items[nextPos].type;
+
+                // Hide current
+                let curEl = previewContainer.querySelector('#rsyc-modal-' + curType);
+                if (!curEl) curEl = document.getElementById('rsyc-modal-' + curType);
+                if (curEl) curEl.style.display = 'none';
+
+                // Show next
+                let nextEl = previewContainer.querySelector('#rsyc-modal-' + nextType);
+                if (!nextEl) nextEl = document.getElementById('rsyc-modal-' + nextType);
+                if (nextEl) {
+                    nextEl.style.display = 'flex';
+                    document.body.style.overflow = 'hidden';
+                }
+            } catch (e) {
+                console.warn('rsycNavigateStaffModal failed in preview:', e);
+            }
+        };
+
         // Attach modal functionality
         // Debug: list modals present in preview and document
         try {

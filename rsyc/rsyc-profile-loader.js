@@ -41,7 +41,7 @@ const RSYCProfileLoader = {
                     centerId,
                     sections: options.sections || [
                         'schedules', 'hours', 'facilities', 'programs', 
-                        'staff', 'nearby', 'volunteer', 'footerPhoto', 'contact'
+                        'staff', 'events', 'nearby', 'volunteer', 'footerPhoto', 'contact'
                     ]
                 })
             });

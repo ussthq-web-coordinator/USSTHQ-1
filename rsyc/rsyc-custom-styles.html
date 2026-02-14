@@ -645,6 +645,43 @@ div.col-sm-12.eventsList * {
    Add this to your CMS global styles
    ======================================== */
 
+/* Standard section vertical rhythm */
+.freeTextArea.section > .u-positionRelative {
+  padding-top: 5rem !important;
+  padding-bottom: 5rem !important;
+}
+
+/* Clean spacing for selected sections: remove stacked inner container padding so rhythm is consistent */
+#freeTextArea-facilities .u-positionRelative > .container > .container,
+#freeTextArea-programs .u-positionRelative > .container > .container,
+#freeTextArea-staff .u-positionRelative > .container > .container,
+#freeTextArea-nearby .u-positionRelative > .container > .container,
+#freeTextArea-parents .u-positionRelative > .container > .container,
+#freeTextArea-youth .u-positionRelative > .container > .container,
+#freeTextArea-volunteer .u-positionRelative > .container > .container {
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+}
+
+/* Program Schedule: reduce extra space above (keep bottom generous) */
+#freeTextArea-schedules > .u-positionRelative {
+  padding-top: 3.5rem !important;
+  padding-bottom: 5rem !important;
+}
+
+@media (max-width: 576px) {
+  .freeTextArea.section > .u-positionRelative {
+    padding-top: 4rem !important;
+    padding-bottom: 4rem !important;
+  }
+}
+
+/* Footer photo section controls its own height/padding */
+#freeTextArea-footerPhoto > .u-positionRelative {
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+}
+
 /* Tooltip styles for schedule cards */
 .tooltip-icon { 
     position: relative; 
@@ -701,6 +738,17 @@ div.col-sm-12.eventsList * {
 .horizontal-scroll {
     scrollbar-width: thin;
     scrollbar-color: rgba(255,255,255,0.3) transparent;
+}
+
+/* Events: center cards across breakpoints */
+#freeTextArea-events .horizontal-scroll {
+    justify-content: center !important;
+}
+
+@media (max-width: 1024px) {
+    #freeTextArea-events .horizontal-scroll {
+        align-items: center !important;
+    }
 }
 
 /* Center schedule cards when using justify-content-center */
@@ -991,21 +1039,21 @@ div.col-sm-12.eventsList * {
 /* Responsive schedule display - Show accordion on small devices/iPad */
 @media (max-width: 1024px) {
     .rsyc-schedule-card-desktop {
-        display: none !important;
+        display: flex !important;
+        width: 100% !important;
+        min-width: 0 !important;
     }
     
     .rsyc-schedule-accordion-mobile {
-        display: block !important;
-        width: 100% !important;
-        margin-bottom: 0.75rem;
-    }
-    
-    .rsyc-details-btn-desktop {
         display: none !important;
     }
     
-    .rsyc-details-btn-mobile {
+    .rsyc-details-btn-desktop {
         display: inline-block !important;
+    }
+    
+    .rsyc-details-btn-mobile {
+        display: none !important;
     }
     
     /* Stack schedule items vertically on mobile */
@@ -1014,6 +1062,24 @@ div.col-sm-12.eventsList * {
         flex-direction: column !important;
         overflow-x: visible !important;
         overflow-y: visible !important;
+    }
+    
+    /* Increase font sizes for better mobile readability */
+    .rsyc-schedule-card-desktop h5 {
+        font-size: 1.25rem !important;
+    }
+    
+    .rsyc-schedule-card-desktop .small,
+    .rsyc-schedule-card-desktop .text-muted {
+        font-size: 1rem !important;
+    }
+    
+    .rsyc-schedule-card-desktop p {
+        font-size: 1.05rem !important;
+    }
+    
+    .rsyc-schedule-card-desktop strong {
+        font-size: 1.05rem !important;
     }
 }
 
@@ -1107,7 +1173,7 @@ button.btn-outline-primary:focus-visible {
 }
 
 div #freeTextArea-0 {
-  margin-bottom: -75px !important;
+  margin-bottom: 0 !important;
 }
   
 #freeTextArea-scripture .container {
@@ -1272,6 +1338,46 @@ function closeRSYCModal(type) {
         document.body.style.overflow = ''; // Restore scroll
     } else {
         console.log('  modal not found in document for type:', type);
+    }
+}
+
+function rsycNavigateStaffModal(groupKey, currentIndex, delta) {
+    try {
+        const modals = Array.from(document.querySelectorAll(`.rsyc-modal[data-rsyc-staff-group="${groupKey}"]`));
+        if (!modals.length) return;
+
+        const items = modals
+            .map(m => ({
+                el: m,
+                idx: Number(m.dataset.rsycStaffIndex),
+                type: m.id ? m.id.replace('rsyc-modal-', '') : ''
+            }))
+            .filter(x => Number.isFinite(x.idx) && x.type);
+
+        if (items.length <= 1) return;
+        items.sort((a, b) => a.idx - b.idx);
+
+        const curPos = items.findIndex(x => x.idx === Number(currentIndex));
+        if (curPos === -1) return;
+
+        const nextPos = (curPos + delta + items.length) % items.length;
+        const current = items[curPos];
+        const next = items[nextPos];
+
+        if (current && current.type) {
+            const curEl = document.getElementById('rsyc-modal-' + current.type);
+            if (curEl) curEl.style.display = 'none';
+        }
+
+        if (next && next.type) {
+            const nextEl = document.getElementById('rsyc-modal-' + next.type);
+            if (nextEl) {
+                nextEl.style.display = 'flex';
+                document.body.style.overflow = 'hidden';
+            }
+        }
+    } catch (e) {
+        console.warn('rsycNavigateStaffModal failed:', e);
     }
 }
 

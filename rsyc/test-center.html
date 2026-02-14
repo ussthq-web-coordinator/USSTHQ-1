@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RSYC Profile Test</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            font-family: Arial, sans-serif;
+        }
+        #test-container {
+            border: 2px solid #007bff;
+            padding: 20px;
+            min-height: 500px;
+            background: #f8f9fa;
+        }
+    </style>
+</head>
+<body>
+    <div data-rsyc-center-id="1">
+	&nbsp;
+</div>
+<script src="https://thisishoperva.org/rsyc/rsyc-profile-injector.js"></script>
+    <h1>RSYC Profile Injector Test</h1>
+    <div id="test-container">
+        <div data-rsyc-center-id="1">&nbsp;</div>
+    </div>
+    
+    <!-- Load local scripts for testing -->
+    <script src="rsyc-data.js"></script>
+    <script src="rsyc-staff-order.js"></script>
+    <script src="rsyc-cms-publisher.js"></script>
+    <script src="rsyc-templates.js"></script>
+    
+    <script>
+        // Manual injection test
+        console.log('Starting manual injection test...');
+        
+        async function testManualInjection() {
+            try {
+                // Load data
+                const dataLoader = new RSYCDataLoader();
+                await dataLoader.loadCriticalData();
+                await dataLoader.loadOptionalData();
+                
+                // Get center data
+                const centerData = await dataLoader.getCenterData(1);
+                if (!centerData || !centerData.center) {
+                    throw new Error('Center not found: 1');
+                }
+                
+                console.log('Center found:', centerData.center.name);
+                
+                // Generate HTML
+                const templateEngine = new RSYCTemplates();
+                const enabledSections = ['hero', 'about', 'schedules', 'hours', 'facilities', 'programs', 'staff', 'events', 'nearby', 'parents', 'youth', 'volunteer', 'footerPhoto', 'contact'];
+                const html = templateEngine.generateProfile(centerData, enabledSections);
+                
+                console.log('HTML generated, length:', html.length);
+                
+                // Direct injection
+                const targetDiv = document.querySelector('[data-rsyc-center-id="1"]');
+                if (targetDiv) {
+                    targetDiv.innerHTML = html;
+                    targetDiv.style.display = 'block';
+                    targetDiv.style.height = 'auto';
+                    targetDiv.style.minHeight = '800px';
+                    targetDiv.style.visibility = 'visible';
+                    
+                    console.log('Direct injection successful!');
+                    console.log('Target height:', targetDiv.offsetHeight);
+                }
+                
+            } catch (error) {
+                console.error('Manual injection failed:', error);
+                document.querySelector('[data-rsyc-center-id="1"]').innerHTML = 
+                    '<div style="padding: 40px; text-align: center; color: red;">Error: ' + error.message + '</div>';
+            }
+        }
+        
+        // Run test when page loads
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', testManualInjection);
+        } else {
+            testManualInjection();
+        }
+    </script>
+</body>
+</html>
