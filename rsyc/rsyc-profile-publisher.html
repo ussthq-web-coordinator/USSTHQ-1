@@ -4,6 +4,23 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>RSYC Profile Generator</title>
+    
+    <!-- Open Graph Meta Tags (dynamically updated by JavaScript) -->
+    <meta property="og:title" content="" id="og-title">
+    <meta property="og:description" content="" id="og-description">
+    <meta property="og:image" content="" id="og-image">
+    <meta property="og:image:width" content="1200" id="og-image-width">
+    <meta property="og:image:height" content="630" id="og-image-height">
+    <meta property="og:url" content="" id="og-url">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="Red Shield Youth Centers">
+    
+    <!-- Twitter Card Meta Tags -->
+    <meta name="twitter:card" content="summary_large_image" id="twitter-card">
+    <meta name="twitter:title" content="" id="twitter-title">
+    <meta name="twitter:description" content="" id="twitter-description">
+    <meta name="twitter:image" content="" id="twitter-image">
+    
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
     <link rel="stylesheet" href="rsyc-generator-v2.css">
     <style id="globalStyles">
@@ -53,12 +70,15 @@
                         <div class="section-checkboxes">
                             <label><input type="checkbox" value="hero" checked> Hero</label>
                             <label><input type="checkbox" value="about" checked> About</label>
+                            <label><input type="checkbox" value="navigation" checked> Navigation</label>
                             <label><input type="checkbox" value="schedules" checked> Schedules</label>
                             <label><input type="checkbox" value="hours" checked> Hours</label>
                             <label><input type="checkbox" value="facilities" checked> Facilities</label>
                             <label><input type="checkbox" value="programs" checked> Programs</label>
+                            <label><input type="checkbox" value="midsectionPhoto" checked> Midsection Photo</label>
                             <label><input type="checkbox" value="staff" checked> Staff & Leadership</label>
                             <label><input type="checkbox" value="events" checked> Upcoming Events</label>
+                            <label><input type="checkbox" value="infopages" checked> Information & Policies</label>
                             <label><input type="checkbox" value="stories" checked> Recent Stories</label>
                             <label><input type="checkbox" value="nearby" checked> Nearby Centers</label>
                             <label><input type="checkbox" value="parents" checked> For Parents</label>
@@ -78,6 +98,7 @@
                     <button id="selectAllSections" class="btn btn-sm">Select All</button>
                     <button id="clearAllSections" class="btn btn-sm">Clear All</button>
                     <button id="downloadHTML" class="btn btn-sm btn-info" disabled>Download</button>
+                    <button id="downloadWithOG" class="btn btn-sm btn-info" disabled title="Download with Open Graph meta tags for social sharing">📱 Download with OG Tags</button>
                     <button id="viewCustomCSS" class="btn btn-sm btn-secondary">✏️ Edit Custom CSS</button>
                     <button id="viewDataStructure" class="btn btn-sm btn-secondary">🔍 Templates & Data</button>
                     <div id="roleOrderDisplayContainer" style="display:flex; align-items:center; gap:8px;">
@@ -184,6 +205,122 @@
             </div>
         </div>
     </div>
+
+    <script>
+        /**
+         * Initialize OG tags when page loads (especially important when injected into CMS)
+         * This overwrites parent page OG tags with RSYC-specific values
+         */
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('📄 DOMContentLoaded - waiting for rsycApp to initialize...');
+            
+            // Poll for app to be ready (with exponential backoff)
+            let attempts = 0;
+            const maxAttempts = 30;
+            const initialDelay = 100;
+            
+            function tryInitializeOGTags() {
+                attempts++;
+                
+                console.log(`⏳ Attempt ${attempts}/${maxAttempts} to initialize OG tags...`);
+                
+                if (!window.rsycApp) {
+                    console.log('  ⏳ rsycApp not yet available');
+                    if (attempts < maxAttempts) {
+                        setTimeout(tryInitializeOGTags, initialDelay * (1 + Math.floor(attempts / 5)));
+                    } else {
+                        console.warn('  ❌ Timeout waiting for rsycApp to initialize');
+                    }
+                    return;
+                }
+                
+                if (!window.rsycApp.dataLoader) {
+                    console.log('  ⏳ dataLoader not yet available');
+                    if (attempts < maxAttempts) {
+                        setTimeout(tryInitializeOGTags, initialDelay * (1 + Math.floor(attempts / 5)));
+                    }
+                    return;
+                }
+                
+                const centers = window.rsycApp.dataLoader.cache.centers;
+                
+                if (!centers || centers.length === 0) {
+                    console.log('  ⏳ Centers not yet loaded');
+                    if (attempts < maxAttempts) {
+                        setTimeout(tryInitializeOGTags, initialDelay * (1 + Math.floor(attempts / 5)));
+                    } else {
+                        console.warn('  ❌ Timeout waiting for centers to load');
+                    }
+                    return;
+                }
+                
+                // Data is ready!
+                console.log(`✅ App ready! Found ${centers.length} centers`);
+                
+                // Check if a center is already selected
+                if (window.rsycApp.currentCenter) {
+                    console.log('✅ Center already selected:', window.rsycApp.currentCenter.Title);
+                    window.rsycApp.updateOGTagsOnPage(window.rsycApp.currentCenter);
+                } else {
+                    // Use the first center for initialization
+                    console.log('📍 Initializing with first center:', centers[0].Title);
+                    window.rsycApp.updateOGTagsOnPage(centers[0]);
+                }
+            }
+            
+            // Start polling
+            tryInitializeOGTags();
+        });
+
+        /**
+         * Also watch for mutations in case parent CMS overwrites OG tags
+         * This ensures our tags stay in place even if parent page tries to modify them
+         */
+        document.addEventListener('DOMContentLoaded', function() {
+            setTimeout(function() {
+                if (!window.rsycApp) return;
+                
+                const observerConfig = {
+                    attributes: true,
+                    attributeFilter: ['content'],
+                    subtree: true
+                };
+
+                const mutationHandler = function(mutations) {
+                    mutations.forEach(function(mutation) {
+                        // If OG tags were modified by parent page, restore our values
+                        if (mutation.target.id && (mutation.target.id.startsWith('og-') || mutation.target.id.startsWith('twitter-'))) {
+                            if (window.rsycApp && window.rsycApp.currentCenter) {
+                                const center = window.rsycApp.currentCenter;
+                                const city = center.city || 'Your Community';
+                                const state = center.state || '';
+                                const cityState = state ? `${city}, ${state}` : city;
+                                const description = `A safe, welcoming space in ${cityState} offering youth programs, activities, mentoring, and community support for kids and teens.`;
+                                const pageTitle = `The Salvation Army ${center.Title} - Exciting Youth Programs and Community Support`;
+                                const pageUrl = center.websiteURL || 'https://www.redshieldyouth.org/';
+                                const ogImageUrl = 'https://s3.amazonaws.com/uss-cache.salvationarmy.org/f432e3f1-79a6-4dfe-82c6-5c93c55e6b09_Charlotte+NC-04489.jpg';
+
+                                window.rsycApp.setOGTags({
+                                    title: pageTitle,
+                                    description: description,
+                                    image: ogImageUrl,
+                                    url: pageUrl
+                                });
+                            }
+                        }
+                    });
+                };
+
+                // Only set up mutation observer if we're likely injected into another page
+                // Check if parent window is different from current window
+                if (window.parent !== window) {
+                    const observer = new MutationObserver(mutationHandler);
+                    document.head && observer.observe(document.head, observerConfig);
+                    console.log('👁️ Mutation observer set up for injected page');
+                }
+            }, 2000);
+        });
+    </script>
 </body>
 </html>
 

@@ -165,13 +165,27 @@ function processCenters(data) {
 }
 
 function processSchedules(data) {
-    return data.map(s => ({
-        id: s.ID,
-        centerId: s['Center#Id'],
-        title: s.CustomProgramScheduleTitle || s.Title,
-        description: s.Narrative || '',
-        days: s.ScheduleDays ? s.ScheduleDays.map(d => d.Value) : []
-    }));
+    return data.map(s => {
+        const ShowinEventsSection = (function(v) {
+            if (v === true || v === 'true') return true;
+            if (typeof v === 'object' && v && v.Value !== undefined) {
+                const val = String(v.Value).toLowerCase();
+                return val === 'true' || val === 'yes';
+            }
+            return false;
+        })(s.ShowinEventsSection);
+        
+        return {
+            id: s.ID,
+            centerId: s['Center#Id'],
+            title: s.CustomProgramScheduleTitle || s.Title,
+            description: s.Narrative || '',
+            days: s.ScheduleDays ? s.ScheduleDays.map(d => d.Value) : [],
+            ShowinEventsSection: ShowinEventsSection,
+            URLImage: s.URLImage || s.URLMainImage || '',
+            URLThumbnailImage: s.URLThumbnailImage || ''
+        };
+    });
 }
 
 function processLeaders(data) {

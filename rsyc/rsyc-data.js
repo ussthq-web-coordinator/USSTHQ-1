@@ -19,6 +19,16 @@ if (typeof window.getVal === 'undefined') {
 }
 const getVal = window.getVal;
 
+// Global helper to ensure values are arrays
+if (typeof window.ensureArray === 'undefined') {
+    window.ensureArray = (v) => {
+        if (Array.isArray(v)) return v;
+        if (v === null || v === undefined) return [];
+        return [v];
+    };
+}
+const ensureArray = window.ensureArray;
+
 if (typeof window.RSYCDataLoader === 'undefined') {
 class RSYCDataLoader {
     constructor() {
@@ -45,6 +55,7 @@ class RSYCDataLoader {
             leaders: null,
             events: null,
             stories: null,
+            informationalPages: null,
             photos: null,
             hours: null,
             facilities: null,
@@ -66,6 +77,7 @@ class RSYCDataLoader {
             leaders: null,
             events: null,
             stories: null,
+            informationalPages: null,
             photos: null,
             hours: null,
             facilities: null,
@@ -134,7 +146,7 @@ class RSYCDataLoader {
         try {
             console.log('📦 Loading optional data...');
             
-            const [schedules, leaders, facilities, featuredPrograms, events, stories] = await Promise.all([
+            const [schedules, leaders, facilities, featuredPrograms, events, stories, informationalPages] = await Promise.all([
                 this.fetchJSON('RSYCProgramSchedules.json').catch(e => {
                     console.warn('Schedules data unavailable:', e.message);
                     return [];
@@ -158,6 +170,10 @@ class RSYCDataLoader {
                 this.fetchJSON('RSYCStories.json').catch(e => {
                     console.warn('Stories data unavailable:', e.message);
                     return [];
+                }),
+                this.fetchJSON('RSYCInformationalPages.json').catch(e => {
+                    console.warn('Information pages unavailable:', e.message);
+                    return [];
                 })
             ]);
 
@@ -167,12 +183,14 @@ class RSYCDataLoader {
             this.cache.featuredPrograms = this.processPrograms(featuredPrograms);
             this.cache.events = this.processEvents(events);
             this.cache.stories = this.processStories(stories);
+            this.cache.informationalPages = this.processInformationalPages(informationalPages);
 
             console.log('📦 Optional data loaded:', {
                 schedules: this.cache.schedules.length,
                 leaders: this.cache.leaders.length,
                 events: this.cache.events.length,
                 stories: this.cache.stories.length,
+                informationalPages: this.cache.informationalPages.length,
                 facilities: this.cache.facilities.length,
                 programs: this.cache.featuredPrograms.length
             });
@@ -194,7 +212,7 @@ class RSYCDataLoader {
             
             // Load critical data first, then optional data
             // Some files may be empty or missing - that's OK
-            const [centers, schedules, leaders, hours, facilities, featuredPrograms, events, stories] = await Promise.all([
+            const [centers, schedules, leaders, hours, facilities, featuredPrograms, events, stories, informationalPages] = await Promise.all([
                 this.fetchJSON('units-rsyc-profiles.json').catch(e => {
                     console.error('Failed to load centers:', e.message);
                     return [];
@@ -226,6 +244,10 @@ class RSYCDataLoader {
                 this.fetchJSON('RSYCStories.json').catch(e => {
                     console.warn('Stories data unavailable:', e.message);
                     return [];
+                }),
+                this.fetchJSON('RSYCInformationalPages.json').catch(e => {
+                    console.warn('Information pages unavailable:', e.message);
+                    return [];
                 })
             ]);
 
@@ -244,6 +266,7 @@ class RSYCDataLoader {
             this.cache.leaders = this.processLeaders(leaders);
             this.cache.events = this.processEvents(events);
             this.cache.stories = this.processStories(stories);
+            this.cache.informationalPages = this.processInformationalPages(informationalPages);
             this.cache.photos = this.processPhotos(photos);
             this.cache.hours = this.processHours(hours);
             this.cache.facilities = this.processFacilities(facilities);
@@ -261,6 +284,7 @@ class RSYCDataLoader {
                 leaders: this.cache.leaders.length,
                 events: this.cache.events.length,
                 stories: this.cache.stories.length,
+                informationalPages: this.cache.informationalPages.length,
                 photos: this.cache.photos.length,
                 hours: this.cache.hours.length,
                 facilities: this.cache.facilities.length,
@@ -272,6 +296,8 @@ class RSYCDataLoader {
                 schedules: this.cache.schedules,
                 leaders: this.cache.leaders,
                 events: this.cache.events,
+                stories: this.cache.stories,
+                informationalPages: this.cache.informationalPages,
                 photos: this.cache.photos,
                 hours: this.cache.hours,
                 facilities: this.cache.facilities,
@@ -502,6 +528,11 @@ class RSYCDataLoader {
             donationURL: center.DonationFormURL || '',
             signUpURL: center['OnlineSign_x002d_UpURL'] || '',
             facebookURL: center.FacebookPageURL || '',
+            instagramURL: center.InstagramURL || '',
+            linkedInURL: center.LinkedInURL || '',
+            youTubeURL: center.YouTubeURL || '',
+            twitterURL: center.TwitterURL || '',
+            embedFacebookFeedCode: center.EmbedFacebookFeed || '',
             facilityFeatures: (center.FacilityFeatures || []).map(f => ({
                 id: f.Id,
                 name: f.Value
@@ -643,11 +674,23 @@ class RSYCDataLoader {
             // Extract ages served as readable values
             const agesServed = (schedule.AgesServed || []).map(a => a.Value);
             
+            // Extract whether schedule should show in events section
+            const showInEventsValue = schedule.ShowinEventsSection;
+            const ShowinEventsSection = (function(v) {
+                if (v === true || v === 'true') return true;
+                if (typeof v === 'object' && v && v.Value !== undefined) {
+                    const val = String(v.Value).toLowerCase();
+                    return val === 'true' || val === 'yes';
+                }
+                return false;
+            })(showInEventsValue);
+            
             return {
                 id: schedule.ID,
                 centerId: schedule['Center#Id'],
                 title: schedule.CustomProgramScheduleTitle,
                 subtitle: subtitle,
+                ShowinEventsSection: ShowinEventsSection,
                 centerName: schedule.Center?.Value || '',
                 status: schedule.Status?.Value || '',
                 description: schedule.Narrative || schedule.Description || '',
@@ -670,6 +713,8 @@ class RSYCDataLoader {
                 openHalfDayDates: schedule.OpenHalfDayDates || '',
                 openFullDayDates: schedule.OpenFullDayDates || '',
                 videoEmbedCode: schedule.VideoEmbedCode || '',
+                URLImage: schedule.URLImage || schedule.URLMainImage || '',
+                URLThumbnailImage: schedule.URLThumbnailImage || '',
                 startDate: schedule.StartDate || '',
                 endDate: schedule.EndDate || '',
                 // Extract .Value from ScheduleDays array
@@ -682,10 +727,10 @@ class RSYCDataLoader {
                 programRunsIn: (schedule.ProgramRunsIn || []).map(m => m.Value),
                 // Extract .Value from RegistrationTypicallyOpensin array
                 registrationOpensIn: (schedule.RegistrationTypicallyOpensin || []).map(m => m.Value),
-                relatedPrograms: (schedule.RelatedProgram && schedule.RelatedProgram.Value) ? [{
-                    id: schedule.RelatedProgram.Id,
-                    name: schedule.RelatedProgram.Value
-                }] : [],
+                AllRelatedPrograms: ensureArray(schedule.AllRelatedPrograms).map(p => ({
+                    id: p.Id,
+                    name: p.Value
+                })),
                 // Internal helper fields for sorting
                 _firstDayIndex: firstDayIndex,
                 _timeMinutes: timeMinutes,
@@ -785,6 +830,10 @@ class RSYCDataLoader {
                 isOnSale: isOnSale,
                 extendedCareTimes: getVal(evt.ExtendedCareTimes),
                 specialFeatures: getVal(evt.SpecialFeatures),
+                AllRelatedPrograms: ensureArray(evt.AllRelatedPrograms || evt.RelatedPrograms || evt['Related Programs']).map(p => ({
+                    id: p.id || p.ID,
+                    name: p.name || p.Name || p.Value || ''
+                })),
                 __type: 'event'
             };
         });
@@ -815,6 +864,43 @@ class RSYCDataLoader {
                 thumbnailImage: getVal(story.URLThumbnailImage) || '',
                 mainImage: getVal(story.URLMainImage) || '',
                 __type: 'story'
+            };
+        });
+    }
+
+    /**
+     * Process informational pages
+     */
+    processInformationalPages(data) {
+        return (data || []).map((page) => {
+            // Process points of contact
+            const pointsOfContact = (page.PointsofContact || []).map(contact => ({
+                name: contact.DisplayName || '',
+                email: contact.Email || '',
+                picture: contact.Picture || '',
+                department: contact.Department || '',
+                jobTitle: contact.JobTitle || ''
+            }));
+
+            return {
+                id: page.ID,
+                centerId: page['Center#Id'],
+                title: getVal(page.PageTitle) || getVal(page.Title) || 'Information Page',
+                subtitle: getVal(page.Subtitle) || '',
+                category: getVal(page.Subtitle) || getVal(page.Category) || '',
+                body: page.Body ? String(page.Body).trim() : '',
+                lastModified: page.Modified || '',
+                heroImage: getVal(page.URLHeroImage) || '',
+                thumbnailImage: getVal(page.URLHeroImage) || getVal(page.URLThumbnailImage) || '',
+                externalUrl: getVal(page.ExternalURL) || '',
+                primaryCTAName: getVal(page.PrimaryCTAName) || '',
+                primaryCTALink: getVal(page.PrimaryCTALink) || '',
+                secondaryCTAName: getVal(page.SecondaryCTAName) || '',
+                secondaryCTALink: getVal(page.SecondaryCTALink) || '',
+                pointsOfContact: pointsOfContact,
+                relatedProgramIds: page['RelatedPrograms#Id'] || [],
+                relatedFacilityIds: page['RelatedFacilities#Id'] || [],
+                __type: 'infoPage'
             };
         });
     }
@@ -1025,7 +1111,8 @@ class RSYCDataLoader {
               }))
             : [];
 
-        // Get program details
+        // Get program details - filter to show only featured programs for THIS center
+        // Mimic facility features pattern: match center's featured program IDs against reference data
         const programDetails = (this.cache.featuredPrograms || []).length > 0
             ? center.featuredPrograms.map(p => 
                 this.cache.featuredPrograms.find(program => program.id === p.id)
@@ -1105,17 +1192,26 @@ class RSYCDataLoader {
             return 0;
         });
 
+        // Enrich all centers with their photos for nearby centers section
+        const allCentersWithPhotos = (this.cache.centers || []).map(c => ({
+            ...c,
+            photos: (this.cache.photos || []).filter(p => p.centerId === c.sharePointId)
+        }));
+
         return {
             center,
             schedules: schedulesForCenter,
             leaders: (this.cache.leaders || []).filter(l => l.centerIds.includes(center.sharePointId)),
             stories: (this.cache.stories || []).filter(s => s.centerId === center.sharePointId),
             events: (this.cache.events || []).filter(e => e.centerId === center.sharePointId),
+            informationalPages: (this.cache.informationalPages || []).filter(p => p.centerId === center.sharePointId),
             photos: (this.cache.photos || []).filter(p => p.centerId === center.sharePointId),
             hours,
             facilityFeatures,  // Use the mapped version with biClass
             facilityDetails: facilityFeatures,  // Alias for backward compatibility
-            programDetails
+            programDetails,
+            allPrograms: this.cache.featuredPrograms || [],  // All programs from RSYCPrograms.json for related program lookups
+            allCenters: allCentersWithPhotos  // All centers with photos for nearby centers section filtering
         };
     }
 

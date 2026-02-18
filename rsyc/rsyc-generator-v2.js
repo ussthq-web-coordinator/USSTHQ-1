@@ -88,6 +88,14 @@ class RSYCGeneratorV2 {
 
             // Load all data
             await this.dataLoader.loadAll();
+            
+            // Build dynamic data models from live endpoints (for Data Models accordion)
+            try {
+                await this.buildDataModelsFromLiveData();
+            } catch (e) {
+                console.warn('Failed to build data models from live data, using fallback:', e);
+            }
+            
             // Pre-process center content (aboutText, volunteerText) into clickable links
             try {
                 this.processAllCenterContacts();
@@ -567,6 +575,10 @@ class RSYCGeneratorV2 {
         document.getElementById('downloadHTML')?.addEventListener('click', () => {
             this.downloadHTML();
         });
+        
+        document.getElementById('downloadWithOG')?.addEventListener('click', () => {
+            this.downloadFullPageWithOG();
+        });
 
         // View Custom CSS button
         document.getElementById('viewCustomCSS')?.addEventListener('click', () => {
@@ -677,6 +689,19 @@ class RSYCGeneratorV2 {
         });
     }
 
+    switchCenter(centerId) {
+        if (!centerId) return;
+        console.log('🔄 Dashboard Switching Center to:', centerId);
+        const dropdown = document.getElementById('centerSelect');
+        if (dropdown) {
+            dropdown.value = centerId;
+            this.onCenterSelect(centerId);
+            
+            // Visual feedback: briefly highlight the link that was clicked or show a message
+            // or just rely on the UI behind updating.
+        }
+    }
+
     onCenterSelect(centerId) {
         console.log('🎯 onCenterSelect called with:', centerId, 'Type:', typeof centerId);
         
@@ -721,6 +746,24 @@ class RSYCGeneratorV2 {
         
         if (this.currentCenter) {
             this.updateStatus('selectedCenter', `Selected: ${this.currentCenter.Title}`);
+            
+            // Update OG tags dynamically
+            const center = this.currentCenter;
+            const pageTitle = `${center.Title} - Red Shield Youth Centers`;
+            const city = center.city || 'Your Community';
+            const state = center.state || '';
+            const cityState = state ? `${city}, ${state}` : city;
+            const pageDescription = `A safe, welcoming space in ${cityState} offering youth programs, activities, mentoring, and community support for kids and teens.`;
+            const ogImageUrl = 'https://s3.amazonaws.com/uss-cache.salvationarmy.org/f432e3f1-79a6-4dfe-82c6-5c93c55e6b09_Charlotte+NC-04489.jpg';
+            const pageUrl = center.websiteURL || 'https://www.redshieldyouth.org/';
+            
+            this.setOGTags({
+                title: pageTitle,
+                description: pageDescription,
+                image: ogImageUrl,
+                url: pageUrl
+            });
+            
             document.getElementById('generateHTML').disabled = false;
             const dataBtn = document.getElementById('viewDataStructure');
             console.log('🔧 View Data Structure button:', dataBtn, 'Disabled before:', dataBtn?.disabled);
@@ -854,20 +897,50 @@ class RSYCGeneratorV2 {
             // Gather all related data for this center
             const centerData = await this.dataLoader.getCenterData(this.currentCenter.Id);
             
+            // Sort selected sections by their formal template order
+            selectedSections.sort((a, b) => {
+                const orderA = (this.templateEngine.sections[a]?.order) || 99;
+                const orderB = (this.templateEngine.sections[b]?.order) || 99;
+                return orderA - orderB;
+            });
+
             // Generate HTML for selected sections
             let html = '';
             selectedSections.forEach(sectionId => {
-                const sectionHTML = this.templateEngine.generateSection(sectionId, centerData);
+                // Add enabled sections list to data so generateNavigation can access it
+                const dataWithSections = { ...centerData, __enabledSections: selectedSections };
+                const sectionHTML = this.templateEngine.generateSection(sectionId, dataWithSections);
                 if (sectionHTML) {
                     html += sectionHTML + '\n\n';
                 }
             });
 
+            // Add modals to the HTML
+            console.log('[RSYC Generator V2] Adding modals to preview...');
+            let modals = '';
+            
+            // Add audit modal
+            if (this.templateEngine.generateAuditModal) {
+                modals += '\n\n' + this.templateEngine.generateAuditModal(selectedSections);
+                console.log('[RSYC Generator V2] Audit modal added');
+            }
+            
+            // Add joinCenter modal
+            if (this.templateEngine.generateJoinCenterModal) {
+                modals += '\n\n' + this.templateEngine.generateJoinCenterModal();
+                console.log('[RSYC Generator V2] Join Center modal added');
+            } else {
+                console.log('[RSYC Generator V2] generateJoinCenterModal method not found!');
+            }
+            
+            // Combine sections and modals
+            const fullHTML = html + modals;
+
             // Store ONLY the section HTML (without customStyles) for export
             this.generatedHTML = html;
             
-            // Update live preview (custom styles already injected globally in page head)
-            this.updatePreview(html);
+            // Update live preview with full HTML including modals (custom styles already injected globally in page head)
+            this.updatePreview(fullHTML);
             
             // Update status
             document.getElementById('previewStatus').textContent = 
@@ -1080,6 +1153,118 @@ class RSYCGeneratorV2 {
                 }
             });
         });
+
+        // Initialize pagination for nearby center cards that already exist in the HTML from rsyc-templates.js
+        this.initializeNearbyCardsPagination(previewContainer);
+    }
+
+    initializeNearbyCardsPagination(container) {
+        try {
+            // Find the nearby section
+            const nearbySection = container.querySelector('#nearby');
+            if (!nearbySection) return; // No nearby section, nothing to paginate
+
+            // Initialize pagination for both area and division card lists using existing HTML
+            this.initializePaginationForSection(nearbySection, 'area');
+            this.initializePaginationForSection(nearbySection, 'division');
+
+            // Setup toggle button listener to reinitialize pagination when division centers are shown/hidden
+            const toggleBtn = nearbySection.querySelector('#rsyc-nearby-toggle-btn');
+            if (toggleBtn) {
+                toggleBtn.addEventListener('click', () => {
+                    // After toggle, reinitialize division pagination
+                    setTimeout(() => {
+                        this.initializePaginationForSection(nearbySection, 'division');
+                    }, 10);
+                });
+            }
+        } catch (e) {
+            console.warn('Failed to initialize nearby cards pagination:', e);
+        }
+    }
+
+    initializePaginationForSection(nearbySection, section) {
+        try {
+            const grid = nearbySection.querySelector(`.rsyc-nearby-grid[data-section="${section}"]`);
+            if (!grid) return;
+
+            const cards = Array.from(grid.querySelectorAll('.rsyc-nearby-card'));
+            if (!cards.length) return;
+
+            // Determine cards per page based on screen width
+            const getPerPage = () => {
+                const w = window.innerWidth;
+                if (w < 768) return 1;           // Mobile: 1 column
+                if (w < 992) return 4;           // Tablet: 2 columns × 2 rows
+                return 6;                         // Desktop: 3 columns × 2 rows
+            };
+
+            const paginationContainer = grid.parentElement.querySelector(`.rsyc-pagination-${section}`);
+            if (!paginationContainer) return; // Pagination HTML should already exist from rsyc-templates.js
+
+            const render = () => {
+                const perPage = getPerPage();
+                const totalPages = Math.max(1, Math.ceil(cards.length / perPage));
+                
+                // Hide all cards first
+                cards.forEach(card => card.classList.add('hidden'));
+                
+                // Show cards for first page
+                for (let i = 0; i < Math.min(perPage, cards.length); i++) {
+                    cards[i].classList.remove('hidden');
+                }
+                
+                // Update pagination controls
+                const currentPageSpan = paginationContainer.querySelector('.rsyc-current-page');
+                const totalPagesSpan = paginationContainer.querySelector('.rsyc-total-pages');
+                const prevBtn = paginationContainer.querySelector('.rsyc-prev-btn');
+                const nextBtn = paginationContainer.querySelector('.rsyc-next-btn');
+                
+                if (currentPageSpan) currentPageSpan.textContent = '1';
+                if (totalPagesSpan) totalPagesSpan.textContent = totalPages;
+                if (prevBtn) prevBtn.disabled = true;
+                if (nextBtn) nextBtn.disabled = totalPages <= 1;
+                
+                // Show/hide pagination based on whether multiple pages exist
+                paginationContainer.style.display = totalPages > 1 ? 'flex' : 'none';
+            };
+
+            // Attach onclick handlers to the pagination buttons (they should call window.rsycPagination)
+            const prevBtn = paginationContainer.querySelector('.rsyc-prev-btn');
+            const nextBtn = paginationContainer.querySelector('.rsyc-next-btn');
+            
+            if (prevBtn && !prevBtn.__initialized) {
+                prevBtn.onclick = () => window.rsycPagination(section, 'prev');
+                prevBtn.__initialized = true;
+            }
+            
+            if (nextBtn && !nextBtn.__initialized) {
+                nextBtn.onclick = () => window.rsycPagination(section, 'next');
+                nextBtn.__initialized = true;
+            }
+
+            // Initial render
+            render();
+
+            // Re-render on window resize with debounce
+            if (!window._rsycNearbyResizeTimeout) {
+                window._rsycNearbyResizeTimeout = null;
+            }
+            
+            const resizeHandler = () => {
+                clearTimeout(window._rsycNearbyResizeTimeout);
+                window._rsycNearbyResizeTimeout = setTimeout(() => {
+                    render();
+                }, 150);
+            };
+            
+            if (!window._rsycNearbyResizeListenerAttached) {
+                window.addEventListener('resize', resizeHandler);
+                window._rsycNearbyResizeListenerAttached = true;
+            }
+        } catch (e) {
+            console.warn(`Failed to initialize pagination for section "${section}":`, e);
+        }
     }
 
     showPlaceholder(message = 'Select a center and sections above to see the live preview') {
@@ -1274,10 +1459,42 @@ class RSYCGeneratorV2 {
             })
             .join('');
 
+        const instructionBlock = `
+            <div style="padding: 16px; background-color: #fafafa; border-bottom: 1px solid #e0e0e0; font-family: 'Segoe UI', sans-serif; margin: 8px; border-radius: 8px; border: 1px solid #eee;">
+                <div style="font-size: 16px; font-weight: 600; color: #242424; margin: 0 0 8px 0;">RSYC Staff & Community Leader Instructions</div>
+                <p style="font-size: 14px; color: #333; line-height: 1.5; margin: 0 0 12px 0;">Please create a new entry for most staff at your center to profiles with photos and bios. <b>Please refrain from using selfies.</b></p>
+                
+                <div style="margin-bottom: 16px;">
+                    <a href="https://submitstaff-rsyc.usscommunications.org/" target="_blank" style="font-size: 14px; color: #0078d4; text-decoration: underline; font-weight: 600; margin-right: 12px;">Submit a New Staff Item</a>
+                    <a href="https://staffreview-rsyc.usscommunications.org/" target="_blank" style="font-size: 14px; color: #0078d4; text-decoration: underline; font-weight: 600;">View and edit submitted staff & leaders</a>
+                    <div style="font-size: 12px; color: #666; margin-top: 4px;">Note: Profile photo and biography are required before the staff entry can be published.</div>
+                </div>
+
+                <div style="background-color: #fff8e1; border-left: 4px solid #f2c200; padding: 12px; margin-bottom: 16px;">
+                    <div style="font-size: 15px; font-weight: 700; color: #242424; margin-bottom: 8px;">🖼️ Profile Photo and Bio Required</div>
+                    <div style="font-size: 13px; color: #444; line-height: 1.5;">
+                        <b>REQUIRED:</b> Upload a high-quality photo (4:5, 5:7, or Square aspect ratio).
+                        <ul style="margin: 8px 0; padding-left: 20px;">
+                            <li>Contain only one individual.</li>
+                            <li>Reflect professional image/attire (Full uniform for officers).</li>
+                            <li>No stretching - crop the image if necessary.</li>
+                            <li>Full face and top of shoulders; no masks.</li>
+                        </ul>
+                        <b>Recommendations:</b> No hats or sunglasses (eyeglasses accepted). Good lighting. Face centered and not blurry.
+                    </div>
+                </div>
+
+                <div style="font-size: 13px; color: #555; font-style: italic; background: #fff; border: 1px solid #eee; padding: 8px; border-radius: 4px;">
+                    💡 <b>Pro-Tip:</b> Alternate name can be used to show the name the youth calls the leader (e.g., "Miss J", "Coach Mike", or "Vicky" for Victoria).
+                </div>
+            </div>
+        `;
+
         return `
-            <div style="font-family: 'Segoe UI', Tahoma, sans-serif; color: #333; max-width: 720px; line-height: 1.4;">
-                <h2 style="margin: 0 0 12px 0; font-size: 18px;">Staff &amp; Community Leaders</h2>
-                <p style="margin: 0 0 12px 0; font-size: 12.5px; color: #666;">Generated on ${new Date().toLocaleDateString()} • ${expandedRows.length} total</p>
+            <div style="font-family: 'Segoe UI', Tahoma, sans-serif; color: #333; max-width: 900px; line-height: 1.4;">
+                <div style="background-color: #f4f4f4; padding: 14px; border-left: 6px solid #d93d3d; font-weight: bold; margin-bottom: 25px; font-size: 18px; color: #333; display: block; width: 100%;">👥 RSYC STAFF & COMMUNITY LEADERS DIRECTORY</div>
+                ${instructionBlock}
+                <p style="margin: 0 0 12px 0; font-size: 12.5px; color: #666;">Generated on ${new Date().toLocaleDateString()} • ${expandedRows.length} total profiles</p>
                 ${centerSections || '<div style="font-size:12.5px; color:#999;">No staff found.</div>'}
             </div>
         `;
@@ -1558,7 +1775,7 @@ class RSYCGeneratorV2 {
 
         return `
             <div style="font-family: 'Segoe UI', Tahoma, sans-serif; color: #333; max-width: 900px; line-height: 1.4;">
-                <h2 style="margin: 0 0 12px 0; font-size: 18px;">Editors (Division + Center)</h2>
+                <div style="background-color: #f4f4f4; padding: 14px; border-left: 6px solid #d93d3d; font-weight: bold; margin-bottom: 25px; font-size: 18px; color: #333; display: block; width: 100%;">🔐 RSYC PROFILE PERMISSIONS (EDITORS)</div>
                 <p style="margin: 0 0 12px 0; font-size: 12.5px; color: #666;">Generated on ${new Date().toLocaleDateString()}${div ? ` • Division: <b>${esc(div)}</b>` : ''}</p>
                 <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="border-collapse: collapse; width: 100%; font-size: 12.5px;">
                     <tr>
@@ -1589,7 +1806,7 @@ class RSYCGeneratorV2 {
         const num = (v) => (v === 0 || v) ? String(v) : '';
 
         const overallHeader = `
-            <h2 style="color: #d93d3d; margin-bottom: 18px; display: block;">RSYC Profile Audit - Overall Status</h2>
+            <div style="background-color: #f4f4f4; padding: 14px; border-left: 6px solid #d93d3d; font-weight: bold; margin-bottom: 25px; font-size: 18px; color: #333; display: block; width: 100%;">📊 RSYC PROFILE AUDIT - OVERALL STATUS</div>
             <p style="font-size: 14px; margin-top: 0; color: #666; margin-bottom: 18px; display: block;">Generated on ${new Date().toLocaleDateString()} • Analyzing ${centersCount} total centers (${closedCount} flagged as CLOSED)</p>
         `;
 
@@ -1607,18 +1824,29 @@ class RSYCGeneratorV2 {
             { label: 'Schedules', value: `${aggregates?.schedules_centers ?? rows.filter(r => r.schedCount > 0).length} centers`, sub: `${aggregates?.schedules_items ?? rows.reduce((s, r) => s + (r.schedCount || 0), 0)} items` },
             { label: 'Leaders', value: `${aggregates?.leaders_centers ?? rows.filter(r => r.leaderCount > 0).length} centers`, sub: `${aggregates?.leaders_items ?? rows.reduce((s, r) => s + (r.leaderCount || 0), 0)} total` },
             { label: 'Photos', value: `${aggregates?.photos_centers ?? rows.filter(r => r.photoCount > 0).length} centers`, sub: `${aggregates?.photos_items ?? rows.reduce((s, r) => s + (r.photoCount || 0), 0)} images` },
-            { label: 'Hours', value: `${aggregates?.hours ?? rows.filter(r => r.hasHours).length}` }
+            { label: 'Hours', value: `${aggregates?.hours ?? rows.filter(r => r.hasHours).length}` },
+            { label: 'Events', value: `${aggregates?.events_centers ?? 0} centers`, sub: `${aggregates?.events_items ?? 0} total` },
+            { label: 'Info Pages', value: `${aggregates?.informationalPages_centers ?? 0} centers`, sub: `${aggregates?.informationalPages_items ?? 0} total` }
         ];
 
         const metrics = `
             <div style="margin: 0 0 18px 0; display:block;">
-                <table style="width:100%; border-collapse:separate; border-spacing:10px 0; table-layout:fixed;">
+                <table style="width:100%; border-collapse:separate; border-spacing:10px 10px; table-layout:fixed;">
                     <tr>
-                        ${metricCells.map(c => `
+                        ${metricCells.slice(0, 4).map(c => `
                             <td style="background:#f8f9fa; border:1px solid #e9ecef; padding:12px; border-radius:8px; text-align:center; vertical-align:top;">
-                                <div style="font-size:12px; color:#666; text-transform:uppercase; font-weight:600; line-height:1.2;">${esc(c.label)}<br></div>
-                                <div style="font-weight:700; font-size:18px; margin:4px 0; line-height:1.2;">${esc(c.value)}</div>
-                                ${c.sub ? `<div style=\"font-size:11px; color:#999; line-height:1.2;\">${esc(c.sub)}</div>` : ''}
+                                <div style="font-size:11px; color:#666; text-transform:uppercase; font-weight:600; line-height:1.2;">${esc(c.label)}<br></div>
+                                <div style="font-weight:700; font-size:16px; margin:4px 0; line-height:1.2;">${esc(c.value)}</div>
+                                ${c.sub ? `<div style=\"font-size:10px; color:#999; line-height:1.2;\">${esc(c.sub)}</div>` : ''}
+                            </td>
+                        `).join('')}
+                    </tr>
+                    <tr>
+                        ${metricCells.slice(4).map(c => `
+                            <td style="background:#f8f9fa; border:1px solid #e9ecef; padding:12px; border-radius:8px; text-align:center; vertical-align:top;">
+                                <div style="font-size:11px; color:#666; text-transform:uppercase; font-weight:600; line-height:1.2;">${esc(c.label)}<br></div>
+                                <div style="font-weight:700; font-size:16px; margin:4px 0; line-height:1.2;">${esc(c.value)}</div>
+                                ${c.sub ? `<div style=\"font-size:10px; color:#999; line-height:1.2;\">${esc(c.sub)}</div>` : ''}
                             </td>
                         `).join('')}
                     </tr>
@@ -1626,14 +1854,53 @@ class RSYCGeneratorV2 {
             </div>
         `;
 
+        const missingAboutCount = rows.filter(r => !r.hasAbout && !r.isClosed).length;
+        const missingPhotosCount = rows.filter(r => r.photoCount === 0 && !r.isClosed).length;
+        const missingHoursCount = rows.filter(r => !r.hasHours && !r.isClosed).length;
+        const missingSchedulesCount = rows.filter(r => r.schedCount === 0 && !r.isClosed).length;
+
+        const needsAttention = `
+            <div style="margin-bottom: 22px; padding: 16px; background-color: #fff5f5; border: 1px solid #ffccd5; border-radius: 8px; font-family: 'Segoe UI', Tahoma, sans-serif;">
+                <div style="font-weight: 800; color: #dc3545; font-size: 14px; margin-bottom: 12px; text-transform: uppercase; border-bottom: 1px solid #ffccd5; padding-bottom: 8px;">🚨 High-Priority Content Needs Attention</div>
+                <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px;">
+                    <div style="font-size: 13px; color: #333;">
+                        <span style="display:inline-block; width:22px; height:22px; background:#dc3545; color:white; border-radius:50%; text-align:center; line-height:22px; font-weight:bold; margin-right:8px; font-size:11px;">${missingAboutCount}</span> 
+                        <strong>No About This Center Statement</strong>
+                    </div>
+                    <div style="font-size: 13px; color: #333;">
+                        <span style="display:inline-block; width:22px; height:22px; background:#dc3545; color:white; border-radius:50%; text-align:center; line-height:22px; font-weight:bold; margin-right:8px; font-size:11px;">${missingPhotosCount}</span> 
+                        <strong>No Photos (Missing Facility Exterior)</strong>
+                    </div>
+                    <div style="font-size: 13px; color: #333;">
+                        <span style="display:inline-block; width:22px; height:22px; background:#dc3545; color:white; border-radius:50%; text-align:center; line-height:22px; font-weight:bold; margin-right:8px; font-size:11px;">${missingHoursCount}</span> 
+                        <strong>Missing Custom Operating Hours</strong>
+                    </div>
+                    <div style="font-size: 13px; color: #333;">
+                        <span style="display:inline-block; width:22px; height:22px; background:#dc3545; color:white; border-radius:50%; text-align:center; line-height:22px; font-weight:bold; margin-right:8px; font-size:11px;">${missingSchedulesCount}</span> 
+                        <strong>No Program Schedules Submitted</strong>
+                    </div>
+                </div>
+                <div style="margin-top: 12px; font-size: 11px; color: #dc3545; font-style: italic;">
+                    * All counts exclude centers flagged as [CLOSED]. Refer to the detailed status table below for center-specific items.
+                </div>
+            </div>
+        `;
+
         const tableRows = rows.map(r => `
             <tr style="border-bottom:1px solid #f5f5f5; ${r.isClosed ? 'background:#fff5f5;' : ''}">
-                <td style="padding:6px 8px; font-size:12px;">${r.isClosed ? `<span style=\"color:#dc3545; font-size:10px; font-weight:bold;\">[CLOSED]</span> ` : ''}${esc(shortCenterName(r.name))}</td>
-                <td style="padding:6px 8px; text-align:center; font-size:12px;">${r.isClosed ? '' : `<a href=\"${esc(r.liveUrl)}\" target=\"_blank\" style=\"text-decoration:none;\">🔗</a>`}</td>
+                <td style="padding:6px 8px; font-size:12px;">
+                    ${r.isClosed ? `<span style="color:#dc3545; font-size:10px; font-weight:bold;">[CLOSED]</span> ` : ''}
+                    <span class="center-audit-link" data-center-id="${r.id}" style="color:#004a99; font-weight:bold; cursor:pointer; text-decoration:none;" title="Click to switch dropdown to this center">
+                        ${esc(shortCenterName(r.name))}
+                    </span>
+                </td>
+                <td style="padding:6px 8px; text-align:center; font-size:12px;">${r.isClosed ? '' : `<a href="${esc(r.liveUrl)}" target="_blank" style="text-decoration:none;">🔗</a>`}</td>
                 <td style="padding:6px 8px; text-align:center; font-size:12px;">${check(r.hasAbout)}</td>
                 <td style="padding:6px 8px; text-align:center; font-size:12px;">${check(r.hasStaff)}</td>
                 <td style="padding:6px 8px; text-align:center; font-size:12px;">${num(r.leaderCount)}</td>
                 <td style="padding:6px 8px; text-align:center; font-size:12px;">${num(r.schedCount)}</td>
+                <td style="padding:6px 8px; text-align:center; font-size:12px;">${num(r.eventCount)}</td>
+                <td style="padding:6px 8px; text-align:center; font-size:12px;">${num(r.infoPageCount)}</td>
                 <td style="padding:6px 8px; text-align:center; font-size:12px;">${num(r.photoCount)}</td>
                 <td style="padding:6px 8px; text-align:center; font-size:12px;">${check(r.hasHours)}</td>
                 <td style="padding:6px 8px; text-align:center; font-size:12px;">${num(r.facilityCount)}</td>
@@ -1657,6 +1924,8 @@ class RSYCGeneratorV2 {
                                 <th style="padding:8px; text-align:center; font-size:11px;">Staff</th>
                                 <th style="padding:8px; text-align:center; font-size:11px;">Leaders</th>
                                 <th style="padding:8px; text-align:center; font-size:11px;">Schedules</th>
+                                <th style="padding:8px; text-align:center; font-size:11px;">Events</th>
+                                <th style="padding:8px; text-align:center; font-size:11px;">Info</th>
                                 <th style="padding:8px; text-align:center; font-size:11px;">Photos</th>
                                 <th style="padding:8px; text-align:center; font-size:11px;">Hours</th>
                                 <th style="padding:8px; text-align:center; font-size:11px;">Facilities</th>
@@ -1684,6 +1953,7 @@ class RSYCGeneratorV2 {
                 ${overallHeader}
                 ${goal}
                 ${metrics}
+                ${needsAttention}
                 ${statusTable}
             </div>
         `;
@@ -1852,7 +2122,7 @@ class RSYCGeneratorV2 {
 
         return `
             <div style="font-family: 'Segoe UI', Tahoma, sans-serif; color: #333; max-width: 900px; line-height: 1.5;">
-                <h2 style="color: #d93d3d; margin-bottom: 18px; display: block;">RSYC Profile Audit - Filters & Associations</h2>
+                <div style="background-color: #f4f4f4; padding: 14px; border-left: 6px solid #d93d3d; font-weight: bold; margin-bottom: 25px; font-size: 18px; color: #333; display: block; width: 100%;">🏷️ RSYC FILTER & TAG ASSOCIATIONS</div>
                 <p style="font-size: 14px; margin-top: 0; color: #666; margin-bottom: 18px; display: block;">Generated on ${new Date().toLocaleDateString()}</p>
                 ${recentlyCreated}
                 ${lowAssoc}
@@ -1860,12 +2130,1283 @@ class RSYCGeneratorV2 {
         `;
     }
 
+    generateEmailAuditDataModels() {
+        return `
+            <div style="font-family: 'Segoe UI', Tahoma, sans-serif; color: #333; max-width: 1000px; line-height: 1.5;">
+                <div style="background-color: #f4f4f4; padding: 14px; border-left: 6px solid #d93d3d; font-weight: bold; margin-bottom: 25px; font-size: 18px; color: #333; display: block; width: 100%;">📘 RSYC DATA MODELS (CORE FIELDS)</div>
+                
+                <div style="background:#fafafa; border:1px solid #e0e0e0; border-radius:12px; padding:24px; margin-bottom:24px;">
+                    <h4 style="font-size:16px; font-weight:700; color:#242424; margin:0 0 4px 0;">1. Center Profile</h4>
+                    <p style="font-size:11px; color:#666; margin:0 0 12px 0;">Primary center information and descriptions</p>
+                    <table style="width:100%; border-collapse:collapse; font-size:11px; margin-bottom:8px;">
+                        <thead>
+                            <tr style="background:#f0f0f0; border-bottom:2px solid #ddd;">
+                                <th style="text-align:left; padding:8px; font-weight:700; color:#333;">Field Name</th>
+                                <th style="text-align:left; padding:8px; font-weight:700; color:#333;">Purpose</th>
+                                <th style="text-align:left; padding:8px; font-weight:700; color:#333;">Example Value</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr style="border-bottom:1px solid #eee;">
+                                <td style="padding:8px; color:#0078d4;"><strong>Title</strong></td>
+                                <td style="padding:8px;">Center name</td>
+                                <td style="padding:8px;">Red Shield Youth Center of Gaston - Joe R. Hudson</td>
+                            </tr>
+                            <tr style="border-bottom:1px solid #eee;">
+                                <td style="padding:8px; color:#0078d4;"><strong>About This Center</strong></td>
+                                <td style="padding:8px;">Center description (HTML)</td>
+                                <td style="padding:8px; font-size:10px;">&lt;div&gt;Our community center offers...&lt;/div&gt;</td>
+                            </tr>
+                            <tr style="border-bottom:1px solid #eee;">
+                                <td style="padding:8px; color:#0078d4;"><strong>Facility Features</strong></td>
+                                <td style="padding:8px;">Array of available facilities</td>
+                                <td style="padding:8px;">["Full-Size Gymnasium", "Computer Lab", ...]</td>
+                            </tr>
+                            <tr style="border-bottom:1px solid #eee;">
+                                <td style="padding:8px; color:#0078d4;"><strong>Featured Programs</strong></td>
+                                <td style="padding:8px;">Array of program highlights</td>
+                                <td style="padding:8px;">["Adventure Corps", "Club 316", ...]</td>
+                            </tr>
+                            <tr style="border-bottom:1px solid #eee;">
+                                <td style="padding:8px; color:#0078d4;"><strong>Explainer Video Embed Code</strong></td>
+                                <td style="padding:8px;">Video iframe HTML</td>
+                                <td style="padding:8px; font-size:10px;">&lt;iframe src="..."&gt;&lt;/iframe&gt;</td>
+                            </tr>
+                            <tr style="border-bottom:1px solid #eee;">
+                                <td style="padding:8px; color:#0078d4;"><strong>Footer Scripture Verse</strong></td>
+                                <td style="padding:8px;">Scripture text for footer</td>
+                                <td style="padding:8px;">"For I know the plans I have for you..."</td>
+                            </tr>
+                            <tr style="border-bottom:1px solid #eee;">
+                                <td style="padding:8px; color:#0078d4;"><strong>Online Sign-Up</strong></td>
+                                <td style="padding:8px;">Sign-up link</td>
+                                <td style="padding:8px; font-size:10px;">https://online.traxsolutions.com/...</td>
+                            </tr>
+                            <tr style="border-bottom:1px solid #eee;">
+                                <td style="padding:8px; color:#0078d4;"><strong>Donation Form</strong></td>
+                                <td style="padding:8px;">Donation link</td>
+                                <td style="padding:8px; font-size:10px;">https://classy.org/give/...</td>
+                            </tr>
+                            <tr style="border-bottom:1px solid #eee;">
+                                <td style="padding:8px; color:#0078d4;"><strong>Facebook Page</strong></td>
+                                <td style="padding:8px;">Facebook profile link</td>
+                                <td style="padding:8px; font-size:10px;">https://facebook.com/SalvationArmyGastonia</td>
+                            </tr>
+                            <tr style="border-bottom:1px solid #eee;">
+                                <td style="padding:8px; color:#0078d4;"><strong>Status</strong></td>
+                                <td style="padding:8px;">Publication status</td>
+                                <td style="padding:8px;">5. Published by THQ</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                    <div style="font-size:10px; color:#666; padding:6px 8px; background:#f9f9f9; border-radius:4px;">
+                        <strong>Example Center:</strong> Gaston - Joe R. Hudson (NSC)
+                    </div>
+                </div>
+
+                <div style="background:#fafafa; border:1px solid #e0e0e0; border-radius:12px; padding:24px; margin-bottom:24px;">
+                    <h4 style="font-size:16px; font-weight:700; color:#242424; margin:0 0 4px 0;">2. Program Schedules</h4>
+                    <p style="font-size:11px; color:#666; margin:0 0 12px 0;">Program schedule details and timing</p>
+                    <table style="width:100%; border-collapse:collapse; font-size:11px; margin-bottom:8px;">
+                        <thead>
+                            <tr style="background:#f0f0f0; border-bottom:2px solid #ddd;">
+                                <th style="text-align:left; padding:8px; font-weight:700; color:#333;">Field Name</th>
+                                <th style="text-align:left; padding:8px; font-weight:700; color:#333;">Purpose</th>
+                                <th style="text-align:left; padding:8px; font-weight:700; color:#333;">Example Value</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr style="border-bottom:1px solid #eee;">
+                                <td style="padding:8px; color:#0078d4;"><strong>Custom Program Schedule Title</strong></td>
+                                <td style="padding:8px;">Schedule name</td>
+                                <td style="padding:8px;">Arrive & Thrive</td>
+                            </tr>
+                            <tr style="border-bottom:1px solid #eee;">
+                                <td style="padding:8px; color:#0078d4;"><strong>Custom Program Schedule Subtitle</strong></td>
+                                <td style="padding:8px;">Schedule description</td>
+                                <td style="padding:8px;">Board Games and Computer Time</td>
+                            </tr>
+                            <tr style="border-bottom:1px solid #eee;">
+                                <td style="padding:8px; color:#0078d4;"><strong>All Related Programs</strong></td>
+                                <td style="padding:8px;">Link to program catalog</td>
+                                <td style="padding:8px;">Adventure Corps</td>
+                            </tr>
+                            <tr style="border-bottom:1px solid #eee;">
+                                <td style="padding:8px; color:#0078d4;"><strong>Schedule Days</strong></td>
+                                <td style="padding:8px;">Days program runs</td>
+                                <td style="padding:8px;">["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"]</td>
+                            </tr>
+                            <tr style="border-bottom:1px solid #eee;">
+                                <td style="padding:8px; color:#0078d4;"><strong>Schedule Time</strong></td>
+                                <td style="padding:8px;">Program time</td>
+                                <td style="padding:8px;">2:30 PM - 6:30 PM</td>
+                            </tr>
+                            <tr style="border-bottom:1px solid #eee;">
+                                <td style="padding:8px; color:#0078d4;"><strong>Timezone</strong></td>
+                                <td style="padding:8px;">Time zone reference</td>
+                                <td style="padding:8px;">Eastern/America/New_York</td>
+                            </tr>
+                            <tr style="border-bottom:1px solid #eee;">
+                                <td style="padding:8px; color:#0078d4;"><strong>Frequency</strong></td>
+                                <td style="padding:8px;">Recurrence pattern</td>
+                                <td style="padding:8px;">Weekly</td>
+                            </tr>
+                            <tr style="border-bottom:1px solid #eee;">
+                                <td style="padding:8px; color:#0078d4;"><strong>Ages Served</strong></td>
+                                <td style="padding:8px;">Age group array</td>
+                                <td style="padding:8px;">["Elementary", "Middle", "Teen"]</td>
+                            </tr>
+                            <tr style="border-bottom:1px solid #eee;">
+                                <td style="padding:8px; color:#0078d4;"><strong>Contact Info</strong></td>
+                                <td style="padding:8px;">Program coordinator</td>
+                                <td style="padding:8px;">Name, email, phone</td>
+                            </tr>
+                            <tr style="border-bottom:1px solid #eee;">
+                                <td style="padding:8px; color:#0078d4;"><strong>What to Bring</strong></td>
+                                <td style="padding:8px;">Items to bring</td>
+                                <td style="padding:8px;">Snack, water bottle</td>
+                            </tr>
+                            <tr style="border-bottom:1px solid #eee;">
+                                <td style="padding:8px; color:#0078d4;"><strong>Schedule Disclaimer</strong></td>
+                                <td style="padding:8px;">Special notices</td>
+                                <td style="padding:8px;">Hours may vary on holidays</td>
+                            </tr>
+                            <tr style="border-bottom:1px solid #eee;">
+                                <td style="padding:8px; color:#0078d4;"><strong>Status</strong></td>
+                                <td style="padding:8px;">Publication status</td>
+                                <td style="padding:8px;">5. Published by THQ</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                    <div style="font-size:10px; color:#666; padding:6px 8px; background:#f9f9f9; border-radius:4px;">
+                        <strong>Example Center:</strong> Hagerstown (PMC) - Titles: Arrive & Thrive, TROOPS Classes, STEM Crafts & Arts
+                    </div>
+                </div>
+
+                <div style="background:#fafafa; border:1px solid #e0e0e0; border-radius:12px; padding:24px; margin-bottom:24px;">
+                    <h4 style="font-size:16px; font-weight:700; color:#242424; margin:0 0 4px 0;">3. Leaders</h4>
+                    <p style="font-size:11px; color:#666; margin:0 0 12px 0;">Staff and leadership directory</p>
+                    <table style="width:100%; border-collapse:collapse; font-size:11px; margin-bottom:8px;">
+                        <thead>
+                            <tr style="background:#f0f0f0; border-bottom:2px solid #ddd;">
+                                <th style="text-align:left; padding:8px; font-weight:700; color:#333;">Field Name</th>
+                                <th style="text-align:left; padding:8px; font-weight:700; color:#333;">Purpose</th>
+                                <th style="text-align:left; padding:8px; font-weight:700; color:#333;">Example Value</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr style="border-bottom:1px solid #eee;">
+                                <td style="padding:8px; color:#0078d4;"><strong>Person</strong></td>
+                                <td style="padding:8px;">Staff member name</td>
+                                <td style="padding:8px;">Damion Motley</td>
+                            </tr>
+                            <tr style="border-bottom:1px solid #eee;">
+                                <td style="padding:8px; color:#0078d4;"><strong>Role Type</strong></td>
+                                <td style="padding:8px;">Position/title</td>
+                                <td style="padding:8px;">Center Executive Director</td>
+                            </tr>
+                            <tr style="border-bottom:1px solid #eee;">
+                                <td style="padding:8px; color:#0078d4;"><strong>Center</strong></td>
+                                <td style="padding:8px;">Center assignment (array)</td>
+                                <td style="padding:8px;">Gaston - Joe R. Hudson</td>
+                            </tr>
+                            <tr style="border-bottom:1px solid #eee;">
+                                <td style="padding:8px; color:#0078d4;"><strong>Department</strong></td>
+                                <td style="padding:8px;">Department/corps</td>
+                                <td style="padding:8px;">Gastonia Corps</td>
+                            </tr>
+                            <tr style="border-bottom:1px solid #eee;">
+                                <td style="padding:8px; color:#0078d4;"><strong>Image</strong></td>
+                                <td style="padding:8px;">Staff photo</td>
+                                <td style="padding:8px;">Uploaded Photo</td>
+                            </tr>
+                            <tr style="border-bottom:1px solid #eee;">
+                                <td style="padding:8px; color:#0078d4;"><strong>Center Division</strong></td>
+                                <td style="padding:8px;">Regional division (array)</td>
+                                <td style="padding:8px;">NSC</td>
+                            </tr>
+                            <tr style="border-bottom:1px solid #eee;">
+                                <td style="padding:8px; color:#0078d4;"><strong>Status</strong></td>
+                                <td style="padding:8px;">Publication status</td>
+                                <td style="padding:8px;">5. Published by THQ</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                    <div style="font-size:10px; color:#666; padding:6px 8px; background:#f9f9f9; border-radius:4px;">
+                        <strong>Example Center:</strong> Gaston - Joe R. Hudson (NSC)
+                    </div>
+                </div>
+
+                <div style="background:#fafafa; border:1px solid #e0e0e0; border-radius:12px; padding:24px; margin-bottom:24px;">
+                    <h4 style="font-size:16px; font-weight:700; color:#242424; margin:0 0 4px 0;">4. Hours</h4>
+                    <p style="font-size:11px; color:#666; margin:0 0 12px 0;">Operating hours and schedules</p>
+                    <table style="width:100%; border-collapse:collapse; font-size:11px; margin-bottom:8px;">
+                        <thead>
+                            <tr style="background:#f0f0f0; border-bottom:2px solid #ddd;">
+                                <th style="text-align:left; padding:8px; font-weight:700; color:#333;">Field Name</th>
+                                <th style="text-align:left; padding:8px; font-weight:700; color:#333;">Purpose</th>
+                                <th style="text-align:left; padding:8px; font-weight:700; color:#333;">Example Value</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr style="border-bottom:1px solid #eee;">
+                                <td style="padding:8px; color:#0078d4;"><strong>Center</strong></td>
+                                <td style="padding:8px;">Center reference</td>
+                                <td style="padding:8px;">Hickory</td>
+                            </tr>
+                            <tr style="border-bottom:1px solid #eee;">
+                                <td style="padding:8px; color:#0078d4;"><strong>Regular Hours Term</strong></td>
+                                <td style="padding:8px;">Season/term label</td>
+                                <td style="padding:8px;">August - May</td>
+                            </tr>
+                            <tr style="border-bottom:1px solid #eee;">
+                                <td style="padding:8px; color:#0078d4;"><strong>Open Full Days Dates</strong></td>
+                                <td style="padding:8px;">Days fully open</td>
+                                <td style="padding:8px;">All Week</td>
+                            </tr>
+                            <tr style="border-bottom:1px solid #eee;">
+                                <td style="padding:8px; color:#0078d4;"><strong>Closed Dates</strong></td>
+                                <td style="padding:8px;">Holiday closures</td>
+                                <td style="padding:8px;">July 3rd (4th of July Holiday)</td>
+                            </tr>
+                            <tr style="border-bottom:1px solid #eee;">
+                                <td style="padding:8px; color:#0078d4;"><strong>Special Hours</strong></td>
+                                <td style="padding:8px;">Extended/modified times</td>
+                                <td style="padding:8px;">Early Drop 7:30AM / Late Pick 5:30PM</td>
+                            </tr>
+                            <tr style="border-bottom:1px solid #eee;">
+                                <td style="padding:8px; color:#0078d4;"><strong>Status</strong></td>
+                                <td style="padding:8px;">Publication status</td>
+                                <td style="padding:8px;">5. Published by THQ</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                    <div style="font-size:10px; color:#666; padding:6px 8px; background:#f9f9f9; border-radius:4px;">
+                        <strong>Example Center:</strong> Hickory (NSC)
+                    </div>
+                </div>
+
+                <div style="background:#fafafa; border:1px solid #e0e0e0; border-radius:12px; padding:24px; margin-bottom:24px;">
+                    <h4 style="font-size:16px; font-weight:700; color:#242424; margin:0 0 4px 0;">5. Events</h4>
+                    <p style="font-size:11px; color:#666; margin:0 0 12px 0;">Special events and camps</p>
+                    <table style="width:100%; border-collapse:collapse; font-size:11px; margin-bottom:8px;">
+                        <thead>
+                            <tr style="background:#f0f0f0; border-bottom:2px solid #ddd;">
+                                <th style="text-align:left; padding:8px; font-weight:700; color:#333;">Field Name</th>
+                                <th style="text-align:left; padding:8px; font-weight:700; color:#333;">Purpose</th>
+                                <th style="text-align:left; padding:8px; font-weight:700; color:#333;">Example Value</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr style="border-bottom:1px solid #eee;">
+                                <td style="padding:8px; color:#0078d4;"><strong>Event Title</strong></td>
+                                <td style="padding:8px;">Event name</td>
+                                <td style="padding:8px;">The Great Garden Escape</td>
+                            </tr>
+                            <tr style="border-bottom:1px solid #eee;">
+                                <td style="padding:8px; color:#0078d4;"><strong>Center</strong></td>
+                                <td style="padding:8px;">Host center</td>
+                                <td style="padding:8px;">Aiken Teen Center</td>
+                            </tr>
+                            <tr style="border-bottom:1px solid #eee;">
+                                <td style="padding:8px; color:#0078d4;"><strong>Event Type</strong></td>
+                                <td style="padding:8px;">Type of event</td>
+                                <td style="padding:8px;">Spring Break Camp</td>
+                            </tr>
+                            <tr style="border-bottom:1px solid #eee;">
+                                <td style="padding:8px; color:#0078d4;"><strong>Start Date and Time</strong></td>
+                                <td style="padding:8px;">Event start</td>
+                                <td style="padding:8px;">2026-04-06T12:00:00Z</td>
+                            </tr>
+                            <tr style="border-bottom:1px solid #eee;">
+                                <td style="padding:8px; color:#0078d4;"><strong>End Date and Time</strong></td>
+                                <td style="padding:8px;">Event end</td>
+                                <td style="padding:8px;">2026-04-10T21:00:00Z</td>
+                            </tr>
+                            <tr style="border-bottom:1px solid #eee;">
+                                <td style="padding:8px; color:#0078d4;"><strong>Extended Care Times</strong></td>
+                                <td style="padding:8px;">Before/after care hours</td>
+                                <td style="padding:8px;">Early Drop 7:30AM / Late 5:30PM</td>
+                            </tr>
+                            <tr style="border-bottom:1px solid #eee;">
+                                <td style="padding:8px; color:#0078d4;"><strong>Special Features</strong></td>
+                                <td style="padding:8px;">Event highlights</td>
+                                <td style="padding:8px;">Escape Rooms, Crafts, Field Trips</td>
+                            </tr>
+                            <tr style="border-bottom:1px solid #eee;">
+                                <td style="padding:8px; color:#0078d4;"><strong>Cost</strong></td>
+                                <td style="padding:8px;">Registration fee</td>
+                                <td style="padding:8px;">$80 (Includes meals & snacks)</td>
+                            </tr>
+                            <tr style="border-bottom:1px solid #eee;">
+                                <td style="padding:8px; color:#0078d4;"><strong>Contact Person</strong></td>
+                                <td style="padding:8px;">Primary contact</td>
+                                <td style="padding:8px;">Kathleen Hutto</td>
+                            </tr>
+                            <tr style="border-bottom:1px solid #eee;">
+                                <td style="padding:8px; color:#0078d4;"><strong>Contact Email</strong></td>
+                                <td style="padding:8px;">Contact email</td>
+                                <td style="padding:8px;">kathleen.hutto@uss.salvationarmy.org</td>
+                            </tr>
+                            <tr style="border-bottom:1px solid #eee;">
+                                <td style="padding:8px; color:#0078d4;"><strong>Contact Number</strong></td>
+                                <td style="padding:8px;">Contact phone</td>
+                                <td style="padding:8px;">(803) 522-2963</td>
+                            </tr>
+                            <tr style="border-bottom:1px solid #eee;">
+                                <td style="padding:8px; color:#0078d4;"><strong>Primary Button Text</strong></td>
+                                <td style="padding:8px;">CTA button label</td>
+                                <td style="padding:8px;">Register Here</td>
+                            </tr>
+                            <tr style="border-bottom:1px solid #eee;">
+                                <td style="padding:8px; color:#0078d4;"><strong>Primary Button Link</strong></td>
+                                <td style="padding:8px;">Registration URL</td>
+                                <td style="padding:8px; font-size:10px;">https://online.traxsolutions.com/...</td>
+                            </tr>
+                            <tr style="border-bottom:1px solid #eee;">
+                                <td style="padding:8px; color:#0078d4;"><strong>Event Image</strong></td>
+                                <td style="padding:8px;">Event photo</td>
+                                <td style="padding:8px;">Uploaded Image</td>
+                            </tr>
+                            <tr style="border-bottom:1px solid #eee;">
+                                <td style="padding:8px; color:#0078d4;"><strong>Status</strong></td>
+                                <td style="padding:8px;">Publication status</td>
+                                <td style="padding:8px;">5. Published by THQ</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                    <div style="font-size:10px; color:#666; padding:6px 8px; background:#f9f9f9; border-radius:4px;">
+                        <strong>Example Center:</strong> Aiken Teen Center (NSC)
+                    </div>
+                </div>
+
+                <div style="background:#fafafa; border:1px solid #e0e0e0; border-radius:12px; padding:24px; margin-bottom:24px;">
+                    <h4 style="font-size:16px; font-weight:700; color:#242424; margin:0 0 4px 0;">6. Informational Pages</h4>
+                    <p style="font-size:11px; color:#666; margin:0 0 12px 0;">Facility policies, safety protocols, and mission details</p>
+                    <table style="width:100%; border-collapse:collapse; font-size:11px; margin-bottom:8px;">
+                        <thead>
+                            <tr style="background:#f0f0f0; border-bottom:2px solid #ddd;">
+                                <th style="text-align:left; padding:8px; font-weight:700; color:#333;">Field Name</th>
+                                <th style="text-align:left; padding:8px; font-weight:700; color:#333;">Purpose</th>
+                                <th style="text-align:left; padding:8px; font-weight:700; color:#333;">Example Value</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr style="border-bottom:1px solid #eee;">
+                                <td style="padding:8px; color:#0078d4;"><strong>Page Title</strong></td>
+                                <td style="padding:8px;">Information headline</td>
+                                <td style="padding:8px;">Safety Protocol & Guidelines</td>
+                            </tr>
+                            <tr style="border-bottom:1px solid #eee;">
+                                <td style="padding:8px; color:#0078d4;"><strong>Category</strong></td>
+                                <td style="padding:8px;">Information type</td>
+                                <td style="padding:8px;">Safety</td>
+                            </tr>
+                            <tr style="border-bottom:1px solid #eee;">
+                                <td style="padding:8px; color:#0078d4;"><strong>Body</strong></td>
+                                <td style="padding:8px;">Detail content (HTML)</td>
+                                <td style="padding:8px; font-size:10px;">&lt;div&gt;We ensure that...&lt;/div&gt;</td>
+                            </tr>
+                            <tr style="border-bottom:1px solid #eee;">
+                                <td style="padding:8px; color:#0078d4;"><strong>URL Thumbnail Image</strong></td>
+                                <td style="padding:8px;">Upload image</td>
+                                <td style="padding:8px;">Uploaded Image</td>
+                            </tr>
+                            <tr style="border-bottom:1px solid #eee;">
+                                <td style="padding:8px; color:#0078d4;"><strong>External URL</strong></td>
+                                <td style="padding:8px;">External link/PDF</td>
+                                <td style="padding:8px; font-size:10px;">https://example.com/safety.pdf</td>
+                            </tr>
+                            <tr style="border-bottom:1px solid #eee;">
+                                <td style="padding:8px; color:#0078d4;"><strong>Status</strong></td>
+                                <td style="padding:8px;">Publication status</td>
+                                <td style="padding:8px;">5. Published by THQ</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                    <div style="font-size:10px; color:#666; padding:6px 8px; background:#f9f9f9; border-radius:4px;">
+                        <strong>Example Center:</strong> Aiken Teen Center (NSC)
+                    </div>
+                </div>
+
+                <div style="background:#fafafa; border:1px solid #e0e0e0; border-radius:12px; padding:24px; margin-bottom:24px;">
+                    <h4 style="font-size:16px; font-weight:700; color:#242424; margin:0 0 4px 0;">7. Stories</h4>
+                    <p style="font-size:11px; color:#666; margin:0 0 12px 0;">Success stories and testimonials</p>
+                    <table style="width:100%; border-collapse:collapse; font-size:11px; margin-bottom:8px;">
+                        <thead>
+                            <tr style="background:#f0f0f0; border-bottom:2px solid #ddd;">
+                                <th style="text-align:left; padding:8px; font-weight:700; color:#333;">Field Name</th>
+                                <th style="text-align:left; padding:8px; font-weight:700; color:#333;">Purpose</th>
+                                <th style="text-align:left; padding:8px; font-weight:700; color:#333;">Example Value</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr style="border-bottom:1px solid #eee;">
+                                <td style="padding:8px; color:#0078d4;"><strong>Story Title</strong></td>
+                                <td style="padding:8px;">Story headline</td>
+                                <td style="padding:8px;">How the Red Shield Youth Center Helped One Teen Find His Way</td>
+                            </tr>
+                            <tr style="border-bottom:1px solid #eee;">
+                                <td style="padding:8px; color:#0078d4;"><strong>Center</strong></td>
+                                <td style="padding:8px;">Story center location</td>
+                                <td style="padding:8px;">Greater Charlotte - Belmont Avenue</td>
+                            </tr>
+                            <tr style="border-bottom:1px solid #eee;">
+                                <td style="padding:8px; color:#0078d4;"><strong>Story Date</strong></td>
+                                <td style="padding:8px;">Published/authored date</td>
+                                <td style="padding:8px;">2025-08-25</td>
+                            </tr>
+                            <tr style="border-bottom:1px solid #eee;">
+                                <td style="padding:8px; color:#0078d4;"><strong>Author</strong></td>
+                                <td style="padding:8px;">Story author</td>
+                                <td style="padding:8px;">Ed Boyce</td>
+                            </tr>
+                            <tr style="border-bottom:1px solid #eee;">
+                                <td style="padding:8px; color:#0078d4;"><strong>Body</strong></td>
+                                <td style="padding:8px;">Full story narrative (HTML)</td>
+                                <td style="padding:8px; font-size:10px;">&lt;article&gt;Micah Grier came...&lt;/article&gt;</td>
+                            </tr>
+                            <tr style="border-bottom:1px solid #eee;">
+                                <td style="padding:8px; color:#0078d4;"><strong>Thumbnail Image</strong></td>
+                                <td style="padding:8px;">Story preview image</td>
+                                <td style="padding:8px;">Uploaded Image</td>
+                            </tr>
+                            <tr style="border-bottom:1px solid #eee;">
+                                <td style="padding:8px; color:#0078d4;"><strong>Main Image</strong></td>
+                                <td style="padding:8px;">Story featured image</td>
+                                <td style="padding:8px;">Uploaded Image</td>
+                            </tr>
+                            <tr style="border-bottom:1px solid #eee;">
+                                <td style="padding:8px; color:#0078d4;"><strong>External URL</strong></td>
+                                <td style="padding:8px;">External story link</td>
+                                <td style="padding:8px; font-size:10px;">https://southernusa.salvationarmy.org/...</td>
+                            </tr>
+                            <tr style="border-bottom:1px solid #eee;">
+                                <td style="padding:8px; color:#0078d4;"><strong>Status</strong></td>
+                                <td style="padding:8px;">Publication status</td>
+                                <td style="padding:8px;">5. Published by THQ</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                    <div style="font-size:10px; color:#666; padding:6px 8px; background:#f9f9f9; border-radius:4px;">
+                        <strong>Example Center:</strong> Greater Charlotte - Belmont Avenue (NSC)
+                    </div>
+                </div>
+
+                <div style="background:#fafafa; border:1px solid #e0e0e0; border-radius:12px; padding:24px; margin-bottom:24px;">
+                    <h4 style="font-size:16px; font-weight:700; color:#242424; margin:0 0 4px 0;">8. Photos</h4>
+                    <p style="font-size:11px; color:#666; margin:0 0 12px 0;">Homepage and section images</p>
+                    <table style="width:100%; border-collapse:collapse; font-size:11px; margin-bottom:8px;">
+                        <thead>
+                            <tr style="background:#f0f0f0; border-bottom:2px solid #ddd;">
+                                <th style="text-align:left; padding:8px; font-weight:700; color:#333;">Field Name</th>
+                                <th style="text-align:left; padding:8px; font-weight:700; color:#333;">Purpose</th>
+                                <th style="text-align:left; padding:8px; font-weight:700; color:#333;">Example Value</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr style="border-bottom:1px solid #eee;">
+                                <td style="padding:8px; color:#0078d4;"><strong>Center</strong></td>
+                                <td style="padding:8px;">Center reference</td>
+                                <td style="padding:8px;">Baltimore - Middle River</td>
+                            </tr>
+                            <tr style="border-bottom:1px solid #eee;">
+                                <td style="padding:8px; color:#0078d4;"><strong>Exterior Photo</strong></td>
+                                <td style="padding:8px;">Building exterior image</td>
+                                <td style="padding:8px;">Uploaded Image</td>
+                            </tr>
+                            <tr style="border-bottom:1px solid #eee;">
+                                <td style="padding:8px; color:#0078d4;"><strong>Facility Features Photo</strong></td>
+                                <td style="padding:8px;">Facilities image</td>
+                                <td style="padding:8px;">Uploaded Image</td>
+                            </tr>
+                            <tr style="border-bottom:1px solid #eee;">
+                                <td style="padding:8px; color:#0078d4;"><strong>Programs Photo</strong></td>
+                                <td style="padding:8px;">Programs section image</td>
+                                <td style="padding:8px;">Uploaded Image</td>
+                            </tr>
+                            <tr style="border-bottom:1px solid #eee;">
+                                <td style="padding:8px; color:#0078d4;"><strong>Nearby Centers Photo</strong></td>
+                                <td style="padding:8px;">Locations image</td>
+                                <td style="padding:8px;">Uploaded Image</td>
+                            </tr>
+                            <tr style="border-bottom:1px solid #eee;">
+                                <td style="padding:8px; color:#0078d4;"><strong>Parents Section Photo</strong></td>
+                                <td style="padding:8px;">Parents page image</td>
+                                <td style="padding:8px;">Uploaded Image</td>
+                            </tr>
+                            <tr style="border-bottom:1px solid #eee;">
+                                <td style="padding:8px; color:#0078d4;"><strong>Youth Section Photo</strong></td>
+                                <td style="padding:8px;">Youth page image</td>
+                                <td style="padding:8px;">Uploaded Image</td>
+                            </tr>
+                            <tr style="border-bottom:1px solid #eee;">
+                                <td style="padding:8px; color:#0078d4;"><strong>Get Involved Photo</strong></td>
+                                <td style="padding:8px;">Volunteer/involvement image</td>
+                                <td style="padding:8px;">Uploaded Image</td>
+                            </tr>
+                            <tr style="border-bottom:1px solid #eee;">
+                                <td style="padding:8px; color:#0078d4;"><strong>Footer Photo</strong></td>
+                                <td style="padding:8px;">Footer background image</td>
+                                <td style="padding:8px;">Uploaded Image</td>
+                            </tr>
+                            <tr style="border-bottom:1px solid #eee;">
+                                <td style="padding:8px; color:#0078d4;"><strong>Status</strong></td>
+                                <td style="padding:8px;">Publication status</td>
+                                <td style="padding:8px;">5. Published by THQ</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                    <div style="font-size:10px; color:#666; padding:6px 8px; background:#f9f9f9; border-radius:4px;">
+                        <strong>Example Center:</strong> Baltimore - Middle River (PMC)
+                    </div>
+                </div>
+
+                <div style="background:#fafafa; border:1px solid #e0e0e0; border-radius:12px; padding:24px; margin-bottom:24px;">
+                    <h4 style="font-size:16px; font-weight:700; color:#242424; margin:0 0 4px 0;">9. Facility Features</h4>
+                    <p style="font-size:11px; color:#666; margin:0 0 12px 0;">Physical amenities and resources</p>
+                    <table style="width:100%; border-collapse:collapse; font-size:11px; margin-bottom:8px;">
+                        <thead>
+                            <tr style="background:#f0f0f0; border-bottom:2px solid #ddd;">
+                                <th style="text-align:left; padding:8px; font-weight:700; color:#333;">Field Name</th>
+                                <th style="text-align:left; padding:8px; font-weight:700; color:#333;">Purpose</th>
+                                <th style="text-align:left; padding:8px; font-weight:700; color:#333;">Example Value</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr style="border-bottom:1px solid #eee;">
+                                <td style="padding:8px; color:#0078d4;"><strong>Title</strong></td>
+                                <td style="padding:8px;">Facility name</td>
+                                <td style="padding:8px;">Full-Size Gymnasium</td>
+                            </tr>
+                            <tr style="border-bottom:1px solid #eee;">
+                                <td style="padding:8px; color:#0078d4;"><strong>Description</strong></td>
+                                <td style="padding:8px;">Facility purpose/details</td>
+                                <td style="padding:8px;">Basketball, volleyball & sports</td>
+                            </tr>
+                            <tr style="border-bottom:1px solid #eee;">
+                                <td style="padding:8px; color:#0078d4;"><strong>Icon Class</strong></td>
+                                <td style="padding:8px;">Bootstrap icon identifier</td>
+                                <td style="padding:8px;">bi bi-trophy</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                    <div style="font-size:10px; color:#666; padding:6px 8px; background:#f9f9f9; border-radius:4px;">
+                        <strong>Example Center:</strong> All centers (40+ shared facilities)
+                    </div>
+                </div>
+
+                <div style="background:#fafafa; border:1px solid #e0e0e0; border-radius:12px; padding:24px;">
+                    <h4 style="font-size:16px; font-weight:700; color:#242424; margin:0 0 4px 0;">10. Programs</h4>
+                    <p style="font-size:11px; color:#666; margin:0 0 12px 0;">Program catalog</p>
+                    <table style="width:100%; border-collapse:collapse; font-size:11px; margin-bottom:8px;">
+                        <thead>
+                            <tr style="background:#f0f0f0; border-bottom:2px solid #ddd;">
+                                <th style="text-align:left; padding:8px; font-weight:700; color:#333;">Field Name</th>
+                                <th style="text-align:left; padding:8px; font-weight:700; color:#333;">Purpose</th>
+                                <th style="text-align:left; padding:8px; font-weight:700; color:#333;">Example Value</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr style="border-bottom:1px solid #eee;">
+                                <td style="padding:8px; color:#0078d4;"><strong>Title</strong></td>
+                                <td style="padding:8px;">Program name</td>
+                                <td style="padding:8px;">Adventure Corps: Explorers (Gr. 1–5)</td>
+                            </tr>
+                            <tr style="border-bottom:1px solid #eee;">
+                                <td style="padding:8px; color:#0078d4;"><strong>Description</strong></td>
+                                <td style="padding:8px;">Program summary</td>
+                                <td style="padding:8px;">Outdoor, skill-based team program</td>
+                            </tr>
+                            <tr style="border-bottom:1px solid #eee;">
+                                <td style="padding:8px; color:#0078d4;"><strong>Category</strong></td>
+                                <td style="padding:8px;">Program category</td>
+                                <td style="padding:8px;">Character & Leadership</td>
+                            </tr>
+                            <tr style="border-bottom:1px solid #eee;">
+                                <td style="padding:8px; color:#0078d4;"><strong>Icon Class</strong></td>
+                                <td style="padding:8px;">Bootstrap icon identifier</td>
+                                <td style="padding:8px;">bi bi-shield</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                    <div style="font-size:10px; color:#666; padding:6px 8px; background:#f9f9f9; border-radius:4px;">
+                        <strong>Example Center:</strong> All centers (55+ shared programs)
+                    </div>
+                </div>
+
+            </div>
+        `;
+    }
+
+    async buildDataModelsFromLiveData() {
+        /**
+         * Dynamically fetch and build data models from live JSON endpoints
+         * Shows actual single-record examples for each model type
+         */
+        try {
+            const baseUrl = 'https://thisishoperva.org/rsyc';
+            
+            // SharePoint/system fields to hide
+            const hiddenFields = new Set([
+                '@odata.etag', 'ItemInternalId', 'Editor', 'Editor#Claims', 'Author', 'Author#Claims',
+                '{Identifier}', '{IsFolder}', '{Thumbnail}', '{Link}', '{Name}', '{FilenameWithExtension}',
+                '{Path}', '{FullPath}', '{ContentType}', '{ContentType}#Id', '{HasAttachments}', '{VersionNumber}',
+                'CountryOrRegion', 'FacilityFeatures@odata.type', 'FacilityFeatures#Id', 'FacilityFeatures#Id@odata.type',
+                'FeaturedPrograms@odata.type', 'FeaturedPrograms#Id', 'URLEventImage', 'URLEventThumbnail'
+            ]);
+            
+            const systemFieldPatterns = /@odata|#|{.*}|__|^_|Claims|etag|created|modified|version|lastmodified/i;
+            
+            // Field name normalization (rename certain fields for display)
+            const normalizeFieldName = (fieldName) => {
+                const renames = {
+                    'URLEventImage': 'EventImage',
+                    'URLEventThumbnail': 'EventThumbnail'
+                };
+                return renames[fieldName] || fieldName;
+            };
+            
+            // Generate smart purpose descriptions based on field name
+            const generatePurpose = (fieldName, value) => {
+                const lower = fieldName.toLowerCase();
+                
+                if (lower.includes('image') || lower.includes('photo') || lower.includes('picture') || lower.includes('thumbnail')) return 'High-quality uploaded image';
+                if (lower.includes('title') || lower.includes('name')) return 'Display name/title';
+                if (lower.includes('email') || lower.includes('@')) return 'Contact email';
+                if (lower.includes('phone') || lower.includes('number')) return 'Phone/contact number';
+                if (lower.includes('date') || lower.includes('time')) return 'Date/timestamp';
+                if (lower.includes('url') || lower.includes('link') || lower.includes('href')) return 'External link/URL';
+                if (lower.includes('description') || lower.includes('body')) return 'Narrative/rich content';
+                if (lower.includes('status') || lower.includes('state')) return 'Status/lifecycle';
+                if (lower.includes('category') || lower.includes('type') || lower.includes('kind')) return 'Classification/category';
+                if (lower.includes('center')) return 'Location/center reference';
+                if (lower.includes('cost') || lower.includes('price') || lower.includes('fee')) return 'Pricing/cost';
+                if (lower.includes('person') || lower.includes('staff') || lower.includes('author') || lower.includes('contact')) return 'Person/staff reference';
+                if (lower.includes('days') || lower.includes('schedule') || lower.includes('hours')) return 'Scheduling/timing';
+                if (lower.includes('content') || lower.includes('text')) return 'Text content';
+                if (Array.isArray(value)) return 'Related items (array)';
+                if (typeof value === 'object' && value !== null) return 'Structured data';
+                
+                return 'Field value';
+            };
+
+            // Recursively find the most useful value in an object
+            const extractObjectValue = (obj, depth = 0) => {
+                if (depth > 5) return null; // Prevent infinite recursion
+                
+                // Priority order of fields to look for
+                const priorities = [
+                    'displayName', 'name', 'title', 'Person', 'email', 'value',
+                    'Title', 'Name', 'Email', 'DisplayName'
+                ];
+                
+                // Check priority fields first
+                for (const field of priorities) {
+                    if (field in obj && obj[field] !== null && obj[field] !== undefined) {
+                        const val = obj[field];
+                        if (typeof val === 'string' && val.trim().length > 0) {
+                            return val;
+                        }
+                    }
+                }
+                
+                // Look for any non-system string field
+                for (const [key, val] of Object.entries(obj)) {
+                    if (systemFieldPatterns.test(key)) continue;
+                    if (hiddenFields.has(key)) continue;
+                    
+                    if (typeof val === 'string' && val.trim().length > 0 && !val.startsWith('{')) {
+                        return val;
+                    }
+                }
+                
+                // If no string found, check for nested objects/arrays
+                for (const [key, val] of Object.entries(obj)) {
+                    if (systemFieldPatterns.test(key)) continue;
+                    if (hiddenFields.has(key)) continue;
+                    
+                    if (typeof val === 'object' && val !== null) {
+                        const nested = extractObjectValue(val, depth + 1);
+                        if (nested) return nested;
+                    }
+                }
+                
+                return null;
+            };
+
+            // Format value intelligently for display
+            const formatValue = (val, maxLen = 60) => {
+                if (val === null || val === undefined) return '—';
+                
+                // Handle strings
+                if (typeof val === 'string') {
+                    // Hide amazonaws URLs entirely - just show upload indicator
+                    if (val.includes('amazonaws.com')) {
+                        return '[Uploaded Image]';
+                    }
+                    
+                    // HTML content - extract text preview
+                    if (val.includes('<') && val.includes('>')) {
+                        const text = val.replace(/<[^>]*>/g, '').trim();
+                        return text.length > 0 ? (text.length > maxLen ? text.substring(0, maxLen) + '...' : text) : '[HTML markup]';
+                    }
+                    // URLs - show domain
+                    if (val.startsWith('http')) {
+                        try {
+                            const url = new URL(val);
+                            return url.hostname;
+                        } catch (e) {
+                            return '[URL]';
+                        }
+                    }
+                    // Regular strings
+                    return val.length > maxLen ? val.substring(0, maxLen) + '...' : val;
+                }
+                
+                // Handle arrays
+                if (Array.isArray(val)) {
+                    if (val.length === 0) return '[]';
+                    
+                    // For arrays of objects, extract useful values
+                    if (typeof val[0] === 'object' && val[0] !== null) {
+                        const values = val.slice(0, 3).map(item => {
+                            const extracted = extractObjectValue(item);
+                            return extracted || '[Item]';
+                        }).filter(v => v !== '[Item]' || val.length === 1);
+                        
+                        if (values.length === 0) return '[]';
+                        return `[${values.join(', ')}${val.length > 3 ? ', ...' : ''}]`;
+                    }
+                    
+                    // Arrays of strings
+                    return `[${val.slice(0, 3).join(', ')}${val.length > 3 ? ', ...' : ''}]`;
+                }
+                
+                // Handle objects - dig down to find the usable value
+                if (typeof val === 'object' && val !== null) {
+                    const extracted = extractObjectValue(val);
+                    if (extracted) return extracted.length > maxLen ? extracted.substring(0, maxLen) + '...' : extracted;
+                    
+                    // If no string value found, describe the structure
+                    const keys = Object.keys(val).filter(k => !systemFieldPatterns.test(k) && !hiddenFields.has(k));
+                    if (keys.length > 0) {
+                        return `[${keys.length} properties]`;
+                    }
+                    return '[Complex object]';
+                }
+                
+                // Handle numbers/booleans
+                if (typeof val === 'number' || typeof val === 'boolean') {
+                    return String(val);
+                }
+                
+                return '—';
+            };
+
+            const models = [];
+
+            // 1. CENTER PROFILE
+            try {
+                const centersRes = await fetch(`${baseUrl}/units-rsyc-profiles.json`);
+                const centers = await centersRes.json();
+                const gastonCenter = centers.find(c => c.Title && c.Title.includes('Gaston'));
+                
+                if (gastonCenter) {
+                    const centerFields = Object.keys(gastonCenter)
+                        .filter(k => !hiddenFields.has(k) && gastonCenter[k] !== null && gastonCenter[k] !== undefined && gastonCenter[k] !== '')
+                        .map(k => ({
+                            name: normalizeFieldName(k),
+                            purpose: generatePurpose(k, gastonCenter[k]),
+                            example: formatValue(gastonCenter[k], 60)
+                        }));
+                    
+                    models.push({
+                        title: '1. Center Profile',
+                        fields: centerFields.slice(0, 12),
+                        example: `${gastonCenter.Title} (Real data)`
+                    });
+                }
+            } catch (e) { console.warn('Error loading Center Profile data:', e); }
+
+            // 2. PROGRAM SCHEDULES
+            try {
+                const schedulesRes = await fetch(`${baseUrl}/RSYCProgramSchedules.json`);
+                const schedules = await schedulesRes.json();
+                const haggerstownSchedules = schedules.filter(s => s.Center && String(s.Center).toLowerCase().includes('hagerstown'));
+                const arriveAndThrive = haggerstownSchedules.find(s => s.CustomProgramScheduleTitle === 'Arrive & Thrive');
+                
+                if (arriveAndThrive) {
+                    const scheduleFields = Object.keys(arriveAndThrive)
+                        .filter(k => !hiddenFields.has(k) && arriveAndThrive[k] !== null && arriveAndThrive[k] !== undefined && arriveAndThrive[k] !== '')
+                        .map(k => ({
+                            name: normalizeFieldName(k),
+                            purpose: generatePurpose(k, arriveAndThrive[k]),
+                            example: formatValue(arriveAndThrive[k], 60)
+                        }));
+                    
+                    models.push({
+                        title: '2. Program Schedules',
+                        fields: scheduleFields,
+                        example: `${arriveAndThrive.CustomProgramScheduleTitle} at ${arriveAndThrive.Center} (Real data)`
+                    });
+                }
+            } catch (e) { console.warn('Error loading Program Schedules data:', e); }
+
+            // 3. LEADERS
+            try {
+                const leadersRes = await fetch(`${baseUrl}/RSYCLeaders.json`);
+                const leaders = await leadersRes.json();
+                const gastonLeader = leaders.find(l => l.Department && l.Department.includes('Gastonia'));
+                
+                if (gastonLeader) {
+                    const leaderFields = Object.keys(gastonLeader)
+                        .filter(k => !hiddenFields.has(k) && gastonLeader[k] !== null && gastonLeader[k] !== undefined && gastonLeader[k] !== '')
+                        .map(k => ({
+                            name: normalizeFieldName(k),
+                            purpose: generatePurpose(k, gastonLeader[k]),
+                            example: formatValue(gastonLeader[k], 60)
+                        }));
+                    
+                    models.push({
+                        title: '3. Leaders',
+                        fields: leaderFields,
+                        example: `${gastonLeader.Person} (Real data)`
+                    });
+                }
+            } catch (e) { console.warn('Error loading Leaders data:', e); }
+
+            // 4. HOURS
+            try {
+                const hoursRes = await fetch(`${baseUrl}/RSYCHours.json`);
+                const hours = await hoursRes.json();
+                const hickoryHours = hours.find(h => h.Center && String(h.Center).includes('Hickory'));
+                
+                if (hickoryHours) {
+                    const hourFields = Object.keys(hickoryHours)
+                        .filter(k => !hiddenFields.has(k) && hickoryHours[k] !== null && hickoryHours[k] !== undefined && hickoryHours[k] !== '')
+                        .map(k => ({
+                            name: normalizeFieldName(k),
+                            purpose: generatePurpose(k, hickoryHours[k]),
+                            example: formatValue(hickoryHours[k], 60)
+                        }));
+                    
+                    models.push({
+                        title: '4. Hours',
+                        fields: hourFields,
+                        example: `${hickoryHours.Center} (Real data)`
+                    });
+                }
+            } catch (e) { console.warn('Error loading Hours data:', e); }
+
+            // 5. EVENTS
+            try {
+                const eventsRes = await fetch(`${baseUrl}/RSYCEvents.json`);
+                const events = await eventsRes.json();
+                const gardenEscape = events.find(e => e.EventTitle && e.EventTitle.includes('Garden'));
+                
+                if (gardenEscape) {
+                    const eventFields = Object.keys(gardenEscape)
+                        .filter(k => !hiddenFields.has(k) && gardenEscape[k] !== null && gardenEscape[k] !== undefined && gardenEscape[k] !== '')
+                        .map(k => ({
+                            name: normalizeFieldName(k),
+                            purpose: generatePurpose(k, gardenEscape[k]),
+                            example: formatValue(gardenEscape[k], 60)
+                        }));
+                    
+                    models.push({
+                        title: '5. Events',
+                        fields: eventFields,
+                        example: `${gardenEscape.EventTitle} (Real data)`
+                    });
+                }
+            } catch (e) { console.warn('Error loading Events data:', e); }
+
+            // 6. INFORMATIONAL PAGES
+            try {
+                const infoPagesRes = await fetch(`${baseUrl}/RSYCInformationalPages.json`);
+                const infoPages = await infoPagesRes.json();
+                const infoPage = infoPages && infoPages.length > 0 ? infoPages[0] : null;
+                
+                if (infoPage) {
+                    const infoFields = Object.keys(infoPage)
+                        .filter(k => !hiddenFields.has(k) && infoPage[k] !== null && infoPage[k] !== undefined && infoPage[k] !== '')
+                        .map(k => ({
+                            name: normalizeFieldName(k),
+                            purpose: generatePurpose(k, infoPage[k]),
+                            example: formatValue(infoPage[k], 60)
+                        }));
+                    
+                    models.push({
+                        title: '6. Informational Pages',
+                        fields: infoFields,
+                        example: `${infoPage.PageTitle || infoPage.Title || 'Informational Page'} (Real data)`
+                    });
+                }
+            } catch (e) { console.warn('Error loading Informational Pages data:', e); }
+
+            // 7. STORIES
+            try {
+                const storiesRes = await fetch(`${baseUrl}/RSYCStories.json`);
+                const stories = await storiesRes.json();
+                const story = stories && stories.length > 0 ? stories[0] : null;
+                
+                if (story) {
+                    const storyFields = Object.keys(story)
+                        .filter(k => !hiddenFields.has(k) && story[k] !== null && story[k] !== undefined && story[k] !== '')
+                        .map(k => ({
+                            name: normalizeFieldName(k),
+                            purpose: generatePurpose(k, story[k]),
+                            example: formatValue(story[k], 60)
+                        }));
+                    
+                    models.push({
+                        title: '7. Stories',
+                        fields: storyFields,
+                        example: `${story.StoryTitle} (Real data)`
+                    });
+                }
+            } catch (e) { console.warn('Error loading Stories data:', e); }
+
+            // 8. PHOTOS
+            try {
+                const photosRes = await fetch(`${baseUrl}/RSYCHomepagePhotos.json`);
+                const photos = await photosRes.json();
+                const baltimorPhotos = photos.find(p => p.Center && String(p.Center).includes('Baltimore'));
+                
+                if (baltimorPhotos) {
+                    const photoFields = Object.keys(baltimorPhotos)
+                        .filter(k => !hiddenFields.has(k) && baltimorPhotos[k] !== null && baltimorPhotos[k] !== undefined && baltimorPhotos[k] !== '')
+                        .map(k => ({
+                            name: normalizeFieldName(k),
+                            purpose: generatePurpose(k, baltimorPhotos[k]),
+                            example: formatValue(baltimorPhotos[k], 60)
+                        }));
+                    
+                    models.push({
+                        title: '8. Photos',
+                        fields: photoFields,
+                        example: `${baltimorPhotos.Center} (Real data)`
+                    });
+                }
+            } catch (e) { console.warn('Error loading Photos data:', e); }
+
+            // 9. FACILITY FEATURES (Pick List)
+            try {
+                const facilitiesRes = await fetch(`${baseUrl}/RSYCFacilityFeatures.json`);
+                const facilities = await facilitiesRes.json();
+                const gymnasiumFeature = facilities.find(f => f.Title && f.Title.includes('Gymnasium'));
+                
+                if (gymnasiumFeature) {
+                    const facilityFields = Object.keys(gymnasiumFeature)
+                        .filter(k => !hiddenFields.has(k) && gymnasiumFeature[k] !== null && gymnasiumFeature[k] !== undefined && gymnasiumFeature[k] !== '')
+                        .map(k => ({
+                            name: normalizeFieldName(k),
+                            purpose: generatePurpose(k, gymnasiumFeature[k]),
+                            example: formatValue(gymnasiumFeature[k], 60)
+                        }));
+                    
+                    models.push({
+                        title: '9. Facility Features (Pick List)',
+                        fields: facilityFields,
+                        example: `${gymnasiumFeature.Title} (Real data)`
+                    });
+                }
+            } catch (e) { console.warn('Error loading Facility Features data:', e); }
+
+            // 10. PROGRAMS (Pick List)
+            try {
+                const programsRes = await fetch(`${baseUrl}/RSYCPrograms.json`);
+                const programs = await programsRes.json();
+                const adventureCorps = programs.find(p => p.Title && p.Title.includes('Adventure Corps'));
+                
+                if (adventureCorps) {
+                    const programFields = Object.keys(adventureCorps)
+                        .filter(k => !hiddenFields.has(k) && adventureCorps[k] !== null && adventureCorps[k] !== undefined && adventureCorps[k] !== '')
+                        .map(k => ({
+                            name: normalizeFieldName(k),
+                            purpose: generatePurpose(k, adventureCorps[k]),
+                            example: formatValue(adventureCorps[k], 60)
+                        }));
+                    
+                    models.push({
+                        title: '10. Programs (Pick List)',
+                        fields: programFields,
+                        example: `${adventureCorps.Title} (Real data)`
+                    });
+                }
+            } catch (e) { console.warn('Error loading Programs data:', e); }
+
+            this.liveDataModels = models;
+            return models;
+        } catch (e) {
+            console.error('Error building data models from live data:', e);
+            return [];
+        }
+    }
+
+    createDataModelsSection() {
+        const content = document.createElement('div');
+        content.style.fontSize = '12px';
+        content.style.padding = '12px';
+        content.style.lineHeight = '1.6';
+        content.style.maxHeight = '600px';
+        content.style.overflowY = 'auto';
+        content.style.color = '#333';
+        
+        // Use live data models if available, otherwise use fallback
+        const models = this.liveDataModels && this.liveDataModels.length > 0 ? this.liveDataModels : [
+            {
+                title: '1. Center Profile',
+                fields: [
+                    { name: 'Title', purpose: 'Center name', example: 'Red Shield Youth Center of Gaston - Joe R. Hudson' },
+                    { name: 'About This Center', purpose: 'Center description (HTML)', example: '<div>Our community center offers...</div>' },
+                    { name: 'Facility Features', purpose: 'Array of available facilities', example: '["Full-Size Gymnasium", "Computer Lab", ...]' },
+                    { name: 'Featured Programs', purpose: 'Array of program highlights', example: '["Adventure Corps", "Club 316", ...]' },
+                    { name: 'Explainer Video Embed Code', purpose: 'Video iframe HTML', example: '<iframe src="..."></iframe>' },
+                    { name: 'Footer Scripture Verse', purpose: 'Scripture text for footer', example: '"For I know the plans I have for you..."' },
+                    { name: 'Online Sign-Up', purpose: 'Sign-up link', example: 'https://online.traxsolutions.com/...' },
+                    { name: 'Donation Form', purpose: 'Donation link', example: 'https://classy.org/give/...' },
+                    { name: 'Facebook Page', purpose: 'Facebook profile link', example: 'https://facebook.com/SalvationArmyGastonia' },
+                    { name: 'Status', purpose: 'Publication status', example: '5. Published by THQ' }
+                ],
+                example: 'Gaston - Joe R. Hudson (NSC)'
+            },
+            {
+                title: '2. Program Schedules',
+                fields: [
+                    { name: 'Custom Program Schedule Title', purpose: 'Schedule name', example: 'Arrive & Thrive' },
+                    { name: 'Custom Program Schedule Subtitle', purpose: 'Schedule description', example: 'Board Games and Computer Time' },
+                    { name: 'All Related Programs', purpose: 'Link to program catalog', example: 'Adventure Corps' },
+                    { name: 'Schedule Days', purpose: 'Days program runs', example: '["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"]' },
+                    { name: 'Schedule Time', purpose: 'Program time', example: '2:30 PM - 6:30 PM' },
+                    { name: 'Timezone', purpose: 'Time zone reference', example: 'Eastern/America/New_York' },
+                    { name: 'Frequency', purpose: 'Recurrence pattern', example: 'Weekly' },
+                    { name: 'Ages Served', purpose: 'Age group array', example: '["Elementary", "Middle", "Teen"]' },
+                    { name: 'Contact Info', purpose: 'Program coordinator', example: 'Name, email, phone' },
+                    { name: 'What to Bring', purpose: 'Items to bring', example: 'Snack, water bottle' },
+                    { name: 'Schedule Disclaimer', purpose: 'Special notices', example: 'Hours may vary on holidays' },
+                    { name: 'Status', purpose: 'Publication status', example: '5. Published by THQ' }
+                ],
+                example: 'Hagerstown (PMC) - Titles: Arrive & Thrive, TROOPS Classes, STEM Crafts & Arts'
+            },
+            {
+                title: '3. Leaders',
+                fields: [
+                    { name: 'Person', purpose: 'Staff member name', example: 'Damion Motley' },
+                    { name: 'Role Type', purpose: 'Position/title', example: 'Center Executive Director' },
+                    { name: 'Center', purpose: 'Center assignment (array)', example: 'Gaston - Joe R. Hudson' },
+                    { name: 'Department', purpose: 'Department/corps', example: 'Gastonia Corps' },
+                    { name: 'Image', purpose: 'Staff photo', example: 'Uploaded Photo' },
+                    { name: 'Center Division', purpose: 'Regional division (array)', example: 'NSC' },
+                    { name: 'Status', purpose: 'Publication status', example: '5. Published by THQ' }
+                ],
+                example: 'Gaston - Joe R. Hudson (NSC)'
+            },
+            {
+                title: '4. Hours',
+                fields: [
+                    { name: 'Center', purpose: 'Center reference', example: 'Hickory' },
+                    { name: 'Regular Hours Term', purpose: 'Season/term label', example: 'August - May' },
+                    { name: 'Open Full Days Dates', purpose: 'Days fully open', example: 'All Week' },
+                    { name: 'Closed Dates', purpose: 'Holiday closures', example: 'July 3rd (4th of July Holiday)' },
+                    { name: 'Special Hours', purpose: 'Extended/modified times', example: 'Early Drop 7:30AM / Late Pick 5:30PM' },
+                    { name: 'Status', purpose: 'Publication status', example: '5. Published by THQ' }
+                ],
+                example: 'Hickory (NSC)'
+            },
+            {
+                title: '5. Events',
+                fields: [
+                    { name: 'Event Title', purpose: 'Event name', example: 'The Great Garden Escape' },
+                    { name: 'Center', purpose: 'Host center', example: 'Aiken Teen Center' },
+                    { name: 'Event Type', purpose: 'Type of event', example: 'Spring Break Camp' },
+                    { name: 'Start Date and Time', purpose: 'Event start', example: '2026-04-06T12:00:00Z' },
+                    { name: 'End Date and Time', purpose: 'Event end', example: '2026-04-10T21:00:00Z' },
+                    { name: 'Extended Care Times', purpose: 'Before/after care hours', example: 'Early Drop 7:30AM / Late 5:30PM' },
+                    { name: 'Special Features', purpose: 'Event highlights', example: 'Escape Rooms, Crafts, Field Trips' },
+                    { name: 'Cost', purpose: 'Registration fee', example: '$80 (Includes meals & snacks)' },
+                    { name: 'Contact Person', purpose: 'Primary contact', example: 'Kathleen Hutto' },
+                    { name: 'Contact Email', purpose: 'Contact email', example: 'kathleen.hutto@uss.salvationarmy.org' },
+                    { name: 'Contact Number', purpose: 'Contact phone', example: '(803) 522-2963' },
+                    { name: 'Primary Button Text', purpose: 'CTA button label', example: 'Register Here' },
+                    { name: 'Primary Button Link', purpose: 'Registration URL', example: 'https://online.traxsolutions.com/...' },
+                    { name: 'Event Image', purpose: 'Event photo', example: 'Uploaded Image' },
+                    { name: 'Status', purpose: 'Publication status', example: '5. Published by THQ' }
+                ],
+                example: 'Aiken Teen Center (NSC)'
+            },
+            {
+                title: '6. Informational Pages',
+                fields: [
+                    { name: 'Page Title', purpose: 'The title of the information page', example: 'Safety Protocol & Guidelines' },
+                    { name: 'Center', purpose: 'Host center location', example: 'Aiken Teen Center' },
+                    { name: 'Category', purpose: 'Classification (e.g. Safety, Policy, Faith)', example: 'Safety' },
+                    { name: 'Body', purpose: 'Main content/protocol details (HTML)', example: '<div>We ensure that all staff...</div>' },
+                    { name: 'URL Thumbnail Image', purpose: 'Uploaded thumbnail image URL', example: 'https://uss-cache.salvationarmy.org/...' },
+                    { name: 'External URL', purpose: 'Link to external source or PDF', example: 'https://example.com/safety.pdf' },
+                    { name: 'Status', purpose: 'Publication status', example: '5. Published by THQ' }
+                ],
+                example: 'Aiken Teen Center (NSC)'
+            },
+            {
+                title: '7. Stories',
+                fields: [
+                    { name: 'Story Title', purpose: 'Story headline', example: 'How the Red Shield Youth Center Helped One Teen Find His Way' },
+                    { name: 'Center', purpose: 'Story center location', example: 'Greater Charlotte - Belmont Avenue' },
+                    { name: 'Story Date', purpose: 'Published/authored date', example: '2025-08-25' },
+                    { name: 'Author', purpose: 'Story author', example: 'Ed Boyce' },
+                    { name: 'Body', purpose: 'Full story narrative (HTML)', example: '<article>Micah Grier came...</article>' },
+                    { name: 'Thumbnail Image', purpose: 'Story preview image', example: 'Uploaded Image' },
+                    { name: 'Main Image', purpose: 'Story featured image', example: 'Uploaded Image' },
+                    { name: 'External URL', purpose: 'External story link', example: 'https://southernusa.salvationarmy.org/...' },
+                    { name: 'Status', purpose: 'Publication status', example: '5. Published by THQ' }
+                ],
+                example: 'Greater Charlotte - Belmont Avenue (NSC)'
+            },
+            {
+                title: '8. Photos',
+                fields: [
+                    { name: 'Center', purpose: 'Center reference', example: 'Baltimore - Middle River' },
+                    { name: 'Exterior Photo', purpose: 'Building exterior image', example: 'Uploaded Image' },
+                    { name: 'Facility Features Photo', purpose: 'Facilities image', example: 'Uploaded Image' },
+                    { name: 'Programs Photo', purpose: 'Programs section image', example: 'Uploaded Image' },
+                    { name: 'Nearby Centers Photo', purpose: 'Locations image', example: 'Uploaded Image' },
+                    { name: 'Parents Section Photo', purpose: 'Parents page image', example: 'Uploaded Image' },
+                    { name: 'Youth Section Photo', purpose: 'Youth page image', example: 'Uploaded Image' },
+                    { name: 'Get Involved Photo', purpose: 'Volunteer/involvement image', example: 'Uploaded Image' },
+                    { name: 'Footer Photo', purpose: 'Footer background image', example: 'Uploaded Image' },
+                    { name: 'Status', purpose: 'Publication status', example: '5. Published by THQ' }
+                ],
+                example: 'Baltimore - Middle River (PMC)'
+            },
+            {
+                title: '9. Facility Features (Pick List)',
+                fields: [
+                    { name: 'Title', purpose: 'Facility name', example: 'Full-Size Gymnasium' },
+                    { name: 'Description', purpose: 'Facility purpose/details', example: 'Basketball, volleyball & sports' },
+                    { name: 'Icon Class', purpose: 'Bootstrap icon identifier', example: 'bi bi-trophy' }
+                ],
+                example: 'All centers (40+ shared facilities)'
+            },
+            {
+                title: '10. Programs (Pick List)',
+                fields: [
+                    { name: 'Title', purpose: 'Program name', example: 'Adventure Corps: Explorers (Gr. 1–5)' },
+                    { name: 'Description', purpose: 'Program summary', example: 'Outdoor, skill-based team program' },
+                    { name: 'Category', purpose: 'Program category', example: 'Character & Leadership' },
+                    { name: 'Icon Class', purpose: 'Bootstrap icon identifier', example: 'bi bi-shield' }
+                ],
+                example: 'All centers (55+ shared programs)'
+            }
+        ];
+        
+        models.forEach((model, index) => {
+            // Model title
+            const titleDiv = document.createElement('div');
+            titleDiv.style.fontWeight = '700';
+            titleDiv.style.fontSize = '13px';
+            titleDiv.style.marginTop = index === 0 ? '0' : '16px';
+            titleDiv.style.marginBottom = '8px';
+            titleDiv.style.color = '#242424';
+            titleDiv.textContent = model.title;
+            content.appendChild(titleDiv);
+            
+            // Fields table
+            const table = document.createElement('table');
+            table.style.width = '100%';
+            table.style.borderCollapse = 'collapse';
+            table.style.marginBottom = '4px';
+            table.style.fontSize = '11px';
+            table.style.border = '1px solid #e0e0e0';
+            
+            // Header
+            const thead = document.createElement('thead');
+            const headerRow = document.createElement('tr');
+            headerRow.style.backgroundColor = '#f0f0f0';
+            headerRow.style.borderBottom = '2px solid #ddd';
+            
+            ['Field Name', 'Purpose', 'Example'].forEach(headerText => {
+                const th = document.createElement('th');
+                th.style.textAlign = 'left';
+                th.style.padding = '6px';
+                th.style.fontWeight = '700';
+                th.style.color = '#333';
+                th.textContent = headerText;
+                headerRow.appendChild(th);
+            });
+            thead.appendChild(headerRow);
+            table.appendChild(thead);
+            
+            // Body
+            const tbody = document.createElement('tbody');
+            model.fields.forEach((field, fieldIndex) => {
+                const row = document.createElement('tr');
+                row.style.borderBottom = '1px solid #eee';
+                
+                const nameCell = document.createElement('td');
+                nameCell.style.padding = '6px';
+                nameCell.style.color = '#0078d4';
+                nameCell.style.fontWeight = '600';
+                nameCell.style.fontSize = '10px';
+                nameCell.textContent = field.name;
+                row.appendChild(nameCell);
+                
+                const purposeCell = document.createElement('td');
+                purposeCell.style.padding = '6px';
+                purposeCell.style.fontSize = '10px';
+                purposeCell.textContent = field.purpose;
+                row.appendChild(purposeCell);
+                
+                const exampleCell = document.createElement('td');
+                exampleCell.style.padding = '6px';
+                exampleCell.style.fontSize = '10px';
+                exampleCell.style.color = '#666';
+                exampleCell.textContent = field.example;
+                row.appendChild(exampleCell);
+                
+                tbody.appendChild(row);
+            });
+            table.appendChild(tbody);
+            content.appendChild(table);
+            
+            // Example center
+            const exampleDiv = document.createElement('div');
+            exampleDiv.style.fontSize = '10px';
+            exampleDiv.style.color = '#666';
+            exampleDiv.style.padding = '6px';
+            exampleDiv.style.backgroundColor = '#f9f9f9';
+            exampleDiv.style.borderRadius = '3px';
+            exampleDiv.style.marginBottom = '6px';
+            exampleDiv.innerHTML = `<strong>Example:</strong> ${model.example}`;
+            content.appendChild(exampleDiv);
+        });
+        
+        return content;
+    }
+
+    createCenterProfileSectionsSection() {
+        const content = document.createElement('div');
+        content.style.fontSize = '12px';
+        content.style.padding = '15px';
+        content.style.background = '#fcfcfc';
+        
+        if (this.templateEngine && typeof this.templateEngine.getSectionReferenceTable === 'function') {
+            content.innerHTML = this.templateEngine.getSectionReferenceTable();
+        } else {
+            content.innerHTML = '<div style="color:#d93d3d; padding:20px; border:1px solid #ffccd5; background:#fff5f5; border-radius:8px;">Section Metadata unavailable. Ensure RSYCTemplates is initialized correctly.</div>';
+        }
+        
+        return content;
+    }
+
     generateEmailMasterCommandCenter() {
         return `
             <div style="font-family: 'Segoe UI', Tahoma, sans-serif; color: #333; max-width: 900px; line-height: 1.5;">
+                <div style="background-color: #f4f4f4; padding: 14px; border-left: 6px solid #d93d3d; font-weight: bold; margin-bottom: 25px; font-size: 18px; color: #333; display: block; width: 100%;">🛠️ RSYC CENTER PROFILE MASTER COMMAND CENTER</div>
                 <div style="background:#fafafa; border:1px solid #e0e0e0; border-radius:12px; padding:24px; margin-bottom:30px; font-family:Segoe UI, sans-serif;">
                     <div style="margin-bottom:24px; border-bottom:2px solid #eee; padding-bottom:20px;">
-                        <h4 style="font-size:20px; font-weight:700; color:#242424; margin:0 0 8px 0;">RSYC Center Profile Master Command Center</h4>
+                        <h4 style="font-size:20px; font-weight:700; color:#242424; margin:0 0 8px 0;">Dashboard & Resource Links</h4>
                         <p style="font-size:14px; color:#444; line-height:1.6; margin:0 0 15px 0;">
                             To ensure each location is represented well for our upcoming launch, use this dashboard to manage all local content. Final launch dates will be set once profiles are reviewed and marked "Ready to Publish."
                         </p>
@@ -1955,10 +3496,10 @@ class RSYCGeneratorV2 {
                                 <br>
                                 <div style="background:white; border:1px solid #eee; border-radius:8px; padding:10px; display:flex; flex-direction:column; gap:6px;">
                                     <div style="display:flex; justify-content:space-between; align-items:center;">
-                                        <span style="font-size:13px; font-weight:500;">📄 Info Pages</span>
+                                        <span style="font-size:13px; font-weight:500;">📄 Informational Pages</span>
                                         <a href="https://submitinfopage-rsyc.usscommunications.org/" target="_blank" style="font-size:11px; background:#28a745; color:white; padding:4px 10px; border-radius:4px; text-decoration:none;">Add New →</a>
                                     </div>
-                                    <a href="https://infopagereview-rsyc.usscommunications.org/" target="_blank" style="font-size:10px; color:#0078d4; text-decoration:underline; font-weight:600; margin-left:2px;">Edit/Review Existing Info Pages</a>
+                                    <a href="https://infopagereview-rsyc.usscommunications.org/" target="_blank" style="font-size:10px; color:#0078d4; text-decoration:underline; font-weight:600; margin-left:2px;">Edit/Review Existing Informational Pages</a>
                                 </div>
                             </div>
                         </div>
@@ -1990,6 +3531,8 @@ class RSYCGeneratorV2 {
                                 <div style="background:#fff; border:1px solid #eee; padding:12px; border-radius:8px; margin-top:12px;">
                                     <br>
                                     <b style="color:#333;">Best Practices From Live Profiles:</b><br>
+                                    • <b>Events & Camps:</b> <u>Camps should be listed as Events</u>, not just as a program schedule item.<br>
+                                    • <b>Informational Pages:</b> <u>Use for presentations and parent meetings.</u> Do not use for events, programs, volunteer recruitment, or fundraising.<br>
                                     • About: who you serve (ages/grades) + core programs (after-school, camps, tutoring, arts/sports)
                                     • About: outcomes (academic support, character/leadership, life skills, faith/values)
                                     • Schedules: title + optional subtitle, days, time range, timezone, and frequency
@@ -2195,10 +3738,39 @@ class RSYCGeneratorV2 {
             })
             .join('');
 
+        const instructionBlock = `
+            <div style="padding: 16px; background-color: #fafafa; border-bottom: 1px solid #e0e0e0; font-family: 'Segoe UI', sans-serif; margin: 8px; border-radius: 8px; border: 1px solid #eee;">
+                <div>
+                    <div style="font-size: 16px; font-weight: 600; color: #242424; margin: 0 0 8px 0;">RSYC Program Schedule Instructions</div>
+                    <p style="font-size: 14px; color: #333; line-height: 1.5; margin: 0 20px 8px 0;">Please click in the area beneath each of the field labels to see instructions and select from the options or provide your own text. Changes are saved when you click out of the field. If you have images or flyers, please add them as attachments.</p>
+                    <div style="margin-bottom: 12px;">
+                        <a href="https://sauss.sharepoint.com/sites/ConnectCommunications/SitePages/Manage-Youth-Center-Web-Profile.aspx#center-profile-manager" target="_blank" style="font-size: 13px; color: #0078d4; text-decoration: underline; margin: 0 6px 12px 0; display: inline-block;">Learn more</a>
+                        <a href="https://southernusa.salvationarmy.org/redshieldyouth/center-locations" target="_blank" style="font-size: 13px; color: #0078d4; text-decoration: underline; margin: 0 6px 12px 0; display: inline-block;">View Your Profile</a>
+                    </div>
+                    <div style="font-size: 15px; color: #444; background-color: #fff8e1; border-left: 4px solid #f2c200; padding: 8px 10px; margin: 0 0 8px 0; line-height: 1.5;">💬 Submit recurring programs that are part of the afterschool program or corps programs as separate items (e.g., Afterschool Enrichment, Youth Night, Dinner, Club 316, Music/Arts, Sunday Worship, Homework Help & Mentoring, Visual Arts & Crafts, Dance, Drama, & Creative Arts, and Youth Meal or snack).</div>
+                    <div style="font-size: 15px; color: #444; background-color: #fff8e1; border-left: 4px solid #f2c200; padding: 8px 10px; margin: 0 0 8px 0; line-height: 1.5;">We suggest listing unique items you want to be found on Google like ACT, ASVAB Prep, Karate; etc. All details entered below will show online and be available for print/save as PDF.</div>
+                    <div style="font-size: 15px; color: #444; background-color: #fff8e1; border-left: 4px solid #d13438; padding: 8px 10px; margin: 0 0 16px 0; line-height: 1.5; font-weight: 600;">IMPORTANT: Scheduled programs that are typically open to the public or have a separate registration from the afterschool program, like <u>camps</u>, should be submitted as <b>Events</b> instead of Program Schedules. They will show in the program schedule section on the website automatically when published.</div>
+                    <a href="https://submitevents-rsyc.usscommunications.org/" target="_blank" style="font-size: 14px; color: #0078d4; text-decoration: underline; margin: 0 0 16px 0; display: inline-block;">Submit a New Event / Camp</a>
+                </div>
+                <div style="display: flex; flex-direction: column; gap: 16px; margin-top: 8px; border-top: 1px solid #eee; padding-top: 16px;">
+                    <div>
+                        <div style="font-size: 15px; font-weight: 600; color: #242424; margin: 0 0 8px 0;">Check it out!</div>
+                        <a href="https://southernusa.salvationarmy.org/redshieldyouth/hickory" target="_blank" style="font-size: 15px; color: #0078d4; text-decoration: underline;">View an example of a profile with localized and printable program schedules.</a>
+                    </div>
+                    <div>
+                        <div style="font-size: 15px; font-weight: 600; color: #242424; margin: 0 0 8px 0;">New Schedule Item?</div>
+                        <a href="https://submitschedules-rsyc.usscommunications.org/" target="_blank" style="font-size: 15px; color: #0078d4; text-decoration: underline;">Submit a New Program Schedule Item</a>
+                    </div>
+                </div>
+            </div>
+        `;
+
         return `
             <div style="font-family: 'Segoe UI', Tahoma, sans-serif; color: #333; max-width: 1000px; line-height: 1.5;">
-                <h2 style="color: #d93d3d; margin-bottom: 10px; display: block;">RSYC Program Schedules</h2>
-                <br>
+                <div style="background-color: #f4f4f4; padding: 14px; border-left: 6px solid #d93d3d; font-weight: bold; margin-bottom: 25px; font-size: 18px; color: #333; display: block; width: 100%;">📅 RSYC TERRITORIAL PROGRAM SCHEDULE CATALOG</div>
+                
+                ${instructionBlock}
+
                 <div style="font-size:12px; color:#777; font-style:italic; margin-bottom:12px; line-height:1.6;">
                     Note: the live center profiles already include print helpers (individual schedule print and a "Print all schedules" option). We also have a share-ready flyer concept that combines center bio, photo, and active schedules for easy sharing.
                 </div>
@@ -2214,6 +3786,452 @@ class RSYCGeneratorV2 {
                 <div style="background-color: #f4f4f4; padding: 14px; border-left: 6px solid #d93d3d; font-weight: bold; margin-bottom: 14px; font-size: 16px; color: #333; display: block; width: 100%;">📌 Current Schedules (Grouped by Center)</div>
                 <br>
                 ${centerBlocks || '<div style="font-size:13px; color:#999;">No schedules found.</div>'}
+            </div>
+        `;
+    }
+
+    generateEmailAuditEvents(data) {
+        const { centers, events } = data;
+
+        const esc = (v) => v ? String(v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') : '';
+        const val = (v, fallback = '') => (v === null || v === undefined || v === '' ? fallback : v);
+        
+        const centersBySpId = new Map((centers || []).map(c => [String(c.sharePointId ?? c.id ?? c.Id), c]));
+
+        const eventsByCenterId = {};
+        (events || []).forEach(e => {
+            const cid = String(e.centerId ?? '');
+            if (!cid) return;
+            if (!eventsByCenterId[cid]) eventsByCenterId[cid] = [];
+            eventsByCenterId[cid].push(e);
+        });
+
+        const instructionBlock = `
+            <div style="padding: 16px; background-color: #fafafa; border-bottom: 1px solid #e0e0e0; font-family: 'Segoe UI', sans-serif; margin: 8px; border-radius: 8px; border: 1px solid #eee;">
+                <div>
+                    <div style="font-size: 16px; font-weight: 600; color: #242424; margin: 0 0 8px 0;">RSYC Upcoming Events Instructions</div>
+                    <p style="font-size: 14px; color: #333; line-height: 1.5; margin: 0 20px 8px 0;">Please click in the area beneath each of the field labels to see instructions and select from the options or provide your own text. Changes are saved when you click out of the field.</p>
+                    <div style="margin-bottom: 12px;">
+                        <a href="https://sauss.sharepoint.com/sites/ConnectCommunications/SitePages/Manage-Youth-Center-Web-Profile.aspx#center-profile-manager" target="_blank" style="font-size: 13px; color: #0078d4; text-decoration: underline; margin: 0 6px 12px 0; display: inline-block;">Learn more</a>
+                        <a href="https://southernusa.salvationarmy.org/redshieldyouth/center-locations" target="_blank" style="font-size: 13px; color: #0078d4; text-decoration: underline; margin: 0 6px 12px 0; display: inline-block;">View Your Profile</a>
+                    </div>
+                    <div style="font-size: 15px; color: #444; background-color: #fff8e1; border-left: 4px solid #f2c200; padding: 8px 10px; margin: 0 0 8px 0; line-height: 1.5;">💬 Submit one-time and recurring events as separate items (e.g., Spring Break Camp, Summer Day Camp, and Family & Community Events).</div>
+                    <div style="font-size: 15px; color: #444; background-color: #fff8e1; border-left: 4px solid #f2c200; padding: 8px 10px; margin: 0 0 8px 0; line-height: 1.5;">We suggest listing unique items you want to be found on Google by those looking for fun events in your city. All details entered below will show online and be available for print/save as PDF. Events are typically open to the public or have a separate registration from the afterschool program.</div>
+                    <div style="font-size: 15px; color: #444; background-color: #fff8e1; border-left: 4px solid #d13438; padding: 8px 10px; margin: 0 0 8px 0; line-height: 1.5; font-weight: 600;">IMPORTANT: Ongoing weekly programs that are part of your afterschool or corps programming (such as Afterschool Enrichment, Youth Night, Music/Arts, Sunday Worship, Homework Help, etc.) should be submitted as Program Schedule items instead of Events.</div>
+                    <a href="https://submitevents-rsyc.usscommunications.org/" target="_blank" style="font-size: 14px; color: #0078d4; text-decoration: underline; margin: 0 0 16px 0; display: inline-block;">Submit a New Event Item</a>
+                </div>
+                <div style="display: flex; flex-direction: column; gap: 16px; margin-top: 8px; border-top: 1px solid #eee; padding-top: 16px;">
+                    <div>
+                        <div style="font-size: 15px; font-weight: 600; color: #242424; margin: 0 0 8px 0;">Check it out!</div>
+                        <a href="https://southernusa.salvationarmy.org/redshieldyouth/aiken-teen-center" target="_blank" style="font-size: 15px; color: #0078d4; text-decoration: underline;">View an example of a profile with upcoming events.</a>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        const fieldRows = [
+            ['EventTitle', 'Public name of the event shown on the website.'],
+            ['StartDateandTime', 'When the event begins.'],
+            ['EndDateandTime', 'When the event ends.'],
+            ['Cost', 'Price or fee for the event (shown on button/badge).'],
+            ['EventType', 'Categorization (Camp, Community, Holiday, etc).'],
+            ['RegistrationURL', 'Link to register or learn more (primary button).'],
+            ['EventDescription', 'Narrative details about the event.']
+        ];
+
+        const fieldGuide = `
+            <div style="margin-bottom: 22px; font-family: 'Segoe UI', Tahoma, sans-serif;">
+                <div style="background-color: #f4f4f4; padding: 14px; border-left: 6px solid #d93d3d; font-weight: bold; margin-bottom: 14px; font-size: 16px; color: #333; display: block; width: 100%;">📘 Event Model Fields (Purpose Guide)</div>
+                <div style="border:1px solid #eee; border-radius:8px; overflow:hidden; background:#fff;">
+                    <table style="width:100%; border-collapse:collapse; font-size:12px;">
+                        <thead style="background:#f8f9fa; border-bottom:1px solid #eee;">
+                            <tr>
+                                <th style="padding:10px; text-align:left; width:240px;">Field</th>
+                                <th style="padding:10px; text-align:left;">Purpose</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${fieldRows.map(([f,p], idx) => `
+                                <tr style="border-bottom:1px solid #f3f3f3; ${idx % 2 ? 'background:#fcfcfc;' : ''}">
+                                    <td style="padding:8px 10px; font-family:Consolas, monospace; font-size:11px; color:#333;">${esc(f)}</td>
+                                    <td style="padding:8px 10px; color:#555; line-height:1.5;">${esc(p)}</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        `;
+
+        const centerBlocks = Object.keys(eventsByCenterId)
+            .sort((a, b) => {
+                const ca = centersBySpId.get(String(a));
+                const cb = centersBySpId.get(String(b));
+                return String(ca?.name || '').localeCompare(String(cb?.name || ''));
+            })
+            .map(centerId => {
+                const c = centersBySpId.get(String(centerId));
+                const centerName = c?.name || c?.Title || `Center ${centerId}`;
+                const items = eventsByCenterId[centerId] || [];
+
+                const rowsHtml = items.map(e => {
+                    const dateInfo = [
+                        e.startDateTime ? `Start: ${e.startDateTime}` : '',
+                        e.endDateTime ? `End: ${e.endDateTime}` : ''
+                    ].filter(Boolean).join(' • ');
+
+                    const details = [
+                        e.eventType ? `Type: ${e.eventType}` : '',
+                        e.cost ? `Cost: ${e.cost}` : '',
+                        e.subtitle ? `Subtitle: ${e.subtitle}` : ''
+                    ].filter(Boolean).join(' • ');
+
+                    return `
+                        <tr style="border-bottom:1px solid #f3f3f3;">
+                            <td style="padding:8px 10px; font-weight:700; font-size:12px;">${esc(e.title || '')}</td>
+                            <td style="padding:8px 10px; font-size:12px; color:#555; line-height:1.5;">
+                                <div style="margin-bottom:4px;">${esc(dateInfo)}</div>
+                                <div style="font-size:11px; color:#777;">${esc(details)}</div>
+                            </td>
+                        </tr>
+                    `;
+                }).join('');
+
+                return `
+                    <div style="margin-bottom: 22px; font-family: 'Segoe UI', Tahoma, sans-serif;">
+                        <div style="background:#fff; border:1px solid #e9ecef; border-radius:10px; overflow:hidden;">
+                            <div style="padding:12px 14px; background:#f8f9fa; border-bottom:1px solid #e9ecef;">
+                                <div style="font-weight:800; color:#242424;">${esc(centerName)}</div>
+                                <div style="font-size:12px; color:#666;">${items.length} upcoming event(s)</div>
+                            </div>
+                            <table style="width:100%; border-collapse:collapse; table-layout:fixed;">
+                                <thead style="background:#fff; border-bottom:1px solid #eee;">
+                                    <tr>
+                                        <th style="padding:10px; text-align:left; width:240px; font-size:11px; color:#333;">Event</th>
+                                        <th style="padding:10px; text-align:left; font-size:11px; color:#333;">Dates & Details</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${rowsHtml}
+                                </tbody>
+                            </table>
+                        </div>
+                        <br>
+                    </div>
+                `;
+            })
+            .join('');
+
+        return `
+            <div style="font-family: 'Segoe UI', Tahoma, sans-serif; color: #333; max-width: 1000px; line-height: 1.5;">
+                <div style="background-color: #f4f4f4; padding: 14px; border-left: 6px solid #d93d3d; font-weight: bold; margin-bottom: 25px; font-size: 18px; color: #333; display: block; width: 100%;">📣 RSYC TERRITORIAL UPCOMING EVENTS CATALOG</div>
+                
+                ${instructionBlock}
+
+                <div style="font-size:12px; color:#777; font-style:italic; margin-bottom:12px; line-height:1.6;">
+                    Note: All events are shown in the program schedule section on the live website automatically when published.
+                </div>
+                <br>
+                <p style="font-size: 14px; margin-top: 0; color: #666; margin-bottom: 18px; display: block;">Generated on ${new Date().toLocaleDateString()} • ${val((events || []).length)} total event(s)</p>
+                ${fieldGuide}
+                <br>
+                <br>
+                <div style="background-color: #f4f4f4; padding: 14px; border-left: 6px solid #d93d3d; font-weight: bold; margin-bottom: 14px; font-size: 16px; color: #333; display: block; width: 100%;">📌 Upcoming Events (Grouped by Center)</div>
+                <br>
+                ${centerBlocks || '<div style="font-size:13px; color:#999;">No upcoming events found.</div>'}
+            </div>
+        `;
+    }
+
+    generateEmailAuditStories(data) {
+        const { centers, stories } = data;
+
+        const esc = (v) => v ? String(v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') : '';
+        const val = (v, fallback = '') => (v === null || v === undefined || v === '' ? fallback : v);
+        
+        const centersBySpId = new Map((centers || []).map(c => [String(c.sharePointId ?? c.id ?? c.Id), c]));
+
+        const storiesByCenterId = {};
+        (stories || []).forEach(s => {
+            const cid = String(s.centerId ?? '');
+            if (!cid) return;
+            if (!storiesByCenterId[cid]) storiesByCenterId[cid] = [];
+            storiesByCenterId[cid].push(s);
+        });
+
+        const instructionBlock = `
+            <div style="padding: 16px; background-color: #fafafa; border-bottom: 1px solid #e0e0e0; font-family: 'Segoe UI', sans-serif; margin: 8px; border-radius: 8px; border: 1px solid #eee;">
+                <div>
+                    <div style="font-size: 16px; font-weight: 600; color: #242424; margin: 0 0 8px 0;">RSYC Stories Instructions</div>
+                    <div style="font-size: 14px; color: #333; line-height: 1.5; margin-bottom: 8px;">Click in the area beneath each of the field labels to see instructions or provide your own text. Changes are saved automatically.</div>
+                    <div style="margin-bottom: 12px;">
+                        <a href="https://sauss.sharepoint.com/sites/ConnectCommunications/SitePages/Manage-Youth-Center-Web-Profile.aspx#center-profile-manager" target="_blank" style="font-size: 13px; color: #0078d4; text-decoration: underline; margin: 0 6px 12px 0; display: inline-block;">Learn more</a>
+                        <a href="https://southernusa.salvationarmy.org/redshieldyouth/center-locations" target="_blank" style="font-size: 13px; color: #0078d4; text-decoration: underline; margin: 0 6px 12px 0; display: inline-block;">View Your Profile</a>
+                    </div>
+                    <div style="font-size: 15px; color: #444; background-color: #fff8e1; border-left: 4px solid #f2c200; padding: 8px 10px; margin-bottom: 12px; line-height: 1.5;">💬 Stories should highlight the center’s impact on youth, families, and the community. Choose stories that inspire, inform, and celebrate accomplishments.</div>
+                    
+                    <div style="font-size: 15px; font-weight: 600; margin-bottom: 4px;">Guidance for selecting stories:</div>
+                    <div style="margin-left: 16px; margin-bottom: 12px; font-size: 14px; color: #444;">
+                        • Youth Spotlights: Highlight achievements, talents, and personal growth.<br>
+                        • Local Community Highlights: Showcase partnerships, volunteer initiatives, or neighborhood impact.<br>
+                        • Earned Media: Link to news coverage, press releases, or blog articles.<br>
+                        • Fundraising & Events: Promote upcoming events, share recaps, and highlight donor impact.<br>
+                        • Programs & Activities: Share innovative programs, special activities, and successes.<br>
+                        • Partner & School Features: Spotlight collaborations with local schools, organizations, or community groups.<br>
+                        • Legacy Giving Stories: Show how gifts make a long-term impact on youth and families.
+                    </div>
+
+                    <div style="font-size: 15px; font-weight: 600; margin-bottom: 4px;">Tips for writing stories:</div>
+                    <div style="margin-left: 16px; margin-bottom: 12px; font-size: 14px; color: #444;">
+                        • Keep the story concise, clear, and positive.<br>
+                        • Include quotes from youth, staff, or community members when appropriate.<br>
+                        • Add photos or videos to bring the story to life.<br>
+                        • Use links to program pages, event registrations, or partner websites for additional context.<br>
+                        • Focus on impact—how did the program, event, or initiative benefit youth, families, or the community?
+                    </div>
+
+                    <a href="https://submitstories-rsyc.usscommunications.org/" target="_blank" style="font-size: 14px; color: #0078d4; text-decoration: underline; display: inline-block; margin-bottom: 12px;">Submit a Story Item</a>
+                </div>
+                <div style="display: flex; flex-direction: column; gap: 16px; margin-top: 8px; border-top: 1px solid #eee; padding-top: 16px;">
+                    <div>
+                        <div style="font-size: 15px; font-weight: 600; color: #242424; margin-bottom: 8px;">Check it out!</div>
+                        <a href="https://southernusa.salvationarmy.org/redshieldyouth/aiken-teen-center" target="_blank" style="font-size: 15px; color: #0078d4; text-decoration: underline;">View an example of a profile with published stories</a>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        const fieldRows = [
+            ['StoryTitle', 'Public name of the story shown on the website.'],
+            ['StoryDate', 'When the story occurred or was published.'],
+            ['StoryCategory', 'Categorization (Youth Spotlight, Community, Media, etc).'],
+            ['StoryURL', 'Link to full article or related content.'],
+            ['StoryDescription', 'Short summary or narrative of the story.']
+        ];
+
+        const fieldGuide = `
+            <div style="margin-bottom: 22px; font-family: 'Segoe UI', Tahoma, sans-serif;">
+                <div style="background-color: #f4f4f4; padding: 14px; border-left: 6px solid #d93d3d; font-weight: bold; margin-bottom: 14px; font-size: 16px; color: #333; display: block; width: 100%;">📘 Story Model Fields (Purpose Guide)</div>
+                <div style="border:1px solid #eee; border-radius:8px; overflow:hidden; background:#fff;">
+                    <table style="width:100%; border-collapse:collapse; font-size:12px;">
+                        <thead style="background:#f8f9fa; border-bottom:1px solid #eee;">
+                            <tr>
+                                <th style="padding:10px; text-align:left; width:240px;">Field</th>
+                                <th style="padding:10px; text-align:left;">Purpose</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${fieldRows.map(([f,p], idx) => `
+                                <tr style="border-bottom:1px solid #f3f3f3; ${idx % 2 ? 'background:#fcfcfc;' : ''}">
+                                    <td style="padding:8px 10px; font-family:Consolas, monospace; font-size:11px; color:#333;">${esc(f)}</td>
+                                    <td style="padding:8px 10px; color:#555; line-height:1.5;">${esc(p)}</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        `;
+
+        const centerBlocks = Object.keys(storiesByCenterId)
+            .sort((a, b) => {
+                const ca = centersBySpId.get(String(a));
+                const cb = centersBySpId.get(String(b));
+                return String(ca?.name || '').localeCompare(String(cb?.name || ''));
+            })
+            .map(centerId => {
+                const c = centersBySpId.get(String(centerId));
+                const centerName = c?.name || c?.Title || `Center ${centerId}`;
+                const items = storiesByCenterId[centerId] || [];
+
+                const rowsHtml = items.map(s => {
+                    return `
+                        <tr style="border-bottom:1px solid #f3f3f3;">
+                            <td style="padding:8px 10px; font-weight:700; font-size:12px;">${esc(s.title || '')}</td>
+                            <td style="padding:8px 10px; font-size:12px; color:#555; line-height:1.5;">
+                                ${s.date ? `<div style="margin-bottom:4px;">Date: ${esc(s.date)}</div>` : ''}
+                                ${s.category ? `<div style="font-size:11px; color:#777;">Category: ${esc(s.category)}</div>` : ''}
+                                ${s.description ? `<div style="margin-top:4px; font-style:italic;">${esc(s.description)}</div>` : ''}
+                            </td>
+                        </tr>
+                    `;
+                }).join('');
+
+                return `
+                    <div style="margin-bottom: 22px;">
+                        <div style="background-color: #f4f4f4; padding: 12px 14px; border-left: 6px solid #FCA200; font-weight: 800; font-size: 14px; color: #242424; margin-bottom: 8px;">
+                            ${esc(centerName)} <span style="font-weight:600; color:#666;">(${items.length} stories)</span>
+                        </div>
+                        <div style="border:1px solid #eee; border-radius:8px; overflow:hidden; background:#fff;">
+                            <table style="width:100%; border-collapse:collapse; font-size:12px;">
+                                <thead style="background:#f8f9fa; border-bottom:1px solid #eee;">
+                                    <tr>
+                                        <th style="padding:10px; text-align:left; width:220px;">Story Title</th>
+                                        <th style="padding:10px; text-align:left;">Details</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${rowsHtml}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                `;
+            })
+            .join('');
+
+        return `
+            <div style="font-family: 'Segoe UI', Tahoma, sans-serif; color: #333; max-width: 1000px; line-height: 1.5;">
+                <div style="background-color: #f4f4f4; padding: 14px; border-left: 6px solid #d93d3d; font-weight: bold; margin-bottom: 25px; font-size: 18px; color: #333; display: block; width: 100%;">📰 RSYC TERRITORIAL STORIES CATALOG</div>
+                
+                ${instructionBlock}
+
+                <p style="font-size: 14px; margin-top: 0; color: #666; margin-bottom: 18px; display: block;">Generated on ${new Date().toLocaleDateString()} • ${val((stories || []).length)} total story item(s)</p>
+                ${fieldGuide}
+                <br>
+                <div style="background-color: #f4f4f4; padding: 14px; border-left: 6px solid #d93d3d; font-weight: bold; margin-bottom: 14px; font-size: 16px; color: #333; display: block; width: 100%;">📌 Center Stories (Impact & News)</div>
+                <br>
+                ${centerBlocks || '<div style="font-size:13px; color:#999;">No stories found.</div>'}
+            </div>
+        `;
+    }
+
+    generateEmailAuditInfoPages(data) {
+        const { centers, informationalPages } = data;
+
+        const esc = (v) => v ? String(v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') : '';
+        const val = (v, fallback = '') => (v === null || v === undefined || v === '' ? fallback : v);
+        
+        const centersBySpId = new Map((centers || []).map(c => [String(c.sharePointId ?? c.id ?? c.Id), c]));
+
+        const pagesByCenterId = {};
+        (informationalPages || []).forEach(p => {
+            const cid = String(p.centerId ?? '');
+            if (!cid) return;
+            if (!pagesByCenterId[cid]) pagesByCenterId[cid] = [];
+            pagesByCenterId[cid].push(p);
+        });
+
+        const instructionBlock = `
+            <div style="padding: 16px; background-color: #fafafa; border-bottom: 1px solid #e0e0e0; font-family: 'Segoe UI', sans-serif; margin: 8px; border-radius: 8px; border: 1px solid #eee;">
+                <div>
+                    <div style="font-size: 18px; font-weight: 600; color: #242424; margin-bottom: 8px;">RSYC Informational Pages Instructions</div>
+                    <div style="font-size: 14px; color: #333; margin-bottom: 12px; line-height:1.5;">Use Informational Pages to support youth presentations, parent meetings, and important center-wide communication. These pages provide a link you can reference during live sessions and share with families afterward.</div>
+                    
+                    <div style="font-size: 15px; font-weight: 600; margin-bottom: 6px;">Suggested Informational Page Topics:</div>
+                    <div style="font-size: 14px; color:#444; line-height:1.6; margin-bottom:12px;">
+                        • Digital Citizenship & Online Safety<br>
+                        • Healthy Relationships & Respect<br>
+                        • Bullying Prevention & Peer Leadership<br>
+                        • Emotional Resilience & Mental Wellness<br>
+                        • Academic Responsibility & Study Skills<br>
+                        • Leadership & Personal Responsibility<br>
+                        • Substance Use Awareness & Wise Choices<br>
+                        • Safety Policies & Behavioral Expectations<br>
+                        • Life Skills & Preparing for the Future<br>
+                        • Faith Foundations: What We Teach & Why
+                    </div>
+
+                    <div style="font-size: 14px; background-color: #fff8e1; border-left: 4px solid #d13438; padding: 8px 10px; margin-bottom: 12px; font-weight: 600; line-height:1.4;">
+                        IMPORTANT: Do not use Informational Pages for events, recurring programs, volunteer recruitment, fundraising appeals, or contact details. Use those dedicated sections instead.
+                    </div>
+
+                    <a href="https://submitinfopage-rsyc.usscommunications.org/" target="_blank" style="font-size: 14px; color: #0078d4; text-decoration: underline; font-weight:600;">Submit a New Informational Page</a>
+                </div>
+            </div>
+        `;
+
+        const fieldRows = [
+            ['PageTitle', 'Public name of the information page.'],
+            ['Category', 'Categorization (Bullying Prevention, Safety, Faith, etc).'],
+            ['Body', 'Full narrative content and resources for the page.'],
+            ['ExternalURL', 'Link to related materials, forms, or external websites.'],
+            ['URLThumbnailImage', 'Thumbnail icon or photo for the page listing.']
+        ];
+
+        const fieldGuide = `
+            <div style="margin-bottom: 22px; font-family: 'Segoe UI', Tahoma, sans-serif;">
+                <div style="background-color: #f4f4f4; padding: 14px; border-left: 6px solid #d93d3d; font-weight: bold; margin-bottom: 14px; font-size: 16px; color: #333; display: block; width: 100%;">📘 Information Page Model Fields (Purpose Guide)</div>
+                <div style="border:1px solid #eee; border-radius:8px; overflow:hidden; background:#fff;">
+                    <table style="width:100%; border-collapse:collapse; font-size:12px;">
+                        <thead style="background:#f8f9fa; border-bottom:1px solid #eee;">
+                            <tr>
+                                <th style="padding:10px; text-align:left; width:240px;">Field</th>
+                                <th style="padding:10px; text-align:left;">Purpose</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${fieldRows.map(([f,p], idx) => `
+                                <tr style="border-bottom:1px solid #f3f3f3; ${idx % 2 ? 'background:#fcfcfc;' : ''}">
+                                    <td style="padding:8px 10px; font-family:Consolas, monospace; font-size:11px; color:#333;">${esc(f)}</td>
+                                    <td style="padding:8px 10px; color:#555; line-height:1.5;">${esc(p)}</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        `;
+
+        const centerBlocks = Object.keys(pagesByCenterId)
+            .sort((a, b) => {
+                const ca = centersBySpId.get(String(a));
+                const cb = centersBySpId.get(String(b));
+                return String(ca?.name || '').localeCompare(String(cb?.name || ''));
+            })
+            .map(centerId => {
+                const c = centersBySpId.get(String(centerId));
+                const centerName = c?.name || c?.Title || `Center ${centerId}`;
+                const items = pagesByCenterId[centerId] || [];
+
+                const rowsHtml = items.map(p => {
+                    return `
+                        <tr style="border-bottom:1px solid #f3f3f3;">
+                            <td style="padding:8px 10px; font-weight:700; font-size:12px;">${esc(p.title || '')}</td>
+                            <td style="padding:8px 10px; font-size:12px; color:#555; line-height:1.5;">
+                                ${p.category ? `<div style="font-size:11px; font-weight:600; color:#444;">Category: ${esc(p.category)}</div>` : ''}
+                                ${p.lastModified ? `<div style="font-size:10px; color:#888;">Modified: ${esc(p.lastModified)}</div>` : ''}
+                                ${p.externalUrl ? `<div style="margin-top:4px;"><a href="${esc(p.externalUrl)}" style="color:#0078d4;">External Link</a></div>` : ''}
+                            </td>
+                        </tr>
+                    `;
+                }).join('');
+
+                return `
+                    <div style="margin-bottom: 22px;">
+                        <div style="background-color: #f4f4f4; padding: 12px 14px; border-left: 6px solid #FCA200; font-weight: 800; font-size: 14px; color: #242424; margin-bottom: 8px;">
+                            ${esc(centerName)} <span style="font-weight:600; color:#666;">(${items.length} pages)</span>
+                        </div>
+                        <div style="border:1px solid #eee; border-radius:8px; overflow:hidden; background:#fff;">
+                            <table style="width:100%; border-collapse:collapse; font-size:12px;">
+                                <thead style="background:#f8f9fa; border-bottom:1px solid #eee;">
+                                    <tr>
+                                        <th style="padding:10px; text-align:left; width:220px;">Page Title</th>
+                                        <th style="padding:10px; text-align:left;">Details</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${rowsHtml}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                `;
+            })
+            .join('');
+
+        return `
+            <div style="font-family: 'Segoe UI', Tahoma, sans-serif; color: #333; max-width: 1000px; line-height: 1.5;">
+                <div style="background-color: #f4f4f4; padding: 14px; border-left: 6px solid #d93d3d; font-weight: bold; margin-bottom: 25px; font-size: 18px; color: #333; display: block; width: 100%;">💡 RSYC TERRITORIAL INFORMATIONAL PAGES CATALOG</div>
+                
+                ${instructionBlock}
+
+                <p style="font-size: 14px; margin-top: 0; color: #666; margin-bottom: 18px; display: block;">Generated on ${new Date().toLocaleDateString()} • ${val((informationalPages || []).length)} total informational page(s)</p>
+                ${fieldGuide}
+                <br>
+                <div style="background-color: #f4f4f4; padding: 14px; border-left: 6px solid #d93d3d; font-weight: bold; margin-bottom: 14px; font-size: 16px; color: #333; display: block; width: 100%;">📌 Center Informational Pages (Guidance & Policy)</div>
+                <br>
+                ${centerBlocks || '<div style="font-size:13px; color:#999;">No informational pages found.</div>'}
             </div>
         `;
     }
@@ -2271,7 +4289,7 @@ class RSYCGeneratorV2 {
                 if (r.photoCount === 0) missing.push("Missing Mandatory Site Photos (Exterior/Facility)");
                 if (!r.hasFooterPhoto) missing.push("Missing Local Footer Photo (Building/Staff/Community)");
                 if (!r.hasFooterScripture) missing.push("Missing Footer Scripture Reference");
-                return { name: r.name, liveUrl: r.liveUrl, missing };
+                return { id: r.id, name: r.name, liveUrl: r.liveUrl, missing };
             })
             .filter(c => c.missing.length > 0);
 
@@ -2279,7 +4297,10 @@ class RSYCGeneratorV2 {
             ? missingByCenter.map(c => `
                 <br>
                 <div style="margin-bottom: 18px; display:block;">
-                    <div style="font-weight:700; font-size:13px; margin-bottom:8px; display:block;">📍 ${esc(c.name)} <a href="${esc(c.liveUrl)}" target="_blank" style="text-decoration:none; margin-left:6px;">🔗</a></div>
+                    <div style="font-weight:700; font-size:13px; margin-bottom:8px; display:block;">
+                        📍 <span class="center-audit-link" data-center-id="${c.id}" style="cursor:pointer; color:#004a99; text-decoration:none;" title="Click to switch dropdown to this center">${esc(c.name)}</span> 
+                        <a href="${esc(c.liveUrl)}" target="_blank" style="text-decoration:none; margin-left:6px;">🔗</a>
+                    </div>
                     <div style="font-size:12px; color:#555; line-height:1.6; margin-left:12px;">
                         ${c.missing.map(m => `• ${esc(m)}`).join('<br>')}
                     </div>
@@ -2315,16 +4336,16 @@ class RSYCGeneratorV2 {
 
         return `
             <div style="font-family: 'Segoe UI', Tahoma, sans-serif; color: #333; max-width: 900px; line-height: 1.5;">
-                <h2 style="color: #d93d3d; margin-bottom: 14px; display: block;">RSYC Profile Audit - Divisional Report</h2>
-                <p style="font-size: 14px; margin-top: 0; color: #666; margin-bottom: 18px; display: block;">Division: <b>${esc(displayDivision)}</b> • Generated on ${new Date().toLocaleDateString()}</p>
+                <div style="background-color: #f4f4f4; padding: 14px; border-left: 6px solid #d93d3d; font-weight: bold; margin-bottom: 25px; font-size: 18px; color: #333; display: block; width: 100%;">📂 RSYC DIVISIONAL AUDIT REPORT: ${esc(displayDivision)}</div>
+                <p style="font-size: 14px; margin-top: 0; color: #666; margin-bottom: 18px; display: block;">Generated on ${new Date().toLocaleDateString()}</p>
                 ${howTo}
                 <br>
                 ${divisionEditorsTable}
                 <br>
-                <div style="background-color: #f4f4f4; padding: 14px; border-left: 6px solid #d93d3d; font-weight: bold; margin-bottom: 14px; font-size: 16px; color: #333; display: block; width: 100%;">Division Action List</div>
+                <div style="background-color: #f4f4f4; padding: 14px; border-left: 6px solid #d93d3d; font-weight: bold; margin-bottom: 14px; font-size: 16px; color: #333; display: block; width: 100%;">📌 Division Action List</div>
                 ${actionList}
                 <br>
-                <div style="background-color: #f4f4f4; padding: 14px; border-left: 6px solid #FCA200; font-weight: bold; margin-bottom: 14px; font-size: 16px; color: #333; display: block; width: 100%;">Divisional Staff &amp; Community Leaders</div>
+                <div style="background-color: #f4f4f4; padding: 14px; border-left: 6px solid #d93d3d; font-weight: bold; margin-bottom: 14px; font-size: 16px; color: #333; display: block; width: 100%;">👥 Divisional Staff &amp; Community Leaders</div>
                 ${divisionStaffTable}
             </div>
         `;
@@ -2377,6 +4398,229 @@ class RSYCGeneratorV2 {
         a.click();
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
+    }
+
+    /**
+     * Build complete HTML page with Open Graph meta tags for social sharing
+     */
+    buildFullPageWithOGTags() {
+        if (!this.generatedHTML || !this.currentCenter) {
+            alert('No HTML generated yet!');
+            return '';
+        }
+
+        const center = this.currentCenter;
+        const pageTitle = `${center.Title} - Red Shield Youth Centers`;
+        
+        // Build dynamic description with city and state
+        const city = center.city || 'Your Community';
+        const state = center.state || '';
+        const cityState = state ? `${city}, ${state}` : city;
+        const pageDescription = `A safe, welcoming space in ${cityState} offering youth programs, activities, mentoring, and community support for kids and teens.`;
+        
+        const ogImageUrl = 'https://s3.amazonaws.com/uss-cache.salvationarmy.org/f432e3f1-79a6-4dfe-82c6-5c93c55e6b09_Charlotte+NC-04489.jpg';
+        
+        // Use the center's website URL if available, otherwise use the websiteURL field
+        const pageUrl = center.websiteURL || `https://www.redshieldyouth.org/`;
+
+        // Truncate description to 160 chars for OG tags (though our description should already be short)
+        const shortDescription = pageDescription.substring(0, 160) + (pageDescription.length > 160 ? '...' : '');
+
+        const fullHTML = `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>${this.escapeHTML(pageTitle)}</title>
+    
+    <!-- Open Graph Meta Tags for Social Sharing -->
+    <meta property="og:title" content="${this.escapeHTML(pageTitle)}">
+    <meta property="og:description" content="${this.escapeHTML(shortDescription)}">
+    <meta property="og:image" content="${ogImageUrl}">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:image:type" content="image/jpeg">
+    <meta property="og:url" content="${this.escapeHTML(pageUrl)}">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="The Salvation Army Red Shield Youth Centers">
+    
+    <!-- Twitter Card Meta Tags -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="${this.escapeHTML(pageTitle)}">
+    <meta name="twitter:description" content="${this.escapeHTML(shortDescription)}">
+    <meta name="twitter:image" content="${ogImageUrl}">
+    
+    <!-- Standard Meta Tags -->
+    <meta name="description" content="${this.escapeHTML(shortDescription)}">
+    <meta name="theme-color" content="#20B3A8">
+    
+    <style>
+        :root {
+            --rsyc-teal: #20B3A8;
+            --rsyc-navy: #2F4857;
+        }
+
+        * { 
+            margin: 0; 
+            padding: 0; 
+            box-sizing: border-box; 
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+            color-adjust: exact !important;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', sans-serif;
+            color: #333;
+            background: #f8f9fa;
+            padding: 20px;
+        }
+
+        .rsyc-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        img { max-width: 100%; height: auto; display: block; }
+        a { color: #20B3A8; text-decoration: none; }
+        a:hover { text-decoration: underline; }
+    </style>
+</head>
+<body>
+    <div class="rsyc-container">
+        ${this.generatedHTML}
+    </div>
+</body>
+</html>`;
+
+        return fullHTML;
+    }
+
+    /**
+     * Download complete page with Open Graph tags
+     */
+    downloadFullPageWithOG() {
+        const fullHTML = this.buildFullPageWithOGTags();
+        if (!fullHTML) return;
+
+        const center = this.currentCenter;
+        const filename = `${center.Title.replace(/[^a-z0-9]/gi, '-')}-full-profile.html`;
+        const blob = new Blob([fullHTML], { type: 'text/html' });
+        const url = URL.createObjectURL(blob);
+        
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    }
+
+    /**
+     * Escape HTML special characters for use in meta tags
+     */
+    escapeHTML(text) {
+        if (!text) return '';
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    /**
+     * Update Open Graph meta tags dynamically for in-page updates
+     * Note: These won't affect social media previews (FB/LinkedIn fetchers don't run JS),
+     * but are useful for client-side page updates and SPA navigation
+     */
+    setOGTags(ogData) {
+        const { title, description, image, url } = ogData;
+
+        // Update OG meta tags
+        const ogTitle = document.getElementById('og-title');
+        const ogDescription = document.getElementById('og-description');
+        const ogImage = document.getElementById('og-image');
+        const ogImageWidth = document.getElementById('og-image-width');
+        const ogImageHeight = document.getElementById('og-image-height');
+        const ogUrl = document.getElementById('og-url');
+
+        if (ogTitle && title) ogTitle.setAttribute('content', title);
+        if (ogDescription && description) ogDescription.setAttribute('content', description);
+        if (ogImage && image) {
+            ogImage.setAttribute('content', image);
+            // Set standard OG image dimensions (1200x630 is optimal for most platforms)
+            if (ogImageWidth) ogImageWidth.setAttribute('content', '1200');
+            if (ogImageHeight) ogImageHeight.setAttribute('content', '630');
+        }
+        if (ogUrl && url) ogUrl.setAttribute('content', url);
+
+        // Update Twitter Card meta tags
+        const twitterTitle = document.getElementById('twitter-title');
+        const twitterDescription = document.getElementById('twitter-description');
+        const twitterImage = document.getElementById('twitter-image');
+
+        if (twitterTitle && title) twitterTitle.setAttribute('content', title);
+        if (twitterDescription && description) twitterDescription.setAttribute('content', description);
+        if (twitterImage && image) twitterImage.setAttribute('content', image);
+
+        // Also update the page title tag
+        if (title) document.title = title;
+    }
+
+    /**
+     * Initialize and overwrite OG/Twitter tags on page load
+     * Especially important when this page is injected into a CMS
+     * This method generates all required OG tag values from a center and updates the meta tags
+     */
+    updateOGTagsOnPage(center) {
+        if (!center) return;
+
+        // Build OG tag values from center data
+        const pageTitle = `${center.Title} - Red Shield Youth Centers`;
+        const city = center.city || 'Your Community';
+        const state = center.state || '';
+        const cityState = state ? `${city}, ${state}` : city;
+        const pageDescription = `A safe, welcoming space in ${cityState} offering youth programs, activities, mentoring, and community support for kids and teens.`;
+        const ogImageUrl = 'https://s3.amazonaws.com/uss-cache.salvationarmy.org/f432e3f1-79a6-4dfe-82c6-5c93c55e6b09_Charlotte+NC-04489.jpg';
+        const pageUrl = center.websiteURL || 'https://www.redshieldyouth.org/';
+
+        // Update all OG and Twitter meta tags in document head
+        // These will overwrite parent page's meta tags
+        const metaTags = {
+            'og-title': pageTitle,
+            'og-description': pageDescription,
+            'og-image': ogImageUrl,
+            'og-url': pageUrl,
+            'twitter-title': pageTitle,
+            'twitter-description': pageDescription,
+            'twitter-image': ogImageUrl
+        };
+
+        Object.entries(metaTags).forEach(([id, value]) => {
+            let element = document.getElementById(id);
+            
+            // If element doesn't exist (parent page didn't include it), create it
+            if (!element) {
+                const isTwitter = id.startsWith('twitter-');
+                const property = isTwitter ? 'name' : 'property';
+                const propertyValue = isTwitter ? id : `og:${id.replace('og-', '')}`;
+                
+                element = document.createElement('meta');
+                element.setAttribute(property, propertyValue);
+                element.id = id;
+                document.head.appendChild(element);
+            }
+            
+            element.setAttribute('content', value);
+        });
+
+        // Update page title
+        document.title = pageTitle;
+
+        // Store current center for future reference
+        this.currentCenter = center;
     }
 
     /**
@@ -2556,7 +4800,7 @@ class RSYCGeneratorV2 {
             .replace(/[^\w-]/g, '');        // Remove special characters except dashes (no need to escape - if at end)
     }
 
-    showDataAuditModal() {
+    async showDataAuditModal() {
         // Remove existing modal if present
         const existing = document.getElementById('dataAuditModal');
         if (existing) existing.remove();
@@ -2568,6 +4812,9 @@ class RSYCGeneratorV2 {
         const hours = this.dataLoader.cache.hours || [];
         const facilities = this.dataLoader.cache.facilities || [];
         const featuredPrograms = this.dataLoader.cache.featuredPrograms || [];
+        const events = this.dataLoader.cache.events || [];
+        const stories = this.dataLoader.cache.stories || [];
+        const informationalPages = this.dataLoader.cache.informationalPages || [];
 
         // Helper: normalize hour strings for robust comparison
         const normalizeHourValue = (v) => {
@@ -2639,6 +4886,9 @@ class RSYCGeneratorV2 {
             let hasHours = !!hoursForCenter && !isDefaultHoursRecord(hoursForCenter);
             const facilityCount = (c.facilityFeatures || []).length;
             const programCount = (c.featuredPrograms || []).length;
+            
+            const eventCount = events.filter(e => e.centerId == spId).length;
+            const infoPageCount = informationalPages.filter(p => p.centerId == spId).length;
 
             return {
                 id: c.id || c.Id,
@@ -2650,6 +4900,7 @@ class RSYCGeneratorV2 {
                 divisionCode: c.divisionCode || '',
                 isClosed: isClosed,
                 hasAbout, hasVolunteer, hasStaff, schedCount, leaderCount, photoCount, hasHours, facilityCount, programCount,
+                eventCount, infoPageCount,
                 hasFooterPhoto, hasFooterScripture,
                 hasSignUpUrl, hasDonationUrl, hasExplainerVideo
             };
@@ -2693,7 +4944,11 @@ class RSYCGeneratorV2 {
             leaders_items: rows.reduce((s, r) => s + (r.leaderCount || 0), 0),
             photos_centers: rows.filter(r => r.photoCount > 0).length,
             photos_items: rows.reduce((s, r) => s + (r.photoCount || 0), 0),
-            hours: rows.filter(r => r.hasHours).length
+            hours: rows.filter(r => r.hasHours).length,
+            events_centers: Array.from(new Set((events || []).map(e => e.centerId))).length,
+            events_items: (events || []).length,
+            informationalPages_centers: Array.from(new Set((informationalPages || []).map(p => p.centerId))).length,
+            informationalPages_items: (informationalPages || []).length
         };
 
         const modal = document.createElement('div');
@@ -2807,6 +5062,19 @@ class RSYCGeneratorV2 {
             });
         };
 
+        const copyDataModelsBtn = document.createElement('button');
+        copyDataModelsBtn.className = 'btn btn-success btn-sm';
+        copyDataModelsBtn.innerHTML = '<i class="bi bi-diagram-2"></i> Copy Data Models';
+        copyDataModelsBtn.onclick = () => {
+            const reportHtml = this.generateEmailAuditDataModels();
+            const blob = new Blob([reportHtml], { type: 'text/html' });
+            const data = [new ClipboardItem({ 'text/html': blob })];
+            navigator.clipboard.write(data).then(() => {
+                copyDataModelsBtn.textContent = '✓ Copied!';
+                setTimeout(() => copyDataModelsBtn.innerHTML = '<i class="bi bi-diagram-2"></i> Copy Data Models', 2000);
+            });
+        };
+
         const copySchedulesBtn = document.createElement('button');
         copySchedulesBtn.className = 'btn btn-success btn-sm';
         copySchedulesBtn.innerHTML = '<i class="bi bi-calendar-week"></i> Copy Program Schedules';
@@ -2820,6 +5088,54 @@ class RSYCGeneratorV2 {
             navigator.clipboard.write(data).then(() => {
                 copySchedulesBtn.textContent = '✓ Copied!';
                 setTimeout(() => copySchedulesBtn.innerHTML = '<i class="bi bi-calendar-week"></i> Copy Program Schedules', 2000);
+            });
+        };
+
+        const copyEventsBtn = document.createElement('button');
+        copyEventsBtn.className = 'btn btn-success btn-sm';
+        copyEventsBtn.innerHTML = '<i class="bi bi-megaphone"></i> Copy Events';
+        copyEventsBtn.onclick = () => {
+            const reportHtml = this.generateEmailAuditEvents({
+                centers,
+                events
+            });
+            const blob = new Blob([reportHtml], { type: 'text/html' });
+            const data = [new ClipboardItem({ 'text/html': blob })];
+            navigator.clipboard.write(data).then(() => {
+                copyEventsBtn.textContent = '✓ Copied!';
+                setTimeout(() => copyEventsBtn.innerHTML = '<i class="bi bi-megaphone"></i> Copy Events', 2000);
+            });
+        };
+
+        const copyStoriesBtn = document.createElement('button');
+        copyStoriesBtn.className = 'btn btn-success btn-sm';
+        copyStoriesBtn.innerHTML = '<i class="bi bi-chat-left-quote"></i> Copy Stories';
+        copyStoriesBtn.onclick = () => {
+            const reportHtml = this.generateEmailAuditStories({
+                centers,
+                stories
+            });
+            const blob = new Blob([reportHtml], { type: 'text/html' });
+            const data = [new ClipboardItem({ 'text/html': blob })];
+            navigator.clipboard.write(data).then(() => {
+                copyStoriesBtn.textContent = '✓ Copied!';
+                setTimeout(() => copyStoriesBtn.innerHTML = '<i class="bi bi-chat-left-quote"></i> Copy Stories', 2000);
+            });
+        };
+
+        const copyInfoPagesBtn = document.createElement('button');
+        copyInfoPagesBtn.className = 'btn btn-success btn-sm';
+        copyInfoPagesBtn.innerHTML = '<i class="bi bi-info-circle"></i> Copy Info Pages';
+        copyInfoPagesBtn.onclick = () => {
+            const reportHtml = this.generateEmailAuditInfoPages({
+                centers,
+                informationalPages
+            });
+            const blob = new Blob([reportHtml], { type: 'text/html' });
+            const data = [new ClipboardItem({ 'text/html': blob })];
+            navigator.clipboard.write(data).then(() => {
+                copyInfoPagesBtn.textContent = '✓ Copied!';
+                setTimeout(() => copyInfoPagesBtn.innerHTML = '<i class="bi bi-info-circle"></i> Copy Info Pages', 2000);
             });
         };
 
@@ -2879,6 +5195,19 @@ class RSYCGeneratorV2 {
             }
         };
 
+        const copyDocsBtn = document.createElement('button');
+        copyDocsBtn.className = 'btn btn-success btn-sm';
+        copyDocsBtn.innerHTML = '<i class="bi bi-journal-text"></i> Copy Documentation';
+        copyDocsBtn.onclick = () => {
+            const reportHtml = this.templateEngine.getSectionReferenceTable();
+            const blob = new Blob([reportHtml], { type: 'text/html' });
+            const data = [new ClipboardItem({ 'text/html': blob })];
+            navigator.clipboard.write(data).then(() => {
+                copyDocsBtn.textContent = '✓ Copied!';
+                setTimeout(() => copyDocsBtn.innerHTML = '<i class="bi bi-journal-text"></i> Copy Documentation', 2000);
+            });
+        };
+
         const copyAllBtn = document.createElement('button');
         copyAllBtn.className = 'btn btn-primary btn-sm';
         copyAllBtn.innerHTML = '<i class="bi bi-envelope"></i> Copy All';
@@ -2896,6 +5225,8 @@ class RSYCGeneratorV2 {
 
                 const masterHtml = this.generateEmailMasterCommandCenter();
 
+                const dataModelsHtml = this.generateEmailAuditDataModels();
+
                 const filtersHtml = this.generateEmailAuditFiltersAndAssociations({
                     lowFacilities, lowPrograms, recentFacs, recentProgs
                 });
@@ -2903,6 +5234,21 @@ class RSYCGeneratorV2 {
                 const schedulesHtml = this.generateEmailAuditProgramSchedules({
                     centers,
                     schedules
+                });
+
+                const eventsHtml = this.generateEmailAuditEvents({
+                    centers,
+                    events
+                });
+
+                const storiesHtml = this.generateEmailAuditStories({
+                    centers,
+                    stories
+                });
+
+                const infoPagesHtml = this.generateEmailAuditInfoPages({
+                    centers,
+                    informationalPages
                 });
 
                 const allDivisions = Array.from(new Set(rows
@@ -2929,10 +5275,14 @@ class RSYCGeneratorV2 {
                     leaders
                 });
 
+                const docsHtml = this.templateEngine.getSectionReferenceTable();
+
                 const editorsHtml = this.generateEmailAuditEditorsTable({
                     editorsCache,
                     leaders
                 });
+
+                const errorsHtml = this.generateEmailAuditErrorMessages();
 
                 const reportHtml = `
                     <div style="font-family: 'Segoe UI', Tahoma, sans-serif; color: #333; max-width: 900px; line-height: 1.5;">
@@ -2940,16 +5290,28 @@ class RSYCGeneratorV2 {
                         <br>
                         ${masterHtml}
                         <br>
+                        ${dataModelsHtml}
+                        <br>
                         ${filtersHtml}
                         <br>
                         ${schedulesHtml}
                         <br>
-                        <div style="background-color: #f4f4f4; padding: 14px; border-left: 6px solid #d93d3d; font-weight: bold; margin-bottom: 14px; font-size: 16px; color: #333; display: block; width: 100%;">All Divisions - Divisional Reports</div>
+                        ${eventsHtml}
+                        <br>
+                        ${infoPagesHtml}
+                        <br>
+                        ${storiesHtml}
+                        <br>
+                        <div style="background-color: #f4f4f4; padding: 14px; border-left: 6px solid #d93d3d; font-weight: bold; margin-bottom: 25px; font-size: 18px; color: #333; display: block; width: 100%;">All Divisions - Divisional Reports</div>
                         ${allDivisionReportsHtml || '<div style="font-size:12.5px; color:#999;">No divisions found.</div>'}
+                        <br>
+                        ${docsHtml}
                         <br>
                         ${staffHtml}
                         <br>
                         ${editorsHtml}
+                        <br>
+                        ${errorsHtml}
                     </div>
                 `;
 
@@ -2974,10 +5336,15 @@ class RSYCGeneratorV2 {
 
         btnRow.appendChild(copyOverallBtn);
         btnRow.appendChild(copyMasterCommandCenterBtn);
+        btnRow.appendChild(copyDataModelsBtn);
         btnRow.appendChild(copyFiltersBtn);
         btnRow.appendChild(copySchedulesBtn);
+        btnRow.appendChild(copyEventsBtn);
+        btnRow.appendChild(copyStoriesBtn);
+        btnRow.appendChild(copyInfoPagesBtn);
         btnRow.appendChild(copyStaffTableBtn);
         btnRow.appendChild(copyEditorsBtn);
+        btnRow.appendChild(copyDocsBtn);
         btnRow.appendChild(copyAllBtn);
 
         divisionRow.appendChild(divisionSelect);
@@ -3054,332 +5421,60 @@ class RSYCGeneratorV2 {
         };
 
         // Narrative Section
-        const narrative = document.createElement('div');
-        narrative.style.cssText = 'background:#f0f7ff; border-left:4px solid #007bff; padding:16px; margin-bottom:24px; border-radius:4px; font-size:14px; line-height:1.6; color:#2c3e50;';
-        narrative.innerHTML = `<strong>Our Goal:</strong> We are currently auditing the Red Shield Youth Center territory-wide to ensure every location is accurately represented and fully ready for public promotion. This focus on profile readiness ensures that when families, donors, and community partners visit <strong>redshieldyouth.org</strong>, they encounter a professional, complete, and locally relevant view of our ministry. By addressing the specific data points identified in this report, we can collectively strengthen our regional presence and ensure every center has the "digital front door" it deserves.`;
-
-        // Summary Badges (Original Style)
-        const summary = document.createElement('div');
-        summary.style.display = 'flex';
-        summary.style.gap = '12px';
-        summary.style.flexWrap = 'wrap';
-        summary.style.marginBottom = '0';
-        const makeBadge = (label, countLine, subline = '') => `
-            <div style="background:#f8f9fa; border:1px solid #e9ecef; padding:12px; border-radius:8px; min-width:140px; text-align:center;">
-                <div style="font-size:12px; color:#666; text-transform:uppercase; font-weight:600;">${label}</div>
-                <div style="font-weight:700; font-size:18px; margin:4px 0;">${countLine}</div>
-                ${subline ? `<div style="font-size:11px; color:#999;">${subline}</div>` : ''}
-            </div>`;
-        
-        summary.innerHTML = 
-            makeBadge('Centers', centers.length, `${aggregates.closed} closed`) +
-            makeBadge('About Tags', aggregates.about) +
-            makeBadge('Schedules', `${aggregates.schedules_centers} centers`, `${aggregates.schedules_items} total items`) +
-            makeBadge('Leaders', `${aggregates.leaders_centers} centers`, `${aggregates.leaders_items} total items`) +
-            makeBadge('Photos', `${aggregates.photos_centers} centers`, `${aggregates.photos_items} total images`) +
-            makeBadge('Hours', aggregates.hours);
+        const narrativeHtml = this.generateEmailAuditOverallStatus({
+            rows: rows,
+            lowFacilities, lowPrograms, recentFacs, recentProgs,
+            centersCount: centers.length,
+            closedCount: aggregates.closed,
+            aggregates
+        });
 
         const overviewWrap = document.createElement('div');
-        overviewWrap.appendChild(narrative);
-        overviewWrap.appendChild(summary);
-
-        // Helper to generate generic missing checklist for a row
-        const getMissingChecklist = (r) => {
-            const missing = [];
-            // Priority 1: Hours
-            if (!r.hasHours) missing.push("Missing Custom Hours (Check Year-Round vs Summer)");
-            
-            // Priority 2: Staff & Community Leaders
-            if (!r.hasStaff && r.leaderCount === 0) missing.push("Missing Staff & Community Leaders (Photos/Bios)");
-            
-            // Priority 3: Schedules
-            if (r.schedCount === 0) missing.push("Missing Program Schedules (Recurring Weekly, Camps, Afterschool Time Breakdown)");
-            
-            // Priority 4: Engagement Links
-            if (!r.hasDonationUrl || !r.hasSignUpUrl || !r.hasVolunteer) {
-                missing.push("Missing Engagement Links (Classy Studio, Parent Portal, or Volunteer/Recruitment)");
-            }
-
-            // Priority 5: Profile Context
-            if (!r.hasAbout) missing.push("Missing 'About This Center' (Local Narrative)");
-            if (!r.hasExplainerVideo) missing.push("Missing Explainer Video (Using Territorial Placeholder)");
-            if (r.photoCount === 0) missing.push("Missing Mandatory Site Photos (Exterior/Facility)");
-            
-            // Priority 6: Footer Integrity
-            if (!r.hasFooterPhoto) missing.push("Missing Local Footer Photo (Building/Staff/Community)");
-            if (!r.hasFooterScripture) missing.push("Missing Footer Scripture Reference");
-            
-            return missing;
-        };
-
-        // Grid for New Audits (Recent & Low Assoc)
-        const grid = document.createElement('div');
-        grid.style.cssText = 'display:grid; grid-template-columns:repeat(auto-fit, minmax(300px, 1fr)); gap:20px; margin-bottom:24px;';
+        overviewWrap.innerHTML = narrativeHtml;
         
-        const newAuditSections = [
-            { title: '📅 Recently Created Filter Options (90d)', items: [
-                { label: 'New Facility Features', rows: recentFacs.map(f => f.name) },
-                { label: 'New Featured Programs', rows: recentProgs.map(p => p.name) }
-            ]},
-            { title: '⚠️ Low Filter Association (<30)', items: [
-                { label: 'Low Facility Features', rows: lowFacilities.map(([n,c]) => `${n}: ${c}`) },
-                { label: 'Programs', rows: lowPrograms.map(([n,c]) => `${n}: ${c}`) }
-            ], footer: '💡 Important: Associate as many applicable features/programs as possible to ensure centers show on location page filters.' },
-            { title: '❌ Center Profile Needs Attention', items: [
-                { label: 'No About This Center statement', rows: missingAbout, count: missingAbout.length },
-                { label: 'No Photos (Missing Exterior Photo)', rows: missingPhotos, count: missingPhotos.length }
-            ]}
-        ];
-
-        newAuditSections.forEach(sec => {
-            const card = document.createElement('div');
-            card.style.cssText = 'border:1px solid #e0e0e0; border-radius:8px; padding:16px; background:#fcfcfc; display:flex; flex-direction:column;';
-            card.innerHTML = `<h6 style="margin:0 0 10px 0; border-bottom:1px solid #eee; padding-bottom:6px; font-weight:bold;">${sec.title}</h6>`;
-            sec.items.forEach(it => {
-                const badge = it.count !== undefined ? `<span style="background:#dc3545; color:white; padding:1px 5px; border-radius:8px; font-size:10px; margin-left:5px;">${it.count}</span>` : '';
-                card.innerHTML += `<div style="font-size:11px; font-weight:600; color:#666; margin-top:8px;">${it.label}${badge}</div>`;
-                if (it.rows.length === 0) card.innerHTML += `<div style="font-size:11px; color:#bbb; font-style:italic;">None</div>`;
-                else {
-                    const l = document.createElement('div');
-                    l.style.cssText = 'max-height:80px; overflow-y:auto; font-size:11px; color:#444; border:1px solid #eee; padding:4px; border-radius:4px; background:white; margin-top:2px; flex:1;';
-                    l.innerHTML = it.rows.slice(0, 15).map(r => `• ${esc(r)}`).join('<br>') + (it.rows.length > 15 ? `<br><i>+ ${it.rows.length - 15} more...</i>` : '');
-                    card.appendChild(l);
-                }
-            });
-            if (sec.footer) {
-                const f = document.createElement('div');
-                f.style.cssText = 'margin-top:10px; font-size:10px; color:#d93d3d; font-style:italic; line-height:1.2;';
-                f.textContent = sec.footer;
-                card.appendChild(f);
-            }
-            grid.appendChild(card);
-        });
-        const insightsWrap = document.createElement('div');
-        insightsWrap.appendChild(grid);
-
-        // New Educational Guidance Section (One-Stop Shop)
-        const instructionWrapper = document.createElement('div');
-        instructionWrapper.style.cssText = 'background:#fafafa; border:1px solid #e0e0e0; border-radius:12px; padding:24px; margin-bottom:30px; font-family:Segoe UI, sans-serif;';
-        
-        instructionWrapper.innerHTML = `
-            <div style="margin-bottom:24px; border-bottom:2px solid #eee; padding-bottom:20px;">
-                <h4 style="font-size:20px; font-weight:700; color:#242424; margin:0 0 8px 0;">RSYC Center Profile Master Command Center</h4>
-                <p style="font-size:14px; color:#444; line-height:1.6; margin:0 0 15px 0;">
-                    To ensure each location is represented well for our upcoming launch, use this dashboard to manage all local content. Final launch dates will be set once profiles are reviewed and marked "Ready to Publish."
-                </p>
-                
-                <div style="display:grid; grid-template-columns:1fr 1fr; gap:20px; margin-bottom:15px;">
-                    <div style="background:#fff; border:1px solid #d0e3ff; border-radius:10px; padding:15px; border-left:5px solid #0078d4;">
-                        <div style="font-weight:700; color:#0056b3; font-size:12px; text-transform:uppercase; margin-bottom:8px;">🚀 Primary Profile Editor</div>
-                        <a href="https://centerprofile.redshieldyouth.org" target="_blank" style="font-size:16px; color:#0078d4; text-decoration:none; font-weight:700; display:block;">centerprofile.redshieldyouth.org</a>
-                        <div style="font-size:12px; color:#666; margin-top:6px;">Main portal for editing About, Contact, Hours, and Mandatory Fields.</div>
-                    </div>
-                    <div style="background:#fff; border:1px solid #eee; border-radius:10px; padding:15px; border-left:5px solid #666;">
-                        <br>
-                        <div style="font-weight:700; color:#666; font-size:12px; text-transform:uppercase; margin-bottom:8px;">📚 Training & Support</div>
-                        <a href="https://sauss.sharepoint.com/sites/ConnectCommunications/SitePages/Manage-Youth-Center-Web-Profile.aspx" target="_blank" style="font-size:13px; color:#0078d4; text-decoration:underline; font-weight:600; display:block; margin-bottom:4px;">View Detailed User Guide</a>
-                        <br>
-                        <a href="https://southernusa.salvationarmy.org/redshieldyouth/center-locations" target="_blank" style="font-size:13px; color:#0078d4; text-decoration:underline; font-weight:600; display:block;">Live Profiles Filter Site</a>
-                    </div>
-                </div>
-
-                <div style="font-size:13px; color:#444; background-color:#fff8e1; border-left:5px solid #f2c200; padding:15px; line-height:1.6; border-radius:6px; margin-bottom:15px;">
-                    <b>💡 Dashboard Pro-Tips:</b><br>
-                    • <b>Seamless Editing:</b> Click directly beneath each field label to select options or enter text; work is saved automatically when you click away.<br>
-                    • <b>Launch Process:</b> When updates are finished, set the status to <b>"Ready to Publish"</b> and @mention <b>@Shared THQ Web and Social Media</b> in the sidebar comments.
-                </div>
-            </div>
-
-            <div style="display:grid; grid-template-columns:1fr 1fr; gap:35px; margin-bottom:28px;">
-                <div>
-                    <h5 style="font-size:15px; font-weight:700; color:#d93d3d; margin:0 0 15px 0; display:flex; align-items:center;">
-                        <span style="background:#d93d3d; color:white; width:24px; height:24px; border-radius:50%; display:inline-flex; align-items:center; justify-content:center; margin-right:8px; font-size:12px;">1</span> High-Priority Content Updates
-                    </h5>
-                    <div style="display:grid; grid-template-columns:1fr; gap:10px;">
-                        <div style="background:white; border:1px solid #eee; border-radius:8px; padding:10px; display:flex; justify-content:space-between; align-items:center;">
-                            <span style="font-size:13px; font-weight:500;">📅 Operating Hours</span>
-                            <a href="https://hoursreview-rsyc.usscommunications.org/" target="_blank" style="font-size:11px; background:#0078d4; color:white; padding:4px 10px; border-radius:4px; text-decoration:none;">Manage →</a>
-                        </div>
-                        <div style="background:white; border:1px solid #eee; border-radius:8px; padding:10px; display:flex; justify-content:space-between; align-items:center;">
-                            <span style="font-size:13px; font-weight:500;">🖼️ Center Exterior Photos</span>
-                            <a href="https://photos1review-rsyc.usscommunications.org/" target="_blank" style="font-size:11px; background:#0078d4; color:white; padding:4px 10px; border-radius:4px; text-decoration:none;">Manage →</a>
-                        </div>
-                        <div style="background:white; border:1px solid #eee; border-radius:8px; padding:10px; display:flex; flex-direction:column; gap:6px;">
-                            <div style="display:flex; justify-content:space-between; align-items:center;">
-                                <span style="font-size:13px; font-weight:500;">📋 Program Schedules</span>
-                                <a href="https://submitschedules-rsyc.usscommunications.org/" target="_blank" style="font-size:11px; background:#28a745; color:white; padding:4px 10px; border-radius:4px; text-decoration:none;">Add New →</a>
-                            </div>
-                            <a href="https://schedulesreview-rsyc.usscommunications.org/" target="_blank" style="font-size:10px; color:#0078d4; text-decoration:underline; font-weight:600; margin-left:2px;">Edit/Review Existing Schedules</a>
-                        </div>
-                        <div style="background:white; border:1px solid #eee; border-radius:8px; padding:10px; display:flex; flex-direction:column; gap:6px;">
-                            <div style="display:flex; justify-content:space-between; align-items:center;">
-                                <span style="font-size:13px; font-weight:500;">👥 Staff & Local Leaders</span>
-                                <a href="https://submitstaff-rsyc.usscommunications.org/" target="_blank" style="font-size:11px; background:#28a745; color:white; padding:4px 10px; border-radius:4px; text-decoration:none;">Add New →</a>
-                            </div>
-                            <a href="https://staffreview-rsyc.usscommunications.org/" target="_blank" style="font-size:10px; color:#0078d4; text-decoration:underline; font-weight:600; margin-left:2px;">Edit/Review Existing Staff</a>
-                        </div>
-                        <div style="background:white; border:1px solid #eee; border-radius:8px; padding:10px; display:flex; flex-direction:column; gap:6px;">
-                            <div style="display:flex; justify-content:space-between; align-items:center;">
-                                <span style="font-size:13px; font-weight:500;">🎭 Hero / Theatre Slides</span>
-                                <a href="https://submitslides-rsyc.usscommunications.org/" target="_blank" style="font-size:11px; background:#28a745; color:white; padding:4px 10px; border-radius:4px; text-decoration:none;">Add New →</a>
-                            </div>
-                            <a href="https://slidesreview-rsyc.usscommunications.org/" target="_blank" style="font-size:10px; color:#0078d4; text-decoration:underline; font-weight:600; margin-left:2px;">Edit/Review Existing Slides</a>
-                        </div>
-                        <div style="background:white; border:1px solid #eee; border-radius:8px; padding:10px; display:flex; flex-direction:column; gap:6px;">
-                            <div style="display:flex; justify-content:space-between; align-items:center;">
-                                <span style="font-size:13px; font-weight:500;">📰 Stories</span>
-                                <a href="https://submitstories-rsyc.usscommunications.org/" target="_blank" style="font-size:11px; background:#28a745; color:white; padding:4px 10px; border-radius:4px; text-decoration:none;">Add New →</a>
-                            </div>
-                            <a href="https://storiesreview-rsyc.usscommunications.org/" target="_blank" style="font-size:10px; color:#0078d4; text-decoration:underline; font-weight:600; margin-left:2px;">Edit/Review Existing Stories</a>
-                        </div>
-                        <div style="background:white; border:1px solid #eee; border-radius:8px; padding:10px; display:flex; flex-direction:column; gap:6px;">
-                            <div style="display:flex; justify-content:space-between; align-items:center;">
-                                <span style="font-size:13px; font-weight:500;">📣 Events</span>
-                                <a href="https://submitevents-rsyc.usscommunications.org/" target="_blank" style="font-size:11px; background:#28a745; color:white; padding:4px 10px; border-radius:4px; text-decoration:none;">Add New →</a>
-                            </div>
-                            <a href="https://eventsreview-rsyc.usscommunications.org/" target="_blank" style="font-size:10px; color:#0078d4; text-decoration:underline; font-weight:600; margin-left:2px;">Edit/Review Existing Events</a>
-                        </div>
-                        <div style="background:white; border:1px solid #eee; border-radius:8px; padding:10px; display:flex; flex-direction:column; gap:6px;">
-                            <div style="display:flex; justify-content:space-between; align-items:center;">
-                                <span style="font-size:13px; font-weight:500;">📄 Info Pages</span>
-                                <a href="https://submitinfopage-rsyc.usscommunications.org/" target="_blank" style="font-size:11px; background:#28a745; color:white; padding:4px 10px; border-radius:4px; text-decoration:none;">Add New →</a>
-                            </div>
-                            <a href="https://infopagereview-rsyc.usscommunications.org/" target="_blank" style="font-size:10px; color:#0078d4; text-decoration:underline; font-weight:600; margin-left:2px;">Edit/Review Existing Info Pages</a>
-                        </div>
-                    </div>
-                </div>
-                <div>
-                    <h5 style="font-size:15px; font-weight:700; color:#242424; margin:0 0 15px 0; display:flex; align-items:center;">
-                        <span style="background:#242424; color:white; width:24px; height:24px; border-radius:50%; display:inline-flex; align-items:center; justify-content:center; margin-right:8px; font-size:12px;">2</span> Required Profile Data
-                    </h5>
-                    <div style="font-size:13px; color:#555; line-height:1.7;">
-                        <div style="background:#fff; border:1px solid #eee; padding:12px; border-radius:8px; margin-bottom:12px;">
-                            <b style="color:#333;">Category Maintenance:</b><br>
-                            • Facility Features: <a href="https://sauss.sharepoint.com/sites/THQITDWeb/Lists/RSYCFacilityFeatures/AllItems.aspx?env=WebViewList" target="_blank" style="color:#0078d4; font-weight:600;">View Pick List</a> | <a href="https://forms.office.com/r/DtqymAM3Vu" target="_blank" style="color:#0078d4; font-weight:600;">Submit Missing Feature</a><br>
-                            • Featured Programs: <a href="https://sauss.sharepoint.com/sites/THQITDWeb/Lists/RSYCPrograms/AllItems.aspx?env=WebViewList" target="_blank" style="color:#0078d4; font-weight:600;">View Pick List</a> | <a href="https://forms.office.com/r/9AwuTKQ3fE" target="_blank" style="color:#0078d4; font-weight:600;">Submit Missing Program</a><br>
-                            <span style="font-size:11px; color:#777; font-style:italic;">Use these if your center offers something not in current pick-lists.</span>
-                        </div>
-                        <div style="background:#f0f7ff; border:1px solid #cfe2ff; padding:12px; border-radius:8px;">
-                            <b style="color:#004085;">Mandatory Narrative Fields:</b><br>
-                            • Overall "About This Center" History/Story<br>
-                            • Parent/Guardian Registration Link<br>
-                            • Classy Donation Link (for Youth Ministry)<br>
-                            • Volunteer/Mentor Contact Instructions<br>
-                            • Local Footer Scripture Verse
-                        </div>
-                        <div style="background:#fff; border:1px solid #eee; padding:12px; border-radius:8px; margin-top:12px;">
-                            <b style="color:#333;">Best Practices From Live Profiles:</b><br>
-                            • About: who you serve (ages/grades) + core programs (after-school, camps, tutoring, arts/sports)
-                            • About: outcomes (academic support, character/leadership, life skills, faith/values)
-                            • Schedules: title + optional subtitle, days, time range, timezone, and frequency
-                            • Schedules: include season details (start/end dates or months running) and registration opens
-                            • Schedules: add ages served, fees, transportation notes, and holiday/closure disclaimers when relevant
-                            • Schedules narrative: describe activities, meals/snacks, transportation, and family expectations
-                            • Volunteer: include contact name, email/phone, and required steps (background check, Safe From Harm, orientation)
-                            • Other fields: parent sign-up link and donation link
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div style="display:grid; grid-template-columns:1fr 1fr; gap:35px; border-top:1px solid #eee; padding-top:28px;">
-                 <div>
-                    <h5 style="font-size:15px; font-weight:700; color:#242424; margin:0 0 15px 0;">🔐 Permissions & User Access</h5>
-                    <div style="font-size:13px; color:#555; line-height:1.6;">
-                        <p style="margin-bottom:12px;">Divisional Communications Directors and Authorized Web Teams can grant edit permissions directly:</p>
-                        <div style="display:flex; flex-direction:column; gap:8px;">
-                            <a href="https://sauss.sharepoint.com/sites/ConnectCommunications/_layouts/15/user.aspx?obj=%7B681BC933-4712-4B2E-893C-8A6136B28795%7D%2C0%2CIcon" target="_blank" style="background:#f8f9fa; border:1px solid #ddd; padding:8px 12px; border-radius:6px; color:#0078d4; text-decoration:none; font-weight:600; font-size:12px;">Grant Permissions to RSYC Manager</a>
-                            <div style="display:block;">
-                                <a href="https://sauss.sharepoint.com/sites/THQITDWeb/Lists/RSYCPermissions/AllItems.aspx?env=WebViewList" target="_blank" style="color:#0078d4; font-size:11px; text-decoration:underline;">View Center Profile Permissions</a>
-                                <br>
-                                <a href="https://sauss.sharepoint.com/sites/THQITDWeb/Lists/RSYCDivisionPermissions/AllItems.aspx?env=WebViewList" target="_blank" style="color:#0078d4; font-size:11px; text-decoration:underline;">View Division Profile Permissions</a>
-                            </div>
-                        </div>
-                        <p style="font-size:11px; color:#888; margin-top:12px;">Need Help? Email <a href="mailto:THQ.Web.SocialMedia@uss.salvationarmy.org" style="color:#0078d4;">Shared THQ Web and Social Media</a></p>
-                    </div>
-                </div>
-                <div>
-                     <h5 style="font-size:14px; font-weight:700; color:#242424; margin:0 0 12px 0;">📋 Program Schedule Example:</h5>
-                     <div style="background:white; border:1px solid #eee; border-radius:8px; overflow:hidden;">
-                        <table style="width:100%; border-collapse:collapse; font-size:11px; line-height:1.1;">
-                            <thead style="background:#f1f1f1; border-bottom:1px solid #ddd;">
-                                <tr>
-                                    <th style="padding:6px; text-align:left;">Program Title</th>
-                                    <th style="padding:6px; text-align:left;">Local Schedule Info</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <tr style="border-bottom:1px solid #f9f9f9;">
-                                    <td style="padding:6px; font-weight:600;">After-School Program</td>
-                                    <td style="padding:6px; color:#666;">Mon-Fri, 2:00PM - 6:00PM</td>
-                                </tr>
-                                <tr style="border-bottom:1px solid #f9f9f9;">
-                                    <td style="padding:6px; font-weight:600;">Cooking Class</td>
-                                    <td style="padding:6px; color:#666;">Mondays, 5:30PM - 7:00PM</td>
-                                </tr>
-                                <tr style="border-bottom:1px solid #f9f9f9;">
-                                    <td style="padding:6px; font-weight:600;">Music Fundamentals</td>
-                                    <td style="padding:6px; color:#666;">Tue/Thu, 4:00PM - 5:30PM</td>
-                                </tr>
-                                <tr style="border-bottom:1px solid #f9f9f9;">
-                                    <td style="padding:6px; font-weight:600;">Basketball League</td>
-                                    <td style="padding:6px; color:#666;">Tue, 5:00PM - 8:00PM</td>
-                                </tr>
-                                <tr style="border-bottom:1px solid #f9f9f9;">
-                                    <td style="padding:6px; font-weight:600;">Midweek Study + Supper</td>
-                                    <td style="padding:6px; color:#666;">Tuesdays, 5:30PM - 7:30PM</td>
-                                </tr>
-                                <tr style="border-bottom:1px solid #f9f9f9;">
-                                    <td style="padding:6px; font-weight:600;">Karate (All Levels)</td>
-                                    <td style="padding:6px; color:#666;">Tue & Thu, 6:30PM - 7:30PM</td>
-                                </tr>
-                                <tr style="border-bottom:1px solid #f9f9f9;">
-                                    <td style="padding:6px; font-weight:600;">Youth Creative Arts</td>
-                                    <td style="padding:6px; color:#666;">Wednesdays, 5:00PM - 6:30PM</td>
-                                </tr>
-                                <tr style="border-bottom:1px solid #f9f9f9;">
-                                    <td style="padding:6px; font-weight:600;">Senior Gathering</td>
-                                    <td style="padding:6px; color:#666;">Second Fri, 10:00AM - 12:00PM</td>
-                                </tr>
-                                <tr style="border-bottom:1px solid #f9f9f9;">
-                                    <td style="padding:6px; font-weight:600;">Teen Night</td>
-                                    <td style="padding:6px; color:#666;">Fridays, 6:00PM - 9:00PM</td>
-                                </tr>
-                                <tr style="border-bottom:1px solid #f9f9f9;">
-                                    <td style="padding:6px; font-weight:600;">Community Garden</td>
-                                    <td style="padding:6px; color:#666;">Saturdays, 9:00AM - 11:00AM</td>
-                                </tr>
-                                <tr style="border-bottom:1px solid #f9f9f9;">
-                                    <td style="padding:6px; font-weight:600;">SAT/ACT Prep</td>
-                                    <td style="padding:6px; color:#666;">Saturdays, 10:00AM - 1:00PM</td>
-                                </tr>
-                                <tr style="border-bottom:1px solid #f9f9f9;">
-                                    <td style="padding:6px; font-weight:600;">Sunday Morning Class</td>
-                                    <td style="padding:6px; color:#666;">Sundays, 10:00AM</td>
-                                </tr>
-                                <tr style="border-bottom:1px solid #f9f9f9;">
-                                    <td style="padding:6px; font-weight:600;">Sunday Worship Gathering</td>
-                                    <td style="padding:6px; color:#666;">Sundays, 11:00AM</td>
-                                </tr>
-                            </tbody>
-                        </table>
-                     </div>
-                     <div style="font-size:10px; color:#999; margin-top:8px; font-style:italic;">Use consistent formatting to help families browse activities.</div>
-                </div>
-            </div>
-        `;
+        // Command Center
+        const commandCenterHTML = this.generateEmailMasterCommandCenter();
         const commandCenterWrap = document.createElement('div');
-        commandCenterWrap.appendChild(instructionWrapper);
+        commandCenterWrap.innerHTML = commandCenterHTML;
+
+        // Filter Associations
+        const filtersHTML = this.generateEmailAuditFiltersAndAssociations({
+            lowFacilities, lowPrograms, recentFacs, recentProgs
+        });
+        const filtersWrap = document.createElement('div');
+        filtersWrap.innerHTML = filtersHTML;
+
+        // All Divisional Reports
+        const editorsCache = await this.ensureEditorsCacheLoaded();
+        const allDivisions = Array.from(new Set(rows
+            .map(r => normalizeDivisionName(r.division || 'Other'))
+            .filter(Boolean)))
+            .sort();
+
+        const allDivisionReportsHtml = allDivisions.map(d => {
+            return `
+                <div style="margin-top: 22px;">
+                    ${this.generateEmailAuditDivisionReport({
+                        rows: rows,
+                        division: d,
+                        centers,
+                        leaders,
+                        editorsCache
+                    })}
+                </div>
+            `;
+        }).join('<br>');
+        
+        const divisionalReportsWrap = document.createElement('div');
+        divisionalReportsWrap.innerHTML = `
+            <div style="background-color: #f4f4f4; padding: 14px; border-left: 6px solid #d93d3d; font-weight: bold; margin-bottom: 24px; font-size: 16px; color: #333; display: block; width: 100%;">Complete Divisional Performance Audit</div>
+            ${allDivisionReportsHtml || '<div style="font-size:12.5px; color:#999; padding:20px;">No divisions found.</div>'}
+        `;
 
         // Detailed Checklist (The "Outlook" view but live in the modal)
-        const detailedChecklistHeader = document.createElement('h5');
-        detailedChecklistHeader.style.margin = '24px 0 12px 0';
-        detailedChecklistHeader.textContent = 'Territorial Action List (Grouped by Division & Area Command)';
         const actionListSection = document.createElement('div');
-        actionListSection.appendChild(detailedChecklistHeader);
-
         const actionListWrap = document.createElement('div');
-        actionListWrap.style.cssText = 'max-height:400px; overflow:auto; border:1px solid #eee; border-radius:12px; padding:20px; background:#fafafa; margin-bottom:24px;';
+        actionListWrap.style.cssText = 'max-height:600px; overflow:auto; border:1px solid #eee; border-radius:12px; padding:20px; background:#fafafa; margin-bottom:24px;';
         
         // Group by division and area command
         const actionsByGroup = {};
@@ -3390,7 +5485,20 @@ class RSYCGeneratorV2 {
             if (!actionsByGroup[divName]) actionsByGroup[divName] = {};
             if (!actionsByGroup[divName][acName]) actionsByGroup[divName][acName] = [];
             
-            const missing = getMissingChecklist(r);
+            // Priority 1: Hours
+            const missing = [];
+            if (!r.hasHours) missing.push("Missing Custom Hours (Check Year-Round vs Summer)");
+            if (!r.hasStaff && r.leaderCount === 0) missing.push("Missing Staff & Community Leaders (Photos/Bios)");
+            if (r.schedCount === 0) missing.push("Missing Program Schedules (Recurring Weekly)");
+            if (!r.hasDonationUrl || !r.hasSignUpUrl || !r.hasVolunteer) {
+                missing.push("Missing Engagement Links (Classy Studio, Parent Portal, or Volunteer/Recruitment)");
+            }
+            if (!r.hasAbout) missing.push("Missing 'About This Center' (Local Narrative)");
+            if (!r.hasExplainerVideo) missing.push("Missing Explainer Video (Using Territorial Placeholder)");
+            if (r.photoCount === 0) missing.push("Missing Mandatory Site Photos (Exterior/Facility)");
+            if (!r.hasFooterPhoto) missing.push("Missing Local Footer Photo (Building/Staff/Community)");
+            if (!r.hasFooterScripture) missing.push("Missing Footer Scripture Reference");
+
             if (missing.length > 0) actionsByGroup[divName][acName].push({ name: r.name, liveUrl: r.liveUrl, missing });
         });
 
@@ -3418,76 +5526,13 @@ class RSYCGeneratorV2 {
         });
         actionListSection.appendChild(actionListWrap);
 
-        // Detailed Status Table (Full Width)
-        const tableWrapHeader = document.createElement('h5');
-        tableWrapHeader.style.margin = '24px 0 12px 0';
-        tableWrapHeader.textContent = 'All Centers Status Detail (Table View)';
-        const statusTableSection = document.createElement('div');
-        statusTableSection.appendChild(tableWrapHeader);
-
-        const tableWrap = document.createElement('div');
-        tableWrap.style.cssText = 'max-height:450px; overflow:auto; border:1px solid #eee; border-radius:8px;';
-        const table = document.createElement('table');
-        table.className = 'table table-hover table-sm';
-        table.style.margin = '0';
-        table.innerHTML = `<thead style="position:sticky; top:0; background:#f8f9fa; z-index:10; border-bottom:2px solid #dee2e6;">
-            <tr>
-                <th>Center Name</th>
-                <th style="text-align:center">Live</th>
-                <th style="text-align:center">About</th>
-                <th style="text-align:center">Staff</th>
-                <th style="text-align:center">Lead</th>
-                <th style="text-align:center">Sched</th>
-                <th style="text-align:center">Photo</th>
-                <th style="text-align:center">Hours</th>
-                <th style="text-align:center">Features</th>
-                <th style="text-align:center">Progs</th>
-                <th style="text-align:center">F-Photo</th>
-                <th style="text-align:center">F-Scrip</th>
-            </tr>
-        </thead>`;
-        const tbody = document.createElement('tbody');
-        rows.forEach(r => {
-            const tr = document.createElement('tr');
-            if (r.isClosed) tr.style.background = '#fff5f5';
-            if (this.currentCenter && (this.currentCenter.id == r.id)) tr.style.background = '#f1f9ff';
-            tr.style.cursor = 'pointer';
-            tr.onclick = () => {
-                const dd = document.getElementById('centerSelect');
-                if (dd) { dd.value = r.id; dd.dispatchEvent(new Event('change')); }
-                modal.remove();
-            };
-
-            const check = (v) => v ? '<span style="color:#28a745">✓</span>' : (r.isClosed ? '<span style="color:#bbb">-</span>' : '<span style="color:#dc3545">✗</span>');
-            const num = (v) => (v > 0) ? v : (r.isClosed ? '<span style="color:#bbb">0</span>' : '<span style="color:#dc3545">0</span>');
-            
-            tr.innerHTML = `
-                <td>${r.isClosed ? `<span style="color:#dc3545; font-size:10px; font-weight:bold;">[CLOSED]</span> ` : ''}${esc(shortCenterName(r.name))}</td>
-                <td style="text-align:center">${r.isClosed ? '' : `<a href="${r.liveUrl}" target="_blank" onclick="event.stopPropagation();">🔗</a>`}</td>
-                <td style="text-align:center">${check(r.hasAbout)}</td>
-                <td style="text-align:center">${check(r.hasStaff)}</td>
-                <td style="text-align:center">${num(r.leaderCount)}</td>
-                <td style="text-align:center">${num(r.schedCount)}</td>
-                <td style="text-align:center">${num(r.photoCount)}</td>
-                <td style="text-align:center">${check(r.hasHours)}</td>
-                <td style="text-align:center">${r.facilityCount}</td>
-                <td style="text-align:center">${r.programCount}</td>
-                <td style="text-align:center">${check(r.hasFooterPhoto)}</td>
-                <td style="text-align:center">${check(r.hasFooterScripture)}</td>
-            `;
-            tbody.appendChild(tr);
-        });
-        table.appendChild(tbody);
-        tableWrap.appendChild(table);
-        statusTableSection.appendChild(tableWrap);
-
         const footerNote = document.createElement('div');
         footerNote.style.cssText = 'margin-top:24px; padding:15px; background:#f8f9fa; border:1px solid #eee; border-radius:8px; color:#666; font-size:12px; font-style:italic; line-height:1.5;';
         footerNote.innerHTML = `
-            <b>Status Key:</b><br>
-            • Red (✗) items indicate missing data for <b>OPEN</b> centers that require immediate attention.<br>
-            • Light red rows indicate centers currently marked as <b>CLOSED</b> (excluded from "Needs Attention" counts).<br>
-            • Use the <b>Command Center</b> at the top of this modal for direct links to all management portals.
+            <b>Audit Summary:</b><br>
+            • Red (✗) items indicate missing data for <b>OPEN</b> centers that require attention before launch.<br>
+            • This view is synchronized with the <b>"Copy All"</b> report tool to ensure data consistency.<br>
+            • Use the <b>Command Center</b> for direct links to all management portals.
         `;
 
         const footerSection = document.createElement('div');
@@ -3499,6 +5544,24 @@ class RSYCGeneratorV2 {
             schedules
         });
 
+        const eventsPreviewSection = document.createElement('div');
+        eventsPreviewSection.innerHTML = this.generateEmailAuditEvents({
+            centers,
+            events
+        });
+
+        const infoPagesPreviewSection = document.createElement('div');
+        infoPagesPreviewSection.innerHTML = this.generateEmailAuditInfoPages({
+            centers,
+            informationalPages
+        });
+
+        const storiesPreviewSection = document.createElement('div');
+        storiesPreviewSection.innerHTML = this.generateEmailAuditStories({
+            centers,
+            stories
+        });
+
         const staffPreviewSection = document.createElement('div');
         staffPreviewSection.innerHTML = this.generateEmailAuditStaffTable({
             centers,
@@ -3506,56 +5569,71 @@ class RSYCGeneratorV2 {
         });
 
         const editorsPreviewSection = document.createElement('div');
-        editorsPreviewSection.innerHTML = '<div style="font-size:12px; color:#666;">Loading editors…</div>';
-        this.ensureEditorsCacheLoaded()
-            .then((editorsCache) => {
-                const stillMounted = document.getElementById('dataAuditModal');
-                if (!stillMounted) return;
-                editorsPreviewSection.innerHTML = this.generateEmailAuditEditorsTable({ editorsCache, leaders });
-            })
-            .catch(() => {
-                const stillMounted = document.getElementById('dataAuditModal');
-                if (!stillMounted) return;
-                editorsPreviewSection.innerHTML = '<div style="font-size:12px; color:#dc3545;">Failed to load editors.</div>';
-            });
+        editorsPreviewSection.innerHTML = '<div style="font-size:12px; color:#666;">Loading editors Permissions…</div>';
+        editorsPreviewSection.innerHTML = this.generateEmailAuditEditorsTable({ editorsCache, leaders });
 
         // Error Messages section
         const errorMessagesSection = document.createElement('div');
-        errorMessagesSection.style.cssText = 'padding: 20px; font-family: "Segoe UI", Tahoma, sans-serif;';
-        errorMessagesSection.innerHTML = `
-            <div style="margin-bottom: 30px;">
-                <h4 style="color: #333; font-size: 16px; font-weight: 600; margin: 0 0 16px 0; border-bottom: 2px solid #e0e0e0; padding-bottom: 8px;">Center Profile Error Message</h4>
-                <div style="padding: 40px 20px; background: #ffffff; border-radius: 12px; border: 1px solid #e0e0e0; text-align: center; font-family: 'Segoe UI', Tahoma, sans-serif; max-width: 500px; margin: 0 auto;">
-                    <div style="font-size: 48px; margin-bottom: 16px;">👋</div>
-                    <h2 style="color: #333; font-size: 24px; font-weight: 600; margin: 0 0 12px 0;">Thanks for stopping by!</h2>
-                    <p style="color: #666; font-size: 16px; line-height: 1.6; margin: 0;">This Center Profile page did not load successfully. Please refresh and try again.</p>
-                </div>
-            </div>
-            <div>
-                <h4 style="color: #333; font-size: 16px; font-weight: 600; margin: 0 0 16px 0; border-bottom: 2px solid #e0e0e0; padding-bottom: 8px;">Unit Grid Error Message</h4>
-                <div style="padding: 40px 20px; background: #ffffff; border-radius: 12px; border: 1px solid #e0e0e0; text-align: center; font-family: 'Segoe UI', Tahoma, sans-serif; max-width: 500px; margin: 0 auto;">
-                    <div style="font-size: 48px; margin-bottom: 16px;">👋</div>
-                    <h2 style="color: #333; font-size: 24px; font-weight: 600; margin: 0 0 12px 0;">Thanks for stopping by!</h2>
-                    <p style="color: #666; font-size: 16px; line-height: 1.6; margin: 0;">This Unit Grid page did not load successfully. Please refresh and try again.</p>
-                </div>
-            </div>
-        `;
+        errorMessagesSection.innerHTML = this.generateEmailAuditErrorMessages();
 
-        accordion.appendChild(makeAccordionItem('status', 'All Centers Status Detail', statusTableSection, true));
-        accordion.appendChild(makeAccordionItem('overview', 'Overview', overviewWrap, false));
-        accordion.appendChild(makeAccordionItem('insights', 'Quick Insights', insightsWrap, false));
+        accordion.appendChild(makeAccordionItem('status', 'All Centers Status Detail', overviewWrap, true));
+        accordion.appendChild(makeAccordionItem('filters', 'Filter & Tag Associations', filtersWrap, false));
         accordion.appendChild(makeAccordionItem('command', 'Master Control Center', commandCenterWrap, false));
+        accordion.appendChild(makeAccordionItem('datamodels', 'Data Models (Center Profile Fields)', this.createDataModelsSection(), false));
+        accordion.appendChild(makeAccordionItem('centerProfileSections', 'Center Profile Sections', this.createCenterProfileSectionsSection(), false));
         accordion.appendChild(makeAccordionItem('actions', 'Territorial Action List', actionListSection, false));
-        accordion.appendChild(makeAccordionItem('previewSchedules', 'Program Schedules (Preview)', schedulesPreviewSection, false));
-        accordion.appendChild(makeAccordionItem('previewStaff', 'Staff Table (Preview)', staffPreviewSection, false));
-        accordion.appendChild(makeAccordionItem('previewEditors', 'Editors (Preview)', editorsPreviewSection, false));
+        accordion.appendChild(makeAccordionItem('divisional', 'All Divisional Audit Reports', divisionalReportsWrap, false));
+        accordion.appendChild(makeAccordionItem('previewSchedules', 'Program Schedules (Full Catalog)', schedulesPreviewSection, false));
+        accordion.appendChild(makeAccordionItem('previewEvents', 'Upcoming Events (Full Catalog)', eventsPreviewSection, false));
+        accordion.appendChild(makeAccordionItem('previewStories', 'Published Stories (Full Catalog)', storiesPreviewSection, false));
+        accordion.appendChild(makeAccordionItem('previewInfoPages', 'Informational Pages (Full Catalog)', infoPagesPreviewSection, false));
+        accordion.appendChild(makeAccordionItem('previewStaff', 'Staff Table (Full Preview)', staffPreviewSection, false));
+        accordion.appendChild(makeAccordionItem('previewEditors', 'Editors (Full Permissions)', editorsPreviewSection, false));
         accordion.appendChild(makeAccordionItem('errorMessages', 'Front-End Error Messages', errorMessagesSection, false));
         accordion.appendChild(makeAccordionItem('footer', 'Notes', footerSection, false));
 
         modalInner.appendChild(accordion);
 
+        // Add delegating click listener for center switching throughout the modal
+        modalInner.addEventListener('click', (e) => {
+            const link = e.target.closest('.center-audit-link');
+            if (link) {
+                const id = link.dataset.centerId;
+                this.switchCenter(id);
+                
+                // Close the modal as requested so the user can see the profile switch
+                modal.remove();
+            }
+        });
+
         modal.appendChild(modalInner);
         document.body.appendChild(modal);
+    }
+
+    generateEmailAuditErrorMessages() {
+        return `
+            <div style="font-family: 'Segoe UI', Tahoma, sans-serif; color: #333; max-width: 900px; line-height: 1.5;">
+                <div style="background-color: #f4f4f4; padding: 14px; border-left: 6px solid #d93d3d; font-weight: bold; margin-bottom: 25px; font-size: 18px; color: #333; display: block; width: 100%;">🚧 RSYC FRONT-END ERROR MESSAGES (SYSTEM PREVIEW)</div>
+                
+                <div style="margin-bottom: 35px; border-bottom: 1px solid #eee; padding-bottom: 20px;">
+                    <h4 style="color: #333; font-size: 14px; font-weight: 600; margin: 0 0 12px 0; text-transform: uppercase;">1. Center Profile Error Message</h4>
+                    <div style="padding: 30px 20px; background: #ffffff; border-radius: 12px; border: 1px solid #e0e0e0; text-align: center; max-width: 450px; margin: 0 auto;">
+                        <div style="font-size: 40px; margin-bottom: 12px;">👋</div>
+                        <h2 style="color: #333; font-size: 20px; font-weight: 600; margin: 0 0 10px 0;">Thanks for stopping by!</h2>
+                        <p style="color: #666; font-size: 14px; line-height: 1.5; margin: 0;">This Center Profile page did not load successfully. Please refresh and try again.</p>
+                    </div>
+                </div>
+
+                <div style="margin-bottom: 20px;">
+                    <h4 style="color: #333; font-size: 14px; font-weight: 600; margin: 0 0 12px 0; text-transform: uppercase;">2. Unit Grid Error Message</h4>
+                    <div style="padding: 30px 20px; background: #ffffff; border-radius: 12px; border: 1px solid #e0e0e0; text-align: center; max-width: 450px; margin: 0 auto;">
+                        <div style="font-size: 40px; margin-bottom: 12px;">👋</div>
+                        <h2 style="color: #333; font-size: 20px; font-weight: 600; margin: 0 0 10px 0;">Thanks for stopping by!</h2>
+                        <p style="color: #666; font-size: 14px; line-height: 1.5; margin: 0;">This Unit Grid page did not load successfully. Please refresh and try again.</p>
+                    </div>
+                </div>
+            </div>
+        `;
     }
 
     generateEmailAuditReport(data) {
@@ -3715,6 +5793,7 @@ class RSYCGeneratorV2 {
                                 <h4 style="font-size: 15px; color: #242424; border-bottom: 1px solid #ddd; padding-bottom: 5px; margin-bottom: 15px;">💡 Best Practices</h4>
                                 <div style="font-size: 12px; line-height: 1.6; color: #555;">
                                     <b>Schedules:</b> List recurring programs separately (ACT Prep, Karate, Afterschool).<br>
+                                    <b>Events & Camps:</b> <u>Camps should be listed as Events</u>, not just as a program schedule item. Submit all one-time and recurring events (Summer Camp, Spring Break, Community Fairs) as Events.<br>
                                     <b>Season:</b> Add start/end dates or months running plus registration opens.<br>
                                     <b>Details:</b> Add ages served, fees, transportation notes, and holiday/closure disclaimers when relevant.<br>
                                     <b>Narrative:</b> Include activities, meals/snacks, transportation, and expectations (orientation, required forms).
@@ -3739,6 +5818,7 @@ class RSYCGeneratorV2 {
                         <div style="margin-bottom: 10px; display: block;">• <strong>Explainer/About Video:</strong> A territorial promotional video is provided as the default until a local video is uploaded.</div>
                         <div style="display: block;">• <strong>Footer Content:</strong> Local footer photos and scripture provide a unique city-specific touch and can be updated as often as desired to keep the site fresh.</div>
                         <div style="margin-top: 12px; display: block;"><strong>Best Practices From Live Profiles:</strong></div>
+                        <div style="margin-top: 6px; display: block;">• <strong>Events & Camps:</strong> <u>Camps should be listed as Events</u>, not just as a program schedule item.</div>
                         <div style="margin-top: 6px; display: block;">• <strong>About This Center:</strong> lead with who you serve (ages/grades) and core programs (after-school, camps, tutoring, arts/sports), then outcomes (academic support, character/leadership, life skills, faith/values).</div>
                         <div style="margin-top: 6px; display: block;">• <strong>Program Schedules:</strong> list each program separately with title/subtitle, days, time range, timezone, and frequency.</div>
                         <div style="margin-top: 6px; display: block;">• <strong>Season & Registration:</strong> include start/end dates or months running plus when registration typically opens.</div>
@@ -3854,6 +5934,9 @@ class RSYCGeneratorV2 {
             { key: 'facilities', name: 'Facility Features' },
             { key: 'programs', name: 'Featured Programs' },
             { key: 'staff', name: 'Staff & Community Leaders' },
+            { key: 'events', name: 'Upcoming Events' },
+            { key: 'infopages', name: 'Information & Policies' },
+            { key: 'stories', name: 'Impact Stories' },
             { key: 'nearby', name: 'Nearby Centers' },
             { key: 'parents', name: 'For Parents' },
             { key: 'youth', name: 'For Youth' },
@@ -4172,7 +6255,14 @@ ${JSON.stringify(this.currentCenter, null, 2)}
         const methodName = 'generate' + sectionKey.charAt(0).toUpperCase() + sectionKey.slice(1);
         
         try {
-            const output = this.templateEngine.generateSection(sectionKey, centerData);
+            // Get currently enabled sections from checkboxes
+            const enabledSections = Array.from(
+                document.querySelectorAll('.section-checkboxes input[type="checkbox"]:checked')
+            ).map(cb => cb.value);
+            
+            // Add enabled sections to data so generateNavigation can access it
+            const dataWithSections = { ...centerData, __enabledSections: enabledSections };
+            const output = this.templateEngine.generateSection(sectionKey, dataWithSections);
             
             if (output && output.trim()) {
                 titleEl.textContent = `Output: ${this.currentCenter.name || this.currentCenter.Title} - ${sectionKey}`;
@@ -4223,6 +6313,14 @@ ${JSON.stringify(this.currentCenter, null, 2)}
                 titleEl.textContent = `Full Page Output: ${centerName} (No Data)`;
                 codeEl.value = `// Error: No data found for center\n// Center: ${centerName}\n// Center ID: ${centerId}`;
                 return;
+            }
+            
+            // Filter programs to show only featured programs for this center
+            if (centerData.programs && Array.isArray(centerData.programs)) {
+                const center = centerData.center;
+                const featuredProgramIds = center['FeaturedPrograms#Id'] || center.FeaturedProgramIds || [];
+                const featuredPrograms = centerData.programs.filter(p => featuredProgramIds.includes(p.Id));
+                centerData.programs = featuredPrograms;
             }
             
             const fullHTML = this.templateEngine.generateProfile(centerData, enabledSections);
@@ -4392,7 +6490,7 @@ ${JSON.stringify(this.currentCenter, null, 2)}
         output.push('');
         
         const sections = ['about', 'schedules', 'hours', 'facilities', 'programs', 
-                         'staff', 'nearby', 'parents', 'youth', 'volunteer', 'footerPhoto', 'contact'];
+                         'staff', 'events', 'infopages', 'stories', 'nearby', 'parents', 'youth', 'volunteer', 'footerPhoto', 'contact'];
         
         sections.forEach((section, index) => {
             const dataMap = this.getSectionDataMap(section);
@@ -4513,6 +6611,30 @@ ${JSON.stringify(this.currentCenter, null, 2)}
                     { icon: '👥', name: 'Leader Bio', file: 'RSYCLeaders.json', path: 'leaders[0].bio', example: '"John has 10 years..."' }
                 ],
                 placeholders: ['${leaders.length}', '${leader.name}', '${leader.title}', '${leader.bio}']
+            },
+            events: {
+                sources: [
+                    { icon: '📅', name: 'Events Array', file: 'RSYCEvents.json', path: 'events', example: '[{title, date, location...}]' },
+                    { icon: '📅', name: 'Event Title', file: 'RSYCEvents.json', path: 'event.title', example: '"Christmas Concert"' },
+                    { icon: '📸', name: 'Event Image', file: 'RSYCEvents.json', path: 'event.imageUrl', example: '"https://..."' }
+                ],
+                placeholders: ['${events.length}', '${evt.title}', '${evt.description}', '${evt.primaryButtonUrl}']
+            },
+            infopages: {
+                sources: [
+                    { icon: '📘', name: 'Info Pages Array', file: 'RSYCInformationalPages.json', path: 'informationalPages', example: '[{title, category, body...}]' },
+                    { icon: '📘', name: 'Page Title', file: 'RSYCInformationalPages.json', path: 'page.title', example: '"Safety Guidelines"' },
+                    { icon: '📘', name: 'Category', file: 'RSYCInformationalPages.json', path: 'page.category', example: '"Safety"' }
+                ],
+                placeholders: ['${informationalPages.length}', '${page.title}', '${page.body}', '${page.externalUrl}']
+            },
+            stories: {
+                sources: [
+                    { icon: '📖', name: 'Stories Array', file: 'RSYCStories.json', path: 'stories', example: '[{title, body, imageUrl...}]' },
+                    { icon: '📖', name: 'Story Title', file: 'RSYCStories.json', path: 'story.title', example: '"Mark\'s Journey"' },
+                    { icon: '📸', name: 'Story Image', file: 'RSYCStories.json', path: 'story.imageUrl', example: '"https://..."' }
+                ],
+                placeholders: ['${stories.length}', '${story.title}', '${story.body}', '${story.imageUrl}']
             },
             nearby: {
                 sources: [
@@ -4657,7 +6779,7 @@ ${JSON.stringify(this.currentCenter, null, 2)}
         
         // Get all section templates
         const sections = ['about', 'schedules', 'hours', 'facilities', 'programs', 
-                         'staff', 'nearby', 'parents', 'youth', 'volunteer', 'footerPhoto', 'contact'];
+                         'staff', 'events', 'infopages', 'stories', 'nearby', 'parents', 'youth', 'volunteer', 'footerPhoto', 'contact'];
         
         const allTemplates = [];
         
@@ -5245,12 +7367,14 @@ document.addEventListener('keydown', function(e) {
         document.getElementById('generateHTML').disabled = false;
         document.getElementById('copyHTML').disabled = false;
         document.getElementById('downloadHTML').disabled = false;
+        document.getElementById('downloadWithOG').disabled = false;
     }
 
     disableButtons() {
         document.getElementById('generateHTML').disabled = true;
         document.getElementById('copyHTML').disabled = true;
         document.getElementById('downloadHTML').disabled = true;
+        document.getElementById('downloadWithOG').disabled = true;
         // Note: viewDataStructure is always enabled (shows templates when no center selected)
     }
 
@@ -5265,6 +7389,7 @@ document.addEventListener('keydown', function(e) {
 // Initialize app when DOM is ready
 document.addEventListener('DOMContentLoaded', () => {
     window.rsycApp = new RSYCGeneratorV2();
+    window.rsycGen = window.rsycApp;  // Alias for template functions to access generator instance
     
     // ADDED 2025-11-15: Toggle advanced controls
     const toggleBtn = document.getElementById('toggleAdvanced');

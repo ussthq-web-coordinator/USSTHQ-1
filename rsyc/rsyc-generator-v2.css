@@ -711,3 +711,56 @@ body {
 }
 /* === END MINIMAL HEADER LAYOUT === */
 
+/* === PRINT STYLING === */
+@media print {
+    /* Reduce font size of center-provided volunteer text in print view */
+    #rsyc-modal-volunteer [data-volunteer-text] {
+        font-size: 0.875rem !important;
+    }
+
+    /* Reduce heading sizes in volunteer modal for print */
+    #rsyc-modal-volunteer h2 {
+        font-size: 1.2rem;
+    }
+
+    #rsyc-modal-volunteer h3 {
+        font-size: 1rem;
+    }
+
+    /* Reduce list item text size for better print formatting */
+    #rsyc-modal-volunteer ul,
+    #rsyc-modal-volunteer ol {
+        font-size: 0.875rem;
+    }
+
+    #rsyc-modal-volunteer p {
+        font-size: 0.875rem;
+    }
+}
+    /* Reduce event modal text sizes for print */
+    @media print {
+        div[id^="rsyc-modal-event-"] .rsyc-modal-body,
+        div[id^="rsyc-modal-event-"] .rsyc-modal-body p,
+        div[id^="rsyc-modal-event-"] .rsyc-modal-body div {
+            font-size: 0.75rem !important;
+        }
+
+        div[id^="rsyc-modal-event-"] .rsyc-modal-body h2 {
+            font-size: 1rem !important;
+        }
+
+        div[id^="rsyc-modal-event-"] .rsyc-modal-body strong {
+            font-size: 0.8rem !important;
+        }
+
+        div[id^="rsyc-modal-event-"] .rsyc-modal-header h2 {
+            font-size: 1.2rem !important;
+        }
+
+        div[id^="rsyc-modal-event-"] button,
+        div[id^="rsyc-modal-event-"] a.btn {
+            display: none !important;
+        }
+    }
+/* === END PRINT STYLING === */
+

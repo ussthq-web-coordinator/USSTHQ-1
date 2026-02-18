@@ -1,0 +1,21 @@
+@media (min-width: 992px) {
+  .rsyc-scroll-center {
+    max-width: 1400px;
+    margin-left: auto;
+    margin-right: auto;
+    width: 100%;
+    display: flex;
+    justify-content: flex-start;
+  }
+}
+
+/* For mobile/tablet, let it be full width */
+@media (max-width: 991px) {
+  .rsyc-scroll-center {
+    width: 100%;
+    margin-left: 0;
+    margin-right: 0;
+    display: flex;
+    justify-content: flex-start;
+  }
+}

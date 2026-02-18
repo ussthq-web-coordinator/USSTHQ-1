@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RSYC Center Profile</title>
+    
+    <!-- Open Graph Meta Tags (populated by JavaScript) -->
+    <meta property="og:title" content="" id="og-title">
+    <meta property="og:description" content="" id="og-description">
+    <meta property="og:image" content="https://s3.amazonaws.com/uss-cache.salvationarmy.org/f432e3f1-79a6-4dfe-82c6-5c93c55e6b09_Charlotte+NC-04489.jpg" id="og-image">
+    <meta property="og:image:width" content="1200" id="og-image-width">
+    <meta property="og:image:height" content="630" id="og-image-height">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="Red Shield Youth Centers">
+    <meta property="og:url" content="" id="og-url">
+    
+    <!-- Twitter Card Meta Tags -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="" id="twitter-title">
+    <meta name="twitter:description" content="" id="twitter-description">
+    <meta name="twitter:image" content="https://s3.amazonaws.com/uss-cache.salvationarmy.org/f432e3f1-79a6-4dfe-82c6-5c93c55e6b09_Charlotte+NC-04489.jpg" id="twitter-image">
+    
+    <!-- Standard Meta -->
+    <meta name="description" content="" id="meta-description">
+    
+    <link rel="stylesheet" href="rsyc-generator-v2.css">
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: #f8f9fa;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        .loading {
+            padding: 40px;
+            text-align: center;
+            color: #666;
+        }
+        .error {
+            padding: 40px;
+            background: #ffe6e6;
+            color: #990000;
+            border-radius: 8px;
+            border: 1px solid #ffcccc;
+        }
+    </style>
+</head>
+<body>
+    <div class="container" id="preview">
+        <div class="loading">Loading profile...</div>
+    </div>
+
+    <script src="rsyc-data.js"></script>
+    <script src="rsyc-staff-order.js"></script>
+    <script src="rsyc-templates.js"></script>
+    <script>
+        /**
+         * RSYC Profile Preview Page
+         * Renders a profile with proper OG tags for social media sharing
+         * Usage: /rsyc/rsyc-profile-preview.html?centerId=123
+         */
+
+        async function loadAndRenderProfile() {
+            try {
+                // Get center ID from URL params
+                const params = new URLSearchParams(window.location.search);
+                const centerId = params.get('centerId');
+
+                if (!centerId) {
+                    throw new Error(`
+                        Missing centerId parameter in URL.
+                        
+                        This page should be accessed via the share buttons on an embedded profile.
+                        
+                        Or manually use: ?centerId=123 (replace 123 with actual center ID)
+                        
+                        Example: https://thisishoperva.org/rsyc/rsyc-profile-preview.html?centerId=2
+                    `);
+                }
+
+                console.log('Loading profile for center:', centerId);
+
+                // Initialize data loader
+                const dataLoader = new RSYCDataLoader();
+                await dataLoader.loadCriticalData();
+                await dataLoader.loadOptionalData();
+
+                // Get center data
+                const centerData = await dataLoader.getCenterData(centerId);
+                if (!centerData || !centerData.center) {
+                    throw new Error(`Center not found: ${centerId}`);
+                }
+
+                const center = centerData.center;
+                console.log('Center loaded:', center.Title);
+
+                // Filter programs to show only featured programs for this center
+                if (centerData.programs && Array.isArray(centerData.programs)) {
+                    const featuredProgramIds = center['FeaturedPrograms#Id'] || center.FeaturedProgramIds || [];
+                    console.log('Center featured program IDs:', featuredProgramIds);
+                    
+                    const featuredPrograms = centerData.programs.filter(p => featuredProgramIds.includes(p.Id));
+                    console.log(`Filtered programs: ${centerData.programs.length} total → ${featuredPrograms.length} featured`);
+                    centerData.programs = featuredPrograms;
+                }
+
+                // Build OG tag values
+                const city = center.city || 'Your Community';
+                const state = center.state || '';
+                const cityState = state ? `${city}, ${state}` : city;
+                const pageTitle = `${center.Title} - Red Shield Youth Centers`;
+                const pageDescription = `A safe, welcoming space in ${cityState} offering youth programs, activities, mentoring, and community support for kids and teens.`;
+                const ogImageUrl = 'https://s3.amazonaws.com/uss-cache.salvationarmy.org/f432e3f1-79a6-4dfe-82c6-5c93c55e6b09_Charlotte+NC-04489.jpg';
+                const pageUrl = center.websiteURL || 'https://www.redshieldyouth.org/';
+
+                // Update meta tags IMMEDIATELY (before rendering)
+                document.title = pageTitle;
+                document.getElementById('og-title').setAttribute('content', pageTitle);
+                document.getElementById('og-description').setAttribute('content', pageDescription);
+                document.getElementById('og-image').setAttribute('content', ogImageUrl);
+                document.getElementById('og-url').setAttribute('content', pageUrl);
+                document.getElementById('twitter-title').setAttribute('content', pageTitle);
+                document.getElementById('twitter-description').setAttribute('content', pageDescription);
+                document.getElementById('twitter-image').setAttribute('content', ogImageUrl);
+                document.getElementById('meta-description').setAttribute('content', pageDescription);
+
+                console.log('OG tags updated:');
+                console.log('  Title:', pageTitle);
+                console.log('  Description:', pageDescription);
+                console.log('  Image:', ogImageUrl);
+                console.log('  URL:', pageUrl);
+
+                // Generate profile HTML
+                const templateEngine = new RSYCTemplates();
+                const html = templateEngine.generateProfile(centerData, [
+                    'hero', 'about', 'schedules', 'hours', 'facilities', 'programs',
+                    'staff', 'events', 'stories', 'nearby', 'parents', 'youth', 'volunteer', 'footerPhoto', 'contact'
+                ]);
+
+                // Render profile
+                const container = document.getElementById('preview');
+                const profileDiv = document.createElement('div');
+                profileDiv.className = 'rsyc-profile';
+                profileDiv.innerHTML = html;
+                container.innerHTML = '';
+                container.appendChild(profileDiv);
+
+                // Add instructions for sharing this preview page
+                const instrDiv = document.createElement('div');
+                instrDiv.style.cssText = `
+                    margin-top: 24px;
+                    padding: 16px;
+                    background: #e8f4f8;
+                    border: 1px solid #b3d9e8;
+                    border-radius: 8px;
+                    font-size: 13px;
+                    color: #004085;
+                    line-height: 1.6;
+                `;
+                instrDiv.innerHTML = `
+                    <strong>📱 Sharing This Profile on Social Media</strong><br>
+                    <br>
+                    <strong>Important:</strong> To share this profile with proper preview images and descriptions, <strong>share this page URL directly</strong>:<br>
+                    <br>
+                    <code style="background: white; padding: 6px 8px; border-radius: 4px; display: inline-block; margin: 8px 0; font-family: monospace; font-size: 12px;">
+                        ${window.location.href}
+                    </code>
+                    <br>
+                    <br>
+                    <small>
+                    ✅ This page has proper Open Graph tags that social platforms (Facebook, Twitter, LinkedIn) will recognize<br>
+                    ✅ The preview image and description will display correctly when you share this link<br>
+                    ℹ️ Copy the URL above and paste it into your social media post<br>
+                    </small>
+                `;
+                container.appendChild(instrDiv);
+
+            } catch (error) {
+                console.error('Error loading profile:', error);
+                document.getElementById('preview').innerHTML = `
+                    <div class="error">
+                        <strong>Error loading profile:</strong> ${error.message}
+                    </div>
+                `;
+            }
+        }
+
+        // Load profile when DOM is ready
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', loadAndRenderProfile);
+        } else {
+            loadAndRenderProfile();
+        }
+    </script>
+</body>
+</html>

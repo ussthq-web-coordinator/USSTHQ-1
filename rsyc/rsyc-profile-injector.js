@@ -8,6 +8,17 @@
 (function() {
     console.log('[RSYCProfileInjector] Initializing...');
 
+    // Inject og:image meta tag into head
+    const ogImageUrl = 'https://s3.amazonaws.com/uss-cache.salvationarmy.org/f432e3f1-79a6-4dfe-82c6-5c93c55e6b09_Charlotte+NC-04489.jpg';
+    let ogImageMeta = document.querySelector('meta[property="og:image"]');
+    if (!ogImageMeta) {
+        ogImageMeta = document.createElement('meta');
+        ogImageMeta.setAttribute('property', 'og:image');
+        document.head.appendChild(ogImageMeta);
+    }
+    ogImageMeta.setAttribute('content', ogImageUrl);
+    console.log('[RSYCProfileInjector] Injected og:image meta tag:', ogImageUrl);
+
     // Stop if in admin environment to prevent interference with CMS editor
     if (window.location.href.includes('/admin/') || window.location.hostname.includes('webmanager')) {
         console.log('[RSYCProfileInjector] Admin environment detected, skipping injection.');
@@ -19,7 +30,7 @@
      * Usage: window.RSYCProfileConfig.enabledSections = ['hero', 'about', 'schedules'];
      */
     window.RSYCProfileConfig = window.RSYCProfileConfig || {
-        enabledSections: ['hero', 'about', 'schedules', 'hours', 'facilities', 'programs', 'staff', 'events', 'stories', 'nearby', 'parents', 'youth', 'volunteer', 'footerPhoto', 'contact']
+        enabledSections: ['hero', 'about', 'navigation', 'schedules', 'hours', 'facilities', 'programs', 'midsectionPhoto', 'staff', 'events', 'infopages', 'stories', 'nearby', 'parents', 'youth', 'volunteer', 'footerPhoto', 'contact']
     };
 
     /**
@@ -120,6 +131,16 @@
                 }
             };
         }
+        if (!window.printRSYCModal) {
+            window.printRSYCModal = function(type) {
+                console.log('[RSYCProfileInjector] printRSYCModal:', type);
+                // The actual implementation is in rsyc-templates.js, this is a placeholder
+                // but usually rsyc-templates.js is loaded first.
+                if (typeof window.printRSYCModal === 'function' && window.printRSYCModal.toString().includes('window.open')) {
+                    // It's already the full version
+                }
+            };
+        }
         if (!window.toggleRSYCAccordion) {
             window.toggleRSYCAccordion = function(accordionId) {
                 const content = document.getElementById(accordionId);
@@ -155,6 +176,88 @@
             };
         }
         console.log('[RSYCProfileInjector] ✓ Modal functions ensured');
+    }
+
+    /**
+     * Update page OG tags with center information when profile is loaded
+     * 
+     * IMPORTANT: This updates the parent page's OG tags for display only.
+     * Social media crawlers (Facebook, Twitter, LinkedIn) don't execute JavaScript,
+     * so they won't see these dynamically updated tags.
+     * 
+     * For social sharing, use the shareable preview URL:
+     * /rsyc/rsyc-profile-preview.html?centerId=[id]
+     * (The share buttons below the profile will link to this)
+     */
+    function updateOGTagsForCenter(center) {
+        if (!center) return;
+
+        try {
+            console.log('[RSYCProfileInjector] Center object for OG tags:', center);
+            
+            // Handle various possible field names for center properties
+            const title = center.Title || center.title || center.name || 'Red Shield Youth Center';
+            const city = center.city || center.City || 'Your Community';
+            const state = center.state || center.State || '';
+            const websiteUrl = center.websiteURL || center.website || center.websiteUrl || 'https://www.redshieldyouth.org/';
+            
+            const cityState = state ? `${city}, ${state}` : city;
+            const pageTitle = `${title} - Red Shield Youth Centers`;
+            const pageDescription = `A safe, welcoming space in ${cityState} offering youth programs, activities, mentoring, and community support for kids and teens.`;
+            const ogImageUrl = 'https://s3.amazonaws.com/uss-cache.salvationarmy.org/f432e3f1-79a6-4dfe-82c6-5c93c55e6b09_Charlotte+NC-04489.jpg';
+            
+            console.log('[RSYCProfileInjector] OG Tag values:');
+            console.log('  Title:', pageTitle);
+            console.log('  Description:', pageDescription);
+            console.log('  Image:', ogImageUrl);
+            console.log('  URL:', websiteUrl);
+
+            // Update or create OG meta tags
+            const metaTags = {
+                'og:title': pageTitle,
+                'og:description': pageDescription,
+                'og:image': ogImageUrl,
+                'og:image:width': '1200',
+                'og:image:height': '630',
+                'og:url': websiteUrl
+            };
+
+            Object.entries(metaTags).forEach(([property, content]) => {
+                let element = document.querySelector(`meta[property="${property}"]`);
+                if (!element) {
+                    element = document.createElement('meta');
+                    element.setAttribute('property', property);
+                    document.head.appendChild(element);
+                }
+                element.setAttribute('content', content);
+                console.log(`  [${property}] = ${content}`);
+            });
+
+            // Update Twitter Card tags
+            const twitterTags = {
+                'twitter:title': pageTitle,
+                'twitter:description': pageDescription,
+                'twitter:image': ogImageUrl,
+                'twitter:card': 'summary_large_image'
+            };
+
+            Object.entries(twitterTags).forEach(([name, content]) => {
+                let element = document.querySelector(`meta[name="${name}"]`);
+                if (!element) {
+                    element = document.createElement('meta');
+                    element.setAttribute('name', name);
+                    document.head.appendChild(element);
+                }
+                element.setAttribute('content', content);
+            });
+
+            // Update page title
+            document.title = pageTitle;
+
+            console.log('[RSYCProfileInjector] ✅ OG tags updated for:', title);
+        } catch (error) {
+            console.warn('[RSYCProfileInjector] Error updating OG tags:', error);
+        }
     }
 
     /**
@@ -228,8 +331,124 @@
 
             console.log('[RSYCProfileInjector] Center found:', centerData.center.name);
 
+            // Filter programs to show only featured programs for this center
+            if (centerData.programs && Array.isArray(centerData.programs)) {
+                const center = centerData.center;
+                const featuredProgramIds = center['FeaturedPrograms#Id'] || center.FeaturedProgramIds || [];
+                console.log('[RSYCProfileInjector] Center featured program IDs:', featuredProgramIds);
+                
+                const featuredPrograms = centerData.programs.filter(p => featuredProgramIds.includes(p.Id));
+                console.log(`[RSYCProfileInjector] Filtered programs: ${centerData.programs.length} total → ${featuredPrograms.length} featured`);
+                centerData.programs = featuredPrograms;
+            }
+
             // Generate profile HTML using the template engine (exactly like generator.js)
             const templateEngine = new window.RSYCTemplates();
+            
+            // --- START HOTFIX: Essential Patch for Midsection Photo & Navigation Support ---
+            // This ensures features render even if the browser loads a cached/stale rsyc-templates.js
+            
+            // 1. Polyfill generateMidsectionPhoto
+            if (typeof templateEngine.generateMidsectionPhoto !== 'function' || true) { // FORCE OVERRIDE
+                console.log('[RSYCProfileInjector] Hot-patching generateMidsectionPhoto');
+                templateEngine.generateMidsectionPhoto = function(data) {
+                    const imageUrl = 'https://s3.amazonaws.com/uss-cache.salvationarmy.org/d731081c-1e2c-4ffb-9a22-595ce1e1effc_Youth+arriving+from+school+to+Red+Shield+Youth+Center+-CNC-04489.jpg';
+                    return `<section id="midsectionPhoto" class="freeTextArea u-centerBgImage section u-coverBgImage" style="min-height: 400px; background-image: url('${imageUrl}'); background-size: cover; background-position: center !important; display: block !important; visibility: visible !important; opacity: 1 !important;"><div class="u-positionRelative" style="min-height: 400px; display: block !important; visibility: visible !important; opacity: 1 !important;"></div></section>`;
+                };
+            }
+
+            // 2. Polyfill generateNavigation
+            if (typeof templateEngine.generateNavigation !== 'function') {
+                console.log('[RSYCProfileInjector] Hot-patching generateNavigation');
+                templateEngine.generateNavigation = function(data) {
+                    const { __enabledSections } = data;
+                    if (!__enabledSections || !Array.isArray(__enabledSections)) return '';
+                    
+                    const navSections = __enabledSections.filter(key => 
+                        key !== 'hero' && key !== 'about' && key !== 'navigation' && 
+                        key !== 'footerPhoto' && key !== 'midsectionPhoto' && this.sections[key]
+                    );
+
+                    if (navSections.length === 0) return '';
+
+                    const navLinks = navSections.map(key => {
+                        const section = this.sections[key];
+                        const name = section ? (section.name || key) : key;
+                        return `<a href="${section.anchor}" class="btn btn-sm m-1" style="
+                            background-color: rgba(255, 255, 255, 0.15); 
+                            border: 1px solid rgba(255, 255, 255, 0.4); 
+                            color: #fff; 
+                            border-radius: 50px; 
+                            padding: 0.4rem 1.2rem; 
+                            font-weight: 600; 
+                            font-size: 0.9rem; 
+                            transition: all 0.2s ease; 
+                            backdrop-filter: blur(4px); 
+                            text-decoration: none; 
+                            display: inline-block;
+                        " onmouseover="this.style.backgroundColor='rgba(255, 255, 255, 0.25)'; this.style.transform='translateY(-2px)';" onmouseout="this.style.backgroundColor='rgba(255, 255, 255, 0.15)'; this.style.transform='translateY(0)';">${name}</a>`;
+                    }).join('');
+
+                    return `<div id="navigation" class="section u-sa-tealBg" style="background-color: #00929C !important; padding-bottom: 3rem; margin-top: -1.5rem;"><div class="container"><div class="row justify-content-center"><div class="col-12 col-lg-10 text-center"><p class="small mb-3 text-uppercase fw-bold text-white" style="letter-spacing: 1.5px; opacity: 0.85; font-size: 0.8rem;">Jump To Section</p><div class="d-flex flex-wrap justify-content-center gap-2">${navLinks}</div></div></div></div></div>`;
+                };
+            }
+
+            // 3. Ensure Metadata & Order
+            if (templateEngine.sections) {
+                if (!templateEngine.sections.navigation) templateEngine.sections.navigation = { name: 'Navigation', anchor: '#navigation', order: 2.5 };
+                if (!templateEngine.sections.midsectionPhoto) templateEngine.sections.midsectionPhoto = { name: 'Midsection Photo', anchor: '#midsectionPhoto', order: 10.5 };
+                
+                // Set explicit orders
+                if (templateEngine.sections.hero) templateEngine.sections.hero.order = 1;
+                if (templateEngine.sections.about) templateEngine.sections.about.order = 2;
+                if (templateEngine.sections.navigation) templateEngine.sections.navigation.order = 2.5;
+                if (templateEngine.sections.midsectionPhoto) templateEngine.sections.midsectionPhoto.order = 10.5;
+                if (templateEngine.sections.volunteer) templateEngine.sections.volunteer.order = 14;
+                if (templateEngine.sections.nearby) templateEngine.sections.nearby.order = 15;
+            }
+
+            // 4. Force using a sorted generator to guarantee order
+            // This replaces the old generatedProfile method which might not sort by 'order' property
+            templateEngine.generateProfile = function(centerData, enabledSections) {
+                console.log('[RSYC] using Hotfixed generateProfile');
+                const sections = [];
+                const sortedKeys = Object.keys(this.sections).sort((a, b) => 
+                    (this.sections[a].order || 0) - (this.sections[b].order || 0)
+                );
+                sortedKeys.forEach(sectionKey => {
+                    if (enabledSections.includes(sectionKey)) {
+                        const html = this.generateSection(sectionKey, { ...centerData, __enabledSections: enabledSections });
+                        if (html) sections.push(html);
+                    }
+                });
+                
+                // Add audit modal and joinCenter modal
+                let modals = '';
+                console.log('[RSYC] Checking for modal generation methods:');
+                console.log('[RSYC] generateAuditModal exists:', typeof this.generateAuditModal);
+                console.log('[RSYC] generateJoinCenterModal exists:', typeof this.generateJoinCenterModal);
+                
+                if (this.generateAuditModal) {
+                    modals += '\n\n' + this.generateAuditModal(enabledSections);
+                    console.log('[RSYC] Audit modal added to hotfixed profile');
+                }
+                if (this.generateJoinCenterModal) {
+                    modals += '\n\n' + this.generateJoinCenterModal();
+                    console.log('[RSYC] Join Center modal added to hotfixed profile');
+                } else {
+                    console.log('[RSYC] generateJoinCenterModal method not found!');
+                }
+                
+                return sections.join('\n\n') + modals;
+            };
+            // --- END HOTFIX ---
+
+            // Patch section order to ensure "Nearby" is below "Volunteer" (older templates might have wrong order)
+            if (templateEngine.sections && templateEngine.sections.volunteer && templateEngine.sections.nearby) {
+                templateEngine.sections.volunteer.order = 14;
+                templateEngine.sections.nearby.order = 15;
+                console.log('[RSYCProfileInjector] Patched section order: Volunteer(14), Nearby(15)');
+            }
             
             // Use sections from global config
             const contentSections = window.RSYCProfileConfig.enabledSections;
@@ -333,10 +552,301 @@ div #freeTextArea {
             targetElement.innerHTML = '';
             targetElement.appendChild(container);
 
+            // Augment nearby section if the loaded template hasn't been updated yet
+            (function augmentNearbySection() {
+                try {
+                    const center = centerData.center || {};
+                    const allCenters = centerData.allCenters || [];
+                    const nearbyEl = container.querySelector('#nearby');
+                    if (!nearbyEl) return; // nothing to do
+
+                    // If the template already contains the new nearby marker or pills, skip augmentation
+                    // Check for updated versions including the restore version
+                    const currentVersion = nearbyEl.dataset.rsycNearbyVersion;
+                    if (currentVersion === 'v2026-02-16' || currentVersion === 'v2026-02-16-restore' || nearbyEl.querySelector('.rsyc-nearby-pills')) {
+                        console.log('[RSYCProfileInjector] Nearby section already upgraded by templates; skipping augmentation');
+                        return;
+                    }
+
+                    const parentCorpsName = center.corpName || center.field_8 || '';
+                    const areaCommandName = center.areaCommand || center.field_17 || '';
+                    const divisionName = center.division || '';
+
+                    // Build pills HTML (Parent > Area > Division)
+                    let pillsHtml = '';
+                    if (parentCorpsName || areaCommandName || divisionName) {
+                        pillsHtml = `<div class="d-flex flex-wrap gap-2 align-items-center justify-content-center mt-4 rsyc-nearby-pills">` +
+                            (parentCorpsName ? `\n<span class="rsyc-parent-pill" style="display:inline-flex; align-items:center; gap:0.5rem; padding:0.45rem 0.75rem; border-radius:999px; background:#fff; border:1px solid #e6eef0; color:#2F4857; font-weight:600; box-shadow: 0 1px 3px rgba(0,0,0,0.04);">\n<i class=\"bi bi-building\" style=\"color:#D93D3D; font-size:1.05rem;\"></i>Parent Center: ${escapeHtml(parentCorpsName)}\n</span>` : '') +
+                            (areaCommandName ? `\n<span class="rsyc-area-pill" style="display:inline-flex; align-items:center; gap:0.5rem; padding:0.45rem 0.75rem; border-radius:999px; background:#fff; border:1px solid #e6eef0; color:#2F4857; font-weight:600; box-shadow: 0 1px 3px rgba(0,0,0,0.04);">\n<i class=\"bi bi-diagram-3\" style=\"color:#20B3A8; font-size:1.05rem;\"></i>Area: ${escapeHtml(areaCommandName)}\n</span>` : '') +
+                            (divisionName ? `\n<span class="rsyc-division-pill" style="display:inline-flex; align-items:center; gap:0.5rem; padding:0.45rem 0.75rem; border-radius:999px; background:#fff; border:1px solid #e6eef0; color:#2F4857; font-weight:600; box-shadow: 0 1px 3px rgba(0,0,0,0.04);">\n<i class=\"bi bi-diagram-2\" style=\"color:#1877F2; font-size:1.05rem;\"></i>Division: ${escapeHtml(divisionName)}\n</span>` : '') +
+                            `</div>`;
+                    }
+
+                    // Helper to normalize strings
+                    const norm = v => String(v || '').toLowerCase().trim();
+                    let matchedCenters = [];
+                    const seenIds = new Set();
+                    
+                    // Add current center to seen to exclude it
+                    const currentId = center.id ? String(center.id) : null;
+                    const currentSpId = center.sharePointId ? String(center.sharePointId) : null;
+                    if (currentId) seenIds.add(currentId);
+                    
+                    const addMatches = (matches) => {
+                        matches.forEach(c => {
+                            if (!c) return;
+                            const cId = c.id ? String(c.id) : (c.sharePointId ? String(c.sharePointId) : null);
+                            if (cId === currentId) return;
+                            if (currentSpId && c.sharePointId && String(c.sharePointId) === currentSpId) return;
+
+                            if (cId && !seenIds.has(cId)) {
+                                seenIds.add(cId);
+                                matchedCenters.push(c);
+                            } else if (!cId) {
+                                matchedCenters.push(c);
+                            }
+                        });
+                    };
+
+                    if (allCenters && Array.isArray(allCenters) && allCenters.length > 0) {
+                        // A. Area Command Matches
+                        if (areaCommandName) {
+                            const areaNorm = norm(areaCommandName);
+                            const areaMatches = allCenters.filter(c => {
+                                const candidates = [c.areaCommand, c.field_17, c.field_10, c.corpName, c.field_8, c.name, c.Title];
+                                return candidates.some(s => areaNorm && String(s || '').toLowerCase().trim().includes(areaNorm));
+                            });
+                            addMatches(areaMatches);
+                        }
+
+                        // B. Division Matches
+                        if (divisionName) {
+                            const divNorm = norm(divisionName);
+                            const divMatches = allCenters.filter(c => {
+                                return norm(c.division || '').includes(divNorm);
+                            });
+                            addMatches(divMatches);
+                        }
+                    }
+
+                    matchedCenters.sort((a, b) => (String(a.name || '').toLowerCase()).localeCompare(String(b.name || '').toLowerCase()));
+
+                    // Build center content: Area matches (Visible) + Other Division matches (Hidden) + Toggle Button
+                    let areaCardsHtml = '';
+                    let divisionOnlyCardsHtml = '';
+                    let toggleButtonHtml = '';
+                    let cardsHtml = ''; // Final combined HTML
+
+                    // Helper to render card
+                    const renderCard = (c, colClass) => {
+                         const displayName = String((c.name || 'Salvation Army Center')).replace(/^red\s+shield\s+youth\s+centers?\s+of\s+/i, '').replace(/^rsyc\s+/i, '');
+                        const centerName = escapeHtml(displayName);
+                        const city = c.city || '';
+                        const state = c.state || '';
+                        let slugName = String((c.name || '')).replace(/^red\s+shield\s+youth\s+centers?\s+of\s+/i, '').replace(/^rsyc\s+/i, '');
+                        const centerSlug = slugName.toLowerCase().replace(/\s+/g, '-').replace(/-+/g, '-').replace(/[^\w\-]/g, '');
+                        const centerUrl = `/redshieldyouth/${centerSlug}`;
+                        let imageUrl = 'https://s3.amazonaws.com/uss-cache.salvationarmy.org/9150a418-1c58-4d01-bf81-5753d1c608ae_salvation+army+building+1.png';
+                        if (c.photos && c.photos.length > 0) {
+                            const exteriorPhoto = c.photos.find(p => p.urlExteriorPhoto);
+                            if (exteriorPhoto) imageUrl = exteriorPhoto.urlExteriorPhoto;
+                            else {
+                                const photo = c.photos[0];
+                                imageUrl = photo.urlFacilityFeaturesPhoto || photo.urlProgramsPhoto || imageUrl;
+                            }
+                        }
+
+                        return `\n<div class="${colClass}" style="max-width:350px;">
+                            <a href="${centerUrl}" style="text-decoration:none; color:inherit; display:block;">
+                                <div class="card h-100 shadow-sm border-0" style="border-radius:12px; overflow:hidden;">
+                                    <div style="height:140px; overflow:hidden; position:relative;">
+                                        <img src="${imageUrl}" alt="${centerName}" loading="lazy" style="width:100%; height:100%; object-fit:cover;">
+                                        <div style="position:absolute; inset:0; background:linear-gradient(to top, rgba(0,0,0,0.6), transparent); display:flex; align-items:flex-end; padding:0.75rem;">
+                                            <h5 style="color:white; margin:0; font-size:1rem; font-weight:700; text-shadow:0 1px 2px rgba(0,0,0,0.3);">${centerName}</h5>
+                                        </div>
+                                    </div>
+                                    <div class="card-body p-3 bg-white text-start">
+                                        <div style="font-size:0.9rem; color:#555;">${escapeHtml(city)}${state ? ', ' + escapeHtml(state) : ''}</div>
+                                        <div style="margin-top:0.5rem; font-weight:600; color:#00929C; font-size:0.85rem;">View Center <i class="bi bi-arrow-right"></i></div>
+                                    </div>
+                                </div>
+                            </a>
+                        </div>`;
+                    };
+
+                    if (matchedCenters.length > 0) {
+                        let areaCenters = [];
+                        let otherDivisionCenters = [];
+
+                        if (areaCommandName) {
+                            const areaNorm = norm(areaCommandName);
+                            matchedCenters.forEach(c => {
+                                const candidates = [c.areaCommand, c.field_17, c.field_10, c.corpName, c.field_8];
+                                const isArea = candidates.some(s => areaNorm && String(s || '').toLowerCase().trim().includes(areaNorm));
+                                if (isArea) {
+                                    areaCenters.push(c);
+                                } else {
+                                    otherDivisionCenters.push(c);
+                                }
+                            });
+                        } else {
+                            otherDivisionCenters = matchedCenters;
+                        }
+
+                        // Render Logic
+                        if (areaCenters.length > 0) {
+                            areaCardsHtml = areaCenters.map(c => renderCard(c, 'col-md-4 mb-3')).join('');
+
+                            if (otherDivisionCenters.length > 0) {
+                                divisionOnlyCardsHtml = otherDivisionCenters.map(c => renderCard(c, 'col-md-4 mb-3')).join('');
+                                
+                                toggleButtonHtml = `
+                                <div class="text-center mt-4" id="rsyc-nearby-toggle-btn-container-inj" style="width:100%;">
+                                    <button id="rsyc-nearby-toggle-btn-inj" class="btn btn-outline-primary rounded-pill px-4" style="border-radius:50px; padding:8px 24px; border:1px solid #0d6efd; background:transparent; color:#0d6efd; font-weight:600;" onclick="
+                                        const divList = document.getElementById('rsyc-nearby-division-list-inj');
+                                        const btn = document.getElementById('rsyc-nearby-toggle-btn-inj');
+                                        if (divList.style.display === 'none') {
+                                            divList.style.display = 'flex';
+                                            btn.innerHTML = 'View Less <i class=\\'bi bi-chevron-up ms-1\\'></i>';
+                                        } else {
+                                            divList.style.display = 'none';
+                                            btn.innerHTML = 'View All in Division <i class=\\'bi bi-chevron-down ms-1\\'></i>';
+                                        }
+                                    ">
+                                        View All in Division <i class="bi bi-chevron-down ms-1"></i>
+                                    </button>
+                                </div>`;
+                            }
+                        } else {
+                             // Fallback: If no dedicated area list, show everything
+                             areaCardsHtml = matchedCenters.map(c => renderCard(c, 'col-md-4 mb-3')).join('');
+                        }
+
+                        const sectionTitle = `Other Centers in Your <em style="color:#20B3A8;">Area</em>`;
+
+                        cardsHtml = `
+                        <div style="margin-top:1rem; width:100%;">
+                            <h3 class="fw-bold mb-4 text-center">${sectionTitle}</h3>
+                            
+                            <!-- Area List (Default) -->
+                            <div id="rsyc-nearby-area-list-inj" class="row justify-content-center">
+                                ${areaCardsHtml}
+                            </div>
+
+                            <!-- Division List (Hidden) -->
+                            ${divisionOnlyCardsHtml ? `
+                            <div id="rsyc-nearby-division-list-inj" class="row justify-content-center" style="display:none; margin-top:0;">
+                                ${divisionOnlyCardsHtml}
+                            </div>
+                            ` : ''}
+
+                             <!-- Button -->
+                            ${toggleButtonHtml}
+                        </div>`;
+                    }
+
+                    // Insert pills and cards after the main row
+                    const innerContainer = nearbyEl.querySelector('.container > .container') || nearbyEl.querySelector('.container');
+                    const mainRow = innerContainer ? innerContainer.querySelector('.row') : null;
+                    if (mainRow) {
+                        const newContainer = document.createElement('div');
+                        newContainer.className = 'row justify-content-center mt-5 pt-5 border-top';
+                        newContainer.innerHTML = `<div class="col-12 text-center">${pillsHtml}</div><div class="col-12"><div id="rsyc-nearby-cards-wrap-inj">${cardsHtml}</div><div id="rsyc-nearby-pagination-inj" class="d-flex justify-content-center align-items-center gap-2 mt-3"></div></div>`;
+                        mainRow.parentElement.appendChild(newContainer);
+                        console.log('[RSYCProfileInjector] Nearby augmentation injected (hybrid mode)');
+
+                        // Initialize pagination for nearby cards (responsive: 1 / 4 / 6)
+                        (function initNearbyPaginationInj() {
+                            try {
+                                const wrap = mainRow.parentElement.querySelector('#rsyc-nearby-cards-wrap-inj');
+                                const paginationEl = mainRow.parentElement.querySelector('#rsyc-nearby-pagination-inj');
+                                if (!wrap || !paginationEl) return;
+
+                                const cards = Array.from(wrap.querySelectorAll('.rsyc-nearby-card'));
+                                if (!cards.length) return;
+
+                                let currentPage = 0;
+
+                                function getPerPage() {
+                                    const w = window.innerWidth;
+                                    if (w < 576) return 1;       // mobile
+                                    return 6;                     // tablet and desktop
+                                }
+
+                                function render() {
+                                    const perPage = getPerPage();
+                                    const totalPages = Math.max(1, Math.ceil(cards.length / perPage));
+                                    if (currentPage > totalPages - 1) currentPage = totalPages - 1;
+
+                                    cards.forEach((c, i) => {
+                                        const show = i >= currentPage * perPage && i < (currentPage + 1) * perPage;
+                                        c.style.display = show ? '' : 'none';
+                                    });
+
+                                    // Build controls - cleaner design with Prev/Next only
+                                    paginationEl.innerHTML = '';
+                                    
+                                    const prev = document.createElement('button');
+                                    prev.className = 'btn btn-outline-secondary btn-sm';
+                                    prev.type = 'button';
+                                    prev.innerHTML = '<i class="bi bi-chevron-left"></i> Prev';
+                                    prev.disabled = currentPage === 0;
+                                    prev.style.cssText = 'border-radius: 6px; font-weight: 500; min-width: 90px;';
+                                    prev.onclick = () => { if (currentPage > 0) { currentPage--; render(); } };
+                                    paginationEl.appendChild(prev);
+
+                                    const indicator = document.createElement('div');
+                                    indicator.style.cssText = 'padding: 0.5rem 1.5rem; font-weight: 500; color: #495057; white-space: nowrap;';
+                                    indicator.textContent = `${currentPage + 1} of ${totalPages}`;
+                                    paginationEl.appendChild(indicator);
+
+                                    const next = document.createElement('button');
+                                    next.className = 'btn btn-outline-secondary btn-sm';
+                                    next.type = 'button';
+                                    next.innerHTML = 'Next <i class="bi bi-chevron-right"></i>';
+                                    next.disabled = currentPage >= totalPages - 1;
+                                    next.style.cssText = 'border-radius: 6px; font-weight: 500; min-width: 90px;';
+                                    next.onclick = () => { if (currentPage < totalPages - 1) { currentPage++; render(); } };
+                                    paginationEl.appendChild(next);
+                                }
+
+                                let resizeTimer = null;
+                                window.addEventListener('resize', function() {
+                                    clearTimeout(resizeTimer);
+                                    resizeTimer = setTimeout(function() { render(); }, 150);
+                                });
+
+                                render();
+                            } catch (e) {
+                                console.warn('[RSYCProfileInjector] Nearby pagination init failed:', e);
+                            }
+                        })();
+                    }
+                } catch (e) {
+                    console.warn('[RSYCProfileInjector] Nearby augmentation failed:', e);
+                }
+
+                // Simple HTML-escaping helper
+                function escapeHtml(str) {
+                    if (!str) return '';
+                    return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+                }
+            })();
+
+            // Augment About section with Navigation Menu - DEPRECATED
+            // Note: Navigation is now a first-class section 'navigation' added to enabledSections.
+            // Keeping this empty block to maintain structural integrity in case of reverts.
+            (function augmentAboutSection() {
+                // Disabled in favor of native section
+            })();
+
             // Load custom styles
             loadCustomStyles();
 
             console.log(`[RSYCProfileInjector] ✅ Profile loaded: ${centerData.center.name}`);
+            
+            // Update page OG tags with this center's information (for display, not social sharing)
+            updateOGTagsForCenter(centerData.center);
 
         } catch (error) {
             console.error('[RSYCProfileInjector] Error:', error);

@@ -467,14 +467,21 @@ div.section.margin-bottom-xl.padding-right-md.padding-left-md {
     -webkit-overflow-scrolling: touch;
     gap: 0.5rem;                      
     padding-bottom: 0.5rem;            
-  }
+    justify-content: flex-start;
+}
 
-  .horizontal-scroll .hover-card {
+@media (min-width: 992px) {
+  .horizontal-scroll.center-if-few {
+    justify-content: center !important;
+  }
+}
+
+.horizontal-scroll .hover-card {
     flex: 0 0 auto;   /* prevent shrinking */
     display: flex;
     flex-direction: column;
     justify-content: flex-start;
-  }
+}
 
 /* Program schedule cards */
   .schedule-card {
