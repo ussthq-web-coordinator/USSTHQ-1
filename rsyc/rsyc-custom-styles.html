@@ -745,6 +745,7 @@ div.col-sm-12.eventsList * {
 .horizontal-scroll {
     scrollbar-width: thin;
     scrollbar-color: rgba(255,255,255,0.3) transparent;
+    justify-content: center; /* always center contents */
 }
 
 /* Events: center cards across breakpoints */
@@ -758,6 +759,13 @@ div.col-sm-12.eventsList * {
     }
 }
 
+/* Utility container that constrains width and centers its contents */
+.rsyc-center-container {
+    margin: 0 auto;
+    max-width: 1400px;
+    width: 100%;
+}
+
 /* Center schedule cards when using justify-content-center */
 .horizontal-scroll.justify-content-center {
     flex-wrap: wrap;
@@ -765,8 +773,12 @@ div.col-sm-12.eventsList * {
 
 /* Schedule scroll wrapper - break out of container on mobile */
 .schedule-scroll-wrapper {
+    /* force vertical stacking so print button sits below cards */
     margin-left: 0;
     margin-right: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
 }
 
 @media (max-width: 767px) {
@@ -796,6 +808,23 @@ div.col-sm-12.eventsList * {
 
 .horizontal-scroll::-webkit-scrollbar-thumb:hover {
     background: rgba(255,255,255,0.5);
+}
+
+/* large screens: other sections wrap, schedule stays scrolling */
+@media (min-width: 1025px) {
+    /* generic selector excludes schedule container */
+    .horizontal-scroll:not(#schedules .horizontal-scroll) {
+        overflow-x: visible !important;
+        flex-wrap: wrap;
+    }
+    .rsyc-scroll-hint {
+        display: none !important;
+    }
+    /* schedule-specific override: always horizontal scroll */
+    #schedules .horizontal-scroll {
+        overflow-x: auto !important;
+        flex-wrap: nowrap !important;
+    }
 }
 
 /* Dark text on white schedule cards */

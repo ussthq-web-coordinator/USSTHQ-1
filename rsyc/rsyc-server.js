@@ -716,7 +716,7 @@ function generateSchedules(data) {
         <div class="container" style="margin: 0; padding: 0;">
             <h2 class="fw-bold mb-4 text-center">Program <em>Schedule</em></h2>
             
-            <div class="schedule-scroll-wrapper" style="margin: 0;">
+            <div class="schedule-scroll-wrapper rsyc-center-container" style="margin: 0; display:flex; justify-content:center;">
                 ${scheduleScrollSection}
             </div>
         </div>
@@ -930,8 +930,10 @@ function generateStaff(data) {
                         <i class="bi bi-arrow-right-circle" style="font-size: 0.85em; vertical-align: middle;"></i>
                     </small>
                 </p>
-                <div class="d-flex overflow-auto gap-4 py-2" style="scroll-snap-type: x mandatory;">
-                    ${staffCards}
+                <div class="rsyc-center-container" style="width:100%;">
+                    <div class="d-flex horizontal-scroll overflow-auto gap-4 py-2" style="scroll-snap-type: x mandatory; max-width:1400px; width:100%; margin:0 auto;">
+                        ${staffCards}
+                    </div>
                 </div>
             </div>
         </div>

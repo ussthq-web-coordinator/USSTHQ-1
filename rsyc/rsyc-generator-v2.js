@@ -2999,25 +2999,26 @@ class RSYCGeneratorV2 {
                 }
             } catch (e) { console.warn('Error loading Hours data:', e); }
 
-            // 5. EVENTS
+            // 5. EVENTS (now derived from program schedules marked for events)
             try {
-                const eventsRes = await fetch(`${baseUrl}/RSYCEvents.json`);
-                const events = await eventsRes.json();
-                const gardenEscape = events.find(e => e.EventTitle && e.EventTitle.includes('Garden'));
-                
-                if (gardenEscape) {
-                    const eventFields = Object.keys(gardenEscape)
-                        .filter(k => !hiddenFields.has(k) && gardenEscape[k] !== null && gardenEscape[k] !== undefined && gardenEscape[k] !== '')
+                // fetch schedules and pick one item flagged ShowinEventsSection to illustrate the schema
+                const schedulesRes = await fetch(`${baseUrl}/RSYCProgramSchedules.json`);
+                const schedules = await schedulesRes.json();
+                const eventSample = (schedules || []).find(s => s && s.ShowinEventsSection === true);
+
+                if (eventSample) {
+                    const eventFields = Object.keys(eventSample)
+                        .filter(k => !hiddenFields.has(k) && eventSample[k] !== null && eventSample[k] !== undefined && eventSample[k] !== '')
                         .map(k => ({
                             name: normalizeFieldName(k),
-                            purpose: generatePurpose(k, gardenEscape[k]),
-                            example: formatValue(gardenEscape[k], 60)
+                            purpose: generatePurpose(k, eventSample[k]),
+                            example: formatValue(eventSample[k], 60)
                         }));
                     
                     models.push({
                         title: '5. Events',
                         fields: eventFields,
-                        example: `${gardenEscape.EventTitle} (Real data)`
+                        example: `${eventSample.CustomProgramScheduleTitle || eventSample.Title || ''} (Real data)`
                     });
                 }
             } catch (e) { console.warn('Error loading Events data:', e); }
@@ -3600,34 +3601,53 @@ class RSYCGeneratorV2 {
         });
 
         const fieldRows = [
-            ['centerId', 'Internal link back to the Center (SharePoint numeric item id).'],
-            ['title', 'Public program name shown on the schedule card and flyer.'],
-            ['subtitle', 'Short descriptor (optional) shown under the title.'],
-            ['status', 'Publishing workflow / state (ex: Draft / Ready / Published).'],
-            ['description', 'Narrative block describing what the program is and what to expect.'],
-            ['scheduleDays', 'Days the program occurs (multi-select). Used for sorting + display.'],
-            ['scheduleTime', 'Human-friendly time range string (ex: "Mon-Fri, 2:00PM - 6:00PM").'],
-            ['timezone', 'Time zone label (Eastern/Central/etc). Helps families interpret times.'],
-            ['frequency', 'Recurring pattern (weekly / monthly / seasonal).'],
-            ['programRunsIn', 'Months the program runs (used for seasonal sorting and context).'],
-            ['registrationOpensIn', 'Months registration typically opens (planning signal).'],
-            ['scheduleDisclaimer', 'Important notes (holidays, closures, variability).'],
-            ['ageRange / agesServed', 'Audience targeting used in narrative and filters.'],
-            ['cost', 'Fee / cost notes.'],
-            ['location', 'Onsite/offsite/location details when needed.'],
-            ['capacity', 'If enrollment is capped, helps set expectations.'],
-            ['prerequisites', 'Requirements (forms, tryouts, permission slips, etc).'],
-            ['materialsProvided', 'What the center provides.'],
-            ['whatToBring', 'What participants should bring.'],
-            ['orientationDetails', 'Orientation / onboarding instructions.'],
-            ['registrationDeadline', 'If a hard deadline exists.'],
-            ['registrationFee', 'If separate from cost.'],
-            ['dropOffPickUp', 'Drop-off/pick-up rules for parents/guardians.'],
-            ['transportationFeeandDetails', 'Transportation notes/fees if applicable.'],
-            ['closedDates / openHalfDayDates / openFullDayDates', 'Date-based exceptions that affect schedule.'],
-            ['contacts / contactInfo', 'Who families should contact with questions.'],
-            ['videoEmbedCode', 'Optional promo video embed for richer storytelling.'],
-            ['startDate / endDate', 'Optional explicit start/end date range for seasonal programs.']
+            ['Title','title','Schedule title or event name'],
+            ['Center','centerId','Associated center SharePoint ID'],
+            ['Custom Program Schedule Title','customProgramScheduleTitle','Alternate title field (if used).'],
+            ['Custom Program Schedule Subtitle','customProgramScheduleSubtitle','Useful very short description'],
+            ['Modified','modified','Last modified timestamp.'],
+            ['Status','status','Is it ready or will you submit it as a draft? You can always edit submitted items later.'],
+            ['Schedule Time','scheduleTime','Time of day (e.g. 3:30 PM - 5:30 PM)'],
+            ['Category','category','Classification or type of program.'],
+            ['All Related Programs','allRelatedPrograms','Please select each related program delivered during this same time.'],
+            ['Contact Info','contactInfo','Enter a name or email address (active mailbox).'],
+            ['Contact Phone Number','contactPhoneNumber','Phone number for inquiries.'],
+            ['Schedule Days','scheduleDays','Days of week the program runs (e.g. Mon, Wed, Fri)'],
+            ['Schedule Disclaimer','scheduleDisclaimer','Example: (Holidays and teacher workdays hours will vary)'],
+            ['Image','image','URL or filename of associated image'],
+            ['Start Date','startDate','Optional explicit start date'],
+            ['End Date','endDate','Optional explicit end date'],
+            ['Time zone','timezone','Time zone for the schedule'],
+            ['Frequency','frequency','How often the program recurs (weekly, monthly, etc.)'],
+            ['Narrative','narrative','Main description. Include special features and exciting things attendees can expect.'],
+            ['Extended Care Times','extendedCareTimes','Details of any extended care options.'],
+            ['What to bring','whatToBring','Include what parents should send and what the center provides.'],
+            ['Orientation Details','orientationDetails','Is an orientation scheduled? Info parents need before registering.'],
+            ['Cost','cost','Example: $25 per week/child; Includes breakfast/lunch and snack.'],
+            ['Transportation Fee and Details','transportationFeeandDetails','List schools and pick-up/drop-off details.'],
+            ['Ages Served','agesServed','Point out whether you serve 5‑year‑olds or other age groups.'],
+            ['Ages Served Custom','agesServedCustom','Provide age range if not in the dropdown.'],
+            ['Registration is open','registrationIsOpen','When parents can prepare to apply; select months open.'],
+            ['Program Runs In','programRunsIn','Months the program is actively running.'],
+            ['Address','address','Street address if applicable.'],
+            ['Primary Button Text','primaryButtonText','Text for main call-to-action button.'],
+            ['Primary Button Link','primaryButtonLink','URL for main action button.'],
+            ['Secondary Button Text','secondaryButtonText','Text for secondary action button.'],
+            ['Secondary Button Link','secondaryButtonLink','URL for secondary action.'],
+            ['Video Embed Code','videoEmbedCode','YouTube or toolkit video embed code.'],
+            ['Modified By','modifiedBy','User who last modified.'],
+            ['Created','created','Creation timestamp.'],
+            ['Created By','createdBy','User who created.'],
+            ['Closed Dates','closedDates','List upcoming closure dates for the program.'],
+            ['Open Full Days Dates','openFullDayDates','Dates/policy for full‑planning days.'],
+            ['Open Half Days Dates','openHalfDayDates','Dates/policy for half‑days.'],
+            ['URLImage','urlImage','Image URL used on site.'],
+            ['URLThumbnailImage','urlThumbnailImage','Thumbnail image URL.'],
+            ['Show in Events Section','showInEventsSection','One‑time programs, camps, seasonal offerings should be in events section.'],
+            ['Center:Division','centerDivision','Division of the center.'],
+            ['Center:City','centerCity','City of the center.'],
+            ['Center:State','centerState','State of the center.'],
+            ['Attachments','attachments','Link or reference to flyers/graphics.']
         ];
 
         const fieldGuide = `
@@ -3637,14 +3657,16 @@ class RSYCGeneratorV2 {
                     <table style="width:100%; border-collapse:collapse; font-size:12px;">
                         <thead style="background:#f8f9fa; border-bottom:1px solid #eee;">
                             <tr>
-                                <th style="padding:10px; text-align:left; width:240px;">Field</th>
+                                <th style="padding:10px; text-align:left; width:200px;">Field</th>
+                                <th style="padding:10px; text-align:left; width:200px;">Raw Name</th>
                                 <th style="padding:10px; text-align:left;">Purpose</th>
                             </tr>
                         </thead>
                         <tbody>
-                            ${fieldRows.map(([f,p], idx) => `
+                            ${fieldRows.map(([f,v,p], idx) => `
                                 <tr style="border-bottom:1px solid #f3f3f3; ${idx % 2 ? 'background:#fcfcfc;' : ''}">
                                     <td style="padding:8px 10px; font-family:Consolas, monospace; font-size:11px; color:#333;">${esc(f)}</td>
+                                    <td style="padding:8px 10px; font-family:Consolas, monospace; font-size:11px; color:#333;">${esc(v)}</td>
                                     <td style="padding:8px 10px; color:#555; line-height:1.5;">${esc(p)}</td>
                                 </tr>
                             `).join('')}
@@ -3688,7 +3710,6 @@ class RSYCGeneratorV2 {
                         s.cost ? `Cost: ${s.cost}` : '',
                         s.location ? `Location: ${s.location}` : '',
                         s.capacity ? `Capacity: ${s.capacity}` : '',
-                        s.prerequisites ? `Prerequisites: ${s.prerequisites}` : '',
                         s.registrationDeadline ? `Registration deadline: ${s.registrationDeadline}` : '',
                         s.registrationFee ? `Registration fee: ${s.registrationFee}` : '',
                         s.dropOffPickUp ? `Drop-off/pick-up: ${s.dropOffPickUp}` : '',
@@ -3739,27 +3760,24 @@ class RSYCGeneratorV2 {
             .join('');
 
         const instructionBlock = `
-            <div style="padding: 16px; background-color: #fafafa; border-bottom: 1px solid #e0e0e0; font-family: 'Segoe UI', sans-serif; margin: 8px; border-radius: 8px; border: 1px solid #eee;">
+            <div style="padding: 16px; background-color: #fafafa; border-bottom: 1px solid #e0e0e0; font-family: 'Segoe UI', sans-serif; margin: 8px;">
                 <div>
-                    <div style="font-size: 16px; font-weight: 600; color: #242424; margin: 0 0 8px 0;">RSYC Program Schedule Instructions</div>
-                    <p style="font-size: 14px; color: #333; line-height: 1.5; margin: 0 20px 8px 0;">Please click in the area beneath each of the field labels to see instructions and select from the options or provide your own text. Changes are saved when you click out of the field. If you have images or flyers, please add them as attachments.</p>
+                    <div style="font-size: 16px; font-weight: 600; color: #242424; margin: 0 0 8px 0;">RSYC Program Schedule & Events Instructions</div>
+                    <p style="font-size: 14px; color: #333; line-height: 1.5; margin: 0 20px 8px 0;">All programs and events are submitted using this form. Please click in the area beneath each field label to see instructions and enter your information. Changes are saved when you click out of a field. If you have images or flyers, please add them as attachments.</p>
                     <div style="margin-bottom: 12px;">
                         <a href="https://sauss.sharepoint.com/sites/ConnectCommunications/SitePages/Manage-Youth-Center-Web-Profile.aspx#center-profile-manager" target="_blank" style="font-size: 13px; color: #0078d4; text-decoration: underline; margin: 0 6px 12px 0; display: inline-block;">Learn more</a>
                         <a href="https://southernusa.salvationarmy.org/redshieldyouth/center-locations" target="_blank" style="font-size: 13px; color: #0078d4; text-decoration: underline; margin: 0 6px 12px 0; display: inline-block;">View Your Profile</a>
+                        <a href="https://schedulesreview-rsyc.usscommunications.org/" target="_blank" style="font-size: 13px; color: #0078d4; text-decoration: underline; margin: 0 6px 12px 0; display: inline-block;">View and edit submitted program schedules or events</a>
+                        <a href="https://submitevents-rsyc.usscommunications.org/" target="_blank" style="font-size:13px; color:#0078d4; text-decoration:underline; margin:0 6px 12px 0; display:inline-block;">Submit a new Program Schedule or Event item</a>
                     </div>
-                    <div style="font-size: 15px; color: #444; background-color: #fff8e1; border-left: 4px solid #f2c200; padding: 8px 10px; margin: 0 0 8px 0; line-height: 1.5;">💬 Submit recurring programs that are part of the afterschool program or corps programs as separate items (e.g., Afterschool Enrichment, Youth Night, Dinner, Club 316, Music/Arts, Sunday Worship, Homework Help & Mentoring, Visual Arts & Crafts, Dance, Drama, & Creative Arts, and Youth Meal or snack).</div>
-                    <div style="font-size: 15px; color: #444; background-color: #fff8e1; border-left: 4px solid #f2c200; padding: 8px 10px; margin: 0 0 8px 0; line-height: 1.5;">We suggest listing unique items you want to be found on Google like ACT, ASVAB Prep, Karate; etc. All details entered below will show online and be available for print/save as PDF.</div>
-                    <div style="font-size: 15px; color: #444; background-color: #fff8e1; border-left: 4px solid #d13438; padding: 8px 10px; margin: 0 0 16px 0; line-height: 1.5; font-weight: 600;">IMPORTANT: Scheduled programs that are typically open to the public or have a separate registration from the afterschool program, like <u>camps</u>, should be submitted as <b>Events</b> instead of Program Schedules. They will show in the program schedule section on the website automatically when published.</div>
-                    <a href="https://submitevents-rsyc.usscommunications.org/" target="_blank" style="font-size: 14px; color: #0078d4; text-decoration: underline; margin: 0 0 16px 0; display: inline-block;">Submit a New Event / Camp</a>
+                    <div style="font-size: 15px; color: #444; background-color: #fff8e1; border-left: 4px solid #f2c200; padding: 8px 10px; margin: 0 20px 8px 0; line-height: 1.5;">💬 Submit recurring programs that are part of your regular afterschool or corps programming as separate items (for example: Afterschool Enrichment, Youth Night, Homework Help, Music & Arts, Dance, Drama, Youth Meals, or Sunday Worship). These will appear in the Program Schedule section.</div>
+                    <div style="font-size: 15px; color: #444; background-color: #fff8e1; border-left: 4px solid #f2c200; padding: 8px 10px; margin: 0 20px 8px 0; line-height: 1.5;">One-time programs, camps, seasonal offerings, or special activities (such as Spring Break Camp, Summer Day Camp, or community events) should also be submitted here.</div>
+                    <div style="font-size: 15px; color: #444; background-color: #fff8e1; border-left: 4px solid #d13438; padding: 8px 10px; margin: 0 20px 16px 0; line-height: 1.5; font-weight: 600;">IMPORTANT: If you want a program or activity to appear in both the Program Schedule and the Events section of your website, simply check the Show in Events Section box. This is especially helpful for camps, seasonal programs, and one-time events.</div>
                 </div>
-                <div style="display: flex; flex-direction: column; gap: 16px; margin-top: 8px; border-top: 1px solid #eee; padding-top: 16px;">
+                <div style="display: flex; flex-direction: column; gap: 16px; margin-top: 8px">
                     <div>
                         <div style="font-size: 15px; font-weight: 600; color: #242424; margin: 0 0 8px 0;">Check it out!</div>
-                        <a href="https://southernusa.salvationarmy.org/redshieldyouth/hickory" target="_blank" style="font-size: 15px; color: #0078d4; text-decoration: underline;">View an example of a profile with localized and printable program schedules.</a>
-                    </div>
-                    <div>
-                        <div style="font-size: 15px; font-weight: 600; color: #242424; margin: 0 0 8px 0;">New Schedule Item?</div>
-                        <a href="https://submitschedules-rsyc.usscommunications.org/" target="_blank" style="font-size: 15px; color: #0078d4; text-decoration: underline;">Submit a New Program Schedule Item</a>
+                        <a href="https://southernusa.salvationarmy.org/redshieldyouth/hickory" target="_blank" style="font-size: 15px; color: #0078d4; text-decoration: underline;">View an example of a profile with combined program schedules and events.</a>
                     </div>
                 </div>
             </div>
@@ -3791,7 +3809,19 @@ class RSYCGeneratorV2 {
     }
 
     generateEmailAuditEvents(data) {
-        const { centers, events } = data;
+        // expects schedules array where ShowinEventsSection flag marks actual events
+        const { centers, schedules, events } = data || {};
+        // determine source array
+        let eventItems = [];
+        if (Array.isArray(schedules)) {
+            // use schedules but only those explicitly marked for events
+            eventItems = (schedules || []).filter(s => s && s.ShowinEventsSection === true);
+        } else if (Array.isArray(events)) {
+            // legacy dataset – include all
+            eventItems = events;
+        } else {
+            eventItems = [];
+        }
 
         const esc = (v) => v ? String(v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') : '';
         const val = (v, fallback = '') => (v === null || v === undefined || v === '' ? fallback : v);
@@ -3799,7 +3829,7 @@ class RSYCGeneratorV2 {
         const centersBySpId = new Map((centers || []).map(c => [String(c.sharePointId ?? c.id ?? c.Id), c]));
 
         const eventsByCenterId = {};
-        (events || []).forEach(e => {
+        (eventItems || []).forEach(e => {
             const cid = String(e.centerId ?? '');
             if (!cid) return;
             if (!eventsByCenterId[cid]) eventsByCenterId[cid] = [];
@@ -3807,53 +3837,96 @@ class RSYCGeneratorV2 {
         });
 
         const instructionBlock = `
-            <div style="padding: 16px; background-color: #fafafa; border-bottom: 1px solid #e0e0e0; font-family: 'Segoe UI', sans-serif; margin: 8px; border-radius: 8px; border: 1px solid #eee;">
+            <div style="padding: 16px; background-color: #fafafa; border-bottom: 1px solid #e0e0e0; font-family: 'Segoe UI', sans-serif; margin: 8px;">
                 <div>
-                    <div style="font-size: 16px; font-weight: 600; color: #242424; margin: 0 0 8px 0;">RSYC Upcoming Events Instructions</div>
-                    <p style="font-size: 14px; color: #333; line-height: 1.5; margin: 0 20px 8px 0;">Please click in the area beneath each of the field labels to see instructions and select from the options or provide your own text. Changes are saved when you click out of the field.</p>
+                    <div style="font-size: 16px; font-weight: 600; color: #242424; margin: 0 0 8px 0;">RSYC Program Schedule & Events Instructions</div>
+                    <p style="font-size: 14px; color: #333; line-height: 1.5; margin: 0 20px 8px 0;">All programs and events are submitted using this form. Please click in the area beneath each field label to see instructions and enter your information. Changes are saved when you click out of a field. If you have images or flyers, please add them as attachments.</p>
                     <div style="margin-bottom: 12px;">
                         <a href="https://sauss.sharepoint.com/sites/ConnectCommunications/SitePages/Manage-Youth-Center-Web-Profile.aspx#center-profile-manager" target="_blank" style="font-size: 13px; color: #0078d4; text-decoration: underline; margin: 0 6px 12px 0; display: inline-block;">Learn more</a>
                         <a href="https://southernusa.salvationarmy.org/redshieldyouth/center-locations" target="_blank" style="font-size: 13px; color: #0078d4; text-decoration: underline; margin: 0 6px 12px 0; display: inline-block;">View Your Profile</a>
+                        <a href="https://schedulesreview-rsyc.usscommunications.org/" target="_blank" style="font-size: 13px; color: #0078d4; text-decoration: underline; margin: 0 6px 12px 0; display: inline-block;">View and edit submitted program schedules or events</a>
+                        <a href="https://submitevents-rsyc.usscommunications.org/" target="_blank" style="font-size:13px; color:#0078d4; text-decoration:underline; margin:0 6px 12px 0; display:inline-block;">Submit a new Program Schedule or Event item</a>
                     </div>
-                    <div style="font-size: 15px; color: #444; background-color: #fff8e1; border-left: 4px solid #f2c200; padding: 8px 10px; margin: 0 0 8px 0; line-height: 1.5;">💬 Submit one-time and recurring events as separate items (e.g., Spring Break Camp, Summer Day Camp, and Family & Community Events).</div>
-                    <div style="font-size: 15px; color: #444; background-color: #fff8e1; border-left: 4px solid #f2c200; padding: 8px 10px; margin: 0 0 8px 0; line-height: 1.5;">We suggest listing unique items you want to be found on Google by those looking for fun events in your city. All details entered below will show online and be available for print/save as PDF. Events are typically open to the public or have a separate registration from the afterschool program.</div>
-                    <div style="font-size: 15px; color: #444; background-color: #fff8e1; border-left: 4px solid #d13438; padding: 8px 10px; margin: 0 0 8px 0; line-height: 1.5; font-weight: 600;">IMPORTANT: Ongoing weekly programs that are part of your afterschool or corps programming (such as Afterschool Enrichment, Youth Night, Music/Arts, Sunday Worship, Homework Help, etc.) should be submitted as Program Schedule items instead of Events.</div>
-                    <a href="https://submitevents-rsyc.usscommunications.org/" target="_blank" style="font-size: 14px; color: #0078d4; text-decoration: underline; margin: 0 0 16px 0; display: inline-block;">Submit a New Event Item</a>
+                    <div style="font-size: 15px; color: #444; background-color: #fff8e1; border-left: 4px solid #f2c200; padding: 8px 10px; margin: 0 20px 8px 0; line-height: 1.5;">💬 Submit recurring programs that are part of your regular afterschool or corps programming as separate items (for example: Afterschool Enrichment, Youth Night, Homework Help, Music & Arts, Dance, Drama, Youth Meals, or Sunday Worship). These will appear in the Program Schedule section.</div>
+                    <div style="font-size: 15px; color: #444; background-color: #fff8e1; border-left: 4px solid #f2c200; padding: 8px 10px; margin: 0 20px 8px 0; line-height: 1.5;">One-time programs, camps, seasonal offerings, or special activities (such as Spring Break Camp, Summer Day Camp, or community events) should also be submitted here.</div>
+                    <div style="font-size: 15px; color: #444; background-color: #fff8e1; border-left: 4px solid #d13438; padding: 8px 10px; margin: 0 20px 16px 0; line-height: 1.5; font-weight: 600;">IMPORTANT: If you want a program or activity to appear in both the Program Schedule and the Events section of your website, simply check the Show in Events Section box. This is especially helpful for camps, seasonal programs, and one-time events.</div>
                 </div>
-                <div style="display: flex; flex-direction: column; gap: 16px; margin-top: 8px; border-top: 1px solid #eee; padding-top: 16px;">
+                <div style="display: flex; flex-direction: column; gap: 16px; margin-top: 8px">
                     <div>
                         <div style="font-size: 15px; font-weight: 600; color: #242424; margin: 0 0 8px 0;">Check it out!</div>
-                        <a href="https://southernusa.salvationarmy.org/redshieldyouth/aiken-teen-center" target="_blank" style="font-size: 15px; color: #0078d4; text-decoration: underline;">View an example of a profile with upcoming events.</a>
+                        <a href="https://southernusa.salvationarmy.org/redshieldyouth/hickory" target="_blank" style="font-size: 15px; color: #0078d4; text-decoration: underline;">View an example of a profile with combined program schedules and events.</a>
                     </div>
                 </div>
             </div>
         `;
-
+        // same field list used for program schedules since events are now schedules
         const fieldRows = [
-            ['EventTitle', 'Public name of the event shown on the website.'],
-            ['StartDateandTime', 'When the event begins.'],
-            ['EndDateandTime', 'When the event ends.'],
-            ['Cost', 'Price or fee for the event (shown on button/badge).'],
-            ['EventType', 'Categorization (Camp, Community, Holiday, etc).'],
-            ['RegistrationURL', 'Link to register or learn more (primary button).'],
-            ['EventDescription', 'Narrative details about the event.']
+            ['Title','title','Schedule title or event name'],
+            ['Center','centerId','Associated center SharePoint ID'],
+            ['Custom Program Schedule Title','customProgramScheduleTitle','Alternate title field (if used).'],
+            ['Custom Program Schedule Subtitle','customProgramScheduleSubtitle','Useful very short description'],
+            ['Modified','modified','Last modified timestamp.'],
+            ['Status','status','Is it ready or will you submit it as a draft? You can always edit submitted items later.'],
+            ['Schedule Time','scheduleTime','Time of day (e.g. 3:30 PM - 5:30 PM)'],
+            ['Category','category','Classification or type of program.'],
+            ['All Related Programs','allRelatedPrograms','Please select each related program delivered during this same time.'],
+            ['Contact Info','contactInfo','Enter a name or email address (active mailbox).'],
+            ['Contact Phone Number','contactPhoneNumber','Phone number for inquiries.'],
+            ['Schedule Days','scheduleDays','Days of week the program runs (e.g. Mon, Wed, Fri)'],
+            ['Schedule Disclaimer','scheduleDisclaimer','Example: (Holidays and teacher workdays hours will vary)'],
+            ['Image','image','URL or filename of associated image'],
+            ['Start Date','startDate','Optional explicit start date'],
+            ['End Date','endDate','Optional explicit end date'],
+            ['Time zone','timezone','Time zone for the schedule'],
+            ['Frequency','frequency','How often the program recurs (weekly, monthly, etc.)'],
+            ['Narrative','narrative','Main description. Include special features and exciting things attendees can expect.'],
+            ['Extended Care Times','extendedCareTimes','Details of any extended care options.'],
+            ['What to bring','whatToBring','Include what parents should send and what the center provides.'],
+            ['Orientation Details','orientationDetails','Is an orientation scheduled? Info parents need before registering.'],
+            ['Cost','cost','Example: $25 per week/child; Includes breakfast/lunch and snack.'],
+            ['Transportation Fee & Details','transportationFeeandDetails','List schools and pick-up/drop-off details.'],
+            ['Ages Served','agesServed','Point out whether you serve 5‑year‑olds or other age groups.'],
+            ['Ages Served Custom','agesServedCustom','Provide age range if not in the dropdown.'],
+            ['Registration is open','registrationIsOpen','When parents can prepare to apply; select months open.'],
+            ['Program Runs In','programRunsIn','Months the program is actively running.'],
+            ['Address','address','Street address if applicable.'],
+            ['Primary Button Text','primaryButtonText','Text for main call-to-action button.'],
+            ['Primary Button Link','primaryButtonLink','URL for main action button.'],
+            ['Secondary Button Text','secondaryButtonText','Text for secondary action button.'],
+            ['Secondary Button Link','secondaryButtonLink','URL for secondary action.'],
+            ['Video Embed Code','videoEmbedCode','YouTube or toolkit video embed code.'],
+            ['Modified By','modifiedBy','User who last modified.'],
+            ['Created','created','Creation timestamp.'],
+            ['Created By','createdBy','User who created.'],
+            ['Closed Dates','closedDates','List upcoming closure dates for the program.'],
+            ['Open Full Days Dates','openFullDayDates','Dates/policy for full‑planning days.'],
+            ['Open Half Days Dates','openHalfDayDates','Dates/policy for half‑days.'],
+            ['URLImage','urlImage','Image URL used on site.'],
+            ['URLThumbnailImage','urlThumbnailImage','Thumbnail image URL.'],
+            ['Show in Events Section','showInEventsSection','One‑time programs, camps, seasonal offerings should be in events section.'],
+            ['Center:Division','centerDivision','Division of the center.'],
+            ['Center:City','centerCity','City of the center.'],
+            ['Center:State','centerState','State of the center.'],
+            ['Attachments','attachments','Link or reference to flyers/graphics.']
         ];
 
         const fieldGuide = `
             <div style="margin-bottom: 22px; font-family: 'Segoe UI', Tahoma, sans-serif;">
-                <div style="background-color: #f4f4f4; padding: 14px; border-left: 6px solid #d93d3d; font-weight: bold; margin-bottom: 14px; font-size: 16px; color: #333; display: block; width: 100%;">📘 Event Model Fields (Purpose Guide)</div>
+                <div style="background-color: #f4f4f4; padding: 14px; border-left: 6px solid #d93d3d; font-weight: bold; margin-bottom: 14px; font-size: 16px; color: #333; display: block; width: 100%;">📘 Program Schedule Model Fields (Purpose Guide)</div>
                 <div style="border:1px solid #eee; border-radius:8px; overflow:hidden; background:#fff;">
                     <table style="width:100%; border-collapse:collapse; font-size:12px;">
                         <thead style="background:#f8f9fa; border-bottom:1px solid #eee;">
                             <tr>
-                                <th style="padding:10px; text-align:left; width:240px;">Field</th>
+                                <th style="padding:10px; text-align:left; width:200px;">Field</th>
+                                <th style="padding:10px; text-align:left; width:200px;">Raw Name</th>
                                 <th style="padding:10px; text-align:left;">Purpose</th>
                             </tr>
                         </thead>
                         <tbody>
-                            ${fieldRows.map(([f,p], idx) => `
+                            ${fieldRows.map(([f,v,p], idx) => `
                                 <tr style="border-bottom:1px solid #f3f3f3; ${idx % 2 ? 'background:#fcfcfc;' : ''}">
                                     <td style="padding:8px 10px; font-family:Consolas, monospace; font-size:11px; color:#333;">${esc(f)}</td>
+                                    <td style="padding:8px 10px; font-family:Consolas, monospace; font-size:11px; color:#333;">${esc(v)}</td>
                                     <td style="padding:8px 10px; color:#555; line-height:1.5;">${esc(p)}</td>
                                 </tr>
                             `).join('')}
@@ -3932,7 +4005,7 @@ class RSYCGeneratorV2 {
                     Note: All events are shown in the program schedule section on the live website automatically when published.
                 </div>
                 <br>
-                <p style="font-size: 14px; margin-top: 0; color: #666; margin-bottom: 18px; display: block;">Generated on ${new Date().toLocaleDateString()} • ${val((events || []).length)} total event(s)</p>
+                <p style="font-size: 14px; margin-top: 0; color: #666; margin-bottom: 18px; display: block;">Generated on ${new Date().toLocaleDateString()} • ${val((eventItems || []).length)} total event(s)</p>
                 ${fieldGuide}
                 <br>
                 <br>
@@ -3967,6 +4040,8 @@ class RSYCGeneratorV2 {
                     <div style="margin-bottom: 12px;">
                         <a href="https://sauss.sharepoint.com/sites/ConnectCommunications/SitePages/Manage-Youth-Center-Web-Profile.aspx#center-profile-manager" target="_blank" style="font-size: 13px; color: #0078d4; text-decoration: underline; margin: 0 6px 12px 0; display: inline-block;">Learn more</a>
                         <a href="https://southernusa.salvationarmy.org/redshieldyouth/center-locations" target="_blank" style="font-size: 13px; color: #0078d4; text-decoration: underline; margin: 0 6px 12px 0; display: inline-block;">View Your Profile</a>
+                        <a href="https://storiesreview-rsyc.usscommunications.org/" target="_blank" style="font-size: 13px; color: #0078d4; text-decoration: underline; margin: 0 6px 12px 0; display: inline-block;">View and edit submitted stories</a>
+                        <a href="https://submitstories-rsyc.usscommunications.org/" target="_blank" style="font-size: 13px; color: #0078d4; text-decoration: underline; margin: 0 6px 12px 0; display: inline-block;">Submit a Story Item</a>
                     </div>
                     <div style="font-size: 15px; color: #444; background-color: #fff8e1; border-left: 4px solid #f2c200; padding: 8px 10px; margin-bottom: 12px; line-height: 1.5;">💬 Stories should highlight the center’s impact on youth, families, and the community. Choose stories that inspire, inform, and celebrate accomplishments.</div>
                     
@@ -3990,7 +4065,6 @@ class RSYCGeneratorV2 {
                         • Focus on impact—how did the program, event, or initiative benefit youth, families, or the community?
                     </div>
 
-                    <a href="https://submitstories-rsyc.usscommunications.org/" target="_blank" style="font-size: 14px; color: #0078d4; text-decoration: underline; display: inline-block; margin-bottom: 12px;">Submit a Story Item</a>
                 </div>
                 <div style="display: flex; flex-direction: column; gap: 16px; margin-top: 8px; border-top: 1px solid #eee; padding-top: 16px;">
                     <div>
@@ -4002,11 +4076,24 @@ class RSYCGeneratorV2 {
         `;
 
         const fieldRows = [
-            ['StoryTitle', 'Public name of the story shown on the website.'],
-            ['StoryDate', 'When the story occurred or was published.'],
-            ['StoryCategory', 'Categorization (Youth Spotlight, Community, Media, etc).'],
-            ['StoryURL', 'Link to full article or related content.'],
-            ['StoryDescription', 'Short summary or narrative of the story.']
+            ['Title','Title','Record title, usually the center name or short descriptor.'],
+            ['Center','Center','Associated center SharePoint ID.'],
+            ['Story Title','StoryTitle','Public name of the story shown on the website.'],
+            ['Status','Status','Select Draft or Published.'],
+            ['Modified','Modified','Last modified timestamp.'],
+            ['Modified By','ModifiedBy','User who last updated the item.'],
+            ['Story Image','StoryImage','URL of the main story image (THQ use only).'],
+            ['Story date','StoryDate','When the story occurred or was published.'],
+            ['Author','Author','Name of the person who wrote the story.'],
+            ['Excerpt','Excerpt','A short, quoted sentence or two from the story that appears on the story card.'],
+            ['Embed Video','EmbedVideo','External embed code for a video about the story.'],
+            ['Primary CTA Name','PrimaryCTAName','Text for primary call‑to‑action button.'],
+            ['Primary CTA Link','PrimaryCTALink','URL for primary call‑to‑action.'],
+            ['Secondary CTA Link','SecondaryCTALink','URL for secondary call‑to‑action.'],
+            ['Secondary CTA Name','SecondaryCTAName','Text for secondary call‑to‑action button.'],
+            ['URL Thumbnail Image','URLThumbnailImage','(THQ use only) thumbnail image URL.'],
+            ['URL Main Image','URLMainImage','(THQ use only) main image URL.'],
+            ['External URL','ExternalURL','URL where visitors can read or watch the full story.']
         ];
 
         const fieldGuide = `
@@ -4016,14 +4103,16 @@ class RSYCGeneratorV2 {
                     <table style="width:100%; border-collapse:collapse; font-size:12px;">
                         <thead style="background:#f8f9fa; border-bottom:1px solid #eee;">
                             <tr>
-                                <th style="padding:10px; text-align:left; width:240px;">Field</th>
+                                <th style="padding:10px; text-align:left; width:200px;">Field</th>
+                                <th style="padding:10px; text-align:left; width:200px;">Raw Name</th>
                                 <th style="padding:10px; text-align:left;">Purpose</th>
                             </tr>
                         </thead>
                         <tbody>
-                            ${fieldRows.map(([f,p], idx) => `
+                            ${fieldRows.map(([f,v,p], idx) => `
                                 <tr style="border-bottom:1px solid #f3f3f3; ${idx % 2 ? 'background:#fcfcfc;' : ''}">
                                     <td style="padding:8px 10px; font-family:Consolas, monospace; font-size:11px; color:#333;">${esc(f)}</td>
+                                    <td style="padding:8px 10px; font-family:Consolas, monospace; font-size:11px; color:#333;">${esc(v)}</td>
                                     <td style="padding:8px 10px; color:#555; line-height:1.5;">${esc(p)}</td>
                                 </tr>
                             `).join('')}
@@ -4096,6 +4185,191 @@ class RSYCGeneratorV2 {
         `;
     }
 
+    generateEmailAuditPhotos(data) {
+        const { centers, photos } = data;
+        const esc = (v) => v ? String(v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') : '';
+        const val = (v, fallback = '') => (v === null || v === undefined || v === '' ? fallback : v);
+        const centersBySpId = new Map((centers || []).map(c => [String(c.sharePointId ?? c.id ?? c.Id), c]));
+        const getCenterName = (c) => {
+            if (!c) return '';
+            return c.name || c.Title || '';
+        };
+
+        // define model fields for center photos
+        const fieldRows = [
+            ['Center','Center','Associated center SharePoint ID'],
+            ['Status','Status','Draft or published status.'],
+            ['Modified','Modified','Last modified timestamp.'],
+            ['Modified By','ModifiedBy','User who last updated the record.'],
+            ['Center Exterior Photo','CenterExteriorPhoto','Exterior building photo.'],
+            ['Facility Features Photo','FacilityFeaturesPhoto','Inside facility photo showing features.'],
+            ['Programs Photo','ProgramsPhoto','Photo representing programs offered.'],
+            ['Nearby Centers Photo','NearbyCentersPhoto','Photo of nearby centers/community.'],
+            ['Parents Section Photo','ParentsSectionPhoto','Image used in parents section.'],
+            ['Youth Section Photo','YouthSectionPhoto','Image used in youth section.'],
+            ['Get Involved Photo','GetInvolvedPhoto','Call-to-action photo for involvement.'],
+            ['Footer Photo','FooterPhoto','Footer-area image.'],
+            ['Footer Photo Focus','FooterPhotoFocus','Crop focus point for footer photo.'],
+            ['URL Center Exterior Photo','URLCenterExteriorPhoto','(THQ use only) external image URL.'],
+            ['URL Facility Features Photo','URLFacilityFeaturesPhoto','(THQ) external URL for features photo.'],
+            ['URL Programs Photo','URLProgramsPhoto','(THQ) external URL for programs photo.'],
+            ['URL Nearby Centers Photo','URLNearbyCentersPhoto','(THQ) external URL for nearby centers photo.'],
+            ['URL Parents Section Photo','URLParentsSectionPhoto','(THQ) external URL for parents photo.'],
+            ['URL Youth Section Photo','URLYouthSectionPhoto','(THQ) external URL for youth photo.'],
+            ['URL Get Involved Photo','URLGetInvolvedPhoto','(THQ) external URL for get-involved photo.'],
+            ['URL Footer Photo','URLFooterPhoto','(THQ) external URL for footer photo.']
+        ];
+
+        // build guide table markup
+        const fieldGuide = `
+            <div style="margin-bottom:22px; font-family:'Segoe UI',Tahoma,sans-serif;">
+                <div style="background-color:#f4f4f4; padding:14px; border-left:6px solid #d93d3d; font-weight:bold; margin-bottom:14px; font-size:16px; color:#333; display:block; width:100%;">📘 Center Photos Fields (Purpose Guide)</div>
+                <div style="border:1px solid #eee; border-radius:8px; overflow:hidden; background:#fff;">
+                    <table style="width:100%; border-collapse:collapse; font-size:12px;">
+                        <thead style="background:#f8f9fa; border-bottom:1px solid #eee;">
+                            <tr>
+                                <th style="padding:10px; text-align:left; width:200px;">Field</th>
+                                <th style="padding:10px; text-align:left; width:200px;">Raw Name</th>
+                                <th style="padding:10px; text-align:left;">Purpose</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${fieldRows.map(([f,v,p], idx) => `
+                                <tr style="border-bottom:1px solid #f3f3f3; ${idx%2?'background:#fcfcfc;':''}">
+                                    <td style="padding:8px 10px; font-family:Consolas,monospace; font-size:11px; color:#333;">${esc(f)}</td>
+                                    <td style="padding:8px 10px; font-family:Consolas,monospace; font-size:11px; color:#333;">${esc(v)}</td>
+                                    <td style="padding:8px 10px; color:#555; line-height:1.5;">${esc(p)}</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        `;
+
+        const photosByCenterId = {};
+        (photos || []).forEach(p => {
+            const cid = String(p.centerId ?? '');
+            if (!cid) return;
+            if (!photosByCenterId[cid]) photosByCenterId[cid] = [];
+            photosByCenterId[cid].push(p);
+        });
+
+        // helper list of known photo types with normalized keys
+        const photoTypes = [
+            { label: 'Center Exterior Photo', key: 'urlExteriorPhoto' },
+            { label: 'Facility Features Photo', key: 'urlFacilityFeaturesPhoto' },
+            { label: 'Programs Photo', key: 'urlProgramsPhoto' },
+            { label: 'Nearby Centers Photo', key: 'urlNearbyCentersPhoto' },
+            { label: 'Parents Section Photo', key: 'urlParentsSectionPhoto' },
+            { label: 'Youth Section Photo', key: 'urlYouthSectionPhoto' },
+            { label: 'Get Involved Photo', key: 'urlGetInvolvedPhoto' },
+            { label: 'Footer Photo', key: 'urlFooterPhoto' }
+        ];
+
+        const centerBlocks = Object.keys(photosByCenterId).map(cid => {
+            const items = photosByCenterId[cid];
+            const c = centersBySpId.get(cid) || {};
+            const name = getCenterName(c);
+
+            // build rows by enumerating each photo type within each record
+            const rowsHtml = [];
+            items.forEach(p => {
+                // gather any missing types for this record (for footer row)
+                const missingImgs = photoTypes
+                    .filter(pt => !p[pt.key])
+                    .map(pt => pt.label);
+
+                photoTypes.forEach(pt => {
+                    const url = p[pt.key] ? String(p[pt.key]) : '';
+                    let imageHtml = '';
+                    if (url) {
+                        // display actual photo only, small thumbnail 100×100 so copy/paste is lightweight
+                        imageHtml = `
+                            <div style="margin:4px 0;">
+                                <img src="${esc(url)}" width="100" height="100" style="object-fit:cover; display:block; border-radius:4px;" />
+                            </div>
+                        `;
+                    } else {
+                        imageHtml = `<div style="font-size:11px; color:#a00;">No Image Provided</div>`;
+                    }
+
+                    rowsHtml.push(`
+                        <tr style="border-bottom:1px solid #f3f3f3;">
+                            <td style="padding:8px 10px; font-weight:700; font-size:12px;">${esc(pt.label)}</td>
+                            <td style="padding:8px 10px; font-size:12px; color:#555; line-height:1.5;">
+                                ${imageHtml}
+                            </td>
+                        </tr>
+                    `);
+                });
+
+                if (missingImgs.length) {
+                    rowsHtml.push(`
+                        <tr>
+                            <td colspan="2" style="padding:6px 10px; font-size:11px; color:#a00;">Missing: ${esc(missingImgs.join(', '))}</td>
+                        </tr>
+                    `);
+                }
+            });
+
+            return `
+                <div style="margin-bottom: 22px; font-family: 'Segoe UI', Tahoma, sans-serif;">
+                    <div style="background:#fff; border:1px solid #e9ecef; border-radius:10px; overflow:hidden;">
+                        <div style="padding:12px 14px; background:#f8f9fa; border-bottom:1px solid #e9ecef;">
+                            <div style="font-weight:800; color:#242424;">${esc(name)}</div>
+                            <div style="font-size:12px; color:#666;">${items.length} photo item(s)</div>
+                        </div>
+                        <table style="width:100%; border-collapse:collapse; table-layout:fixed;">
+                            <thead style="background:#fff; border-bottom:1px solid #eee;">
+                                <tr>
+                                    <th style="padding:10px; text-align:left; width:240px; font-size:11px; color:#333;">Photo Type</th>
+                                    <th style="padding:10px; text-align:left; font-size:11px; color:#333;">Details</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${rowsHtml.join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                    <br>
+                </div>
+            `;
+        }).join('');
+
+        const instructionBlock = `
+            <div style="padding: 16px; background-color: #fafafa; border-bottom: 1px solid #e0e0e0; font-family: 'Segoe UI', sans-serif; margin: 8px;">
+                <div>
+                    <div style="font-size: 16px; font-weight: 600; color: #242424; margin: 0 0 8px 0;">RSYC Center Photos Instructions</div>
+                    <p style="font-size: 14px; color: #333; line-height: 1.5; margin: 0 0 8px 0;">Please click in the area beneath each of the field labels to upload photos for each section in the form below. Changes are saved when you click out of the field.</p>
+                    <div>
+                        <a href="https://sauss.sharepoint.com/sites/ConnectCommunications/SitePages/Manage-Youth-Center-Web-Profile.aspx#center-profile-manager" target="_blank" style="font-size: 13px; color: #0078d4; text-decoration: underline; margin: 0 6px 12px 0; display: inline-block;">Learn more</a>
+                        <a href="https://southernusa.salvationarmy.org/redshieldyouth/center-locations" target="_blank" style="font-size: 13px; color: #0078d4; text-decoration: underline; margin: 0 6px 12px 0; display: inline-block;">View Your Profile</a>
+                    </div>
+                    <div style="font-size: 13px; color: #444; background-color: #fff8e1; border-left: 4px solid #f2c200; padding: 8px 10px; margin: 0 0 16px 0; line-height: 1.5;">
+                        💬 After you make changes to photos, please @mention our team in the comments on the right like this: @Shared THQ Web and Social Media, We have added new center photos ready to publish.
+                    </div>
+                </div>
+                <div style="display:flex; flex-wrap:wrap; gap:10px; margin:4px 0 0 0;">
+                    <div>
+                        <div style="font-size:15px; font-weight:600; color:#242424; margin:0 0 8px 0;">Check it out!</div>
+                        <a href="https://southernusa.salvationarmy.org/redshieldyouth/hickory" target="_blank" style="font-size:15px; color:#0078d4; text-decoration:underline;">View an example of a profile with localized photos.</a>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        return `
+            <div style="font-family: 'Segoe UI', Tahoma, sans-serif; color: #333; max-width: 1000px; line-height: 1.5;">
+                <div style="background-color: #f4f4f4; padding: 14px; border-left: 6px solid #d93d3d; font-weight: bold; margin-bottom: 25px; font-size: 18px; color: #333; display: block; width: 100%;">📸 RSYC CENTER PHOTOS CATALOG</div>
+                ${instructionBlock}
+                <p style="font-size: 14px; margin-top: 0; color: #666; margin-bottom: 18px; display: block;">Generated on ${new Date().toLocaleDateString()} • ${val((photos || []).length)} total photo item(s)</p>
+                <br>
+                ${centerBlocks || '<div style="font-size:13px; color:#999;">No photos found.</div>'}
+            </div>
+        `;
+    }
+
     generateEmailAuditInfoPages(data) {
         const { centers, informationalPages } = data;
 
@@ -4117,7 +4391,10 @@ class RSYCGeneratorV2 {
                 <div>
                     <div style="font-size: 18px; font-weight: 600; color: #242424; margin-bottom: 8px;">RSYC Informational Pages Instructions</div>
                     <div style="font-size: 14px; color: #333; margin-bottom: 12px; line-height:1.5;">Use Informational Pages to support youth presentations, parent meetings, and important center-wide communication. These pages provide a link you can reference during live sessions and share with families afterward.</div>
-                    
+                    <div style="margin-bottom: 12px;">
+                        <a href="https://submitinfopage-rsyc.usscommunications.org/" target="_blank" style="font-size: 13px; color: #0078d4; text-decoration: underline; font-weight: 600; margin: 0 6px 12px 0; display: inline-block;">Submit a New Informational Page</a>
+                        <a href="https://infopagereview-rsyc.usscommunications.org/" target="_blank" style="font-size: 13px; color: #0078d4; text-decoration: underline; font-weight: 600; margin: 0 6px 12px 0; display: inline-block;">View and edit submitted info pages</a>
+                    </div>
                     <div style="font-size: 15px; font-weight: 600; margin-bottom: 6px;">Suggested Informational Page Topics:</div>
                     <div style="font-size: 14px; color:#444; line-height:1.6; margin-bottom:12px;">
                         • Digital Citizenship & Online Safety<br>
@@ -4142,11 +4419,11 @@ class RSYCGeneratorV2 {
         `;
 
         const fieldRows = [
-            ['PageTitle', 'Public name of the information page.'],
-            ['Category', 'Categorization (Bullying Prevention, Safety, Faith, etc).'],
-            ['Body', 'Full narrative content and resources for the page.'],
-            ['ExternalURL', 'Link to related materials, forms, or external websites.'],
-            ['URLThumbnailImage', 'Thumbnail icon or photo for the page listing.']
+            ['PageTitle', 'PageTitle', 'Public name of the information page.'],
+            ['Category', 'Category', 'Categorization (Bullying Prevention, Safety, Faith, etc).'],
+            ['Body', 'Body', 'Full narrative content and resources for the page.'],
+            ['ExternalURL', 'ExternalURL', 'Link to related materials, forms, or external websites.'],
+            ['URLThumbnailImage', 'URLThumbnailImage', 'Thumbnail icon or photo for the page listing.']
         ];
 
         const fieldGuide = `
@@ -4156,14 +4433,16 @@ class RSYCGeneratorV2 {
                     <table style="width:100%; border-collapse:collapse; font-size:12px;">
                         <thead style="background:#f8f9fa; border-bottom:1px solid #eee;">
                             <tr>
-                                <th style="padding:10px; text-align:left; width:240px;">Field</th>
+                                <th style="padding:10px; text-align:left; width:200px;">Field</th>
+                                <th style="padding:10px; text-align:left; width:200px;">Raw Name</th>
                                 <th style="padding:10px; text-align:left;">Purpose</th>
                             </tr>
                         </thead>
                         <tbody>
-                            ${fieldRows.map(([f,p], idx) => `
+                            ${fieldRows.map(([f,v,p], idx) => `
                                 <tr style="border-bottom:1px solid #f3f3f3; ${idx % 2 ? 'background:#fcfcfc;' : ''}">
                                     <td style="padding:8px 10px; font-family:Consolas, monospace; font-size:11px; color:#333;">${esc(f)}</td>
+                                    <td style="padding:8px 10px; font-family:Consolas, monospace; font-size:11px; color:#333;">${esc(v)}</td>
                                     <td style="padding:8px 10px; color:#555; line-height:1.5;">${esc(p)}</td>
                                 </tr>
                             `).join('')}
@@ -4322,7 +4601,12 @@ class RSYCGeneratorV2 {
             return normalizeDivisionName(div) === selectedDivision;
         });
         const divisionCenterSpIds = new Set(divisionCenters.map(c => String(c.sharePointId ?? c.SharePointId ?? '')).filter(Boolean));
-        const divisionLeaders = (leaders || []).filter(l => (l.centerIds || []).some(id => divisionCenterSpIds.has(String(id))));
+        const divisionLeaders = (leaders || []).filter(l => {
+            // treat leaders without any centerIds as global/unassigned and include them
+            if (!l.centerIds || !l.centerIds.length) return true;
+            // normalize to string for comparison (centers may store IDs as numbers)
+            return (l.centerIds || []).map(String).some(id => divisionCenterSpIds.has(String(id)));
+        });
         const divisionStaffTable = this.generateEmailAuditStaffTable({
             centers: divisionCenters,
             leaders: divisionLeaders
@@ -4864,8 +5148,13 @@ class RSYCGeneratorV2 {
             const hasVolunteer = !!(c.volunteerText && String(c.volunteerText).trim());
             const centerSchedules = schedules.filter(s => s.centerId == spId);
             const schedCount = centerSchedules.length;
-            const hasStaff = centerSchedules.some(s => (s.contacts && s.contacts.length > 0) || (s.ContactInfo && s.ContactInfo.length > 0));
-            const leaderCount = leaders.filter(l => (l.centerIds || []).includes(spId)).length;
+            const leaderCount = leaders.filter(l => {
+                if (!l.centerIds || !l.centerIds.length) return false;
+                return (l.centerIds || []).map(String).includes(String(spId));
+            }).length;
+            // indicate staff if either schedules list contacts or leaders JSON includes this center
+            const hasStaff = centerSchedules.some(s => (s.contacts && s.contacts.length > 0) || (s.ContactInfo && s.ContactInfo.length > 0))
+                            || leaderCount > 0;
             const photosForCenter = photos.filter(p => p.centerId == spId);
             const urlFields = ['urlExteriorPhoto','urlFacilityFeaturesPhoto','urlProgramsPhoto','urlNearbyCentersPhoto','urlParentsSectionPhoto','urlYouthSectionPhoto','urlGetInvolvedPhoto','urlFooterPhoto'];
             const urlSet = new Set();
@@ -4887,7 +5176,9 @@ class RSYCGeneratorV2 {
             const facilityCount = (c.facilityFeatures || []).length;
             const programCount = (c.featuredPrograms || []).length;
             
-            const eventCount = events.filter(e => e.centerId == spId).length;
+            // count schedules flagged as events (ShowinEventsSection true) rather than using the deprecated
+            // `events` feed. This aligns audit counts with the program schedules source of truth.
+            const eventCount = centerSchedules.filter(s => s.ShowinEventsSection === true).length;
             const infoPageCount = informationalPages.filter(p => p.centerId == spId).length;
 
             return {
@@ -4945,8 +5236,8 @@ class RSYCGeneratorV2 {
             photos_centers: rows.filter(r => r.photoCount > 0).length,
             photos_items: rows.reduce((s, r) => s + (r.photoCount || 0), 0),
             hours: rows.filter(r => r.hasHours).length,
-            events_centers: Array.from(new Set((events || []).map(e => e.centerId))).length,
-            events_items: (events || []).length,
+            events_centers: rows.filter(r => r.eventCount > 0).length,
+            events_items: rows.reduce((s, r) => s + (r.eventCount || 0), 0),
             informationalPages_centers: Array.from(new Set((informationalPages || []).map(p => p.centerId))).length,
             informationalPages_items: (informationalPages || []).length
         };
@@ -5077,7 +5368,7 @@ class RSYCGeneratorV2 {
 
         const copySchedulesBtn = document.createElement('button');
         copySchedulesBtn.className = 'btn btn-success btn-sm';
-        copySchedulesBtn.innerHTML = '<i class="bi bi-calendar-week"></i> Copy Program Schedules';
+        copySchedulesBtn.innerHTML = '<i class="bi bi-calendar-week"></i> Copy Program Schedules & Events';
         copySchedulesBtn.onclick = () => {
             const reportHtml = this.generateEmailAuditProgramSchedules({
                 centers,
@@ -5093,17 +5384,17 @@ class RSYCGeneratorV2 {
 
         const copyEventsBtn = document.createElement('button');
         copyEventsBtn.className = 'btn btn-success btn-sm';
-        copyEventsBtn.innerHTML = '<i class="bi bi-megaphone"></i> Copy Events';
+        copyEventsBtn.innerHTML = '<i class="bi bi-megaphone"></i> Copy Program Schedules & Events';
         copyEventsBtn.onclick = () => {
             const reportHtml = this.generateEmailAuditEvents({
                 centers,
-                events
+                schedules
             });
             const blob = new Blob([reportHtml], { type: 'text/html' });
             const data = [new ClipboardItem({ 'text/html': blob })];
             navigator.clipboard.write(data).then(() => {
                 copyEventsBtn.textContent = '✓ Copied!';
-                setTimeout(() => copyEventsBtn.innerHTML = '<i class="bi bi-megaphone"></i> Copy Events', 2000);
+                setTimeout(() => copyEventsBtn.innerHTML = '<i class="bi bi-megaphone"></i> Copy Program Schedules & Events', 2000);
             });
         };
 
@@ -5136,6 +5427,29 @@ class RSYCGeneratorV2 {
             navigator.clipboard.write(data).then(() => {
                 copyInfoPagesBtn.textContent = '✓ Copied!';
                 setTimeout(() => copyInfoPagesBtn.innerHTML = '<i class="bi bi-info-circle"></i> Copy Info Pages', 2000);
+            });
+        };
+
+        const copyPhotosBtn = document.createElement('button');
+        copyPhotosBtn.className = 'btn btn-success btn-sm';
+        copyPhotosBtn.innerHTML = '<i class="bi bi-camera"></i> Copy Center Photos';
+        copyPhotosBtn.onclick = () => {
+            // try to reuse the preview's HTML if already rendered so copy output matches exactly
+            let reportHtml;
+            const previewEl = document.getElementById('rsyc-photos-preview');
+            if (previewEl) {
+                reportHtml = previewEl.innerHTML;
+            } else {
+                reportHtml = this.generateEmailAuditPhotos({
+                    centers,
+                    photos
+                });
+            }
+            const blob = new Blob([reportHtml], { type: 'text/html' });
+            const data = [new ClipboardItem({ 'text/html': blob })];
+            navigator.clipboard.write(data).then(() => {
+                copyPhotosBtn.textContent = '✓ Copied!';
+                setTimeout(() => copyPhotosBtn.innerHTML = '<i class="bi bi-camera"></i> Copy Center Photos', 2000);
             });
         };
 
@@ -5238,7 +5552,12 @@ class RSYCGeneratorV2 {
 
                 const eventsHtml = this.generateEmailAuditEvents({
                     centers,
-                    events
+                    schedules
+                });
+
+                const photosHtml = this.generateEmailAuditPhotos({
+                    centers,
+                    photos
                 });
 
                 const storiesHtml = this.generateEmailAuditStories({
@@ -5298,6 +5617,8 @@ class RSYCGeneratorV2 {
                         <br>
                         ${eventsHtml}
                         <br>
+                        ${photosHtml}
+                        <br>
                         ${infoPagesHtml}
                         <br>
                         ${storiesHtml}
@@ -5342,6 +5663,7 @@ class RSYCGeneratorV2 {
         btnRow.appendChild(copyEventsBtn);
         btnRow.appendChild(copyStoriesBtn);
         btnRow.appendChild(copyInfoPagesBtn);
+        btnRow.appendChild(copyPhotosBtn);
         btnRow.appendChild(copyStaffTableBtn);
         btnRow.appendChild(copyEditorsBtn);
         btnRow.appendChild(copyDocsBtn);
@@ -5547,7 +5869,7 @@ class RSYCGeneratorV2 {
         const eventsPreviewSection = document.createElement('div');
         eventsPreviewSection.innerHTML = this.generateEmailAuditEvents({
             centers,
-            events
+            schedules
         });
 
         const infoPagesPreviewSection = document.createElement('div');
@@ -5560,6 +5882,13 @@ class RSYCGeneratorV2 {
         storiesPreviewSection.innerHTML = this.generateEmailAuditStories({
             centers,
             stories
+        });
+
+        const photosPreviewSection = document.createElement('div');
+        photosPreviewSection.id = 'rsyc-photos-preview';
+        photosPreviewSection.innerHTML = this.generateEmailAuditPhotos({
+            centers,
+            photos
         });
 
         const staffPreviewSection = document.createElement('div');
@@ -5586,6 +5915,7 @@ class RSYCGeneratorV2 {
         accordion.appendChild(makeAccordionItem('previewSchedules', 'Program Schedules (Full Catalog)', schedulesPreviewSection, false));
         accordion.appendChild(makeAccordionItem('previewEvents', 'Upcoming Events (Full Catalog)', eventsPreviewSection, false));
         accordion.appendChild(makeAccordionItem('previewStories', 'Published Stories (Full Catalog)', storiesPreviewSection, false));
+        accordion.appendChild(makeAccordionItem('previewPhotos', 'Center Photos (Full Catalog)', photosPreviewSection, false));
         accordion.appendChild(makeAccordionItem('previewInfoPages', 'Informational Pages (Full Catalog)', infoPagesPreviewSection, false));
         accordion.appendChild(makeAccordionItem('previewStaff', 'Staff Table (Full Preview)', staffPreviewSection, false));
         accordion.appendChild(makeAccordionItem('previewEditors', 'Editors (Full Permissions)', editorsPreviewSection, false));

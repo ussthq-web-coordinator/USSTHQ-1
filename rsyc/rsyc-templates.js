@@ -1031,15 +1031,20 @@ console.log('[RSYC] Audit modal initialized');
                 <img src="https://thisishoperva.org/rsyc/Red+Shield+Youth+Centers+Logo+-+Color.svg" alt="Red Shield Youth Centers Logo" style="height:42px; max-width:120px; width:auto; object-fit:contain; display:block;" />
             </div>
 
-            ${(eventTypeText || eventSubtitleText) ? `<div class="mb-3 rsyc-event-cost" style="font-size: 1rem; color:#333;">
-                ${eventTypeText && eventTypeText !== evt.title ? `<div class="rsyc-event-cost"><strong>Type:</strong><br>${this.escapeHTML(eventTypeText)}</div>` : ''}
-                ${eventSubtitleText ? `<div style="margin-top:0.5rem;"><strong>Subtitle:</strong><br>${this.escapeHTML(eventSubtitleText)}</div>` : ''}
-            </div>` : ''}
             ${evt.isOnSale ? `<div class="mb-3"><span class="badge" style="background:#dc3545;">On Sale</span></div>` : ''}
             ${isScheduleInEvents ? '' : `${(dateText || timeText) ? `<div class="mb-3" style="font-size: 1rem; color:#333;">
                 ${dateText ? `<div><strong>Date:</strong><br>${this.escapeHTML(dateText)}</div>` : ''}
                 ${timeText ? `<div style="margin-top:0.5rem;" class="rsyc-event-cost"><strong>Time:</strong><br>${this.escapeHTML(timeText)}</div>` : ''}
             </div>` : ''}`}
+            ${!isScheduleInEvents && eventTypeText ? `<div class="mb-3" style="font-size:1rem; color:#333;"><strong>Type:</strong><br>${this.escapeHTML(eventTypeText)}</div>` : ''}
+            ${evt.description ? `<div class="mb-3 rsyc-event-cost" style="font-size: 1.1rem; line-height: 1.7; color:#333;">${evt.description}</div>` : ''}
+            ${evt.whatToBring || evt.materialsProvided ? `
+            <div class="mb-3" style="background:#f0f8ff; padding:1rem; border-radius:6px; border-left:3px solid #4169e1; color:#333;">
+                <strong style="color:#4169e1;"><i class="bi bi-backpack2 me-2"></i>What to Bring:</strong>
+                ${evt.whatToBring ? `<div class="mt-2">${this.preserveLineBreaks(evt.whatToBring)}</div>` : ''}
+                ${evt.materialsProvided ? `<div class="mt-2"><u>Materials Provided:</u><br>${this.preserveLineBreaks(evt.materialsProvided)}</div>` : ''}
+            </div>
+            ` : ''}
             
             <!-- Schedule-specific fields with styled sections -->
             ${isScheduleInEvents ? `
@@ -1050,19 +1055,12 @@ console.log('[RSYC] Audit modal initialized');
                     ${evt.cost ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Cost:</strong><br>${this.escapeHTML(evt.cost)}</div>` : ''}
                     ${evt.registrationFee ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Registration Fee:</strong><br>${this.escapeHTML(evt.registrationFee)}</div>` : ''}
                     ${evt.startDate || evt.endDate ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Program Dates:</strong><br>${evt.startDate ? this.escapeHTML(evt.startDate) : ''} ${evt.startDate && evt.endDate ? '-' : ''} ${evt.endDate ? this.escapeHTML(evt.endDate) : ''}</div>` : ''}
+                    ${evt.eventTypeText ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Type:</strong><br>${this.escapeHTML(evt.eventTypeText)}</div>` : ''}
                     ${evt.frequency ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Frequency:</strong><br>${this.escapeHTML(evt.frequency)}</div>` : ''}
                     ${evt.ageRange ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Ages:</strong><br>${this.escapeHTML(evt.ageRange)}</div>` : ''}
                     ${evt.programRunsIn && Array.isArray(evt.programRunsIn) && evt.programRunsIn.length > 0 ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Program Runs In:</strong><br>${this.escapeHTML(evt.programRunsIn.join(', '))}</div>` : ''}
                     
                     ${evt.scheduleDisclaimer ? `<div class="col-sm-12 mb-3" style="background:#fff3cd; padding:1rem; border-radius:6px; border-left:3px solid #ff6b6b; color:#000;"><strong style="color:#000;"><i class="bi bi-exclamation-triangle me-2"></i>Important Dates/Closures:</strong><br><div class="mt-2" style="font-size:0.95rem;">${this.escapeHTML(evt.scheduleDisclaimer)}</div></div>` : ''}
-                    
-                    ${evt.whatToBring || evt.materialsProvided ? `
-                    <div class="col-sm-12 mb-3" style="background:#f0f8ff; padding:1rem; border-radius:6px; border-left:3px solid #4169e1; color:#333;">
-                        <strong style="color:#4169e1;"><i class="bi bi-backpack2 me-2"></i>What to Bring:</strong>
-                        ${evt.whatToBring ? `<div class="mt-2">${this.preserveLineBreaks(evt.whatToBring)}</div>` : ''}
-                        ${evt.materialsProvided ? `<div class="mt-2"><u>Materials Provided:</u><br>${this.preserveLineBreaks(evt.materialsProvided)}</div>` : ''}
-                    </div>
-                    ` : ''}
                 </div>
             ` : ''}
             
@@ -1073,8 +1071,6 @@ console.log('[RSYC] Audit modal initialized');
                 <strong>What you can expect:</strong><br>
                 ${this.makeContactsClickable(this.escapeHTML(evt.specialFeatures))}
             </div>` : ''}
-
-            ${evt.description ? `<div class="mb-3 rsyc-event-cost" style="font-size: 1.1rem; line-height: 1.7; color:#333;">${evt.description}</div>` : ''}
 
             ${addressText ? `
             <div class="mb-3 rsyc-event-location" style="background:#f8f9fa; padding:1rem; border-radius:8px; border:1px solid #e0e0e0;">
@@ -1089,7 +1085,7 @@ console.log('[RSYC] Audit modal initialized');
             </div>
             ` : ''}
 
-            ${(evt.contacts && evt.contacts.length > 0) || (evt.contactName || evt.contactEmail || evt.contactNumber) || (evt.contactInfo && evt.contactInfo.trim().length > 0) ? `
+            ${(evt.contacts && evt.contacts.length > 0) || (evt.contactName || evt.contactEmail || evt.contactNumber || evt.contactPhoneNumber) || (evt.contactInfo && evt.contactInfo.trim().length > 0) ? `
             <div class="mb-3 p-4" style="background:#f0f7f7; border-radius:12px; border:1px solid #d1e7e7; color:#333;">
                 <strong style="color:#20B3A8; text-transform:uppercase; font-size:1.1rem; letter-spacing:0.05rem; display:block;">Point${(evt.contacts && evt.contacts.length > 1) ? 's' : ''} of Contact</strong>
                 ${evt.contacts && evt.contacts.length > 0 ? evt.contacts.map((contact, idx) => `
@@ -1105,6 +1101,7 @@ console.log('[RSYC] Audit modal initialized');
                         ${evt.contactName ? `<div class="rsyc-contact-name" style="font-weight:700; font-size:1.25rem; color:#111;">${this.escapeHTML(evt.contactName)}</div>` : ''}
                         ${evt.contactEmail ? `<div class="rsyc-contact-email mt-1"><a href="mailto:${this.escapeHTML(evt.contactEmail)}" style="color:#2F4857; text-decoration:underline; font-weight:400;"><i class="bi bi-envelope-at me-2"></i>${this.escapeHTML(evt.contactEmail)}</a></div>` : ''}
                         ${evt.contactNumber ? `<div class="rsyc-contact-phone mt-1"><a href="tel:${evt.contactNumber.replace(/\D/g, '')}" style="color:#2F4857; text-decoration:underline; font-weight:400;"><i class="bi bi-telephone me-2"></i>${this.escapeHTML(evt.contactNumber)}</a></div>` : ''}
+                        ${evt.contactPhoneNumber ? `<div class="rsyc-contact-phone mt-1"><a href="tel:${evt.contactPhoneNumber.replace(/\D/g, '')}" style="color:#2F4857; text-decoration:underline; font-weight:400;"><i class="bi bi-telephone me-2"></i>${this.escapeHTML(evt.contactPhoneNumber)}</a></div>` : ''}
                     </div>
                 ` : ''}
                 ${evt.contactInfo && evt.contactInfo.trim().length > 0 ? `<div class="mt-2 pt-2${(evt.contacts && evt.contacts.length > 0) || (evt.contactName || evt.contactEmail || evt.contactNumber) ? ' border-top' : ''}" style="${(evt.contacts && evt.contacts.length > 0) || (evt.contactName || evt.contactEmail || evt.contactNumber) ? 'border-top-color:rgba(32,179,168,0.2) !important;' : ''}font-size:0.9rem;">${this.makeContactsClickable(this.escapeHTML(evt.contactInfo))}</div>` : ''}
@@ -1177,14 +1174,15 @@ console.log('[RSYC] Audit modal initialized');
         }).join('');
 
         const scrollHint = sortedEvents.length > 3 ? `
-            <p class="text-center mb-n2">
+            <p class="rsyc-scroll-hint text-center mb-n2">
                 <small class="text-muted" style="color:rgba(255,255,255,0.85);">
                     Scroll to view more
                     <i class="bi bi-arrow-right-circle" style="font-size: 0.85em; vertical-align: middle;"></i>
                 </small>
             </p>` : '';
 
-        const justifyContent = sortedEvents.length <= 3 ? 'justify-content-start' : '';
+        // always centre cards; CSS handles wrapping on wide screens
+const justifyContent = 'justify-content-center';
 
         return `<!-- Events -->
 <div id="events" class="freeTextArea section" style="background-color: #cb2e3d; display: block !important; visibility: visible !important; opacity: 1 !important; height: auto !important;">
@@ -1194,9 +1192,11 @@ console.log('[RSYC] Audit modal initialized');
                 <div class="bg-area rounded p-4">
                     <h2 class="fw-bold mb-4 text-center" style="color:#fff;">Upcoming <em style="color:#fff;">Events</em></h2>
                     ${scrollHint}
-                    <div style="display: flex; justify-content: center; width: 100%; margin: 0 auto;">
-                        <div class="d-flex overflow-auto gap-4 py-2 ${justifyContent}" style="scroll-snap-type: x mandatory; max-width: 1400px; width: 100%;">
-                            ${eventCards}
+                    <div class="rsyc-center-container" style="width:100%;">
+                        <div style="display: flex; justify-content: center; width: 100%; margin: 0 auto;">
+                            <div class="d-flex overflow-auto gap-4 py-2 ${justifyContent}" style="scroll-snap-type: x mandatory; max-width: 1400px; width: 100%;">
+                                ${eventCards}
+                            </div>
                         </div>
                     </div>
                     ${eventModals}
@@ -1392,14 +1392,14 @@ console.log('[RSYC] Audit modal initialized');
             }).join('');
 
             const scrollHint = informationalPages.length > 3 ? `
-                <p class="text-center mb-n2">
+                <p class="rsyc-scroll-hint text-center mb-n2">
                     <small class="text-muted" style="color:rgba(255,255,255,0.85);">
                         Scroll to view more
                         <i class="bi bi-arrow-right-circle" style="font-size: 0.85em; vertical-align: middle;"></i>
                     </small>
                 </p>` : '';
 
-            const justifyContent = informationalPages.length <= 3 ? 'justify-content-start' : '';
+            const justifyContent = 'justify-content-center';
 
             return `<!-- Informational Pages -->
 <div id="infopages" class="freeTextArea section" style="background-color: #00929C; display: block !important; visibility: visible !important; opacity: 1 !important; height: auto !important;">
@@ -1409,9 +1409,11 @@ console.log('[RSYC] Audit modal initialized');
                 <h2 class="fw-bold mb-2 text-center" style="color:#fff;">Center <em style="color:#fff;">Information</em></h2>
                 <p class="text-center mb-4" style="max-width: 600px; margin-left: auto; margin-right: auto; color: rgba(255,255,255,0.9);">Key resources, safety protocols, and operational guidelines for our center community.</p>
                 ${scrollHint}
-                <div style="display: flex; justify-content: center; width: 100%; margin: 0 auto;">
-                    <div class="d-flex overflow-auto gap-4 py-3 ${justifyContent}" style="scroll-snap-type: x mandatory; padding-left:1rem; padding-right:1rem; max-width: 1400px; width: 100%;">
-                        ${infoCards}
+                <div class="rsyc-center-container" style="width:100%;">
+                    <div style="display: flex; justify-content: center; width: 100%; margin: 0 auto;">
+                        <div class="d-flex overflow-auto gap-4 py-3 justify-content-center" style="scroll-snap-type: x mandatory; padding-left:1rem; padding-right:1rem; max-width: 1400px; width: 100%;">
+                            ${infoCards}
+                        </div>
                     </div>
                 </div>
                 ${infoModals}
@@ -1521,14 +1523,14 @@ console.log('[RSYC] Audit modal initialized');
         }).join('');
 
         const scrollHint = sortedStories.length > 3 ? `
-            <p class="text-center mb-n2">
+            <p class="rsyc-scroll-hint text-center mb-n2">
                 <small class="text-muted" style="color:rgba(255,255,255,0.85);">
                     Scroll to view more
                     <i class="bi bi-arrow-right-circle" style="font-size: 0.85em; vertical-align: middle;"></i>
                 </small>
             </p>` : '';
 
-        const justifyContent = sortedStories.length <= 3 ? 'justify-content-start' : '';
+        const justifyContent = 'justify-content-center';
 
         return `<!-- Stories -->
 <style>
@@ -1595,8 +1597,9 @@ console.log('[RSYC] Audit modal initialized');
                 <div class="bg-area rounded p-4">
                     <h2 class="fw-bold mb-4 text-center" style="color:#fff;">Recent <em style="color:#fff;">Stories</em></h2>
                     ${scrollHint}
-                    <div style="display: flex; justify-content: center; width: 100%; margin: 0 auto;">
-                        <div class="stories-container ${justifyContent}" style="max-width: 1400px; width: 100%;">
+                    <div class="rsyc-center-container" style="width:100%;">
+                        <div style="display: flex; justify-content: center; width: 100%; margin: 0 auto;">
+                            <div class="stories-container justify-content-center" style="max-width: 1400px; width: 100%;">
                             ${storyCards}
                         </div>
                     </div>
@@ -1891,6 +1894,10 @@ ${modal}`;
                     }
                 }
                 
+// build address text for schedules (city/state/postal may also be available)
+                const addressText = [schedule.address, schedule.city, schedule.state, schedule.postalCode].filter(Boolean).join(', ');
+                const directionsUrl = addressText ? `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(addressText)}` : '';
+
                 // Parse months for tooltip - summarize into readable ranges
                             const months = schedule.programRunsIn && Array.isArray(schedule.programRunsIn)
                                 ? this.summarizeMonths(schedule.programRunsIn)
@@ -1985,12 +1992,27 @@ ${modal}`;
                 <img src="https://thisishoperva.org/rsyc/Red+Shield+Youth+Centers+Logo+-+Color.svg" alt="Red Shield Youth Centers Logo" style="height:42px; max-width:120px; width:auto; object-fit:contain; display:block;" />
             </div>` : ''}
             ${schedule.title ? `<h3 class="mb-2" style="color:#333;">${this.escapeHTML(schedule.title)}</h3>` : ''}
-            ${isEvent && (eventTypeText || eventSubtitleText) ? `<div class="mb-3" style="font-size: 1.1rem; color:#333;">
-                ${eventTypeText ? `<div><strong>Type:</strong><br>${this.escapeHTML(eventTypeText)}</div>` : ''}
-                ${eventSubtitleText ? `<div style="margin-top:0.5rem;"><strong>Subtitle:</strong><br>${this.escapeHTML(eventSubtitleText)}</div>` : ''}
-            </div>` : ''}
+
             ${(!isEvent && schedule.subtitle) ? `<p class="mb-3" style="color:#666; font-style:italic;">${this.escapeHTML(schedule.subtitle)}</p>` : ''}
             ${schedule.description ? `<p class="mb-1 rsyc-description">${schedule.description}</p>` : ''}
+            ${hasContent(schedule.whatToBring) || hasContent(schedule.materialsProvided) ? `
+            <div class="mb-3" style="background:#f0f8ff; padding:1rem; border-radius:6px; border-left:3px solid #4169e1; color:#333;">
+                <strong style="color:#4169e1;"><i class="bi bi-backpack2 me-2"></i>What to Bring:</strong>
+                ${hasContent(schedule.whatToBring) ? `<div class="mt-2">${this.preserveLineBreaks(schedule.whatToBring)}</div>` : ''}
+                ${hasContent(schedule.materialsProvided) ? `<div class="mt-2"><u>Materials Provided:</u><br>${this.preserveLineBreaks(schedule.materialsProvided)}</div>` : ''}
+            </div>
+            ` : ''}
+            ${addressText ? `
+                <div class="mb-3 rsyc-event-location" style="background:#f8f9fa; padding:1rem; border-radius:8px; border:1px solid #e0e0e0;">
+                    <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:0.75rem;">
+                        <div style="min-width:0;">
+                            <strong style="display:block; margin-bottom:0.35rem;"><i class="bi bi-geo-alt me-2"></i>Address</strong>
+                            <div>${this.escapeHTML(addressText)}</div>
+                        </div>
+                        ${directionsUrl ? `<a class="btn btn-outline-secondary btn-sm" href="${directionsUrl}" target="_blank" style="font-size: 0.8rem; padding:0.25rem 0.5rem; flex-shrink:0;"><i class="bi bi-sign-turn-right me-1"></i>Directions</a>` : ''}
+                    </div>
+                </div>
+            ` : ''}
             ${isEvent && (eventDateText || eventTimeText) ? `<div class="mb-3" style="font-size: 1.1rem; color:#333;">
                 ${eventDateText ? `<div><strong>Date:</strong><br>${this.escapeHTML(eventDateText)}</div>` : ''}
                 ${eventTimeText ? `<div style="margin-top:0.5rem;"><strong>Time:</strong><br>${this.escapeHTML(eventTimeText)}</div>` : ''}
@@ -2014,6 +2036,9 @@ ${modal}`;
                 ${hasContent(schedule.registrationFee) ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Registration Fee:</strong><br>${this.escapeHTML(schedule.registrationFee)}</div>` : ''}
                 ${hasContent(schedule.ageRange) ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Ages:</strong><br>${this.escapeHTML(schedule.ageRange)}</div>` : ''}
                 ${scheduleDateText ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Program Dates:</strong><br>${this.escapeHTML(scheduleDateText)}</div>` : hasContent(schedule.startDate) || hasContent(schedule.endDate) ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Program Dates:</strong><br>${hasContent(schedule.startDate) ? this.escapeHTML(schedule.startDate) : ''} ${hasContent(schedule.startDate) && hasContent(schedule.endDate) ? '-' : ''} ${hasContent(schedule.endDate) ? this.escapeHTML(schedule.endDate) : ''}</div>` : ''}
+                ${isEvent && eventTypeText ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Type:</strong><br>${this.escapeHTML(eventTypeText)}</div>` : ''}
+                ${addressText ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Address:</strong><br>${this.escapeHTML(addressText)}</div>` : ''}
+                ${hasContent(schedule.contactPhoneNumber) ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Phone:</strong><br>${this.escapeHTML(schedule.contactPhoneNumber)}</div>` : ''}
                 
                 ${hasContent(schedule.registrationDeadline) ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Registration Deadline:</strong><br>${this.escapeHTML(schedule.registrationDeadline)}</div>` : ''}
                 ${(!isEvent && hasContent(schedule.location)) ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Location:</strong><br>${this.escapeHTML(schedule.location)}</div>` : ''}
@@ -2025,19 +2050,21 @@ ${modal}`;
                 ${hasContent(schedule.closedDates) ? `<div class="col-sm-12 mb-3" style="background:#ffe6e6; padding:1rem; border-radius:6px; border-left:3px solid #dc3545; color:#333;"><strong style="color:#dc3545;"><i class="bi bi-calendar-x me-2"></i>Closed Dates:</strong><br>${this.preserveLineBreaks(schedule.closedDates)}</div>` : ''}
                 ${hasContent(schedule.openHalfDayDates) ? `<div class="col-sm-12 mb-3" style="color:#333;"><strong>Open Half Days:</strong><br>${this.preserveLineBreaks(schedule.openHalfDayDates)}</div>` : ''}
                 ${hasContent(schedule.openFullDayDates) ? `<div class="col-sm-12 mb-3" style="color:#333;"><strong>Open Full Days:</strong><br>${this.preserveLineBreaks(schedule.openFullDayDates)}</div>` : ''}
+                ${(() => {
+                    // output any extra simple string fields not already rendered above
+                    const known = ['id','title','subtitle','description','videoEmbedCode','URLImage','centerName','startDate','endDate','scheduleDays','scheduleTime','registrationFee','ageRange','scheduleDisclaimer','daysText','timeText','months','registrationMonths','registrationDeadline','location','cost','frequency','transportationFeeandDetails','closedDates','openHalfDayDates','openFullDayDates','orientationDetails','whatToBring','materialsProvided','contacts','contactInfo','address','city','state','postalCode','contactPhoneNumber','status'];
+                    const extras = Object.keys(schedule).filter(k => !known.includes(k) && schedule[k] && typeof schedule[k] === 'string').map(k => `
+                        <div class="col-sm-12 mb-2" style="color:#333;"><strong>${this.escapeHTML(k)}:</strong> ${this.escapeHTML(schedule[k])}</div>
+                    `);
+                    return extras.length ? `<div class="col-sm-12 mb-3" style="background:#eef; padding:0.75rem; border-radius:6px;">
+                        ${extras.join('')}
+                    </div>` : '';
+                })()}
                 
                 ${hasContent(schedule.orientationDetails) ? `
                 <div class="col-sm-12 mb-3" style="background:#fffacd; padding:1rem; border-radius:6px; border-left:3px solid #ff8c00; color:#333;">
                     <strong style="color:#000;"><i class="bi bi-info-circle me-2"></i>Orientation Details:</strong>
                     <div class="mt-2" style="font-size:0.95rem; color:#000;">${this.preserveLineBreaks(schedule.orientationDetails)}</div>
-                </div>
-                ` : ''}
-                
-                ${hasContent(schedule.whatToBring) || hasContent(schedule.materialsProvided) ? `
-                <div class="col-sm-12 mb-3" style="background:#f0f8ff; padding:1rem; border-radius:6px; border-left:3px solid #4169e1; color:#333;">
-                    <strong style="color:#4169e1;"><i class="bi bi-backpack2 me-2"></i>What to Bring:</strong>
-                    ${hasContent(schedule.whatToBring) ? `<div class="mt-2">${this.preserveLineBreaks(schedule.whatToBring)}</div>` : ''}
-                    ${hasContent(schedule.materialsProvided) ? `<div class="mt-2"><u>Materials Provided:</u><br>${this.preserveLineBreaks(schedule.materialsProvided)}</div>` : ''}
                 </div>
                 ` : ''}
                 
@@ -2288,9 +2315,9 @@ ${modal}`;
             }).join('');
             
             // Conditionally center if 3 or fewer cards, otherwise left-align for proper scrolling
-            const justifyContent = mergedSchedules.length <= 3 ? 'justify-content-center' : '';
+            const justifyContent = 'justify-content-center';
             const scrollHint = mergedSchedules.length > 3 ? `
-    <p class="text-center mb-n2">
+    <p class="rsyc-scroll-hint text-center mb-n2">
         <small class="text-light">
             Scroll to view more 
             <i class="bi bi-arrow-right-circle" style="font-size: 0.85em; vertical-align: middle;"></i>
@@ -2314,10 +2341,12 @@ ${modal}`;
             scheduleScrollSection = `
     ${scrollHint}
 
-    <div class="horizontal-scroll ${justifyContent}" style="display:flex;gap:1rem;overflow-x:auto;overflow-y:visible;padding-bottom:0.5rem;align-items:stretch;">
-        ${scheduleCards}
+    <!-- center wrapper for horizontal scroll -->
+    <div class="rsyc-center-container" style="width:100%;">
+        <div class="horizontal-scroll justify-content-center" style="display:flex;gap:1rem;overflow-x:auto;overflow-y:visible;padding-bottom:0.5rem;align-items:stretch; max-width:1400px; width:100%;">
+            ${scheduleCards}
+        </div>
     </div>
-    
     <div class="text-center mt-4">
         <button class="btn btn-outline-primary" onclick="printAllSchedules('${schedulesCacheKey}')" style="border-color:#d3d3d3; color:#d3d3d3;">
             <i class="bi bi-printer me-2"></i>Print / Save all as PDF
@@ -2384,7 +2413,7 @@ ${modal}`;
             <div class="mt-0 mb-5">
                 ${scheduleTitleSection}
                 
-                <div class="schedule-scroll-wrapper">
+                <div class="schedule-scroll-wrapper" style="margin:0; display:flex; flex-direction:column; align-items:center;">
                     ${scheduleScrollSection}
                 </div>
                 
@@ -2990,8 +3019,8 @@ ${modal}`;
                         </small>
                     </p>` : '';
         
-        // Left-align cards if 3 or fewer, otherwise leave for scrolling
-        const justifyContent = sorted.length <= 3 ? 'justify-content-start' : '';
+        // always centre cards; scroll/ wrapping handled via CSS
+        const justifyContent = 'justify-content-center';
 
         return `<!-- Staff & Community Leaders -->
 <div id="staff" class="freeTextArea u-centerBgImage section u-coverBgImage" style="background-color: #F7A200; display: block !important; visibility: visible !important; opacity: 1 !important; height: auto !important;">
@@ -3003,7 +3032,7 @@ ${modal}`;
                     ${scrollHint}
                     
                     <div style="display: flex; justify-content: center; width: 100%; margin: 0 auto;">
-                        <div class="d-flex overflow-auto gap-4 py-2 ${justifyContent}" style="scroll-snap-type: x mandatory; max-width: 1400px; width: 100%;">
+                        <div class="d-flex overflow-auto gap-4 py-2 justify-content-center" style="scroll-snap-type: x mandatory; max-width: 1400px; width: 100%;">
                             ${staffCards}
                         </div>
                     </div>
