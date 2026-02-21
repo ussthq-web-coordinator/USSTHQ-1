@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dynamic Phone Number Extractor - Always Up-to-Date</title>
+    <style>
+        body {
+            font-family: 'Courier New', monospace;
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .results {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            padding: 15px;
+            margin-top: 20px;
+            white-space: pre-wrap;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            line-height: 1.3;
+            max-height: 600px;
+            overflow-y: auto;
+        }
+        .loading {
+            color: #007bff;
+            font-weight: bold;
+        }
+        .error {
+            color: #dc3545;
+            font-weight: bold;
+        }
+        .success {
+            color: #28a745;
+            font-weight: bold;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px 5px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        .summary {
+            background: #e7f3ff;
+            border: 1px solid #b3d9ff;
+            border-radius: 4px;
+            padding: 15px;
+            margin: 20px 0;
+        }
+        .refresh-info {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            border-radius: 4px;
+            padding: 10px;
+            margin: 10px 0;
+            font-size: 14px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+        th, td {
+            padding: 8px 12px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+        th {
+            background: #f8f9fa;
+            font-weight: bold;
+        }
+        .has-phone {
+            background: #d4edda;
+        }
+        .no-phone {
+            background: #f8d7da;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📱 Dynamic Phone Number Extractor</h1>
+        <p><strong>Always up-to-date!</strong> This tool uses the live RSYC data system to show current phone numbers.</p>
+        
+        <div class="refresh-info">
+            💡 <strong>Auto-updating:</strong> This tool fetches fresh data each time you click "Refresh Data" to ensure you always see the latest phone numbers from the JSON file.
+        </div>
+        
+        <button onclick="loadAndExtractPhoneNumbers()">🔄 Refresh Data</button>
+        <button onclick="exportToCSV()">📥 Export to CSV</button>
+        <button onclick="showStatistics()">📊 Show Statistics</button>
+        
+        <div id="summary" class="summary" style="display: none;">
+            <!-- Summary will be populated here -->
+        </div>
+        
+        <div id="output" class="results">
+            Click "Refresh Data" to load the latest phone numbers from RSYCLeaders.json
+        </div>
+    </div>
+
+    <script>
+        // Include the rsyc-data.js functionality (simplified version)
+        class PhoneExtractor {
+            constructor() {
+                this.baseURL = 'https://thisishoperva.org/rsyc/';
+                this.cache = {
+                    leaders: null,
+                    centers: null
+                };
+            }
+
+            async fetchJSON(url) {
+                try {
+                    const response = await fetch(url);
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                    }
+                    return await response.json();
+                } catch (error) {
+                    console.error(`Failed to fetch ${url}:`, error.message);
+                    return null;
+                }
+            }
+
+            extractPhoneNumber(leader) {
+                const phoneFields = [
+                    'PhoneNumber', 'phone', 'Phone', 'contactPhone', 'ContactPhone',
+                    'phoneNumber', 'telephone', 'Telephone', 'mobile', 'Mobile',
+                    'cell', 'Cell', 'workPhone', 'WorkPhone', 'homePhone', 
+                    'HomePhone', 'businessPhone', 'BusinessPhone'
+                ];
+                
+                // Check direct fields
+                for (const field of phoneFields) {
+                    if (leader[field]) {
+                        if (typeof leader[field] === 'string' && leader[field].trim()) {
+                            return leader[field].trim();
+                        }
+                        if (leader[field].Value && typeof leader[field].Value === 'string' && leader[field].Value.trim()) {
+                            return leader[field].Value.trim();
+                        }
+                    }
+                }
+                
+                // Check nested Person object
+                if (leader.Person) {
+                    for (const field of phoneFields) {
+                        if (leader.Person[field]) {
+                            if (typeof leader.Person[field] === 'string' && leader.Person[field].trim()) {
+                                return leader.Person[field].trim();
+                            }
+                            if (leader.Person[field].Value && typeof leader.Person[field].Value === 'string' && leader.Person[field].Value.trim()) {
+                                return leader.Person[field].Value.trim();
+                            }
+                        }
+                    }
+                }
+                
+                return null;
+            }
+
+            processLeaders(data) {
+                return data.map(leader => ({
+                    id: leader.ID,
+                    centerIds: leader['Center#Id'] || [],
+                    roleType: leader.RoleType?.Value || '',
+                    positionTitle: leader.PositionTitle || '',
+                    alternateName: leader.AlternateName || '',
+                    phoneNumber: this.extractPhoneNumber(leader),
+                    person: leader.Person ? {
+                        name: leader.Person.DisplayName,
+                        email: leader.Person.Email,
+                        department: leader.Person.Department,
+                        title: leader.Person.JobTitle
+                    } : null
+                }));
+            }
+
+            getLeadersWithPhoneNumbers() {
+                const leaders = this.cache.leaders || [];
+                return leaders
+                    .filter(leader => leader.phoneNumber && leader.phoneNumber.trim())
+                    .map(leader => ({
+                        id: leader.id,
+                        name: leader.person?.name || leader.alternateName || leader.positionTitle || `ID ${leader.id}`,
+                        phone: leader.phoneNumber,
+                        centerIds: leader.centerIds,
+                        roleType: leader.roleType,
+                        positionTitle: leader.positionTitle
+                    }))
+                    .sort((a, b) => a.id - b.id);
+            }
+
+            async loadData() {
+                try {
+                    // Load both leaders and centers data
+                    const [leadersData, centersData] = await Promise.all([
+                        this.fetchJSON(this.baseURL + 'RSYCLeaders.json'),
+                        this.fetchJSON(this.baseURL + 'units-rsyc-profiles.json')
+                    ]);
+
+                    if (leadersData) {
+                        this.cache.leaders = this.processLeaders(leadersData);
+                    }
+                    if (centersData) {
+                        this.cache.centers = centersData;
+                    }
+
+                    return true;
+                } catch (error) {
+                    console.error('Error loading data:', error);
+                    return false;
+                }
+            }
+
+            getCenterName(centerId) {
+                if (!this.cache.centers || !centerId) return 'Unknown';
+                const center = this.cache.centers.find(c => c.sharePointId === centerId);
+                return center ? (center.name || center.Title || 'Unknown') : 'Unknown';
+            }
+
+            getPhoneNumberStats() {
+                const allLeaders = this.cache.leaders || [];
+                const leadersWithPhones = this.getLeadersWithPhoneNumbers();
+                
+                return {
+                    total: allLeaders.length,
+                    withPhones: leadersWithPhones.length,
+                    coverage: allLeaders.length > 0 ? ((leadersWithPhones.length / allLeaders.length) * 100).toFixed(1) : 0,
+                    leaders: leadersWithPhones,
+                    lastUpdated: new Date().toLocaleString()
+                };
+            }
+        }
+
+        // Global extractor instance
+        const extractor = new PhoneExtractor();
+
+        async function loadAndExtractPhoneNumbers() {
+            const outputDiv = document.getElementById('output');
+            const summaryDiv = document.getElementById('summary');
+            
+            outputDiv.innerHTML = '<div class="loading">🔄 Loading fresh data from RSYCLeaders.json...</div>';
+            summaryDiv.style.display = 'none';
+            
+            try {
+                const success = await extractor.loadData();
+                
+                if (!success) {
+                    outputDiv.innerHTML = '<div class="error">❌ Failed to load data from server</div>';
+                    return;
+                }
+                
+                const stats = extractor.getPhoneNumberStats();
+                
+                // Update summary
+                summaryDiv.innerHTML = `
+                    <h3>📊 Live Data Summary</h3>
+                    <p><strong>Total Leaders:</strong> ${stats.total}</p>
+                    <p><strong>Leaders with Phone Numbers:</strong> ${stats.withPhones}</p>
+                    <p><strong>Coverage:</strong> ${stats.coverage}%</p>
+                    <p><strong>Last Updated:</strong> ${stats.lastUpdated}</p>
+                    <p><strong>Data Source:</strong> https://thisishoperva.org/rsyc/RSYCLeaders.json</p>
+                `;
+                summaryDiv.style.display = 'block';
+                
+                // Generate detailed output
+                let output = '='.repeat(100) + '\n';
+                output += '📱 CURRENT PHONE NUMBERS (LIVE DATA)\n';
+                output += '='.repeat(100) + '\n';
+                output += `✅ Found ${stats.withPhones} leaders with phone numbers (out of ${stats.total} total)\n`;
+                output += `📈 Coverage: ${stats.coverage}%\n`;
+                output += `🕒 Last Updated: ${stats.lastUpdated}\n\n`;
+                
+                if (stats.leaders.length === 0) {
+                    output += '❌ No phone numbers found in the current dataset\n';
+                } else {
+                    output += 'ID  | Name                    | Center                   | Phone Number          | Role\n';
+                    output += '----|-------------------------|--------------------------|----------------------|--------------------\n';
+                    
+                    stats.leaders.forEach((leader, index) => {
+                        const idStr = leader.id.toString().padEnd(4);
+                        const nameStr = (leader.name.length > 23 ? leader.name.substring(0, 20) + '...' : leader.name).padEnd(23);
+                        const centerName = extractor.getCenterName(leader.centerIds[0]);
+                        const centerStr = (centerName.length > 24 ? centerName.substring(0, 21) + '...' : centerName).padEnd(24);
+                        const phoneStr = leader.phone.padEnd(20);
+                        const roleStr = leader.roleType.length > 18 ? leader.roleType.substring(0, 15) + '...' : leader.roleType;
+                        
+                        output += `${idStr} | ${nameStr} | ${centerStr} | ${phoneStr} | ${roleStr}\n`;
+                    });
+                }
+                
+                output += '\n' + '='.repeat(100) + '\n';
+                output += '✅ Live data extraction complete!\n';
+                output += '💡 Data is always current - refreshed from live JSON each time\n';
+                
+                outputDiv.innerHTML = `<pre class="results">${output}</pre>`;
+                
+            } catch (error) {
+                outputDiv.innerHTML = `<div class="error">❌ Error: ${error.message}</div>`;
+            }
+        }
+
+        function exportToCSV() {
+            const stats = extractor.getPhoneNumberStats();
+            
+            if (stats.leaders.length === 0) {
+                alert('No phone numbers to export!');
+                return;
+            }
+            
+            let csv = 'ID,Name,Center,Phone Number,Role Type,Position Title\n';
+            
+            stats.leaders.forEach(leader => {
+                const centerName = extractor.getCenterName(leader.centerIds[0]);
+                csv += `${leader.id},"${leader.name}","${centerName}","${leader.phone}","${leader.roleType}","${leader.positionTitle}"\n`;
+            });
+            
+            // Create download
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `rsyc-phone-numbers-${new Date().toISOString().split('T')[0]}.csv`;
+            a.click();
+            window.URL.revokeObjectURL(url);
+        }
+
+        function showStatistics() {
+            const stats = extractor.getPhoneNumberStats();
+            
+            if (stats.total === 0) {
+                alert('No data loaded. Please refresh data first.');
+                return;
+            }
+            
+            alert(`📊 Phone Number Statistics:\n\n` +
+                  `Total Leaders: ${stats.total}\n` +
+                  `With Phone Numbers: ${stats.withPhones}\n` +
+                  `Coverage: ${stats.coverage}%\n` +
+                  `Last Updated: ${stats.lastUpdated}\n\n` +
+                  `This data is always live and up-to-date!`);
+        }
+
+        // Auto-load on page load
+        window.addEventListener('load', () => {
+            console.log('🚀 Dynamic Phone Extractor loaded - ready for live data!');
+        });
+    </script>
+</body>
+</html>

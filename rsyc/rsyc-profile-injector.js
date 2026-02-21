@@ -30,7 +30,7 @@
      * Usage: window.RSYCProfileConfig.enabledSections = ['hero', 'about', 'schedules'];
      */
     window.RSYCProfileConfig = window.RSYCProfileConfig || {
-        enabledSections: ['hero', 'about', 'navigation', 'schedules', 'hours', 'facilities', 'programs', 'midsectionPhoto', 'staff', 'events', 'infopages', 'stories', 'nearby', 'parents', 'youth', 'volunteer', 'footerPhoto', 'contact']
+        enabledSections: ['hero', 'about', 'navigation', 'schedules', 'social', 'hours', 'facilities', 'programs', 'midsectionPhoto', 'staff', 'events', 'infopages', 'stories', 'nearby', 'parents', 'youth', 'volunteer', 'footerPhoto', 'contact']
     };
 
     /**
@@ -278,9 +278,9 @@
                 ? window.location.origin
                 : 'https://thisishoperva.org';
 
-            // Use hourly cache buster instead of millisecond for better performance
-            const hourlyVersion = Math.floor(Date.now() / 3600000);
-            const cacheBuster = `?v=${hourlyVersion}`;
+            // Use minute-based cache buster for more frequent updates during development
+            const minuteVersion = Math.floor(Date.now() / 60000);
+            const cacheBuster = `?v=${minuteVersion}`;
 
             console.log('[RSYCProfileInjector] Loading scripts from:', baseUrl);
             
@@ -416,8 +416,10 @@
                     (this.sections[a].order || 0) - (this.sections[b].order || 0)
                 );
                 sortedKeys.forEach(sectionKey => {
+                    console.log('[RSYCProfileInjector] Processing section:', sectionKey, 'enabled:', enabledSections.includes(sectionKey));
                     if (enabledSections.includes(sectionKey)) {
                         const html = this.generateSection(sectionKey, { ...centerData, __enabledSections: enabledSections });
+                        console.log('[RSYCProfileInjector] Section', sectionKey, 'generated HTML length:', html ? html.length : 0);
                         if (html) sections.push(html);
                     }
                 });

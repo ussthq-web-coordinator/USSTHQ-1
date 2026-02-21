@@ -187,6 +187,14 @@ class RSYCTemplates {
                 purpose: 'Detailed program cards and interactive modals for daily activities.',
                 fields: 'Programs (Title, Days, Time, Modals, Print Settings)'
             },
+            'social': {
+                name: 'Social Links',
+                enabled: true,
+                order: 3.5,
+                anchor: '#social',
+                purpose: 'Social media links and Facebook feed integration.',
+                fields: 'Facebook, Instagram, Twitter, LinkedIn, YouTube URLs, Facebook Embed Code'
+            },
             'hours': { 
                 name: 'Hours of Operation', 
                 enabled: true, 
@@ -356,10 +364,31 @@ class RSYCTemplates {
             if (enabledSections.includes(sectionKey)) {
                 const html = this.generateSection(sectionKey, { ...centerData, __enabledSections: enabledSections });
                 if (html) {
+                    console.log(`[RSYC] Adding section "${sectionKey}" to profile (${html.length} chars)`);
                     sections.push(html);
+                } else {
+                    console.log(`[RSYC] Section "${sectionKey}" returned empty HTML`);
                 }
             }
         });
+
+        // Always generate schedule modals if there are schedules/events data (events and schedules are the same thing)
+        let scheduleModals = '';
+        console.log('[RSYC] Checking for schedules/events data:', {
+            hasSchedules: !!centerData.schedules,
+            schedulesCount: centerData.schedules ? centerData.schedules.length : 0,
+            hasEvents: !!centerData.events,
+            eventsCount: centerData.events ? centerData.events.length : 0
+        });
+        
+        if (centerData.schedules || centerData.events) {
+            // Generate schedule modals for all schedules/events to ensure they exist for events section
+            console.log('[RSYC] Calling generateScheduleModalsOnly...');
+            scheduleModals = this.generateScheduleModalsOnly(centerData);
+            console.log('[RSYC] generateScheduleModalsOnly returned length:', scheduleModals.length);
+        } else {
+            console.log('[RSYC] No schedules or events data, skipping modal generation');
+        }
 
         // Add audit modal with section navigation
         const auditModal = this.generateAuditModal(enabledSections);
@@ -369,7 +398,125 @@ class RSYCTemplates {
         console.log('[RSYC] Join Center modal generated:', joinCenterModal ? 'YES' : 'NO');
         console.log('[RSYC] Join Center modal length:', joinCenterModal ? joinCenterModal.length : 0);
         
-        return sections.join('\n\n') + '\n\n' + auditModal + '\n\n' + joinCenterModal;
+        console.log(`[RSYC] Final profile: ${sections.length} sections, total length: ${sections.join('\n\n').length + scheduleModals.length + auditModal.length + joinCenterModal.length} chars`);
+        console.log('[RSYC] Sections included:', sections.map((s, i) => `${i+1}. ${s.substring(0, 50)}...`).join('\n'));
+        
+        return sections.join('\n\n') + '\n\n' + scheduleModals + '\n\n' + auditModal + '\n\n' + joinCenterModal;
+    }
+
+    /**
+     * Generate only schedule modals (for events section support)
+     * This ensures modals exist for events even when schedules section is not enabled
+     */
+    generateScheduleModalsOnly(centerData) {
+        const { center, schedules, events } = centerData;
+        
+        console.log('[RSYC] generateScheduleModalsOnly called with:', {
+            hasSchedules: !!schedules,
+            schedulesCount: schedules ? schedules.length : 0,
+            hasEvents: !!events,
+            eventsCount: events ? events.length : 0
+        });
+        
+        if (!schedules && !events) {
+            console.log('[RSYC] No schedules or events data, returning empty');
+            return '';
+        }
+        
+        // Merge all schedules and events for modal generation (ignore ShowinEventsSection filtering for modals)
+        const eventCardsSource = Array.isArray(events) ? events : [];
+        const scheduleCardsSource = Array.isArray(schedules) ? schedules : [];
+        const allSchedulesForModals = [...scheduleCardsSource, ...eventCardsSource];
+        
+        console.log('[RSYC] Total schedules/events for modals:', allSchedulesForModals.length);
+        
+        if (!allSchedulesForModals || allSchedulesForModals.length === 0) {
+            console.log('[RSYC] No schedules/events for modals, returning empty');
+            return '';
+        }
+        
+        // Generate modals for all schedules/events
+        const scheduleModals = allSchedulesForModals.map(schedule => {
+            console.log('[RSYC] Generating modal for schedule:', schedule.id, schedule.title);
+            // Use the same modal generation logic as generateSchedules
+            const addressText = [schedule.street, schedule.city, schedule.state, schedule.postalCode].filter(Boolean).join(', ');
+            const directionsUrl = addressText ? `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(addressText)}` : '';
+            
+            // Format date/time for modal
+            const formatEventDateTimeParts = (event) => {
+                if (!event) return { dateText: '', timeText: '' };
+                
+                let dateText = '';
+                let timeText = '';
+                
+                if (event.eventDate) {
+                    const date = new Date(event.eventDate);
+                    if (!isNaN(date.getTime())) {
+                        const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+                        dateText = date.toLocaleDateString('en-US', options);
+                    }
+                }
+                
+                if (event.eventTime) {
+                    timeText = event.eventTime;
+                }
+                
+                return { dateText, timeText };
+            };
+            
+            const dt = formatEventDateTimeParts(schedule);
+            const eventDateText = dt.dateText || '';
+            const eventTimeText = dt.timeText || '';
+            
+            return `
+<!-- Modal for Schedule Details -->
+<div id="rsyc-modal-schedule-${schedule.id}" class="rsyc-modal" style="display:none;">
+    <div class="rsyc-modal-content">
+        <div class="rsyc-modal-header" style="display:flex; justify-content:space-between; align-items:center;">
+            <h3>What's Happening</h3>
+            <div style="display:flex; gap:0.25rem; align-items:center;">
+                <button class="rsyc-modal-print" onclick="printRSYCModal('schedule-${schedule.id}')" style="background:none; border:none; cursor:pointer; font-size:1.1rem; padding:0.4rem; color:#333;" title="Print or Save as PDF"><i class="bi bi-printer"></i></button>
+                <button class="rsyc-modal-close" onclick="closeRSYCModal('schedule-${schedule.id}')" style="font-size:1.5rem; padding:0 0.5rem;">&times;</button>
+            </div>
+        </div>
+        <div class="rsyc-modal-body" style="color:#333;">
+            ${schedule.videoEmbedCode ? `
+                <div class="mb-4">
+                    <div class="ratio ratio-16x9" style="border-radius: 12px; overflow: hidden;">
+                        ${schedule.videoEmbedCode}
+                    </div>
+                </div>
+            ` : ''}
+            ${schedule.URLImage || schedule.imageUrl ? `
+                <div class="mb-4">
+                    <img alt="${this.escapeHTML(schedule.title)}" src="${this.escapeHTML(schedule.URLImage || schedule.imageUrl)}" style="width:100%; height:auto; border-radius: 12px; display:block;" />
+                </div>
+            ` : ''}
+            ${schedule.title ? `<h3 class="mb-2" style="color:#333;">${this.escapeHTML(schedule.title)}</h3>` : ''}
+            ${schedule.subtitle ? `<p class="mb-3" style="color:#666; font-style:italic;">${this.escapeHTML(schedule.subtitle)}</p>` : ''}
+            ${schedule.description ? `<p class="mb-1 rsyc-description">${schedule.description}</p>` : ''}
+            ${addressText ? `
+                <div class="mb-3 rsyc-event-location" style="background:#f8f9fa; padding:1rem; border-radius:8px; border:1px solid #e0e0e0;">
+                    <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:0.75rem;">
+                        <div style="min-width:0;">
+                            <strong style="display:block; margin-bottom:0.35rem;"><i class="bi bi-geo-alt me-2"></i>Address</strong>
+                            <div>${this.escapeHTML(addressText)}</div>
+                        </div>
+                        ${directionsUrl ? `<a class="btn btn-outline-secondary btn-sm" href="${directionsUrl}" target="_blank" style="font-size: 0.8rem; padding:0.25rem 0.5rem; flex-shrink:0;"><i class="bi bi-sign-turn-right me-1"></i>Directions</a>` : ''}
+                    </div>
+                </div>
+            ` : ''}
+            ${(eventDateText || eventTimeText) ? `<div class="mb-3" style="font-size: 1.1rem; color:#333;">
+                ${eventDateText ? `<div><strong>Date:</strong><br>${this.escapeHTML(eventDateText)}</div>` : ''}
+                ${eventTimeText ? `<div><strong>Time:</strong><br>${this.escapeHTML(eventTimeText)}</div>` : ''}
+            </div>` : ''}
+        </div>
+    </div>
+</div>`;
+        }).join('');
+        
+        console.log('[RSYC] Generated', scheduleModals.split('</div>').length - 1, 'modals');
+        return scheduleModals;
     }
 
     /**
@@ -426,10 +573,12 @@ class RSYCTemplates {
         // Build table rows for all sections in metadata
         let tableHTML = Object.entries(this.sections).map(([key, meta]) => {
             const anchorId = meta.anchor.replace('#', '');
+            const hasStories = key === 'stories' ? '✅' : '';
             return `<tr style="border-bottom: 1px solid #eee;">
-            <td style="padding: 0.75rem 1rem; color: #333;">${meta.name}</td>
-            <td style="padding: 0.75rem 1rem; font-family: monospace; color: #00929C;"><code>#${anchorId}</code></td>
-            <td style="padding: 0.75rem 1rem; text-align: center;"><button onclick="navigator.clipboard.writeText('#${anchorId}'); alert('Copied: #${anchorId}');" style="padding: 0.3rem 0.8rem; background: #00929C; color: white; border: none; border-radius: 3px; cursor: pointer; font-size: 0.85rem; font-weight: 600;">Copy</button></td>
+            <td style="padding: 0.75rem 1rem; color: #333; width: 40%;">${meta.name}</td>
+            <td style="padding: 0.75rem 1rem; font-family: monospace; color: #00929C; width: 30%;"><code>#${anchorId}</code></td>
+            <td style="padding: 0.75rem 1rem; text-align: center; font-size: 1.2rem; width: 15%;">${hasStories}</td>
+            <td style="padding: 0.75rem 1rem; text-align: center; width: 15%;"><button onclick="navigator.clipboard.writeText('#${anchorId}'); alert('Copied: #${anchorId}');" style="padding: 0.3rem 0.8rem; background: #00929C; color: white; border: none; border-radius: 3px; cursor: pointer; font-size: 0.85rem; font-weight: 600;">Copy</button></td>
         </tr>`;
         }).join('');
 
@@ -446,7 +595,7 @@ class RSYCTemplates {
             <h4 style="margin-bottom: 1rem; color: #333;">📌 All Sections Quick Reference</h4>
             <table style="width: 100%; border-collapse: collapse; margin-bottom: 2rem; border: 1px solid #ddd; background: white;">
                 <thead style="background: #f8f9fa;">
-                    <tr><th style="padding: 0.75rem 1rem; text-align: left; font-weight: 600;">Section</th><th style="padding: 0.75rem 1rem; text-align: left; font-weight: 600;">Anchor</th><th style="padding: 0.75rem 1rem; text-align: center; font-weight: 600;">Copy</th></tr>
+                    <tr><th style="padding: 0.75rem 1rem; text-align: left; font-weight: 600; width: 40%;">Section</th><th style="padding: 0.75rem 1rem; text-align: left; font-weight: 600; width: 30%;">Anchor</th><th style="padding: 0.75rem 1rem; text-align: center; font-weight: 600; width: 15%;">Stories</th><th style="padding: 0.75rem 1rem; text-align: center; font-weight: 600; width: 15%;">Copy</th></tr>
                 </thead>
                 <tbody>${tableHTML}</tbody>
             </table>
@@ -602,11 +751,13 @@ console.log('[RSYC] Audit modal initialized');
      */
     generateSection(sectionKey, data) {
         try {
+            console.log('[RSYC] generateSection called with:', sectionKey);
             const methods = {
                 'hero': this.generateHero,
                 'about': this.generateAbout,
                 'navigation': this.generateNavigation,
                 'schedules': this.generateSchedules,
+                'social': this.generateSocial,
                 'hours': this.generateHours,
                 'programs': this.generatePrograms,
                 'midsectionPhoto': this.generateMidsectionPhoto,
@@ -627,8 +778,9 @@ console.log('[RSYC] Audit modal initialized');
             const method = methods[sectionKey];
             if (method) {
                 try {
+                    console.log('[RSYC] Calling method for section:', sectionKey);
                     const result = method.call(this, data);
-                    console.log(`🔍 Section "${sectionKey}":`, result ? `${result.length} chars` : 'EMPTY/NULL');
+                    console.log('[RSYC] Section', sectionKey, 'result length:', result ? result.length : 0);
                     return result || '';
                 } catch (err) {
                     console.error(`[RSYC] Error generating "${sectionKey}" section:`, err);
@@ -790,6 +942,13 @@ console.log('[RSYC] Audit modal initialized');
         // Only show pills for sections that have actual content
         const navSections = candidateSections.filter(key => {
             try {
+                // Special handling for schedules section - only show pill if there are actual schedules
+                if (key === 'schedules') {
+                    const { schedules } = data;
+                    const hasSchedules = schedules && Array.isArray(schedules) && schedules.length > 0;
+                    return hasSchedules;
+                }
+                
                 const sectionHtml = this.generateSection(key, data);
                 return sectionHtml && sectionHtml.trim().length > 0;
             } catch (e) {
@@ -856,6 +1015,74 @@ console.log('[RSYC] Audit modal initialized');
             
             if (!mergedEvents || !Array.isArray(mergedEvents) || mergedEvents.length === 0) return '';
 
+            // Helper function for friendly date formatting without timezone conversion
+            const formatFriendlyDate = (dateStr, includeYear = true) => {
+                if (!dateStr) return '';
+                
+                try {
+                    // Parse the date string (YYYY-MM-DD format)
+                    const date = new Date(dateStr);
+                    if (isNaN(date.getTime())) return dateStr; // Return original if invalid
+                    
+                    const months = ['January', 'February', 'March', 'April', 'May', 'June',
+                                  'July', 'August', 'September', 'October', 'November', 'December'];
+                    
+                    const month = months[date.getMonth()];
+                    const day = date.getDate();
+                    const year = date.getFullYear();
+                    
+                    if (includeYear) {
+                        return `${month} ${day}, ${year}`;
+                    } else {
+                        return `${month} ${day}`;
+                    }
+                } catch (e) {
+                    return dateStr; // Return original if error
+                }
+            };
+            
+            const formatFriendlyDateRange = (startDateStr, endDateStr) => {
+                if (!startDateStr) return '';
+                
+                try {
+                    const startDate = new Date(startDateStr);
+                    const endDate = endDateStr ? new Date(endDateStr) : null;
+                    
+                    if (isNaN(startDate.getTime())) return startDateStr; // Return original if invalid
+                    
+                    const months = ['January', 'February', 'March', 'April', 'May', 'June',
+                                  'July', 'August', 'September', 'October', 'November', 'December'];
+                    
+                    const startMonth = months[startDate.getMonth()];
+                    const startDay = startDate.getDate();
+                    const startYear = startDate.getFullYear();
+                    
+                    if (!endDate || isNaN(endDate.getTime())) {
+                        // Single date
+                        return `${startMonth} ${startDay}, ${startYear}`;
+                    }
+                    
+                    const endMonth = months[endDate.getMonth()];
+                    const endDay = endDate.getDate();
+                    const endYear = endDate.getFullYear();
+                    
+                    // Check if same month and year
+                    if (startMonth === endMonth && startYear === endYear) {
+                        return `${startMonth} ${startDay} - ${endDay}, ${startYear}`;
+                    }
+                    
+                    // Check if same year
+                    if (startYear === endYear) {
+                        return `${startMonth} ${startDay} - ${endMonth} ${endDay}, ${startYear}`;
+                    }
+                    
+                    // Different years
+                    return `${startMonth} ${startDay}, ${startYear} - ${endMonth} ${endDay}, ${endYear}`;
+                } catch (e) {
+                    return startDateStr; // Return original if error
+                }
+            };
+
             const formatEventDateTimeParts = (event) => {
                 try {
                     // For schedules, if we have explicit date fields, parse those
@@ -868,39 +1095,16 @@ console.log('[RSYC] Audit modal initialized');
                             const endDateStr = String(event.EndDate || event.endDate || '').trim();
                             
                             if (startDateStr) {
-                                // If date-only string (no time), append noon to ensure correct date in local timezone
-                                // This prevents UTC midnight from being interpreted as previous day in Eastern time
-                                const startDateFormatted = startDateStr.includes('T') ? startDateStr : `${startDateStr}T12:00:00`;
-                                const endDateFormatted = endDateStr && !endDateStr.includes('T') ? `${endDateStr}T12:00:00` : endDateStr;
+                                // Use friendly date formatting without timezone conversion
+                                const dateText = formatFriendlyDateRange(startDateStr, endDateStr);
                                 
-                                const startDate = new Date(startDateFormatted);
-                                const endDate = endDateFormatted ? new Date(endDateFormatted) : null;
-                                
-                                const dateFmtWithYear = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'America/New_York' });
-                                const dateFmtNoYear = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', timeZone: 'America/New_York' });
-                                const timeFmt = new Intl.DateTimeFormat('en-US', { hour: 'numeric', minute: '2-digit', timeZone: 'America/New_York' });
-                                
-                                if (startDate && endDate) {
-                                    const sameDay = startDate.toDateString() === endDate.toDateString();
-                                    if (sameDay) {
-                                        return {
-                                            dateText: dateFmtWithYear.format(startDate),
-                                            timeText: event.scheduleTime ? `${event.scheduleTime}` : ''
-                                        };
-                                    }
-                                    // Check if same year
-                                    const sameYear = startDate.getFullYear() === endDate.getFullYear();
-                                    const dateText = sameYear 
-                                        ? `${dateFmtNoYear.format(startDate)} - ${dateFmtNoYear.format(endDate)}, ${endDate.getFullYear()}`
-                                        : `${dateFmtWithYear.format(startDate)} - ${dateFmtWithYear.format(endDate)}`;
-                                    return {
-                                        dateText: dateText,
-                                        timeText: event.scheduleTime ? `${event.scheduleTime}` : ''
-                                    };
-                                }
-                                if (startDate) {
-                                    return { dateText: dateFmtWithYear.format(startDate), timeText: event.scheduleTime ? `${event.scheduleTime}` : '' };
-                                }
+                                return {
+                                    dateText: dateText,
+                                    timeText: event.scheduleTime ? `${event.scheduleTime}` : ''
+                                };
+                            }
+                            if (startDateStr) {
+                                return { dateText: formatFriendlyDate(startDateStr), timeText: event.scheduleTime ? `${event.scheduleTime}` : '' };
                             }
                         } catch (e) {
                             console.warn('[RSYC] Error parsing schedule dates:', e);
@@ -927,30 +1131,30 @@ console.log('[RSYC] Audit modal initialized');
                     const start = hasStart ? new Date(startTs) : null;
                     const end = hasEnd ? new Date(endTs) : null;
 
-                    const dateFmtWithYear = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'America/New_York' });
-                    const dateFmtNoYear = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', timeZone: 'America/New_York' });
+                    // Convert dates to ISO strings for friendly formatting
+                    const startDateStr = start ? start.toISOString().split('T')[0] : '';
+                    const endDateStr = end ? end.toISOString().split('T')[0] : '';
+                    
+                    // Time formatter for time display only
                     const timeFmt = new Intl.DateTimeFormat('en-US', { hour: 'numeric', minute: '2-digit', timeZone: 'America/New_York' });
 
                     if (start && end) {
                         const sameDay = start.toDateString() === end.toDateString();
                         if (sameDay) {
                             return {
-                                dateText: dateFmtWithYear.format(start),
+                                dateText: formatFriendlyDate(startDateStr),
                                 timeText: `${timeFmt.format(start)} - ${timeFmt.format(end)}`
                             };
                         }
-                        // Check if same year - consolidate year to end only
-                        const sameYear = start.getFullYear() === end.getFullYear();
-                        const dateText = sameYear
-                            ? `${dateFmtNoYear.format(start)} - ${dateFmtNoYear.format(end)}, ${end.getFullYear()}`
-                            : `${dateFmtWithYear.format(start)} - ${dateFmtWithYear.format(end)}`;
+                        // Use friendly date formatting for date ranges
+                        const dateText = formatFriendlyDateRange(startDateStr, endDateStr);
                         return {
                             dateText: dateText,
                             timeText: `${timeFmt.format(start)} - ${timeFmt.format(end)}`
                         };
                     }
                     if (start) {
-                        return { dateText: dateFmtWithYear.format(start), timeText: timeFmt.format(start) };
+                        return { dateText: formatFriendlyDate(startDateStr), timeText: timeFmt.format(start) };
                     }
                     return { dateText: '', timeText: '' };
                 } catch (e) {
@@ -968,7 +1172,6 @@ console.log('[RSYC] Audit modal initialized');
             return 0;
         });
 
-        let eventModals = '';
         const eventCards = sortedEvents.map(evt => {
             const isScheduleInEvents = evt.ShowinEventsSection === true && !evt.__type;
             
@@ -989,6 +1192,17 @@ console.log('[RSYC] Audit modal initialized');
             const dt = formatEventDateTimeParts(evt);
             const dateText = dt.dateText || '';
             const timeText = dt.timeText || '';
+            
+            // Add timezone to scheduleTime for schedules in events section
+            let scheduleTimeWithTZ = evt.scheduleTime || '';
+            if (scheduleTimeWithTZ && evt.timezone && isScheduleInEvents) {
+                const tz = evt.timezone.toLowerCase();
+                if (tz.includes('eastern')) {
+                    scheduleTimeWithTZ += ' (Eastern)';
+                } else if (tz.includes('central')) {
+                    scheduleTimeWithTZ += ' (Central)';
+                }
+            }
             const addressText = [evt.street, evt.city, evt.state, evt.postalCode].filter(Boolean).join(', ');
             const directionsUrl = addressText ? `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(addressText)}` : '';
             const onSaleTag = evt.isOnSale ? `
@@ -1000,174 +1214,43 @@ console.log('[RSYC] Audit modal initialized');
             const modalImageUrl = isScheduleInEvents ? evt.URLImage : evt.imageUrl;
             const cardImageUrl = isScheduleInEvents ? evt.URLThumbnailImage : evt.thumbnailUrl;
 
-            const modalType = `event-${evt.id}`;
+            const modalType = `schedule-${evt.id}`;
 
-            const eventModal = `
-<!-- Modal for Event Details -->
-<div id="rsyc-modal-${modalType}" class="rsyc-modal" style="display:none;">
-    <div class="rsyc-modal-content">
-        <div class="rsyc-modal-header" style="display:flex; justify-content:space-between; align-items:flex-start; gap: 1rem;">
-            <div style="min-width:0; flex: 1;">
-                <h2 style="margin:0;">${this.escapeHTML(evt.title)}</h2>
-            </div>
-            <button class="rsyc-modal-close" onclick="closeRSYCModal('${modalType}')" style="background:none; border:none; cursor:pointer; font-size: 1.5rem; padding:0.25rem; color:#333; flex-shrink:0;">&times;</button>
-        </div>
-        
-        <div class="rsyc-modal-actions" style="display:flex; gap:0.5rem; flex-wrap:wrap; justify-content:center; align-items:center; margin-bottom:1rem; padding:0.75rem; background:#f8f9fa; border-radius:8px; border:1px solid #e0e0e0;">
-            ${evt.primaryButtonUrl ? `<a class="btn btn-primary" href="${this.escapeHTML(evt.primaryButtonUrl)}" target="_blank" style="background-color:#00929C; border:none; font-size: 0.9rem; padding:0.5rem 1rem;">${this.escapeHTML(evt.primaryButtonText || 'Learn More')}</a>` : ''}
-            ${evt.secondaryButtonUrl ? `<a class="btn btn-outline-primary" href="${this.escapeHTML(evt.secondaryButtonUrl)}" target="_blank" style="font-size: 0.9rem; padding:0.5rem 1rem;">${this.escapeHTML(evt.secondaryButtonText || 'More Info')}</a>` : ''}
-            ${evt.facebookEventUrl ? `<a href="${this.escapeHTML(evt.facebookEventUrl)}" target="_blank" style="background:none; border:none; cursor:pointer; font-size: 1.2rem; padding:0.5rem; color:#1877F2; text-decoration:none;" title="View Facebook Event"><i class="bi bi-facebook"></i></a>` : ''}
-            <button class="rsyc-modal-print" onclick="printRSYCModal('event-${evt.id}')" style="background:none; border:none; cursor:pointer; font-size: 1.2rem; padding:0.5rem; color:#333;" title="Print or Save as PDF"><i class="bi bi-printer"></i></button>
-        </div>
-        <div class="rsyc-modal-body" style="color:#333;">
-            ${modalImageUrl ? `
-                <div class="mb-4">
-                    <img alt="${this.escapeHTML(evt.title)}" src="${this.escapeHTML(modalImageUrl)}" style="width:100%; height:auto; border-radius: 12px; display:block;" />
-                </div>
-            ` : ''}
-
-            <div class="mb-3" style="display:flex;align-items:center;justify-content:space-between;gap:0.75rem;">
-                <div style="font-size: 1.1rem; font-weight:600; color:#0C0C0C;"><strong>${this.escapeHTML(center.name || center.Title)}</strong></div>
-                <img src="https://thisishoperva.org/rsyc/Red+Shield+Youth+Centers+Logo+-+Color.svg" alt="Red Shield Youth Centers Logo" style="height:42px; max-width:120px; width:auto; object-fit:contain; display:block;" />
-            </div>
-
-            ${evt.isOnSale ? `<div class="mb-3"><span class="badge" style="background:#dc3545;">On Sale</span></div>` : ''}
-            ${isScheduleInEvents ? '' : `${(dateText || timeText) ? `<div class="mb-3" style="font-size: 1rem; color:#333;">
-                ${dateText ? `<div><strong>Date:</strong><br>${this.escapeHTML(dateText)}</div>` : ''}
-                ${timeText ? `<div style="margin-top:0.5rem;" class="rsyc-event-cost"><strong>Time:</strong><br>${this.escapeHTML(timeText)}</div>` : ''}
-            </div>` : ''}`}
-            ${!isScheduleInEvents && eventTypeText ? `<div class="mb-3" style="font-size:1rem; color:#333;"><strong>Type:</strong><br>${this.escapeHTML(eventTypeText)}</div>` : ''}
-            ${evt.description ? `<div class="mb-3 rsyc-event-cost" style="font-size: 1.1rem; line-height: 1.7; color:#333;">${evt.description}</div>` : ''}
-            ${evt.whatToBring || evt.materialsProvided ? `
-            <div class="mb-3" style="background:#f0f8ff; padding:1rem; border-radius:6px; border-left:3px solid #4169e1; color:#333;">
-                <strong style="color:#4169e1;"><i class="bi bi-backpack2 me-2"></i>What to Bring:</strong>
-                ${evt.whatToBring ? `<div class="mt-2">${this.preserveLineBreaks(evt.whatToBring)}</div>` : ''}
-                ${evt.materialsProvided ? `<div class="mt-2"><u>Materials Provided:</u><br>${this.preserveLineBreaks(evt.materialsProvided)}</div>` : ''}
-            </div>
-            ` : ''}
-            
-            <!-- Schedule-specific fields with styled sections -->
-            ${isScheduleInEvents ? `
-                <div class="row">
-                    ${evt.scheduleDays && Array.isArray(evt.scheduleDays) && evt.scheduleDays.length > 0 ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Days:</strong><br>${this.escapeHTML(evt.scheduleDays.join(', '))}</div>` : ''}
-                    ${evt.scheduleTime ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Schedule Time:</strong><br>${this.escapeHTML(evt.scheduleTime)}</div>` : ''}
-                    ${evt.location ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Location:</strong><br>${this.escapeHTML(evt.location)}</div>` : ''}
-                    ${evt.cost ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Cost:</strong><br>${this.escapeHTML(evt.cost)}</div>` : ''}
-                    ${evt.registrationFee ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Registration Fee:</strong><br>${this.escapeHTML(evt.registrationFee)}</div>` : ''}
-                    ${evt.startDate || evt.endDate ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Program Dates:</strong><br>${evt.startDate ? this.escapeHTML(evt.startDate) : ''} ${evt.startDate && evt.endDate ? '-' : ''} ${evt.endDate ? this.escapeHTML(evt.endDate) : ''}</div>` : ''}
-                    ${evt.eventTypeText ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Type:</strong><br>${this.escapeHTML(evt.eventTypeText)}</div>` : ''}
-                    ${evt.frequency ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Frequency:</strong><br>${this.escapeHTML(evt.frequency)}</div>` : ''}
-                    ${evt.ageRange ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Ages:</strong><br>${this.escapeHTML(evt.ageRange)}</div>` : ''}
-                    ${evt.programRunsIn && Array.isArray(evt.programRunsIn) && evt.programRunsIn.length > 0 ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Program Runs In:</strong><br>${this.escapeHTML(evt.programRunsIn.join(', '))}</div>` : ''}
-                    
-                    ${evt.scheduleDisclaimer ? `<div class="col-sm-12 mb-3" style="background:#fff3cd; padding:1rem; border-radius:6px; border-left:3px solid #ff6b6b; color:#000;"><strong style="color:#000;"><i class="bi bi-exclamation-triangle me-2"></i>Important Dates/Closures:</strong><br><div class="mt-2" style="font-size:0.95rem;">${this.escapeHTML(evt.scheduleDisclaimer)}</div></div>` : ''}
-                </div>
-            ` : ''}
-            
-            ${!isScheduleInEvents && evt.cost ? `<div class="mb-3 rsyc-event-cost" style="font-size: 1rem; color:#333;"><strong>Cost:</strong><br>${this.escapeHTML(evt.cost)}</div>` : ''}
-            ${!isScheduleInEvents && evt.extendedCareTimes ? `<div class="mb-3 rsyc-event-extended-care" style="font-size: 1rem; color:#333;"><strong>Extended Care Times:</strong><br>${this.escapeHTML(evt.extendedCareTimes)}</div>` : ''}
-
-            ${evt.specialFeatures ? `<div class="mb-3 rsyc-event-cost" style="font-size: 1rem; color:#333;">
-                <strong>What you can expect:</strong><br>
-                ${this.makeContactsClickable(this.escapeHTML(evt.specialFeatures))}
-            </div>` : ''}
-
-            ${addressText ? `
-            <div class="mb-3 rsyc-event-location" style="background:#f8f9fa; padding:1rem; border-radius:8px; border:1px solid #e0e0e0;">
-                <div style="display:flex; align-items:flex-start; justify-content:space-between; gap: 0.75rem;">
-                    <div style="min-width:0;">
-                        <strong style="display:block; margin-bottom:0.35rem;"><i class="bi bi-geo-alt me-2"></i>Location</strong>
-                        ${evt.dispName && evt.dispName !== evt.street ? `<div style="font-weight:500; margin-bottom:0.5rem;">${this.escapeHTML(evt.dispName)}</div>` : ''}
-                        <div>${this.escapeHTML(addressText)}</div>
-                    </div>
-                    ${directionsUrl ? `<a class="btn btn-outline-secondary btn-sm" href="${directionsUrl}" target="_blank" style="font-size: 0.8rem; padding:0.25rem 0.5rem; flex-shrink:0;"><i class="bi bi-sign-turn-right me-1"></i>Directions</a>` : ''}
-                </div>
-            </div>
-            ` : ''}
-
-            ${(evt.contacts && evt.contacts.length > 0) || (evt.contactName || evt.contactEmail || evt.contactNumber || evt.contactPhoneNumber) || (evt.contactInfo && evt.contactInfo.trim().length > 0) ? `
-            <div class="mb-3 p-4" style="background:#f0f7f7; border-radius:12px; border:1px solid #d1e7e7; color:#333;">
-                <strong style="color:#20B3A8; text-transform:uppercase; font-size:1.1rem; letter-spacing:0.05rem; display:block;">Point${(evt.contacts && evt.contacts.length > 1) ? 's' : ''} of Contact</strong>
-                ${evt.contacts && evt.contacts.length > 0 ? evt.contacts.map((contact, idx) => `
-                    <div class="rsyc-contact-item"${idx > 0 ? ` style="margin-top:1.2rem; padding-top:1.2rem; border-top:1px solid rgba(32,179,168,0.2);"` : ''}>
-                        ${contact.name ? `<div class="rsyc-contact-name" style="font-weight:700; font-size:1.25rem; color:#111;">${this.escapeHTML(contact.name)}</div>` : ''}
-                        ${contact.jobTitle ? `<div class="rsyc-contact-job" style="font-weight:500; color:#555; margin-bottom: 0.25rem;">${this.escapeHTML(contact.jobTitle)}</div>` : ''}
-                        ${contact.email ? `<div class="rsyc-contact-email mt-1"><a href="mailto:${this.escapeHTML(contact.email)}" style="color:#2F4857; text-decoration:underline; font-weight:400;"><i class="bi bi-envelope-at me-2"></i>${this.escapeHTML(contact.email)}</a></div>` : ''}
-                        ${contact.phone ? `<div class="rsyc-contact-phone mt-1"><a href="tel:${contact.phone.replace(/\D/g, '')}" style="color:#2F4857; text-decoration:underline; font-weight:400;"><i class="bi bi-telephone me-2"></i>${this.escapeHTML(contact.phone)}</a></div>` : ''}
-                    </div>
-                `).join('') : ''}
-                ${(evt.contactName || evt.contactEmail || evt.contactNumber) && (!evt.contacts || evt.contacts.length === 0) ? `
-                    <div class="rsyc-contact-item">
-                        ${evt.contactName ? `<div class="rsyc-contact-name" style="font-weight:700; font-size:1.25rem; color:#111;">${this.escapeHTML(evt.contactName)}</div>` : ''}
-                        ${evt.contactEmail ? `<div class="rsyc-contact-email mt-1"><a href="mailto:${this.escapeHTML(evt.contactEmail)}" style="color:#2F4857; text-decoration:underline; font-weight:400;"><i class="bi bi-envelope-at me-2"></i>${this.escapeHTML(evt.contactEmail)}</a></div>` : ''}
-                        ${evt.contactNumber ? `<div class="rsyc-contact-phone mt-1"><a href="tel:${evt.contactNumber.replace(/\D/g, '')}" style="color:#2F4857; text-decoration:underline; font-weight:400;"><i class="bi bi-telephone me-2"></i>${this.escapeHTML(evt.contactNumber)}</a></div>` : ''}
-                        ${evt.contactPhoneNumber ? `<div class="rsyc-contact-phone mt-1"><a href="tel:${evt.contactPhoneNumber.replace(/\D/g, '')}" style="color:#2F4857; text-decoration:underline; font-weight:400;"><i class="bi bi-telephone me-2"></i>${this.escapeHTML(evt.contactPhoneNumber)}</a></div>` : ''}
-                    </div>
-                ` : ''}
-                ${evt.contactInfo && evt.contactInfo.trim().length > 0 ? `<div class="mt-2 pt-2${(evt.contacts && evt.contacts.length > 0) || (evt.contactName || evt.contactEmail || evt.contactNumber) ? ' border-top' : ''}" style="${(evt.contacts && evt.contacts.length > 0) || (evt.contactName || evt.contactEmail || evt.contactNumber) ? 'border-top-color:rgba(32,179,168,0.2) !important;' : ''}font-size:0.9rem;">${this.makeContactsClickable(this.escapeHTML(evt.contactInfo))}</div>` : ''}
-            </div>
-            ` : ''}
-
-            ${(evt.AllRelatedPrograms && Array.isArray(evt.AllRelatedPrograms) && evt.AllRelatedPrograms.length > 0) ? (() => {
-                const relatedProgramsHtml = evt.AllRelatedPrograms.map(relatedProgram => {
-                    // Extract program name from AllRelatedPrograms
-                    const programName = typeof relatedProgram === 'string' ? relatedProgram : (relatedProgram.name || relatedProgram.Value || '');
-                    // Find full program details from allPrograms - case-insensitive and trim whitespace
-                    const normalizedName = programName.trim().toLowerCase();
-                    const fullProgram = (data.allPrograms || []).find(p => {
-                        const pName = (p.name || p.Title || '').trim().toLowerCase();
-                        return pName === normalizedName;
-                    });
-                    
-                    // Log for debugging
-                    if (!fullProgram) {
-                        console.warn('[EventRelatedPrograms] Could not find program details for:', programName, 'in', (data.allPrograms || []).map(p => p.name || p.Title));
-                    }
-                    
-                    // Extract icon and description from full program details
-                    const icon = fullProgram?.iconClass || fullProgram?.IconClass || 'bi-star';
-                    const description = fullProgram?.description || fullProgram?.Description || '';
-                    return `
-                    <div class="col-sm-12 col-md-6 mb-3">
-                        <div class="d-flex align-items-start">
-                            <i class="bi ${icon} feature-icon me-3 mt-1" style="font-size: 1.5rem; color:#20B3A8;"></i>
-                            <div style="flex: 1;">
-                                <div class="fw-bold" style="font-size: 1rem; color:#333;">${programName}</div>
-                                ${description ? `<div class="text-muted small mt-1" style="line-height: 1.4; font-size: 0.9rem;">${description}</div>` : ''}
-                            </div>
-                        </div>
-                    </div>
-                    `;
-                }).join('');
-                return `
-            <div class="mb-3" style="background:#f5f5f5; padding:1rem; border-radius:6px; color:#333;">
-                <strong style="color:#333; font-size:1.1rem; display:block; margin-bottom:0.75rem;"><i class="bi bi-link me-2" style="color:#20B3A8;"></i>Related Programs</strong>
-                <div class="row">
-                    ${relatedProgramsHtml}
-                </div>
-            </div>
-                `;
-            })() : ''}
-        </div>
-    </div>
-</div>`;
-
-            eventModals += eventModal;
+            // Event modal removed - events now use schedule modal
 
             return `
-                <div class="card shadow border rounded-3 flex-shrink-0" style="width: 280px; scroll-snap-align: start; border: 1px solid #dee2e6; overflow:hidden; position:relative;">
+                <div class="card shadow border rounded-3 flex-shrink-0" style="width: 280px; border: 1px solid #dee2e6; overflow:hidden; position:relative;">
                     ${onSaleTag}
-                    <div style="width:100%; aspect-ratio:1/1; overflow:hidden; background:#f0f0f0; cursor:pointer;" onclick="showRSYCModal('${modalType}', '${this.escapeHTML(center.name || center.Title, true)}')">
+                    <!-- Desktop: Original layout -->
+                    <div class="d-none d-lg-block" style="width:100%; aspect-ratio:1/1; overflow:hidden; background:#f0f0f0; cursor:pointer;" onclick="showRSYCModal('${modalType}', '${this.escapeHTML(center.name || center.Title, true)}')">
                         <img alt="${this.escapeHTML(evt.title)}" src="${this.escapeHTML(cardImageUrl || '')}" style="width:100%; height:100%; object-fit:cover; display:block;" onerror="this.style.display='none';" />
                     </div>
-                    <div class="card-body d-flex flex-column">
+                    <div class="d-none d-lg-block card-body d-flex flex-column">
                         <div class="fw-bold mb-1" style="font-size: 1.05rem; line-height: 1.3;">${this.escapeHTML(evt.title)}</div>
                         ${eventCardSubtitleText && eventCardSubtitleText !== evt.title ? `<div class="text-muted mb-2" style="font-size: 0.9rem;">${this.escapeHTML(eventCardSubtitleText)}</div>` : ''}
                         <div style="flex-grow:1; font-size: 0.9rem; line-height: 1.5;">
                             ${dateText ? `<div><strong>Date:</strong> ${this.escapeHTML(dateText)}</div>` : ''}
-                            ${isScheduleInEvents ? `${evt.scheduleTime ? `<div><strong>Time:</strong> ${this.escapeHTML(evt.scheduleTime)}</div>` : ''}` : `${timeText ? `<div><strong>Time:</strong> ${this.escapeHTML(timeText)}</div>` : ''}`}
+                            ${isScheduleInEvents ? `${scheduleTimeWithTZ ? `<div><strong>Time:</strong> ${this.escapeHTML(scheduleTimeWithTZ)}</div>` : ''}` : `${timeText ? `<div><strong>Time:</strong> ${this.escapeHTML(timeText)}</div>` : ''}`}
                         </div>
                         <button type="button" class="btn btn-outline-primary btn-sm mt-2" onclick="showRSYCModal('${modalType}', '${this.escapeHTML(center.name || center.Title, true)}')">View Details</button>
+                    </div>
+                    
+                    <!-- Tablet/Mobile: Horizontal layout -->
+                    <div class="d-lg-none p-3" style="cursor:pointer;" onclick="showRSYCModal('${modalType}', '${this.escapeHTML(center.name || center.Title, true)}')">
+                        <div class="d-flex align-items-center">
+                            <div style="width: 150px; height: 150px; overflow:hidden; background:#f0f0f0; flex-shrink: 0;">
+                                <img alt="${this.escapeHTML(evt.title)}" src="${this.escapeHTML(cardImageUrl || '')}" style="width:100%; height:100%; object-fit:cover; display:block;" onerror="this.style.display='none';" />
+                            </div>
+                            <div class="ms-3 flex-grow-1">
+                                <div class="fw-bold mb-1" style="font-size: 0.95rem; line-height: 1.3;">${this.escapeHTML(evt.title)}</div>
+                                ${eventCardSubtitleText && eventCardSubtitleText !== evt.title ? `<div class="text-muted mb-2" style="font-size: 0.8rem;">${this.escapeHTML(eventCardSubtitleText)}</div>` : ''}
+                                <div style="font-size: 0.8rem; line-height: 1.4; margin-bottom: 0.5rem;">
+                                    ${dateText ? `<div><strong>Date:</strong> ${this.escapeHTML(dateText)}</div>` : ''}
+                                    ${isScheduleInEvents ? `${scheduleTimeWithTZ ? `<div><strong>Time:</strong> ${this.escapeHTML(scheduleTimeWithTZ)}</div>` : ''}` : `${timeText ? `<div><strong>Time:</strong> ${this.escapeHTML(timeText)}</div>` : ''}`}
+                                </div>
+                                <button type="button" class="btn btn-outline-primary align-self-start" style="font-size: 0.75rem; padding: 0.25rem 0.5rem;" onclick="event.stopPropagation(); showRSYCModal('${modalType}', '${this.escapeHTML(center.name || center.Title, true)}')">View Details</button>
+                            </div>
+                        </div>
                     </div>
                 </div>
             `;
@@ -1184,6 +1267,9 @@ console.log('[RSYC] Audit modal initialized');
         // always centre cards; CSS handles wrapping on wide screens
 const justifyContent = 'justify-content-center';
 
+        // Events and schedules are the same thing - no separate modal generation needed
+        // All schedule/event modals are generated in the generateSchedules function
+
         return `<!-- Events -->
 <div id="events" class="freeTextArea section" style="background-color: #cb2e3d; display: block !important; visibility: visible !important; opacity: 1 !important; height: auto !important;">
     <div class="u-positionRelative" style="padding-top: 4rem; padding-bottom: 4rem; display: block !important; visibility: visible !important; opacity: 1 !important;">
@@ -1194,12 +1280,11 @@ const justifyContent = 'justify-content-center';
                     ${scrollHint}
                     <div class="rsyc-center-container" style="width:100%;">
                         <div style="display: flex; justify-content: center; width: 100%; margin: 0 auto;">
-                            <div class="d-flex overflow-auto gap-4 py-2 ${justifyContent}" style="scroll-snap-type: x mandatory; max-width: 1400px; width: 100%;">
+                            <div class="d-flex flex-wrap gap-4 justify-content-center">
                                 ${eventCards}
                             </div>
                         </div>
                     </div>
-                    ${eventModals}
                 </div>
             </div>
         </div>
@@ -1378,18 +1463,43 @@ const justifyContent = 'justify-content-center';
                     </div>`;
 
                 return `
-                <div class="card shadow border rounded-3 flex-shrink-0" style="width: 280px; scroll-snap-align: start; border: 1px solid #dee2e6; overflow:hidden; background: white;">
-                    ${cardImageHTML}
-                    <div class="card-body d-flex flex-column" style="padding: 1.25rem;">
-                        <div class="fw-bold mb-1" style="font-size: 1.05rem; line-height: 1.3; color:#2F4857;">${this.escapeHTML(page.title)}</div>
-                        ${categoryText ? `<div class="text-muted mb-2" style="font-size: 0.8rem; font-weight:700; text-transform:uppercase; color:#20B3A8 !important;">${this.escapeHTML(categoryText)}</div>` : ''}
-                        <div style="flex-grow:1; font-size: 0.9rem; line-height: 1.5; color:#555; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;">
-                            ${this.escapeHTML(previewText)}
+                <div class="card shadow border rounded-3 flex-shrink-0" style="width: 280px; border: 1px solid #dee2e6; overflow:hidden; background: white;">
+                    <!-- Desktop: Original layout -->
+                    <div class="d-none d-lg-block">
+                        ${cardImageHTML}
+                        <div class="card-body d-flex flex-column" style="padding: 1.25rem;">
+                            <div class="fw-bold mb-1" style="font-size: 1.05rem; line-height: 1.3; color:#2F4857;">${this.escapeHTML(page.title)}</div>
+                            ${categoryText ? `<div class="text-muted mb-2" style="font-size: 0.8rem; font-weight:700; text-transform:uppercase; color:#20B3A8 !important;">${this.escapeHTML(categoryText)}</div>` : ''}
+                            <div style="flex-grow:1; font-size: 0.9rem; line-height: 1.5; color:#555; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;">
+                                ${this.escapeHTML(previewText)}
+                            </div>
+                            <button type="button" class="btn btn-outline-primary mt-2" onclick="showRSYCModal('${modalType}', '${this.escapeHTML(center.name || center.Title, true)}')">View Information</button>
                         </div>
-                        <button type="button" class="btn btn-sm mt-3" style="background-color:#00929C; color:white; font-weight:600;" onclick="showRSYCModal('${modalType}', '${this.escapeHTML(center.name || center.Title, true)}')">View Information</button>
                     </div>
-                </div>`;
-            }).join('');
+                    
+                    <!-- Tablet/Mobile: Horizontal layout -->
+                    <div class="d-lg-none p-3" style="cursor:pointer;" onclick="showRSYCModal('${modalType}', '${this.escapeHTML(center.name || center.Title, true)}')">
+                        <div class="d-flex align-items-start">
+                            <div style="width: 150px; height: 150px; overflow:hidden; background:#f0f7f7; flex-shrink: 0; border-radius: 8px;">
+                                ${page.heroImage 
+                                    ? `<img src="${this.escapeHTML(page.heroImage)}" alt="${this.escapeHTML(page.title)}" style="width:100%; height:100%; object-fit:cover; object-position:center;" />`
+                                    : `<div style="width:100%; height:100%; display:flex; align-items:center; justify-content:center;">
+                                         <i class="bi bi-journal-text" style="font-size: 3rem; color:#20B3A8; opacity:0.8;"></i>
+                                    </div>`
+                                }
+                            </div>
+                            <div class="ms-3 flex-grow-1">
+                                <div class="fw-bold mb-1" style="font-size: 0.95rem; line-height: 1.3; color:#2F4857;">${this.escapeHTML(page.title)}</div>
+                                ${categoryText ? `<div class="text-muted mb-2" style="font-size: 0.75rem; font-weight:700; text-transform:uppercase; color:#20B3A8 !important;">${this.escapeHTML(categoryText)}</div>` : ''}
+                                <div style="flex-grow:1; font-size: 0.8rem; line-height: 1.4; color:#555; margin-bottom: 0.5rem; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">
+                                    ${this.escapeHTML(previewText)}
+                                </div>
+                                <button type="button" class="btn btn-outline-primary mt-2 align-self-start" style="font-size: 0.75rem; padding: 0.25rem 0.5rem;" onclick="event.stopPropagation(); showRSYCModal('${modalType}', '${this.escapeHTML(center.name || center.Title, true)}')">View Information</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;}).join('');
 
             const scrollHint = informationalPages.length > 3 ? `
                 <p class="rsyc-scroll-hint text-center mb-n2">
@@ -1411,7 +1521,7 @@ const justifyContent = 'justify-content-center';
                 ${scrollHint}
                 <div class="rsyc-center-container" style="width:100%;">
                     <div style="display: flex; justify-content: center; width: 100%; margin: 0 auto;">
-                        <div class="d-flex overflow-auto gap-4 py-3 justify-content-center" style="scroll-snap-type: x mandatory; padding-left:1rem; padding-right:1rem; max-width: 1400px; width: 100%;">
+                        <div class="d-flex flex-wrap gap-4 justify-content-center">
                             ${infoCards}
                         </div>
                     </div>
@@ -1500,8 +1610,9 @@ const justifyContent = 'justify-content-center';
                 storyModals += storyModal;
 
                 return `
-                <div class="card shadow border rounded-3 flex-shrink-0" style="width: 280px; scroll-snap-align: start; border: 1px solid #dee2e6; overflow:hidden; position:relative;">
-                    <div style="width:100%; aspect-ratio:1/1; overflow:hidden; background:#f0f0f0; cursor:pointer;" onclick="showRSYCModal('${modalType}', '${this.escapeHTML(center.name || center.Title, true)}')">
+                <div class="card shadow border rounded-3 flex-shrink-0" style="width: 280px; border: 1px solid #dee2e6; overflow:hidden; position:relative;">
+                    <!-- Desktop: Original layout -->
+                    <div class="d-none d-lg-block" style="width:100%; aspect-ratio:1/1; overflow:hidden; background:#f0f0f0; cursor:pointer;" onclick="showRSYCModal('${modalType}', '${this.escapeHTML(center.name || center.Title, true)}')">
                         ${story.thumbnailImage ? `
                         <img src="${this.escapeHTML(story.thumbnailImage)}" alt="${this.escapeHTML(story.title)}" style="width:100%; height:100%; object-fit:cover; object-position:center;" />
                         ` : `
@@ -1510,13 +1621,36 @@ const justifyContent = 'justify-content-center';
                         </div>
                         `}
                     </div>
-                    <div class="card-body d-flex flex-column">
+                    <div class="d-none d-lg-block card-body d-flex flex-column">
                         <div class="fw-bold mb-1" style="font-size: 1.05rem; line-height: 1.3;">${this.escapeHTML(story.title)}</div>
                         ${storyDateFormatted ? `<div class="text-muted mb-2" style="font-size: 0.9rem;">${storyDateFormatted}</div>` : ''}
                         <div style="flex-grow:1; font-size: 0.9rem; line-height: 1.5;">
                             ${story.excerpt ? `<div>${this.escapeHTML(story.excerpt.substring(0, 100))}${story.excerpt.length > 100 ? '...' : ''}</div>` : ''}
                         </div>
                         <button type="button" class="btn btn-outline-primary btn-sm mt-2" onclick="showRSYCModal('${modalType}', '${this.escapeHTML(center.name || center.Title, true)}')">Read Story</button>
+                    </div>
+                    
+                    <!-- Tablet/Mobile: Horizontal layout -->
+                    <div class="d-lg-none p-3" style="cursor:pointer;" onclick="showRSYCModal('${modalType}', '${this.escapeHTML(center.name || center.Title, true)}')">
+                        <div class="d-flex align-items-center">
+                            <div style="width: 150px; height: 150px; overflow:hidden; background:#f0f0f0; flex-shrink: 0;">
+                                ${story.thumbnailImage ? `
+                                <img src="${this.escapeHTML(story.thumbnailImage)}" alt="${this.escapeHTML(story.title)}" style="width:100%; height:100%; object-fit:cover; object-position:center;" />
+                                ` : `
+                                <div style="width:100%; height:100%; display:flex; align-items:center; justify-content:center; background:linear-gradient(135deg, #20B3A8 0%, #2F4857 100%); color:white; font-size:2rem;">
+                                    <i class="bi bi-book"></i>
+                                </div>
+                                `}
+                            </div>
+                            <div class="ms-3 flex-grow-1">
+                                <div class="fw-bold mb-1" style="font-size: 0.95rem; line-height: 1.3;">${this.escapeHTML(story.title)}</div>
+                                ${storyDateFormatted ? `<div class="text-muted mb-2" style="font-size: 0.8rem;">${storyDateFormatted}</div>` : ''}
+                                <div style="flex-grow:1; font-size: 0.8rem; line-height: 1.4; margin-bottom: 0.5rem;">
+                                    ${story.excerpt ? `<div>${this.escapeHTML(story.excerpt.substring(0, 80))}${story.excerpt.length > 80 ? '...' : ''}</div>` : ''}
+                                </div>
+                                <button type="button" class="btn btn-outline-primary align-self-start" style="font-size: 0.75rem; padding: 0.25rem 0.5rem;" onclick="event.stopPropagation(); showRSYCModal('${modalType}', '${this.escapeHTML(center.name || center.Title, true)}')">Read Story</button>
+                            </div>
+                        </div>
                     </div>
                 </div>
             `;
@@ -1599,7 +1733,7 @@ const justifyContent = 'justify-content-center';
                     ${scrollHint}
                     <div class="rsyc-center-container" style="width:100%;">
                         <div style="display: flex; justify-content: center; width: 100%; margin: 0 auto;">
-                            <div class="stories-container justify-content-center" style="max-width: 1400px; width: 100%;">
+                            <div class="d-flex flex-wrap gap-4 justify-content-center">
                             ${storyCards}
                         </div>
                     </div>
@@ -1816,10 +1950,19 @@ ${modal}`;
         let scheduleTitleSection = '';
 
         const eventCardsSource = Array.isArray(events) ? events : [];
-        const scheduleCardsSource = Array.isArray(schedules) ? schedules : [];
+        const scheduleCardsSource = Array.isArray(schedules) ? schedules : []; // Show ALL schedules
+
+        console.log('[RSYC] Schedules section data:', {
+            totalSchedules: schedules ? schedules.length : 0,
+            eventsCount: events ? events.length : 0,
+            schedulesWithShowInEvents: schedules ? schedules.filter(s => s.ShowinEventsSection === true).length : 0,
+            allSchedulesForDisplay: scheduleCardsSource.length,
+            mergedCount: [...scheduleCardsSource, ...eventCardsSource].length
+        });
 
         // Merge events into the same card scroller (Program Schedule cards)
         // Events are tagged by __type==='event' and have _startTimestamp for sorting.
+        // Show ALL schedules in schedules section (events section will filter separately)
         const mergedSchedules = [...scheduleCardsSource, ...eventCardsSource];
 
         if (mergedSchedules && mergedSchedules.length > 0) {
@@ -1830,6 +1973,74 @@ ${modal}`;
             // ...existing code...
 
             const sortedSchedules = [...mergedSchedules]; // keep sort logic as before if needed
+
+            // Helper function for friendly date formatting without timezone conversion
+            const formatFriendlyDate = (dateStr, includeYear = true) => {
+                if (!dateStr) return '';
+                
+                try {
+                    // Parse the date string (YYYY-MM-DD format)
+                    const date = new Date(dateStr);
+                    if (isNaN(date.getTime())) return dateStr; // Return original if invalid
+                    
+                    const months = ['January', 'February', 'March', 'April', 'May', 'June',
+                                  'July', 'August', 'September', 'October', 'November', 'December'];
+                    
+                    const month = months[date.getMonth()];
+                    const day = date.getDate();
+                    const year = date.getFullYear();
+                    
+                    if (includeYear) {
+                        return `${month} ${day}, ${year}`;
+                    } else {
+                        return `${month} ${day}`;
+                    }
+                } catch (e) {
+                    return dateStr; // Return original if error
+                }
+            };
+            
+            const formatFriendlyDateRange = (startDateStr, endDateStr) => {
+                if (!startDateStr) return '';
+                
+                try {
+                    const startDate = new Date(startDateStr);
+                    const endDate = endDateStr ? new Date(endDateStr) : null;
+                    
+                    if (isNaN(startDate.getTime())) return startDateStr; // Return original if invalid
+                    
+                    const months = ['January', 'February', 'March', 'April', 'May', 'June',
+                                  'July', 'August', 'September', 'October', 'November', 'December'];
+                    
+                    const startMonth = months[startDate.getMonth()];
+                    const startDay = startDate.getDate();
+                    const startYear = startDate.getFullYear();
+                    
+                    if (!endDate || isNaN(endDate.getTime())) {
+                        // Single date
+                        return `${startMonth} ${startDay}, ${startYear}`;
+                    }
+                    
+                    const endMonth = months[endDate.getMonth()];
+                    const endDay = endDate.getDate();
+                    const endYear = endDate.getFullYear();
+                    
+                    // Check if same month and year
+                    if (startMonth === endMonth && startYear === endYear) {
+                        return `${startMonth} ${startDay} - ${endDay}, ${startYear}`;
+                    }
+                    
+                    // Check if same year
+                    if (startYear === endYear) {
+                        return `${startMonth} ${startDay} - ${endMonth} ${endDay}, ${startYear}`;
+                    }
+                    
+                    // Different years
+                    return `${startMonth} ${startDay}, ${startYear} - ${endMonth} ${endDay}, ${endYear}`;
+                } catch (e) {
+                    return startDateStr; // Return original if error
+                }
+            };
 
             scheduleCards = sortedSchedules.map(schedule => {
                 const isEvent = schedule && schedule.__type === 'event';
@@ -1847,12 +2058,30 @@ ${modal}`;
                 const eventSubtitleText = isEvent ? (schedule.subtitle || '') : '';
                 const eventCardSubtitleText = isEvent ? (eventSubtitleText || eventTypeText) : '';
 
-                // CRITICAL: For program schedules, show raw startDate and endDate from JSON, no formatting
+                // Use friendly date formatting for program schedules
                 let scheduleDateText = '';
-                if (!isEvent && schedule.startDate && schedule.endDate) {
-                    scheduleDateText = `${schedule.startDate} - ${schedule.endDate}`;
-                } else if (!isEvent && schedule.startDate && !schedule.endDate) {
-                    scheduleDateText = schedule.startDate;
+                const currentYear = new Date().getFullYear();
+                
+                if (schedule.startDate && schedule.endDate) {
+                    // Check if both dates are in current year
+                    const startYear = new Date(schedule.startDate).getFullYear();
+                    const endYear = new Date(schedule.endDate).getFullYear();
+                    const bothCurrentYear = startYear === currentYear && endYear === currentYear;
+                    
+                    if (bothCurrentYear) {
+                        // Use format without year for current year dates
+                        scheduleDateText = formatFriendlyDateRange(schedule.startDate, schedule.endDate).replace(/,\s*\d{4}/g, '').replace(/,\s*\d{4}\s*-\s*/g, ' - ');
+                    } else {
+                        scheduleDateText = formatFriendlyDateRange(schedule.startDate, schedule.endDate);
+                    }
+                } else if (schedule.startDate && !schedule.endDate) {
+                    const startYear = new Date(schedule.startDate).getFullYear();
+                    if (startYear === currentYear) {
+                        // Use format without year for current year date
+                        scheduleDateText = formatFriendlyDate(schedule.startDate, false);
+                    } else {
+                        scheduleDateText = formatFriendlyDate(schedule.startDate);
+                    }
                 }
                 
                 const onSaleTag = (isEvent && schedule.isOnSale) ? `
@@ -1946,7 +2175,7 @@ ${modal}`;
                 const hasAdditionalInfo = months || registrationMonths || disclaimer;
                 const scheduleId = `schedule-${schedule.id}`;
                 
-                const modalType = isEvent ? `event-${schedule.id}` : `schedule-${schedule.id}`;
+                const modalType = `schedule-${schedule.id}`;
 
                 const expandableInfo = `
                     <div class="mt-2" style="display: flex; gap: 0.5rem;">
@@ -1982,26 +2211,15 @@ ${modal}`;
                     </div>
                 </div>
             ` : ''}
-            ${schedule.URLImage ? `
+            ${schedule.URLImage || schedule.imageUrl ? `
                 <div class="mb-4">
-                    <img alt="${this.escapeHTML(schedule.title)}" src="${this.escapeHTML(schedule.URLImage)}" style="width:100%; height:auto; border-radius: 12px; display:block;" />
+                    <img alt="${this.escapeHTML(schedule.title)}" src="${this.escapeHTML(schedule.URLImage || schedule.imageUrl)}" style="width:100%; height:auto; border-radius: 12px; display:block;" />
                 </div>
             ` : ''}
-            ${schedule.centerName ? `<div class="mb-3" style="display:flex;align-items:center;justify-content:space-between;gap:0.75rem;">
-                <div style="font-size:1.1rem; font-weight:600; color:#0C0C0C;"><strong>${this.escapeHTML(center.name || center.Title)}</strong></div>
-                <img src="https://thisishoperva.org/rsyc/Red+Shield+Youth+Centers+Logo+-+Color.svg" alt="Red Shield Youth Centers Logo" style="height:42px; max-width:120px; width:auto; object-fit:contain; display:block;" />
-            </div>` : ''}
             ${schedule.title ? `<h3 class="mb-2" style="color:#333;">${this.escapeHTML(schedule.title)}</h3>` : ''}
 
-            ${(!isEvent && schedule.subtitle) ? `<p class="mb-3" style="color:#666; font-style:italic;">${this.escapeHTML(schedule.subtitle)}</p>` : ''}
+            ${schedule.subtitle ? `<p class="mb-3" style="color:#666; font-style:italic;">${this.escapeHTML(schedule.subtitle)}</p>` : ''}
             ${schedule.description ? `<p class="mb-1 rsyc-description">${schedule.description}</p>` : ''}
-            ${hasContent(schedule.whatToBring) || hasContent(schedule.materialsProvided) ? `
-            <div class="mb-3" style="background:#f0f8ff; padding:1rem; border-radius:6px; border-left:3px solid #4169e1; color:#333;">
-                <strong style="color:#4169e1;"><i class="bi bi-backpack2 me-2"></i>What to Bring:</strong>
-                ${hasContent(schedule.whatToBring) ? `<div class="mt-2">${this.preserveLineBreaks(schedule.whatToBring)}</div>` : ''}
-                ${hasContent(schedule.materialsProvided) ? `<div class="mt-2"><u>Materials Provided:</u><br>${this.preserveLineBreaks(schedule.materialsProvided)}</div>` : ''}
-            </div>
-            ` : ''}
             ${addressText ? `
                 <div class="mb-3 rsyc-event-location" style="background:#f8f9fa; padding:1rem; border-radius:8px; border:1px solid #e0e0e0;">
                     <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:0.75rem;">
@@ -2013,13 +2231,13 @@ ${modal}`;
                     </div>
                 </div>
             ` : ''}
-            ${isEvent && (eventDateText || eventTimeText) ? `<div class="mb-3" style="font-size: 1.1rem; color:#333;">
+            ${(eventDateText || eventTimeText) ? `<div class="mb-3" style="font-size: 1.1rem; color:#333;">
                 ${eventDateText ? `<div><strong>Date:</strong><br>${this.escapeHTML(eventDateText)}</div>` : ''}
                 ${eventTimeText ? `<div style="margin-top:0.5rem;"><strong>Time:</strong><br>${this.escapeHTML(eventTimeText)}</div>` : ''}
             </div>` : ''}
-            ${isEvent && schedule.cost ? `<div class="mb-3" style="font-size: 1.1rem; color:#333;"><strong>Cost:</strong><br>${this.escapeHTML(schedule.cost)}</div>` : ''}
+            ${schedule.cost ? `<div class="mb-3" style="font-size: 1.1rem; color:#333;"><strong>Cost:</strong><br>${this.escapeHTML(schedule.cost)}</div>` : ''}
 
-            ${isEvent && (schedule.primaryButtonUrl || schedule.secondaryButtonUrl) ? `
+            ${(schedule.primaryButtonUrl || schedule.secondaryButtonUrl) ? `
             <div class="mb-4" style="display:flex; gap:0.5rem; flex-wrap:wrap; align-items:center;">
                 ${schedule.primaryButtonUrl ? `<a class="btn btn-primary" href="${this.escapeHTML(schedule.primaryButtonUrl)}" target="_blank" rel="noopener noreferrer" style="background-color:#00929C; border:none;">${this.escapeHTML(schedule.primaryButtonText || 'Learn More')}</a>` : ''}
                 ${schedule.secondaryButtonUrl ? `<a class="btn btn-outline-primary" href="${this.escapeHTML(schedule.secondaryButtonUrl)}" target="_blank" rel="noopener noreferrer">${this.escapeHTML(schedule.secondaryButtonText || 'More Info')}</a>` : ''}
@@ -2029,30 +2247,38 @@ ${modal}`;
             ${hasContent(schedule.scheduleDisclaimer) ? `<div class="mb-4 rsyc-important-dates" style="background:#fff3cd; padding:1rem; border-radius:6px; border-left:3px solid #ff6b6b; color:#000;"><strong class="rsyc-important-dates-title" style="color:#000;"><i class="bi bi-exclamation-triangle me-2"></i>Important Dates/Closures:</strong><br><div class="mt-2 rsyc-important-dates-body" style="font-size:0.95rem;">${this.escapeHTML(schedule.scheduleDisclaimer)}</div></div>` : ''}
             
             <div class="row">
-                ${(!isEvent && hasContent(daysText)) ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Days:</strong><br>${this.escapeHTML(daysText)}</div>` : ''}
-                ${(!isEvent && hasContent(timeText)) ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Time:</strong><br>${this.escapeHTML(timeText)}</div>` : ''}
+                ${hasContent(daysText) ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Days:</strong><br>${this.escapeHTML(daysText)}</div>` : ''}
+                ${hasContent(timeText) ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Time:</strong><br>${this.escapeHTML(timeText)}</div>` : ''}
                 ${hasContent(months) ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Program Runs In:</strong><br>${this.escapeHTML(months)}</div>` : ''}
                 ${hasContent(registrationMonths) ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Registration Opens:</strong><br>${this.escapeHTML(registrationMonths)}</div>` : ''}
                 ${hasContent(schedule.registrationFee) ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Registration Fee:</strong><br>${this.escapeHTML(schedule.registrationFee)}</div>` : ''}
                 ${hasContent(schedule.ageRange) ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Ages:</strong><br>${this.escapeHTML(schedule.ageRange)}</div>` : ''}
-                ${scheduleDateText ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Program Dates:</strong><br>${this.escapeHTML(scheduleDateText)}</div>` : hasContent(schedule.startDate) || hasContent(schedule.endDate) ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Program Dates:</strong><br>${hasContent(schedule.startDate) ? this.escapeHTML(schedule.startDate) : ''} ${hasContent(schedule.startDate) && hasContent(schedule.endDate) ? '-' : ''} ${hasContent(schedule.endDate) ? this.escapeHTML(schedule.endDate) : ''}</div>` : ''}
-                ${isEvent && eventTypeText ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Type:</strong><br>${this.escapeHTML(eventTypeText)}</div>` : ''}
+                ${scheduleDateText ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Program Dates:</strong><br>${this.escapeHTML(scheduleDateText)}</div>` : ''}
                 ${addressText ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Address:</strong><br>${this.escapeHTML(addressText)}</div>` : ''}
                 ${hasContent(schedule.contactPhoneNumber) ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Phone:</strong><br>${this.escapeHTML(schedule.contactPhoneNumber)}</div>` : ''}
+                ${eventTypeText ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Type:</strong><br>${this.escapeHTML(eventTypeText)}</div>` : ''}
                 
                 ${hasContent(schedule.registrationDeadline) ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Registration Deadline:</strong><br>${this.escapeHTML(schedule.registrationDeadline)}</div>` : ''}
-                ${(!isEvent && hasContent(schedule.location)) ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Location:</strong><br>${this.escapeHTML(schedule.location)}</div>` : ''}
-                ${(!isEvent && hasContent(schedule.cost)) ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Cost:</strong><br>${this.escapeHTML(schedule.cost)}</div>` : ''}
+                ${hasContent(schedule.location) ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Location:</strong><br>${this.escapeHTML(schedule.location)}</div>` : ''}
+                ${hasContent(schedule.cost) ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Cost:</strong><br>${this.escapeHTML(schedule.cost)}</div>` : ''}
                 ${hasContent(schedule.frequency) ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Frequency:</strong><br>${this.escapeHTML(schedule.frequency)}</div>` : ''}
                 
                 ${hasContent(schedule.transportationFeeandDetails) ? `<div class="col-sm-12 mb-3 rsyc-transportation" style="background:#fff9ea; padding:1rem; border-radius:6px; border-left:3px solid #ffb300; color:#333;"><strong style="color:#555;"><i class="bi bi-bus-front me-2"></i>Transportation:</strong><br><div class="mt-1 rsyc-transportation-value" style="font-size:0.95rem;">${this.preserveLineBreaks(schedule.transportationFeeandDetails)}</div></div>` : ''}
+                
+                ${hasContent(schedule.whatToBring) || hasContent(schedule.materialsProvided) ? `
+                <div class="col-sm-12 mb-3" style="background:#f0f8ff; padding:1rem; border-radius:6px; border-left:3px solid #4169e1; color:#333;">
+                    <strong style="color:#4169e1;"><i class="bi bi-backpack2 me-2"></i>What to Bring:</strong>
+                    ${hasContent(schedule.whatToBring) ? `<div class="mt-2">${this.preserveLineBreaks(schedule.whatToBring)}</div>` : ''}
+                    ${hasContent(schedule.materialsProvided) ? `<div class="mt-2"><u>Materials Provided:</u><br>${this.preserveLineBreaks(schedule.materialsProvided)}</div>` : ''}
+                </div>
+                ` : ''}
                 
                 ${hasContent(schedule.closedDates) ? `<div class="col-sm-12 mb-3" style="background:#ffe6e6; padding:1rem; border-radius:6px; border-left:3px solid #dc3545; color:#333;"><strong style="color:#dc3545;"><i class="bi bi-calendar-x me-2"></i>Closed Dates:</strong><br>${this.preserveLineBreaks(schedule.closedDates)}</div>` : ''}
                 ${hasContent(schedule.openHalfDayDates) ? `<div class="col-sm-12 mb-3" style="color:#333;"><strong>Open Half Days:</strong><br>${this.preserveLineBreaks(schedule.openHalfDayDates)}</div>` : ''}
                 ${hasContent(schedule.openFullDayDates) ? `<div class="col-sm-12 mb-3" style="color:#333;"><strong>Open Full Days:</strong><br>${this.preserveLineBreaks(schedule.openFullDayDates)}</div>` : ''}
                 ${(() => {
                     // output any extra simple string fields not already rendered above
-                    const known = ['id','title','subtitle','description','videoEmbedCode','URLImage','centerName','startDate','endDate','scheduleDays','scheduleTime','registrationFee','ageRange','scheduleDisclaimer','daysText','timeText','months','registrationMonths','registrationDeadline','location','cost','frequency','transportationFeeandDetails','closedDates','openHalfDayDates','openFullDayDates','orientationDetails','whatToBring','materialsProvided','contacts','contactInfo','address','city','state','postalCode','contactPhoneNumber','status'];
+                    const known = ['id','title','subtitle','description','videoEmbedCode','URLImage','imageUrl','URLThumbnailImage','thumbnailUrl','centerName','startDate','endDate','scheduleDays','scheduleTime','registrationFee','ageRange','scheduleDisclaimer','daysText','timeText','months','registrationMonths','registrationDeadline','location','cost','frequency','transportationFeeandDetails','closedDates','openHalfDayDates','openFullDayDates','orientationDetails','whatToBring','materialsProvided','contacts','contactInfo','address','city','state','postalCode','contactPhoneNumber','status','timezone'];
                     const extras = Object.keys(schedule).filter(k => !known.includes(k) && schedule[k] && typeof schedule[k] === 'string').map(k => `
                         <div class="col-sm-12 mb-2" style="color:#333;"><strong>${this.escapeHTML(k)}:</strong> ${this.escapeHTML(schedule[k])}</div>
                     `);
@@ -2139,7 +2365,7 @@ ${modal}`;
 
                 // Build accordion version for small screens/iPad with same content as modal
                 const accordionId = `rsyc-accordion-${schedule.id}`;
-                const scheduleAccordion = isEvent ? '' : `
+                const scheduleAccordion = `
                 <div class="rsyc-schedule-accordion" style="width: 100%; margin-bottom: 1rem; border-radius: 8px; overflow: hidden; border: 1px solid #e0e0e0; background: white;">
                     <div class="accordion-header" style="padding: 1rem; cursor: pointer; display: flex; justify-content: space-between; align-items: center; background: #f8f9fa; border-bottom: 1px solid #e0e0e0; color: #000;" onclick="window.toggleRSYCAccordion('${accordionId}')">
                         <div style="color: #000;">
@@ -2163,10 +2389,6 @@ ${modal}`;
                                 </div>
                             </div>
                         ` : ''}
-                        ${schedule.centerName ? `<div class="mb-3" style="display:flex;align-items:center;justify-content:space-between;gap:0.75rem;">
-                            <div style="font-size:1.1rem; font-weight:600; color:#0C0C0C;"><strong>${this.escapeHTML(center.name || center.Title)}</strong></div>
-                            <img src="https://thisishoperva.org/rsyc/Red+Shield+Youth+Centers+Logo+-+Color.svg" alt="Red Shield Youth Centers Logo" style="height:36px; max-width:100px; width:auto; object-fit:contain; display:block;" />
-                        </div>` : ''}
                         ${schedule.title ? `<h3 class="mb-2" style="color:#333;">${this.escapeHTML(schedule.title)}</h3>` : ''}
                         ${schedule.subtitle ? `<p class="mb-3" style="color:#666; font-style:italic;">${this.escapeHTML(schedule.subtitle)}</p>` : ''}
                         ${schedule.description ? `<p class="mb-1 rsyc-description">${schedule.description}</p>` : ''}
@@ -2177,7 +2399,6 @@ ${modal}`;
                             ${hasContent(schedule.ageRange) ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Age Range:</strong><br>${this.escapeHTML(schedule.ageRange)}</div>` : ''}
                             ${hasContent(daysText) ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Days:</strong><br>${this.escapeHTML(daysText)}</div>` : ''}
                             ${hasContent(timeText) ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Time:</strong><br>${this.escapeHTML(timeText)}</div>` : ''}
-                            ${hasContent(schedule.timezone) ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Time Zone:</strong><br>${this.escapeHTML(schedule.timezone)}</div>` : ''}
                             ${hasContent(schedule.frequency) ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Frequency:</strong><br>${this.escapeHTML(schedule.frequency)}</div>` : ''}
                             ${hasContent(months) ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Program Runs In:</strong><br>${this.escapeHTML(months)}</div>` : ''}
                             ${hasContent(registrationMonths) ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Registration Opens:</strong><br>${this.escapeHTML(registrationMonths)}</div>` : ''}
@@ -2188,9 +2409,17 @@ ${modal}`;
                             ${hasContent(schedule.capacity) ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Capacity:</strong><br>${this.escapeHTML(schedule.capacity)}</div>` : ''}
                             
                             ${hasContent(schedule.agesServed?.join(', ')) ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Ages:</strong><br>${this.escapeHTML(schedule.agesServed.join(', '))}</div>` : ''}
-                            ${hasContent(schedule.startDate) || hasContent(schedule.endDate) ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Program Dates:</strong><br>${hasContent(schedule.startDate) ? this.escapeHTML(schedule.startDate) : ''} ${hasContent(schedule.startDate) && hasContent(schedule.endDate) ? '-' : ''} ${hasContent(schedule.endDate) ? this.escapeHTML(schedule.endDate) : ''}</div>` : ''}
+                            ${scheduleDateText ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Program Dates:</strong><br>${this.escapeHTML(scheduleDateText)}</div>` : ''}
                             
                             ${hasContent(schedule.transportationFeeandDetails) ? `<div class="col-sm-12 mb-3 rsyc-transportation" style="background:#fff9ea; padding:1rem; border-radius:6px; border-left:3px solid #ffb300; color:#333;"><strong style="color:#555;"><i class="bi bi-bus-front me-2"></i>Transportation:</strong><br><div class="mt-1 rsyc-transportation-value" style="font-size:0.95rem;">${this.preserveLineBreaks(schedule.transportationFeeandDetails)}</div></div>` : ''}
+                            
+                            ${hasContent(schedule.whatToBring) || hasContent(schedule.materialsProvided) ? `
+                            <div class="col-sm-12 mb-3" style="background:#f0f8ff; padding:1rem; border-radius:6px; border-left:3px solid #4169e1; color:#333;">
+                                <strong style="color:#4169e1;"><i class="bi bi-backpack2 me-2"></i>What to Bring:</strong>
+                                ${hasContent(schedule.whatToBring) ? `<div class="mt-2">${this.preserveLineBreaks(schedule.whatToBring)}</div>` : ''}
+                                ${hasContent(schedule.materialsProvided) ? `<div class="mt-2"><u>Materials Provided:</u><br>${this.preserveLineBreaks(schedule.materialsProvided)}</div>` : ''}
+                            </div>
+                            ` : ''}
                             
                             ${hasContent(schedule.closedDates) ? `<div class="col-sm-12 mb-3" style="background:#ffe6e6; padding:1rem; border-radius:6px; border-left:3px solid #dc3545; color:#333;"><strong style="color:#dc3545;"><i class="bi bi-calendar-x me-2"></i>Closed Dates:</strong><br>${this.preserveLineBreaks(schedule.closedDates)}</div>` : ''}
                             ${hasContent(schedule.openHalfDayDates) ? `<div class="col-sm-12 mb-3" style="color:#333;"><strong>Open Half Days:</strong><br>${this.preserveLineBreaks(schedule.openHalfDayDates)}</div>` : ''}
@@ -2200,14 +2429,6 @@ ${modal}`;
                             <div class="col-sm-12 mb-3" style="background:#fffacd; padding:1rem; border-radius:6px; border-left:3px solid #ff8c00; color:#333;">
                                 <strong style="color:#000;"><i class="bi bi-info-circle me-2"></i>Orientation Details:</strong>
                                 <div class="mt-2" style="font-size:0.95rem; color:#000;">${this.preserveLineBreaks(schedule.orientationDetails)}</div>
-                            </div>
-                            ` : ''}
-                            
-                            ${hasContent(schedule.whatToBring) || hasContent(schedule.materialsProvided) ? `
-                            <div class="col-sm-12 mb-3" style="background:#f0f8ff; padding:1rem; border-radius:6px; border-left:3px solid #4169e1; color:#333;">
-                                <strong style="color:#4169e1;"><i class="bi bi-backpack2 me-2"></i>What to Bring:</strong>
-                                ${hasContent(schedule.whatToBring) ? `<div class="mt-2">${this.preserveLineBreaks(schedule.whatToBring)}</div>` : ''}
-                                ${hasContent(schedule.materialsProvided) ? `<div class="mt-2"><u>Materials Provided:</u><br>${this.preserveLineBreaks(schedule.materialsProvided)}</div>` : ''}
                             </div>
                             ` : ''}
                             
@@ -2274,33 +2495,31 @@ ${modal}`;
                 </div>
                 `;
                 
-                // Only append schedule modals for non-events.
-                // Events reuse the shared event modal defined in the Events section.
-                if (!isEvent) {
-                    scheduleModals += scheduleModal;
-                }
+                // Use schedule modal for both schedules and events
+                scheduleModals += scheduleModal;
 
                 return `
-                    <div>
+                    <div class="col-12 col-md-6 d-flex">
                         <!-- Desktop Card Version -->
-                        <div class="schedule-card rsyc-schedule-card-desktop text-dark" style="min-width:230px;padding:1rem;border-radius:8px;background:#fff;box-shadow:0 1px 4px rgba(0,0,0,0.06);display:flex;flex-direction:column;height:100%;gap:0.75rem; position:relative;">
-                            ${onSaleTag}
-                            <div style="flex-shrink:0;">
-                                <h5 class="fw-bold mb-1">${this.escapeHTML(schedule.title)}</h5>
-                                ${isEvent && eventCardSubtitleText ? `<div class="text-muted small">${this.escapeHTML(eventCardSubtitleText)}</div>` : ''}
-                                ${!isEvent && schedule.subtitle ? `<div class="text-muted small">${this.escapeHTML(schedule.subtitle)}</div>` : ''}
-                            </div>
-                            <div style="flex-grow:1;display:flex;flex-direction:column;">
-                                <p class="mb-0">
-                                    ${isEvent && eventDateText ? `<strong>Date:</strong> ${this.escapeHTML(eventDateText)}<br>` : ''}
-                                    ${isEvent && eventTimeText ? `<strong>Time:</strong> ${this.escapeHTML(eventTimeText)}<br>` : ''}
-                                    ${!isEvent && scheduleDateText ? `<strong>Date:</strong> ${this.escapeHTML(scheduleDateText)}<br>` : ''}
-                                    ${!isEvent && !scheduleDateText && daysText ? `<strong>Days:</strong> <span class="d-inline-block">${this.escapeHTML(daysText)}</span><br>` : ''}
-                                    ${!isEvent && timeText ? `<strong>Time:</strong> ${this.escapeHTML(timeText)}<br>` : ''}
-                                </p>
-                            </div>
-                            <div style="flex-shrink:0;">
-                                ${expandableInfo}
+                        <div class="schedule-card rsyc-schedule-card-desktop text-dark card h-100 bg-white d-flex flex-column" style="border-radius:8px;box-shadow:0 1px 4px rgba(0,0,0,0.06);">
+                            <div class="card-body d-flex flex-column flex-grow-1">
+                                ${onSaleTag}
+                                <div class="flex-shrink-0">
+                                    <h5 class="fw-bold mb-1 text-wrap">${this.escapeHTML(schedule.title)}</h5>
+                                    ${schedule.subtitle ? `<div class="text-muted small text-wrap">${this.escapeHTML(schedule.subtitle)}</div>` : ''}
+                                </div>
+                                <div class="flex-grow-1">
+                                    <p class="mb-0 text-wrap">
+                                        ${eventDateText ? `<strong>Date:</strong> ${this.escapeHTML(eventDateText)}<br>` : ''}
+                                        ${eventTimeText ? `<strong>Time:</strong> ${this.escapeHTML(eventTimeText)}<br>` : ''}
+                                        ${scheduleDateText ? `<strong>Date:</strong> ${this.escapeHTML(scheduleDateText)}<br>` : ''}
+                                        ${!scheduleDateText && daysText ? `<strong>Days:</strong> <span class="d-inline-block text-wrap">${this.escapeHTML(daysText)}</span><br>` : ''}
+                                        ${timeText ? `<strong>Time:</strong> ${this.escapeHTML(timeText)}<br>` : ''}
+                                    </p>
+                                </div>
+                                <div class="flex-shrink-0">
+                                    ${expandableInfo}
+                                </div>
                             </div>
                         </div>
                         
@@ -2308,21 +2527,9 @@ ${modal}`;
                         <div class="rsyc-schedule-accordion-mobile" style="display: none;">
                             ${scheduleAccordion}
                         </div>
-                        
-                        
                     </div>
                     `;
             }).join('');
-            
-            // Conditionally center if 3 or fewer cards, otherwise left-align for proper scrolling
-            const justifyContent = 'justify-content-center';
-            const scrollHint = mergedSchedules.length > 3 ? `
-    <p class="rsyc-scroll-hint text-center mb-n2">
-        <small class="text-light">
-            Scroll to view more 
-            <i class="bi bi-arrow-right-circle" style="font-size: 0.85em; vertical-align: middle;"></i>
-        </small>
-    </p>` : '';
             
             // Store schedules in global variable for printing
             if (typeof window.RSYC_SCHEDULES === 'undefined') {
@@ -2339,15 +2546,151 @@ ${modal}`;
             };
             
             scheduleScrollSection = `
-    ${scrollHint}
-
-    <!-- center wrapper for horizontal scroll -->
-    <div class="rsyc-center-container" style="width:100%;">
-        <div class="horizontal-scroll justify-content-center" style="display:flex;gap:1rem;overflow-x:auto;overflow-y:visible;padding-bottom:0.5rem;align-items:stretch; max-width:1400px; width:100%;">
+    <!-- Desktop Table Layout (hidden on mobile/tablet) -->
+    <div class="d-none d-lg-block">
+        <div class="table-responsive">
+            <table class="table table-hover bg-white" style="border-radius:8px;box-shadow:0 1px 4px rgba(0,0,0,0.06);">
+                <thead class="table-light">
+                    <tr>
+                        <th style="border-radius:8px 0 0 0;">Program</th>
+                        <th style="border-radius:0 8px 0 0;">Summary</th>
+                        <th style="border-radius:0 8px 0 0;">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${sortedSchedules.map(schedule => {
+                        console.log('[RSYC] Processing schedule for table:', schedule.title);
+                        
+                        // Use the exact same date/time extraction logic as the cards
+                        const isEvent = schedule && schedule.__type === 'event';
+                        
+                        // For events shown in program schedule: extract time from StartDateandTime/EndDateandTime
+                        let eventDateText = '';
+                        let eventTimeText = '';
+                        
+                        if (isEvent) {
+                            // Use the same event logic as cards
+                            const dt = this.formatEventDateTimeParts(schedule);
+                            eventDateText = dt.dateText || '';
+                            eventTimeText = dt.timeText || '';
+                        }
+                        
+                        // Use the same date formatting logic as cards - check what functions are available
+                        let scheduleDateText = '';
+                        
+                        // Try to use the same date formatting as cards
+                        if (schedule.startDate && schedule.endDate) {
+                            // Use the formatFriendlyDateRange function if available, otherwise fallback
+                            try {
+                                scheduleDateText = this.formatFriendlyDateRange(schedule.startDate, schedule.endDate);
+                            } catch (e) {
+                                console.warn('[RSYC] formatFriendlyDateRange not available, using fallback:', e);
+                                // Simple fallback formatting
+                                const start = new Date(schedule.startDate);
+                                const end = new Date(schedule.endDate);
+                                const options = { month: 'short', day: 'numeric' };
+                                scheduleDateText = `${start.toLocaleDateString('en-US', options)} - ${end.toLocaleDateString('en-US', options)}`;
+                            }
+                        } else if (schedule.startDate && !schedule.endDate) {
+                            try {
+                                scheduleDateText = this.formatFriendlyDate(schedule.startDate);
+                            } catch (e) {
+                                console.warn('[RSYC] formatFriendlyDate not available, using fallback:', e);
+                                // Simple fallback formatting
+                                const date = new Date(schedule.startDate);
+                                scheduleDateText = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+                            }
+                        }
+                        
+                        // Parse days - format as "Monday - Friday" or list individual days (same as cards)
+                        let daysText = '';
+                        if (schedule.scheduleDays && Array.isArray(schedule.scheduleDays) && schedule.scheduleDays.length > 0) {
+                            const days = schedule.scheduleDays;
+                            const weekdays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
+                            const allWeekdays = weekdays.every(day => days.includes(day));
+                            
+                            if (allWeekdays && days.length === 5) {
+                                daysText = 'Monday - Friday';
+                            } else if (days.length === 1) {
+                                daysText = days[0];
+                            } else if (days.length === 2) {
+                                daysText = days.join(' and ');
+                            } else {
+                                daysText = days.join(', ');
+                            }
+                        }
+                        
+                        // Parse time - the ScheduleTime field already contains the full time range (same as cards)
+                        let timeText = '';
+                        if (schedule.scheduleTime) {
+                            timeText = schedule.scheduleTime;
+                            
+                            // Append Time Zone (Eastern or Central only)
+                            if (schedule.timezone) {
+                                const tz = schedule.timezone.toLowerCase();
+                                if (tz.includes('eastern')) {
+                                    timeText += ' (Eastern)';
+                                } else if (tz.includes('central')) {
+                                    timeText += ' (Central)';
+                                }
+                            }
+                        }
+                        
+                        console.log('[RSYC] Table schedule data (using card logic):', {
+                            title: schedule.title,
+                            isEvent: isEvent,
+                            eventDateText: eventDateText,
+                            eventTimeText: eventTimeText,
+                            scheduleDateText: scheduleDateText,
+                            timeText: timeText,
+                            daysText: daysText,
+                            startDate: schedule.startDate,
+                            endDate: schedule.endDate,
+                            scheduleTime: schedule.scheduleTime,
+                            scheduleDays: schedule.scheduleDays
+                        });
+                        
+                        // Build date/time/days display using the same logic as cards
+                        let dateTimeInfo = [];
+                        if (isEvent && eventDateText) dateTimeInfo.push(`<strong>Date:</strong> ${eventDateText}`);
+                        else if (scheduleDateText) dateTimeInfo.push(`<strong>Date:</strong> ${scheduleDateText}`);
+                        
+                        if (isEvent && eventTimeText) dateTimeInfo.push(`<strong>Time:</strong> ${eventTimeText}`);
+                        else if (timeText) dateTimeInfo.push(`<strong>Time:</strong> ${timeText}`);
+                        
+                        if (daysText) dateTimeInfo.push(`<strong>Days:</strong> ${daysText}`);
+                        
+                        const dateTimeDisplay = dateTimeInfo.length > 0 ? dateTimeInfo.join('<br>') : '';
+                        
+                        return `
+                        <tr>
+                            <td style="width: 40%;">
+                                <div class="fw-bold text-wrap">${this.escapeHTML(schedule.title)}</div>
+                                ${schedule.subtitle ? `<div class="text-muted small text-wrap">${this.escapeHTML(schedule.subtitle)}</div>` : ''}
+                            </td>
+                            <td style="width: 50%;">
+                                ${dateTimeDisplay ? `<div class="text-wrap small">${dateTimeDisplay}</div>` : '<div class="text-muted small">No date/time information available</div>'}
+                            </td>
+                            <td style="width: 10%;">
+                                <button class="btn btn-sm btn-outline-primary" onclick="showRSYCModal('schedule-${schedule.id}', '${this.escapeHTML(center.name || center.Title, true)}')">
+                                    View Details
+                                </button>
+                            </td>
+                        </tr>`;
+                    }).join('')}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    
+    <!-- Mobile/Tablet Card Layout (hidden on desktop) -->
+    <div class="d-lg-none">
+        <div class="row g-2 justify-content-between align-items-stretch">
             ${scheduleCards}
         </div>
     </div>
-    <div class="text-center mt-4">
+    
+    <div class="text-center mt-3 mb-0">
         <button class="btn btn-outline-primary" onclick="printAllSchedules('${schedulesCacheKey}')" style="border-color:#d3d3d3; color:#d3d3d3;">
             <i class="bi bi-printer me-2"></i>Print / Save all as PDF
         </button>
@@ -2356,54 +2699,10 @@ ${modal}`;
         
         // About This Center renders via the dedicated 'about' section.
         
-        // Build social network links
-        let socialSection = '';
-        const hasFacebook = center.facebookURL;
-        const hasInstagram = center.instagramURL;
-        const hasTwitter = center.twitterURL;
-        const hasLinkedIn = center.linkedInURL;
-        const hasYouTube = center.youTubeURL;
-        const hasEmbedFacebook = center.embedFacebookFeedCode;
-        
-        if (hasFacebook || hasInstagram || hasTwitter || hasLinkedIn || hasYouTube || hasEmbedFacebook) {
-            const socialIcons = [];
-            if (hasFacebook) {
-                socialIcons.push(`<a class="text-white text-decoration-none" href="${this.escapeHTML(center.facebookURL)}" target="_blank"><i class="bi bi-facebook" style="font-size:1.45rem;"></i></a>`);
-            }
-            if (hasInstagram) {
-                socialIcons.push(`<a class="text-white text-decoration-none" href="${this.escapeHTML(center.instagramURL)}" target="_blank"><i class="bi bi-instagram" style="font-size:1.45rem;"></i></a>`);
-            }
-            if (hasLinkedIn) {
-                socialIcons.push(`<a class="text-white text-decoration-none" href="${this.escapeHTML(center.linkedInURL)}" target="_blank"><i class="bi bi-linkedin" style="font-size:1.45rem;"></i></a>`);
-            }
-            if (hasYouTube) {
-                socialIcons.push(`<a class="text-white text-decoration-none" href="${this.escapeHTML(center.youTubeURL)}" target="_blank"><i class="bi bi-youtube" style="font-size:1.45rem;"></i></a>`);
-            }
-            if (hasTwitter) {
-                socialIcons.push(`<a class="text-white text-decoration-none" href="${this.escapeHTML(center.twitterURL)}" target="_blank"><i class="bi bi-twitter" style="font-size:1.45rem;"></i></a>`);
-            }
-            
-            // Build social section with icons if any social links exist
-            const socialIconsSection = socialIcons.length > 0 ? `
-    <div class="mt-4 text-center">
-        <h4 class="fw-bold mb-3 text-white">Follow Us</h4>
-        <div class="d-flex justify-content-center gap-3 mb-4">
-            ${socialIcons.join(' ')}
-        </div>
-    </div>` : '';
-            
-            // Build Facebook embed code section if available
-            const facebookEmbedSection = hasEmbedFacebook ? `
-    <div class="mt-4 facebook-feed-container" style="display: flex; justify-content: center;">
-        ${center.embedFacebookFeedCode}
-    </div>` : '';
-            
-            socialSection = socialIconsSection + facebookEmbedSection;
-        }
-
-        // If there is no schedules and no social links, don't render the entire section
-        if ((!scheduleCards || scheduleCards.trim() === '') && (!socialSection || socialSection.trim() === '')) {
-            return '';
+        // Update title section to only show "Program Schedules" when there are actual schedules
+        if (!scheduleCards || scheduleCards.trim() === '') {
+            // Only show social section, no schedules title
+            scheduleTitleSection = '';
         }
 
         return `<!-- Program Schedules -->
@@ -2417,8 +2716,142 @@ ${modal}`;
                     ${scheduleScrollSection}
                 </div>
                 
-                ${socialSection}
                 ${scheduleModals}
+            </div>
+        </div>
+    </div>
+</div>`;    }
+
+    /**
+     * Social Links Section
+     */
+    generateSocial(data) {
+        const { center } = data;
+        
+        if (!center) return '';
+        
+        // Comprehensive social media field checking - support multiple naming conventions
+        const socialFields = {
+            facebook: [
+                center.FacebookPageURL, center.facebookURL, center.Facebook, center.facebook,
+                center.FacebookPage, center.facebookPage
+            ].filter(Boolean),
+            instagram: [
+                center.instagramURL, center.InstagramURL, center.instagram, center.Instagram,
+                center.InstagramPage, center.instagramPage
+            ].filter(Boolean),
+            twitter: [
+                center.twitterURL, center.TwitterURL, center.twitter, center.Twitter,
+                center.TwitterHandle, center.twitterHandle, center.XURL, center.xURL
+            ].filter(Boolean),
+            linkedin: [
+                center.linkedInURL, center.LinkedInURL, center.linkedIn, center.LinkedIn,
+                center.LinkedInPage, center.linkedInPage
+            ].filter(Boolean),
+            youtube: [
+                center.youTubeURL, center.YouTubeURL, center.youtube, center.YouTube,
+                center.YouTubeChannel, center.youtubeChannel
+            ].filter(Boolean),
+            tiktok: [
+                center.tiktokURL, center.TikTokURL, center.tiktok, center.TikTok,
+                center.TikTokHandle, center.tiktokHandle
+            ].filter(Boolean),
+            pinterest: [
+                center.pinterestURL, center.PinterestURL, center.pinterest, center.Pinterest,
+                center.PinterestProfile, center.pinterestProfile
+            ].filter(Boolean),
+            snapchat: [
+                center.snapchatURL, center.SnapchatURL, center.snapchat, center.Snapchat,
+                center.SnapchatHandle, center.snapchatHandle
+            ].filter(Boolean)
+        };
+        
+        // Check for Facebook embed
+        const hasEmbedFacebook = center.EmbedFacebookFeed || center.embedFacebookFeedCode || 
+                                center.FacebookEmbed || center.facebookEmbed;
+        
+        // Check if any social media content exists
+        const hasAnySocial = Object.values(socialFields).some(urls => urls.length > 0) || hasEmbedFacebook;
+        
+        console.log('[RSYC] Social section data check:', {
+            facebook: socialFields.facebook.length > 0 ? socialFields.facebook[0] : null,
+            instagram: socialFields.instagram.length > 0 ? socialFields.instagram[0] : null,
+            twitter: socialFields.twitter.length > 0 ? socialFields.twitter[0] : null,
+            linkedin: socialFields.linkedin.length > 0 ? socialFields.linkedin[0] : null,
+            youtube: socialFields.youtube.length > 0 ? socialFields.youtube[0] : null,
+            tiktok: socialFields.tiktok.length > 0 ? socialFields.tiktok[0] : null,
+            pinterest: socialFields.pinterest.length > 0 ? socialFields.pinterest[0] : null,
+            snapchat: socialFields.snapchat.length > 0 ? socialFields.snapchat[0] : null,
+            hasEmbedFacebook: !!hasEmbedFacebook,
+            hasAnySocial: hasAnySocial
+        });
+        
+        if (!hasAnySocial) {
+            console.log('[RSYC] No social data found, returning empty');
+            return '';
+        }
+        
+        console.log('[RSYC] Social data found, generating section');
+        
+        // Build social icons with proper icons and links
+        const socialIcons = [];
+        
+        if (socialFields.facebook.length > 0) {
+            socialIcons.push(`<a class="text-white text-decoration-none" href="${this.escapeHTML(socialFields.facebook[0])}" target="_blank" title="Facebook"><i class="bi bi-facebook" style="font-size:1.45rem;"></i></a>`);
+        }
+        if (socialFields.instagram.length > 0) {
+            socialIcons.push(`<a class="text-white text-decoration-none" href="${this.escapeHTML(socialFields.instagram[0])}" target="_blank" title="Instagram"><i class="bi bi-instagram" style="font-size:1.45rem;"></i></a>`);
+        }
+        if (socialFields.twitter.length > 0) {
+            socialIcons.push(`<a class="text-white text-decoration-none" href="${this.escapeHTML(socialFields.twitter[0])}" target="_blank" title="X/Twitter"><i class="bi bi-twitter-x" style="font-size:1.45rem;"></i></a>`);
+        }
+        if (socialFields.linkedin.length > 0) {
+            socialIcons.push(`<a class="text-white text-decoration-none" href="${this.escapeHTML(socialFields.linkedin[0])}" target="_blank" title="LinkedIn"><i class="bi bi-linkedin" style="font-size:1.45rem;"></i></a>`);
+        }
+        if (socialFields.youtube.length > 0) {
+            socialIcons.push(`<a class="text-white text-decoration-none" href="${this.escapeHTML(socialFields.youtube[0])}" target="_blank" title="YouTube"><i class="bi bi-youtube" style="font-size:1.45rem;"></i></a>`);
+        }
+        if (socialFields.tiktok.length > 0) {
+            socialIcons.push(`<a class="text-white text-decoration-none" href="${this.escapeHTML(socialFields.tiktok[0])}" target="_blank" title="TikTok"><i class="bi bi-tiktok" style="font-size:1.45rem;"></i></a>`);
+        }
+        if (socialFields.pinterest.length > 0) {
+            socialIcons.push(`<a class="text-white text-decoration-none" href="${this.escapeHTML(socialFields.pinterest[0])}" target="_blank" title="Pinterest"><i class="bi bi-pinterest" style="font-size:1.45rem;"></i></a>`);
+        }
+        if (socialFields.snapchat.length > 0) {
+            socialIcons.push(`<a class="text-white text-decoration-none" href="${this.escapeHTML(socialFields.snapchat[0])}" target="_blank" title="Snapchat"><i class="bi bi-snapchat" style="font-size:1.45rem;"></i></a>`);
+        }
+        
+        // Build social section with icons if any social links exist
+        const socialIconsSection = socialIcons.length > 0 ? `
+    <div class="text-center">
+        <div class="d-flex justify-content-center gap-3 mb-4">
+            ${socialIcons.join(' ')}
+        </div>
+    </div>` : '';
+        
+        // Build Facebook embed code section if available
+        const facebookEmbedSection = hasEmbedFacebook ? `
+    <div class="mt-4 facebook-feed-container" style="display: flex; justify-content: center;">
+        ${hasEmbedFacebook}
+    </div>` : '';
+        
+        const socialSection = socialIconsSection + facebookEmbedSection;
+        
+        console.log('[RSYC] Social section content:', {
+            iconsCount: socialIcons.length,
+            hasIcons: socialIcons.length > 0,
+            hasEmbed: !!hasEmbedFacebook,
+            socialSectionLength: socialSection.length,
+            willShowHeader: true
+        });
+        
+        return `<!-- Social Links -->
+<div id="social" class="freeTextArea section" style="background-color: #6c757d; display: block !important; visibility: visible !important; opacity: 1 !important; height: auto !important;">
+    <div class="u-positionRelative" style="padding-top: 2rem; padding-bottom: 2rem; display: block !important; visibility: visible !important; opacity: 1 !important;">
+        <div class="container" style="display: block !important; visibility: visible !important; opacity: 1 !important;">
+            <div class="text-center">
+                <h2 class="fw-bold mb-4 text-center" style="color:#fff;">Follow <em style="color:#fff;">Us</em></h2>
+                ${socialSection}
             </div>
         </div>
     </div>
@@ -2427,9 +2860,6 @@ ${modal}`;
 
     /**
      * Hours of Operation Section
-     */
-    /**
-     * Hours of Operation Section (Symphony Format)
      */
     generateHours(data) {
         const { hours } = data;
@@ -2910,15 +3340,30 @@ ${modal}`;
             const objectPositionStyle = `object-position:${faceFocus};`;
 
             return `
-		<div class="card shadow border rounded-3 flex-shrink-0" style="width: 280px; scroll-snap-align: start; border: 1px solid #dee2e6; overflow:hidden;">
-			<div style="width:100%; aspect-ratio:1/1; overflow:hidden; background:#f0f0f0; cursor:pointer;" onclick="showRSYCModal('${modalType}', '${this.escapeHTML(center.name || center.Title, true)}')">
+		<div class="card shadow border rounded-3 flex-shrink-0" style="width: 280px; border: 1px solid #dee2e6; overflow:hidden;">
+			<!-- Desktop: Original layout -->
+			<div class="d-none d-lg-block" style="width:100%; aspect-ratio:1/1; overflow:hidden; background:#f0f0f0; cursor:pointer;" onclick="showRSYCModal('${modalType}', '${this.escapeHTML(center.name || center.Title, true)}')">
 				<img alt="${this.escapeHTML(displayName)}" class="card-img-top" src="${this.escapeHTML(photo)}" style="width:100%; height:100%; object-fit:cover; ${objectPositionStyle} ${scaleStyle} display:block;">
 			</div>
-			<div class="card-body d-flex flex-column">
+			<div class="d-none d-lg-block card-body d-flex flex-column">
 				<div class="fw-bold mb-1" style="font-size: 1.1rem; line-height: 1.3;">${this.escapeHTML(displayName)}</div>
 				<div class="text-muted mb-2" style="font-size: 0.95rem;">${this.escapeHTML(title)}</div>
 				<div style="flex-grow:1;"></div>
 				<button type="button" class="btn btn-outline-primary btn-sm mt-2" onclick="showRSYCModal('${modalType}', '${this.escapeHTML(center.name || center.Title, true)}')">View Bio</button>
+			</div>
+			
+			<!-- Tablet/Mobile: Horizontal layout -->
+			<div class="d-lg-none p-3" style="cursor:pointer;" onclick="showRSYCModal('${modalType}', '${this.escapeHTML(center.name || center.Title, true)}')">
+				<div class="d-flex align-items-center">
+					<div style="width: 150px; height: 150px; overflow:hidden; background:#f0f0f0; flex-shrink: 0;">
+						<img alt="${this.escapeHTML(displayName)}" src="${this.escapeHTML(photo)}" style="width:100%; height:100%; object-fit:cover; ${objectPositionStyle} ${scaleStyle} display:block;">
+					</div>
+					<div class="ms-3 flex-grow-1">
+						<div class="fw-bold mb-1" style="font-size: 1rem; line-height: 1.3;">${this.escapeHTML(displayName)}</div>
+						<div class="text-muted mb-2" style="font-size: 0.85rem;">${this.escapeHTML(title)}</div>
+						<button type="button" class="btn btn-outline-primary align-self-start" style="font-size: 0.75rem; padding: 0.25rem 0.5rem;" onclick="event.stopPropagation(); showRSYCModal('${modalType}', '${this.escapeHTML(center.name || center.Title, true)}')">View Bio</button>
+					</div>
+				</div>
 			</div>
 		</div>`;
         }).join('\n');
@@ -2964,6 +3409,37 @@ ${modal}`;
             const centerState = (data && data.center && data.center.state) ? data.center.state : '';
             const centerLocation = centerCity ? `${centerCity}${centerState ? ', ' + centerState : ''}` : (centerState || '');
 
+            // Extract center contact information
+            const centerEmail = (data && data.center && (data.center.email || data.center.emailAddress || data.center.contactEmail)) ? 
+                (data.center.email || data.center.emailAddress || data.center.contactEmail) : '';
+            const centerPhone = (data && data.center && (data.center.phone || data.center.phoneNumber || data.center.contactPhone || data.center.mainPhone)) ? 
+                (data.center.phone || data.center.phoneNumber || data.center.contactPhone || data.center.mainPhone) : '';
+
+            // Extract staff member contact information - comprehensive field checking
+            let staffEmail = '';
+            let staffPhone = '';
+            
+            // Use processed leader data first (from rsyc-data.js)
+            if (leader.phoneNumber) {
+                staffPhone = leader.phoneNumber;
+            }
+            
+            // Check leader object if not found in processed data
+            if (!staffPhone && leader) {
+                staffPhone = leader.PhoneNumber || leader.phoneNumber || leader.Phone || leader.phone || leader.contactPhone || leader.mobile || '';
+            }
+            
+            // Extract email
+            if (leader) {
+                staffEmail = leader.EmailAddress || leader.emailAddress || leader.email || leader.Email || leader.contactEmail || '';
+            }
+            
+            // Check person object if not found in leader
+            if ((!staffEmail || !staffPhone) && person) {
+                staffEmail = staffEmail || person.EmailAddress || person.emailAddress || person.email || person.Email || person.contactEmail || '';
+                staffPhone = staffPhone || person.PhoneNumber || person.phoneNumber || person.Phone || person.phone || person.contactPhone || person.mobile || '';
+            }
+
             return `
 <div id="rsyc-modal-${modalType}" class="rsyc-modal" style="display:none;" data-rsyc-staff-group="${staffModalGroupKey}" data-rsyc-staff-index="${idx}">
     <div class="rsyc-modal-content">
@@ -2989,9 +3465,15 @@ ${modal}`;
                         <div class="card-body">
                             <div class="fw-bold mb-1" style="font-size: 1.1rem; line-height: 1.3;">${this.escapeHTML(displayName)}</div>
                             <div class="text-muted" style="font-size: 0.95rem;">${this.escapeHTML(title)}</div>
+                            ${staffEmail || staffPhone ? `<div class="text-muted" style="margin-top: 0.5rem; font-size: 0.9rem; line-height: 1.4;">
+                                ${staffEmail ? `<div><i class="bi bi-envelope" style="margin-right: 0.35rem;"></i><a href="mailto:${this.escapeHTML(staffEmail)}" style="color: inherit; text-decoration: none;">${this.escapeHTML(staffEmail)}</a></div>` : ''}
+                                ${staffPhone ? `<div><i class="bi bi-telephone" style="margin-right: 0.35rem;"></i><a href="tel:${this.escapeHTML(staffPhone.replace(/\D/g, ''))}" style="color: inherit; text-decoration: none;">${this.escapeHTML(staffPhone)}</a></div>` : ''}
+                            </div>` : ''}
                             ${centerName ? `<div class="text-muted" style="margin-top: 0.75rem; font-size: 0.9rem; line-height: 1.4;">
                                 <div><i class="bi bi-building" style="margin-right: 0.35rem;"></i>${this.escapeHTML(centerName)}</div>
                                 ${centerLocation ? `<div><i class="bi bi-geo-alt" style="margin-right: 0.35rem;"></i>${this.escapeHTML(centerLocation)}</div>` : ''}
+                                ${centerEmail ? `<div><i class="bi bi-envelope" style="margin-right: 0.35rem;"></i><a href="mailto:${this.escapeHTML(centerEmail)}" style="color: inherit; text-decoration: none;">${this.escapeHTML(centerEmail)}</a></div>` : ''}
+                                ${centerPhone ? `<div><i class="bi bi-telephone" style="margin-right: 0.35rem;"></i><a href="tel:${this.escapeHTML(centerPhone.replace(/\D/g, ''))}" style="color: inherit; text-decoration: none;">${this.escapeHTML(centerPhone)}</a></div>` : ''}
                             </div>` : ''}
                         </div>
                     </div>
@@ -3010,14 +3492,8 @@ ${modal}`;
 </div>`;
         }).join('\n');
 
-        // Conditionally show scroll hint if there are more than 3 leaders
-        const scrollHint = sorted.length > 3 ? `
-                    <p class="text-center mb-n2">
-                        <small style="color:#eeeeee;">
-                            Scroll to view more 
-                            <i class="bi bi-arrow-right-circle" style="font-size: 0.85em; vertical-align: middle; color:#eeeeee;"></i>
-                        </small>
-                    </p>` : '';
+        // No scroll hint needed for grid layout
+        const scrollHint = '';
         
         // always centre cards; scroll/ wrapping handled via CSS
         const justifyContent = 'justify-content-center';
@@ -3032,7 +3508,7 @@ ${modal}`;
                     ${scrollHint}
                     
                     <div style="display: flex; justify-content: center; width: 100%; margin: 0 auto;">
-                        <div class="d-flex overflow-auto gap-4 py-2 justify-content-center" style="scroll-snap-type: x mandatory; max-width: 1400px; width: 100%;">
+                        <div class="d-flex flex-wrap gap-4 justify-content-center">
                             ${staffCards}
                         </div>
                     </div>
@@ -4578,28 +5054,180 @@ async function printRSYCModal(modalId) {
     const modal = document.getElementById(`rsyc-modal-${modalId}`);
     if (!modal) return;
     
+    // Helper function for friendly date formatting without timezone conversion
+    const formatFriendlyDate = (dateStr, includeYear = true) => {
+        if (!dateStr) return '';
+        
+        try {
+            // Parse the date string (YYYY-MM-DD format)
+            const date = new Date(dateStr);
+            if (isNaN(date.getTime())) return dateStr; // Return original if invalid
+            
+            const months = ['January', 'February', 'March', 'April', 'May', 'June',
+                          'July', 'August', 'September', 'October', 'November', 'December'];
+            
+            const month = months[date.getMonth()];
+            const day = date.getDate();
+            const year = date.getFullYear();
+            
+            if (includeYear) {
+                return `${month} ${day}, ${year}`;
+            } else {
+                return `${month} ${day}`;
+            }
+        } catch (e) {
+            return dateStr; // Return original if error
+        }
+    };
+    
+    const formatFriendlyDateRange = (startDateStr, endDateStr) => {
+        if (!startDateStr) return '';
+        
+        try {
+            const startDate = new Date(startDateStr);
+            const endDate = endDateStr ? new Date(endDateStr) : null;
+            
+            if (isNaN(startDate.getTime())) return startDateStr; // Return original if invalid
+            
+            const months = ['January', 'February', 'March', 'April', 'May', 'June',
+                          'July', 'August', 'September', 'October', 'November', 'December'];
+            
+            const startMonth = months[startDate.getMonth()];
+            const startDay = startDate.getDate();
+            const startYear = startDate.getFullYear();
+            
+            if (!endDate || isNaN(endDate.getTime())) {
+                // Single date - keep original year format
+                return `${startMonth} ${startDay}, ${startYear}`;
+            }
+            
+            const endMonth = months[endDate.getMonth()];
+            const endDay = endDate.getDate();
+            const endYear = endDate.getFullYear();
+            
+            // Check if same month and year
+            if (startMonth === endMonth && startYear === endYear) {
+                return `${startMonth} ${startDay} - ${endDay}, ${startYear}`;
+            }
+            
+            // Check if same year
+            if (startYear === endYear) {
+                return `${startMonth} ${startDay} - ${endMonth} ${endDay}, ${startYear}`;
+            }
+            
+            // Different years
+            return `${startMonth} ${startDay}, ${startYear} - ${endMonth} ${endDay}, ${endYear}`;
+        } catch (e) {
+            return startDateStr; // Return original if error
+        }
+    };
+    
+    // Helper function to simplify consecutive day ranges
+    const simplifyDayRange = (daysText) => {
+        if (!daysText) return '';
+        
+        const days = daysText.split(',').map(day => day.trim());
+        const dayOrder = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+        
+        // Find consecutive sequences
+        const sequences = [];
+        let currentSequence = [];
+        
+        for (let i = 0; i < days.length; i++) {
+            const dayIndex = dayOrder.indexOf(days[i]);
+            if (dayIndex === -1) {
+                // Day not found in standard order, add as standalone
+                if (currentSequence.length > 0) {
+                    sequences.push([...currentSequence]);
+                    currentSequence = [];
+                }
+                sequences.push([days[i]]);
+            } else {
+                if (currentSequence.length === 0) {
+                    currentSequence.push(days[i]);
+                } else {
+                    const lastIndex = dayOrder.indexOf(currentSequence[currentSequence.length - 1]);
+                    if (dayIndex === lastIndex + 1) {
+                        // Consecutive day
+                        currentSequence.push(days[i]);
+                    } else {
+                        // Not consecutive, start new sequence
+                        sequences.push([...currentSequence]);
+                        currentSequence = [days[i]];
+                    }
+                }
+            }
+        }
+        
+        // Add last sequence if exists
+        if (currentSequence.length > 0) {
+            sequences.push(currentSequence);
+        }
+        
+        // Format sequences
+        const formattedSequences = sequences.map(sequence => {
+            if (sequence.length === 1) {
+                return sequence[0];
+            } else if (sequence.length === 2) {
+                return `${sequence[0]} and ${sequence[1]}`;
+            } else {
+                return `${sequence[0]} - ${sequence[sequence.length - 1]}`;
+            }
+        });
+        
+        return formattedSequences.join(', ');
+    };
+    
     const printDate = new Date().toLocaleDateString('en-US');
     
     // Extract title and center name from modal
-    const isEventModal = typeof modalId === 'string' && modalId.startsWith('event-');
     const isInfoPageModal = typeof modalId === 'string' && modalId.startsWith('infopage-');
     
     let titleElement;
-    if (isEventModal) {
-        titleElement = modal.querySelector('.rsyc-modal-header h3');
-    } else if (isInfoPageModal) {
+    if (isInfoPageModal) {
         titleElement = modal.querySelector('.rsyc-modal-header h2');
     } else {
         titleElement = modal.querySelector('.rsyc-modal-body h3');
     }
     
-    const scheduleTitle = isEventModal ? 'Event Details' : (titleElement ? titleElement.textContent.trim() : 'Schedule');
+    const scheduleTitle = titleElement ? titleElement.textContent.trim() : 'Schedule';
 
-    const centerStrong = modal.querySelector('.rsyc-modal-body strong');
-    const centerName = centerStrong ? centerStrong.textContent.trim() : '';
+    // Extract center name from modal - look for specific center name patterns
+    let centerName = '';
+    
+    // Try to find center name in various ways
+    // 1. Look for center name in the modal call (passed as parameter)
+    const modalCall = modal.querySelector('[onclick*="showRSYCModal"]');
+    if (modalCall) {
+        const onclickAttr = modalCall.getAttribute('onclick');
+        const centerMatch = onclickAttr.match(/showRSYCModal\([^,]+,\s*['"]([^'"]+)['"]\)/);
+        if (centerMatch && centerMatch[1]) {
+            centerName = centerMatch[1];
+        }
+    }
+    
+    // 2. If not found, try to extract from data attributes or other sources
+    if (!centerName) {
+        // Look for any element that might contain the center name
+        const possibleCenterElements = modal.querySelectorAll('[data-center], .center-name, .rsyc-center');
+        possibleCenterElements.forEach(el => {
+            if (!centerName && el.textContent && el.textContent.trim()) {
+                const text = el.textContent.trim();
+                // Exclude field labels
+                if (!text.includes(':') && !text.includes('Days') && !text.includes('Date') && !text.includes('Time')) {
+                    centerName = text;
+                }
+            }
+        });
+    }
+    
+    // 3. Fallback - try to get from global data if available
+    if (!centerName && window.rsycApp && window.rsycApp.currentCenter) {
+        centerName = window.rsycApp.currentCenter.name || window.rsycApp.currentCenter.Title || '';
+    }
     
     // Create print window title
-    const printTitle = isEventModal ? `${scheduleTitle} - ${printDate}` : (centerName ? `${scheduleTitle} - ${centerName} - ${printDate}` : `${scheduleTitle} - ${printDate}`);
+    const printTitle = centerName ? `${scheduleTitle} - ${centerName} - ${printDate}` : `${scheduleTitle} - ${printDate}`;
     
     // Get modal content and clone it
     const modalContent = modal.querySelector('.rsyc-modal-content');
@@ -4608,35 +5236,178 @@ async function printRSYCModal(modalId) {
     // Detect if narrative (description) is long and reduce font size if so
     const descriptionEl = printContent.querySelector('.rsyc-description');
     if (descriptionEl && descriptionEl.textContent.trim().length > 600) {
-        descriptionEl.style.fontSize = '7.5pt';
-        descriptionEl.style.lineHeight = '1.3';
+        descriptionEl.style.fontSize = '6.5pt';
+        descriptionEl.style.lineHeight = '1.2';
+    } else if (descriptionEl) {
+        // Lower font size for all descriptions, not just long ones
+        descriptionEl.style.fontSize = '7pt';
+        descriptionEl.style.lineHeight = '1.2';
+    }
+
+    // Update date fields to use friendly formatting
+    const dateFields = printContent.querySelectorAll('.rsyc-modal-body [class*="col-"]');
+    dateFields.forEach(field => {
+        const strongEl = field.querySelector('strong');
+        if (strongEl) {
+            const label = strongEl.textContent.trim();
+            const contentDiv = field.querySelector('div:last-child') || field;
+            let contentText = contentDiv.textContent.replace(strongEl.textContent, '').trim();
+            
+            // Update Program Dates
+            if (label === 'Program Dates:' && contentText) {
+                // Check if it's a date range or single date
+                const dateParts = contentText.split(' - ');
+                if (dateParts.length === 2) {
+                    // Date range
+                    const friendlyDate = formatFriendlyDateRange(dateParts[0].trim(), dateParts[1].trim());
+                    contentDiv.innerHTML = `<strong>${label}</strong><br>${friendlyDate}`;
+                } else if (dateParts.length === 1) {
+                    // Single date
+                    const friendlyDate = formatFriendlyDate(dateParts[0].trim());
+                    contentDiv.innerHTML = `<strong>${label}</strong><br>${friendlyDate}`;
+                }
+            }
+            // Update Days - simplify consecutive day ranges
+            else if (label === 'Days:' && contentText) {
+                const simplifiedDays = simplifyDayRange(contentText);
+                contentDiv.innerHTML = `<strong>${label}</strong><br>${simplifiedDays}`;
+            }
+            // Update Registration Deadline
+            else if (label === 'Registration Deadline:' && contentText) {
+                const friendlyDate = formatFriendlyDate(contentText);
+                contentDiv.innerHTML = `<strong>${label}</strong><br>${friendlyDate}`;
+            }
+        }
+    });
+
+    // Also update date fields that might be in different formats
+    const allTextNodes = printContent.querySelectorAll('.rsyc-modal-body *');
+    allTextNodes.forEach(element => {
+        const text = element.textContent;
+        // Look for date patterns like YYYY-MM-DD or YYYY/MM/DD
+        const datePattern = /\b(\d{4}[-/]\d{1,2}[-/]\d{1,2})(?:\s*[-–—]\s*(\d{4}[-/]\d{1,2}[-/]\d{1,2}))?\b/g;
+        
+        if (datePattern.test(text) && !element.classList.contains('rsyc-description')) {
+            const updatedText = text.replace(datePattern, (match, startDate, endDate) => {
+                if (endDate) {
+                    return formatFriendlyDateRange(startDate.replace(/\//g, '-'), endDate.replace(/\//g, '-'));
+                } else {
+                    return formatFriendlyDate(startDate.replace(/\//g, '-'));
+                }
+            });
+            
+            if (updatedText !== text) {
+                // Preserve HTML structure if it exists
+                if (element.innerHTML) {
+                    element.innerHTML = updatedText;
+                } else {
+                    element.textContent = updatedText;
+                }
+            }
+        }
+    });
+
+    // Ensure schedule information is always included for events
+    // Check if this is an event modal and if schedule fields are missing
+    const modalBody = printContent.querySelector('.rsyc-modal-body');
+    if (modalBody) {
+        // Check if schedule fields exist by searching text content
+        const bodyText = modalBody.textContent || '';
+        const hasScheduleFields = bodyText.includes('Days:') || bodyText.includes('Time:') || bodyText.includes('Program Runs In:');
+        
+        // If no schedule fields found, try to extract from event data and add them
+        if (!hasScheduleFields) {
+            // Look for event date/time information and convert to schedule format
+            const allElements = modalBody.querySelectorAll('*');
+            let eventDateEl = null;
+            let eventTimeEl = null;
+            
+            allElements.forEach(el => {
+                const text = el.textContent || '';
+                if (text.includes('Date:') && !eventDateEl) {
+                    eventDateEl = el;
+                }
+                if (text.includes('Time:') && !eventTimeEl) {
+                    eventTimeEl = el;
+                }
+            });
+            
+            if (eventDateEl || eventTimeEl) {
+                // Create schedule fields from event information
+                const scheduleInfo = document.createElement('div');
+                scheduleInfo.className = 'row';
+                scheduleInfo.style.cssText = 'margin-top: 12pt;';
+                
+                let scheduleHTML = '';
+                
+                // Extract date and convert to Days if possible
+                if (eventDateEl) {
+                    const dateText = eventDateEl.textContent.replace('Date:', '').trim();
+                    // Try to determine day of week from date
+                    try {
+                        const dateMatch = dateText.match(/\d{4}[-/]\d{1,2}[-/]\d{1,2}/);
+                        if (dateMatch) {
+                            const eventDate = new Date(dateMatch[0]);
+                            const dayOfWeek = eventDate.toLocaleDateString('en-US', { weekday: 'long' });
+                            scheduleHTML += `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Days:</strong><br>${dayOfWeek}</div>`;
+                        }
+                    } catch (e) {
+                        // If can't parse date, use original text
+                        scheduleHTML += `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Days:</strong><br>${dateText}</div>`;
+                    }
+                }
+                
+                // Extract time
+                if (eventTimeEl) {
+                    const timeText = eventTimeEl.textContent.replace('Time:', '').trim();
+                    scheduleHTML += `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Time:</strong><br>${timeText}</div>`;
+                }
+                
+                if (scheduleHTML) {
+                    scheduleInfo.innerHTML = scheduleHTML;
+                    // Insert before the first existing row or at the end
+                    const existingRow = modalBody.querySelector('.row');
+                    if (existingRow) {
+                        existingRow.parentNode.insertBefore(scheduleInfo, existingRow);
+                    } else {
+                        modalBody.appendChild(scheduleInfo);
+                    }
+                }
+            }
+        }
+    }
+
+    // Add the same image from the modal to the print content
+    const modalImage = modal.querySelector('.rsyc-modal-body img[alt]:not([alt="Red Shield Youth Centers Logo"])');
+    if (modalImage && !printContent.querySelector('.rsyc-modal-body img[alt]:not([alt="Red Shield Youth Centers Logo"])')) {
+        const imageClone = modalImage.cloneNode(true);
+        // Insert the image at the beginning of the modal body, after any video but before other content
+        const firstContentElement = printContent.querySelector('.rsyc-modal-body > *:not(.ratio):not([style*="display:flex"])');
+        if (firstContentElement) {
+            firstContentElement.parentNode.insertBefore(imageClone, firstContentElement);
+        } else {
+            const modalBody = printContent.querySelector('.rsyc-modal-body');
+            if (modalBody) {
+                modalBody.insertBefore(imageClone, modalBody.firstChild);
+            }
+        }
+    }
+
+    // Add main image at the very top of the content if it exists
+    const mainImage = modal.querySelector('.rsyc-modal-body img[alt]:not([alt="Red Shield Youth Centers Logo"])');
+    let mainImageHTML = '';
+    if (mainImage) {
+        const imageSrc = mainImage.src || mainImage.getAttribute('src');
+        const imageAlt = mainImage.alt || '';
+        mainImageHTML = `
+        <div class="main-image-container" style="text-align: center; margin-bottom: 20pt; margin-top: 10pt;">
+            <img src="${imageSrc}" alt="${imageAlt}" style="max-width: 100%; max-height: 200pt; object-fit: contain; border-radius: 8pt;" />
+        </div>`;
     }
 
     // Clean up cloned content
     const existingLogoEl = printContent.querySelector('img[alt="Red Shield Youth Centers Logo"]');
     if (existingLogoEl) existingLogoEl.remove();
-    
-    // For event modals, remove the center name div from body (it's in the header)
-    if (isEventModal) {
-        const centerNameDiv = printContent.querySelector('.rsyc-modal-body > div.mb-3');
-        if (centerNameDiv && centerNameDiv.querySelector('strong') && centerNameDiv.textContent.includes(centerName)) {
-            centerNameDiv.remove();
-        }
-        
-        // Remove type/subtitle divs when they match the title (e.g., "Summer Day Camp")
-        const titleEl = printContent.querySelector('.rsyc-modal-body > h3');
-        if (titleEl) {
-            const titleText = titleEl.textContent.trim();
-            const bodyDivs = Array.from(printContent.querySelectorAll('.rsyc-modal-body > div'));
-            bodyDivs.forEach(div => {
-                // Check if this div appears to be a type/subtitle (small text, comes soon after title)
-                const textContent = div.textContent.trim();
-                if (textContent === titleText && !div.querySelector('strong')) {
-                    div.remove();
-                }
-            });
-        }
-    }
 
     // Fetch logo for injection
     let logoSvgHtml = '';
@@ -4658,25 +5429,30 @@ async function printRSYCModal(modalId) {
         return;
     }
     
-    const hideRedundantRule = isEventModal
-        ? ''
-        : `
-
-        /* Hide redundant titles already in header */
-        .rsyc-modal-body > div:first-of-type,
+    const hideRedundantRule = `
+        /* Hide redundant titles already in header, but keep description */
+        .rsyc-modal-body > div:first-of-type:not(.rsyc-event-location):not(.rsyc-important-dates):not(.rsyc-transportation),
         .rsyc-modal-body > h3:first-of-type { display: none !important; }
+        
+        /* Ensure description is always visible with small font and proper layout */
+        .rsyc-description { 
+            display: block !important; 
+            font-size: 7pt !important; 
+            line-height: 1.2 !important;
+            margin-bottom: 8pt !important;
+            margin-top: 8pt !important;
+            text-align: justify !important;
+        }
         `;
 
-    const eventImageRule = isEventModal
-        ? `
-
-        /* EVENT PRINT LAYOUT: keep image compact and allow details to flow beside it */
+    const eventImageRule = `
+        /* SCHEDULE PRINT LAYOUT: keep image compact and allow details to flow beside it */
         .rsyc-modal-body > div:has(> img) {
             display: block !important;
             margin-bottom: 0 !important;
         }
 
-        .rsyc-modal-body img {
+        .rsyc-modal-body img:not([alt="Red Shield Youth Centers Logo"]) {
             float: right;
             width: 190pt !important;
             max-width: 40% !important;
@@ -4691,12 +5467,31 @@ async function printRSYCModal(modalId) {
         /* Prevent the floated image from forcing awkward breaks */
         .rsyc-modal-body::after { content: ""; display: block; clear: both; }
 
+        /* Ensure description flows around floated image */
+        .rsyc-modal-body .rsyc-description {
+            overflow: hidden; /* Creates block formatting context */
+            zoom: 1; /* IE6/7 hasLayout */
+        }
+
+        /* Ensure subtitle also flows around floated image */
+        .rsyc-modal-body p[style*="font-style:italic"] {
+            overflow: hidden; /* Creates block formatting context */
+            zoom: 1; /* IE6/7 hasLayout */
+            margin-bottom: 8pt !important;
+        }
+
+        /* Ensure all text content flows around floated image */
+        .rsyc-modal-body > p:not(.rsyc-description),
+        .rsyc-modal-body > div > p {
+            overflow: hidden; /* Creates block formatting context */
+            zoom: 1; /* IE6/7 hasLayout */
+        }
+
         /* Give key blocks breathing room */
         .rsyc-event-location { margin-top: 10pt !important; margin-bottom: 12pt !important; }
         .rsyc-event-cost { margin-bottom: 10pt !important; }
         .rsyc-event-extended-care { margin-bottom: 10pt !important; }
-        `
-        : '';
+        `;
 
     const htmlContent = `<!DOCTYPE html>
 <html lang="en">
@@ -4749,6 +5544,50 @@ async function printRSYCModal(modalId) {
         ${hideRedundantRule}
 
         ${eventImageRule}
+
+        /* SCHEDULE PRINT LAYOUT: keep image compact and allow details to flow beside it */
+        .rsyc-modal-body > div:has(> img) {
+            display: block !important;
+            margin-bottom: 0 !important;
+        }
+
+        .rsyc-modal-body > div > img:not([alt="Red Shield Youth Centers Logo"]) {
+            float: right;
+            width: 180pt !important;
+            max-width: 35% !important;
+            height: auto !important;
+            max-height: 200pt !important;
+            object-fit: contain !important;
+            border-radius: 6pt !important;
+            margin: 0 0 10pt 12pt !important;
+            display: block !important;
+        }
+
+        /* Prevent the floated image from forcing awkward breaks */
+        .rsyc-modal-body::after { content: ""; display: block; clear: both; }
+
+        /* Ensure description is always visible and flows around image */
+        .rsyc-description { 
+            display: block !important; 
+            font-size: 7pt !important; 
+            line-height: 1.2 !important;
+            margin-bottom: 8pt !important;
+            margin-top: 8pt !important;
+            text-align: justify !important;
+        }
+
+        /* When image is present, make description flow around it */
+        .rsyc-modal-body:has(img:not([alt="Red Shield Youth Centers Logo"])) .rsyc-description {
+            margin-right: 0 !important;
+            text-align: justify !important;
+        }
+
+        /* When no image, center the description */
+        .rsyc-modal-body:not(:has(img:not([alt="Red Shield Youth Centers Logo"]))) .rsyc-description {
+            text-align: center !important;
+            max-width: 100% !important;
+            margin: 8pt auto !important;
+        }
 
         .rsyc-modal-body h3 { 
             color: var(--rsyc-navy); 
@@ -4844,6 +5683,8 @@ async function printRSYCModal(modalId) {
         </div>
         <div class="header-logo">${logoSvgHtml}</div>
     </header>
+
+    ${mainImageHTML}
 
     <main class="rsyc-modal-body">
         ${printContent.innerHTML}
@@ -5009,11 +5850,138 @@ async function printAllSchedules(cacheKey) {
         }
     };
 
+    // Helper function for friendly date formatting without timezone conversion
+    const formatFriendlyDate = (dateStr, includeYear = true) => {
+        if (!dateStr) return '';
+        
+        try {
+            // Parse the date string (YYYY-MM-DD format)
+            const date = new Date(dateStr);
+            if (isNaN(date.getTime())) return dateStr; // Return original if invalid
+            
+            const months = ['January', 'February', 'March', 'April', 'May', 'June',
+                          'July', 'August', 'September', 'October', 'November', 'December'];
+            
+            const month = months[date.getMonth()];
+            const day = date.getDate();
+            const year = date.getFullYear();
+            
+            if (includeYear) {
+                return `${month} ${day}, ${year}`;
+            } else {
+                return `${month} ${day}`;
+            }
+        } catch (e) {
+            return dateStr; // Return original if error
+        }
+    };
+    
+    const formatFriendlyDateRange = (startDateStr, endDateStr) => {
+        if (!startDateStr) return '';
+        
+        try {
+            const startDate = new Date(startDateStr);
+            const endDate = endDateStr ? new Date(endDateStr) : null;
+            
+            if (isNaN(startDate.getTime())) return startDateStr; // Return original if invalid
+            
+            const months = ['January', 'February', 'March', 'April', 'May', 'June',
+                          'July', 'August', 'September', 'October', 'November', 'December'];
+            
+            const startMonth = months[startDate.getMonth()];
+            const startDay = startDate.getDate();
+            const startYear = startDate.getFullYear();
+            
+            if (!endDate || isNaN(endDate.getTime())) {
+                // Single date
+                return `${startMonth} ${startDay}, ${startYear}`;
+            }
+            
+            const endMonth = months[endDate.getMonth()];
+            const endDay = endDate.getDate();
+            const endYear = endDate.getFullYear();
+            
+            // Check if same month and year
+            if (startMonth === endMonth && startYear === endYear) {
+                return `${startMonth} ${startDay} - ${endDay}, ${startYear}`;
+            }
+            
+            // Check if same year
+            if (startYear === endYear) {
+                return `${startMonth} ${startDay} - ${endMonth} ${endDay}, ${startYear}`;
+            }
+            
+            // Different years
+            return `${startMonth} ${startDay}, ${startYear} - ${endMonth} ${endDay}, ${endYear}`;
+        } catch (e) {
+            return startDateStr; // Return original if error
+        }
+    };
+
+    // Helper function to simplify consecutive day ranges
+    const simplifyDayRange = (daysText) => {
+        if (!daysText) return '';
+        
+        const days = daysText.split(',').map(day => day.trim());
+        const dayOrder = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+        
+        // Find consecutive sequences
+        const sequences = [];
+        let currentSequence = [];
+        
+        for (let i = 0; i < days.length; i++) {
+            const dayIndex = dayOrder.indexOf(days[i]);
+            if (dayIndex === -1) {
+                // Day not found in standard order, add as standalone
+                if (currentSequence.length > 0) {
+                    sequences.push([...currentSequence]);
+                    currentSequence = [];
+                }
+                sequences.push([days[i]]);
+            } else {
+                if (currentSequence.length === 0) {
+                    currentSequence.push(days[i]);
+                } else {
+                    const lastIndex = dayOrder.indexOf(currentSequence[currentSequence.length - 1]);
+                    if (dayIndex === lastIndex + 1) {
+                        // Consecutive day
+                        currentSequence.push(days[i]);
+                    } else {
+                        // Not consecutive, start new sequence
+                        sequences.push([...currentSequence]);
+                        currentSequence = [days[i]];
+                    }
+                }
+            }
+        }
+        
+        // Add last sequence if exists
+        if (currentSequence.length > 0) {
+            sequences.push(currentSequence);
+        }
+        
+        // Format sequences
+        const formattedSequences = sequences.map(sequence => {
+            if (sequence.length === 1) {
+                return sequence[0];
+            } else if (sequence.length === 2) {
+                return `${sequence[0]} and ${sequence[1]}`;
+            } else {
+                return `${sequence[0]} - ${sequence[sequence.length - 1]}`;
+            }
+        });
+        
+        return formattedSequences.join(', ');
+    };
+
     schedules.forEach((schedule, index) => {
         const isEvent = schedule && schedule.__type === 'event';
-        const daysText = schedule.scheduleDays && Array.isArray(schedule.scheduleDays) && schedule.scheduleDays.length > 0
+        const rawDaysText = schedule.scheduleDays && Array.isArray(schedule.scheduleDays) && schedule.scheduleDays.length > 0
             ? schedule.scheduleDays.join(', ')
             : '';
+        
+        // Simplify consecutive day ranges
+        const daysText = simplifyDayRange(rawDaysText);
         
         let timeText = schedule.scheduleTime || '';
         if (timeText && schedule.timezone) {
@@ -5043,9 +6011,16 @@ async function printAllSchedules(cacheKey) {
         const cost = schedule.cost || '';
         const registrationFee = schedule.registrationFee || '';
         const registrationDeadline = schedule.registrationDeadline || '';
-        const programDates = (schedule.startDate || schedule.endDate) 
-            ? `${schedule.startDate || ''} ${schedule.startDate && schedule.endDate ? '-' : ''} ${schedule.endDate || ''}`.trim()
-            : '';
+        
+        // Use friendly date formatting for program dates
+        let programDates = '';
+        if (schedule.startDate || schedule.endDate) {
+            if (schedule.startDate && schedule.endDate) {
+                programDates = formatFriendlyDateRange(schedule.startDate, schedule.endDate);
+            } else if (schedule.startDate && !schedule.endDate) {
+                programDates = formatFriendlyDate(schedule.startDate);
+            }
+        }
         
         const eventDt = isEvent ? formatEventDateTimeParts(schedule) : { dateText: '', timeText: '' };
         let eventDateText = eventDt.dateText || '';

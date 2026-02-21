@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Extract Phone Numbers from RSYCLeaders.json</title>
+    <style>
+        body {
+            font-family: 'Courier New', monospace;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .results {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            padding: 15px;
+            margin-top: 20px;
+            white-space: pre-wrap;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            line-height: 1.4;
+        }
+        .loading {
+            color: #007bff;
+            font-weight: bold;
+        }
+        .error {
+            color: #dc3545;
+            font-weight: bold;
+        }
+        .success {
+            color: #28a745;
+            font-weight: bold;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px 0;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 Extract Phone Numbers from RSYCLeaders.json</h1>
+        <p>This tool extracts all staff/leader entries that have phone numbers provided.</p>
+        
+        <button onclick="extractPhoneNumbers()">Extract Phone Numbers</button>
+        
+        <div id="output" class="results">
+            Click the button above to extract phone numbers from RSYCLeaders.json
+        </div>
+    </div>
+
+    <script>
+        // Helper function to fetch JSON with CORS handling
+        async function fetchJSON(url) {
+            try {
+                const response = await fetch(url);
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                return await response.json();
+            } catch (error) {
+                console.error(`Failed to fetch ${url}:`, error.message);
+                return null;
+            }
+        }
+
+        // Helper function to extract phone number from various possible field names
+        function extractPhoneNumber(leader) {
+            // Check various possible phone number field names
+            const phoneFields = [
+                'PhoneNumber',
+                'phone', 
+                'Phone',
+                'contactPhone',
+                'ContactPhone',
+                'phoneNumber',
+                'telephone',
+                'Telephone'
+            ];
+            
+            for (const field of phoneFields) {
+                if (leader[field] && typeof leader[field] === 'string' && leader[field].trim()) {
+                    return leader[field].trim();
+                }
+                // Check for SharePoint .Value pattern
+                if (leader[field] && leader[field].Value && typeof leader[field].Value === 'string') {
+                    return leader[field].Value.trim();
+                }
+            }
+            
+            // Check nested Person object for phone numbers
+            if (leader.Person) {
+                for (const field of phoneFields) {
+                    if (leader.Person[field] && typeof leader.Person[field] === 'string' && leader.Person[field].trim()) {
+                        return leader.Person[field].trim();
+                    }
+                }
+            }
+            
+            return null;
+        }
+
+        // Helper function to get person's name
+        function getPersonName(leader) {
+            // Try various name fields
+            if (leader.Person && leader.Person.DisplayName) {
+                return leader.Person.DisplayName;
+            }
+            if (leader.AlternateName) {
+                return leader.AlternateName;
+            }
+            if (leader.PositionTitle) {
+                return leader.PositionTitle;
+            }
+            return `ID ${leader.ID}`;
+        }
+
+        // Main extraction function
+        async function extractPhoneNumbers() {
+            const outputDiv = document.getElementById('output');
+            outputDiv.innerHTML = '<div class="loading">🔍 Extracting phone numbers from RSYCLeaders.json...</div>';
+            
+            try {
+                // Fetch the leaders data
+                const leadersData = await fetchJSON('https://thisishoperva.org/rsyc/RSYCLeaders.json');
+                
+                if (!leadersData || !Array.isArray(leadersData)) {
+                    outputDiv.innerHTML = '<div class="error">❌ Failed to load leaders data or data is not an array</div>';
+                    return;
+                }
+                
+                outputDiv.innerHTML = `<div class="loading">📊 Processing ${leadersData.length} leader entries...</div>`;
+                
+                // Extract entries with phone numbers
+                const entriesWithPhones = [];
+                
+                leadersData.forEach(leader => {
+                    const phoneNumber = extractPhoneNumber(leader);
+                    
+                    if (phoneNumber) {
+                        const personName = getPersonName(leader);
+                        entriesWithPhones.push({
+                            id: leader.ID,
+                            name: personName,
+                            phone: phoneNumber,
+                            center: leader.Center && leader.Center[0] ? leader.Center[0].Value : 'Unknown',
+                            roleType: leader.RoleType && leader.RoleType.Value ? leader.RoleType.Value : 'Unknown'
+                        });
+                    }
+                });
+                
+                // Sort by ID for easy reference
+                entriesWithPhones.sort((a, b) => a.id - b.id);
+                
+                // Format results
+                let output = `<div class="success">✅ Found ${entriesWithPhones.length} entries with phone numbers:</div>\n\n`;
+                output += '='.repeat(80) + '\n';
+                output += 'ID\tPhone Number\t\tName\t\t\tCenter\n';
+                output += '='.repeat(80) + '\n';
+                
+                entriesWithPhones.forEach(entry => {
+                    const idStr = entry.id.toString().padEnd(6);
+                    const phoneStr = entry.phone.padEnd(20);
+                    const nameStr = (entry.name.length > 20 ? entry.name.substring(0, 17) + '...' : entry.name).padEnd(20);
+                    const centerStr = entry.center.length > 15 ? entry.center.substring(0, 12) + '...' : entry.center;
+                    
+                    output += `${idStr}\t${phoneStr}\t${nameStr}\t${centerStr}\n`;
+                });
+                
+                output += '\n' + '='.repeat(80) + '\n';
+                output += `📋 Summary: ${entriesWithPhones.length} out of ${leadersData.length} leaders have phone numbers\n\n`;
+                
+                // Add detailed list
+                output += 'DETAILED LIST:\n';
+                output += '-'.repeat(80) + '\n';
+                entriesWithPhones.forEach(entry => {
+                    output += `ID: ${entry.id}\n`;
+                    output += `Name: ${entry.name}\n`;
+                    output += `Phone: ${entry.phone}\n`;
+                    output += `Center: ${entry.center}\n`;
+                    output += `Role: ${entry.roleType}\n`;
+                    output += '-'.repeat(40) + '\n';
+                });
+                
+                outputDiv.innerHTML = `<pre class="results">${output}</pre>`;
+                
+                console.log('Results:', entriesWithPhones);
+                
+            } catch (error) {
+                outputDiv.innerHTML = `<div class="error">❌ Error during extraction: ${error.message}</div>`;
+                console.error('Error:', error);
+            }
+        }
+    </script>
+</body>
+</html>

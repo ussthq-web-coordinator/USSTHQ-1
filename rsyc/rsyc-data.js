@@ -906,6 +906,96 @@ class RSYCDataLoader {
     }
 
     /**
+     * Get leaders with phone numbers (dynamic, always up-to-date)
+     */
+    getLeadersWithPhoneNumbers() {
+        const leaders = this.cache.leaders || [];
+        return leaders
+            .filter(leader => leader.phoneNumber && leader.phoneNumber.trim())
+            .map(leader => ({
+                id: leader.id,
+                name: leader.person?.name || leader.alternateName || leader.positionTitle || `ID ${leader.id}`,
+                phone: leader.phoneNumber,
+                centerIds: leader.centerIds,
+                roleType: leader.roleType,
+                positionTitle: leader.positionTitle
+            }))
+            .sort((a, b) => a.id - b.id);
+    }
+
+    /**
+     * Get phone number statistics
+     */
+    getPhoneNumberStats() {
+        const allLeaders = this.cache.leaders || [];
+        const leadersWithPhones = this.getLeadersWithPhoneNumbers();
+        
+        return {
+            total: allLeaders.length,
+            withPhones: leadersWithPhones.length,
+            coverage: allLeaders.length > 0 ? ((leadersWithPhones.length / allLeaders.length) * 100).toFixed(1) : 0,
+            leaders: leadersWithPhones
+        };
+    }
+
+    /**
+     * Extract phone number from various possible fields
+     */
+    extractPhoneNumber(leader) {
+        // Check various possible phone number field names
+        const phoneFields = [
+            'PhoneNumber',
+            'phone', 
+            'Phone',
+            'contactPhone',
+            'ContactPhone',
+            'phoneNumber',
+            'telephone',
+            'Telephone',
+            'mobile',
+            'Mobile',
+            'cell',
+            'Cell',
+            'workPhone',
+            'WorkPhone',
+            'homePhone',
+            'HomePhone',
+            'businessPhone',
+            'BusinessPhone'
+        ];
+        
+        // Check direct fields
+        for (const field of phoneFields) {
+            if (leader[field]) {
+                if (typeof leader[field] === 'string' && leader[field].trim()) {
+                    return leader[field].trim();
+                }
+                // Check for SharePoint .Value pattern
+                if (leader[field].Value && typeof leader[field].Value === 'string' && leader[field].Value.trim()) {
+                    return leader[field].Value.trim();
+                }
+            }
+        }
+        
+        // Check nested Person object for phone numbers
+        if (leader.Person) {
+            for (const field of phoneFields) {
+                if (leader.Person[field]) {
+                    if (typeof leader.Person[field] === 'string' && leader.Person[field].trim()) {
+                        return leader.Person[field].trim();
+                    }
+                    // Check for SharePoint .Value pattern
+                    if (leader.Person[field].Value && typeof leader.Person[field].Value === 'string' && leader.Person[field].Value.trim()) {
+                        return leader.Person[field].Value.trim();
+                    }
+                }
+            }
+        }
+        
+        return null; // No phone number found
+    }
+
+    /**
      * Process leaders/staff
      */
     processLeaders(data) {
@@ -941,6 +1031,9 @@ class RSYCDataLoader {
                 }
             }
             
+            // Extract phone number from various possible fields
+            const phoneNumber = this.extractPhoneNumber(leader);
+            
             return {
                 id: leader.ID,
                 centerIds: leader['Center#Id'] || [],
@@ -948,6 +1041,7 @@ class RSYCDataLoader {
                 positionTitle: getVal(leader.PositionTitle),
                 alternateName: getVal(leader.AlternateName),
                 biography: getVal(leader.Biography),
+                phoneNumber: phoneNumber, // Add phone number to processed data
                 Sort: leader.Sort,
                 // Normalized face focus for smart crop feature
                 faceFocus: faceFocus,

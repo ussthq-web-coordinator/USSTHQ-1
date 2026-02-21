@@ -1,0 +1,32 @@
+# Phone Numbers Extracted from RSYCLeaders.json
+# Generated on: 2025-02-20
+
+Based on analysis of the RSYCLeaders.json file, here are the entries with phone numbers:
+
+ID: 105
+Name: Kathleen Hutto
+Phone: 803- 522- 2963
+Center: Aiken Teen Center
+Role: Center Executive Director
+
+---
+ANALYSIS SUMMARY:
+- Total leaders processed: 115+ entries
+- Entries with phone numbers: 1 found
+- Percentage with phone numbers: ~0.9%
+
+FIELD ANALYSIS:
+- Primary phone field: "PhoneNumber"
+- Alternative phone fields checked: phone, Phone, contactPhone, ContactPhone, phoneNumber, telephone, Telephone
+- Nested Person object also checked for phone fields
+
+NOTES:
+- Most entries in RSYCLeaders.json do not have phone numbers provided
+- Phone numbers appear to be stored in the "PhoneNumber" field when present
+- Kathleen Hutto (ID: 105) is the only entry with a phone number in the current dataset
+- Phone format: "803- 522- 2963" (with spaces after area code)
+
+RECOMMENDATIONS:
+- Consider adding phone number fields to more staff entries for better contact information
+- Standardize phone number format (remove extra spaces)
+- Add phone number validation in data entry forms

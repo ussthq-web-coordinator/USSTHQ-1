@@ -6260,6 +6260,7 @@ class RSYCGeneratorV2 {
         let sections = [
             { key: 'about', name: 'About This Center' },
             { key: 'schedules', name: 'Program Schedules' },
+            { key: 'social', name: 'Social Links' },
             { key: 'hours', name: 'Hours of Operation' },
             { key: 'facilities', name: 'Facility Features' },
             { key: 'programs', name: 'Featured Programs' },
@@ -6819,7 +6820,7 @@ ${JSON.stringify(this.currentCenter, null, 2)}
         output.push('This shows the complete data flow from JSON files to HTML sections:');
         output.push('');
         
-        const sections = ['about', 'schedules', 'hours', 'facilities', 'programs', 
+        const sections = ['about', 'schedules', 'social', 'hours', 'facilities', 'programs', 
                          'staff', 'events', 'infopages', 'stories', 'nearby', 'parents', 'youth', 'volunteer', 'footerPhoto', 'contact'];
         
         sections.forEach((section, index) => {
@@ -7108,7 +7109,7 @@ ${JSON.stringify(this.currentCenter, null, 2)}
         titleEl.textContent = 'Full Page Template Code (All Sections Combined)';
         
         // Get all section templates
-        const sections = ['about', 'schedules', 'hours', 'facilities', 'programs', 
+        const sections = ['about', 'schedules', 'social', 'hours', 'facilities', 'programs', 
                          'staff', 'events', 'infopages', 'stories', 'nearby', 'parents', 'youth', 'volunteer', 'footerPhoto', 'contact'];
         
         const allTemplates = [];

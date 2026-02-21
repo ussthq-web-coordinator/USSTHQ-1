@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug Social Section</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
+</head>
+<body>
+    <div class="container mt-4">
+        <h1>Debug Social Section</h1>
+        
+        <h2>Test 1: With Social Data</h2>
+        <div id="test1-output"></div>
+        
+        <h2>Test 2: Without Social Data</h2>
+        <div id="test2-output"></div>
+        
+        <h2>Test 3: Full Profile Generation</h2>
+        <div id="test3-output"></div>
+        
+        <div class="mt-4">
+            <h3>Console Output:</h3>
+            <pre id="console-output"></pre>
+        </div>
+    </div>
+
+    <script src="rsyc-templates.js"></script>
+    <script>
+        // Capture console output
+        const originalLog = console.log;
+        const logs = [];
+        console.log = function(...args) {
+            logs.push(args.join(' '));
+            originalLog.apply(console, args);
+        };
+        
+        const templateEngine = new RSYCTemplates();
+        
+        // Test 1: With social data
+        const testDataWithSocial = {
+            center: {
+                FacebookPageURL: 'https://facebook.com/test',
+                instagramURL: 'https://instagram.com/test',
+                EmbedFacebookFeed: '<div class="fb-post" data-href="https://www.facebook.com/test/posts/123"></div>'
+            }
+        };
+        
+        const socialHTML1 = templateEngine.generateSocial(testDataWithSocial);
+        document.getElementById('test1-output').innerHTML = socialHTML1 || '<p class="text-muted">No social section generated</p>';
+        
+        // Test 2: Without social data
+        const testDataWithoutSocial = {
+            center: {
+                name: 'Test Center'
+            }
+        };
+        
+        const socialHTML2 = templateEngine.generateSocial(testDataWithoutSocial);
+        document.getElementById('test2-output').innerHTML = socialHTML2 || '<p class="text-muted">No social section generated</p>';
+        
+        // Test 3: Full profile generation
+        const enabledSections = ['hero', 'about', 'navigation', 'schedules', 'social', 'hours'];
+        const fullProfileHTML = templateEngine.generateProfile(testDataWithSocial, enabledSections);
+        document.getElementById('test3-output').innerHTML = fullProfileHTML || '<p class="text-muted">No profile generated</p>';
+        
+        // Display console output
+        document.getElementById('console-output').textContent = logs.join('\n');
+        
+        // Restore console.log
+        console.log = originalLog;
+    </script>
+</body>
+</html>

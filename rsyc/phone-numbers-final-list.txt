@@ -1,0 +1,56 @@
+# RSYC Leaders with Phone Numbers - Complete List
+# Generated: 2025-02-20
+# Total Found: 23 leaders with phone numbers (24.7% coverage)
+
+ID  | Name                    | Center                   | Phone Number          | Role
+----|-------------------------|--------------------------|----------------------|--------------------
+25  | Tracy Mason            | Beckley                  | 681-220-5947         | Center Director
+26  | Holly Toney             | Beckley                  | 304-253-9541         | Program Coordinator
+27  | Brian Nabors            | Beckley                  | 304-253-9541         | Other
+41  | Hugh Jones              | Richmond                 | 804-591-3813         | Center Director
+44  | Mariam Harley           | Shreveport               | (318)636-3314        | Center Executive Director
+46  | Duane Shackelford       | Big Spring               | 432-264-7344 x75811  | Center Director
+47  | Patrick Mouton          | San Antonio - Peacock    | (832) 419-6632       | Area Executive Director
+48  | Renekia Ward            | Beaumont - IH-10         | (409)896-2361        | Area Executive Director
+49  | Michael StJulien        | Houston - Northwest      | (832) 200-4611x77153 | Center Director
+50  | Sadrac Cher-Fils        | Texas City               | (409) 457-9880       | Center Director
+51  | Debbie Mitchell         | Houston - Irvington     | (713) 692-0522       | Center Director
+53  | Mykeala Tyson           | San Antonio - Peacock    | 210-736-5102         | Center Director
+59  | Dan Fortson             | Houston - Pasadena      | 713-78-0020          | Center Director
+60  | Larry Barnes            | Houston - Garden City   | (832) 201-8076       | Center Director
+73  | Victoria Leasure        | Allegany County          | 240.727.9438         | Center Director
+74  | Risa Robinson           | Allegany County          | 301.777.7600         | Corps Officer
+75  | Karen Wells             | Allegany County          | 301.777.7600         | Other
+81  | Felecia Mitchell        | Salisbury - Richard Hazel| 1952024-4058         | Center Director
+86  | Lila Spencer            | Allegany County          | 3017777600           | Youth Development Professional
+92  | Elmer Torres            | Houston - International | (713)988-5201        | Center Director
+100 | Andy Scrivner           | Baltimore - Glen Burnie  | 688296-7704          | Youth Development Professional
+101 | Jaime Jones Mccoy       | Waxahachie               | 972-937-0509         | Center Executive Director
+105 | Kathleen Hutto          | Aiken Teen Center        | 803- 522- 2963       | Center Executive Director
+
+---
+
+## SUMMARY STATISTICS:
+- Total leaders processed: 93
+- Leaders with phone numbers: 23
+- Coverage percentage: 24.7%
+- Most phone numbers stored in: "PhoneNumber" field
+
+## PHONE NUMBER FORMATS FOUND:
+- Standard: XXX-XXX-XXXX (e.g., 681-220-5947)
+- Parentheses: (XXX) XXX-XXXX (e.g., (318)636-3314)
+- With extension: XXX-XXX-XXXX xXXXXX (e.g., 432-264-7344 x75811)
+- Dots: XXX.XXX.XXXX (e.g., 240.727.9438)
+- No separators: XXXXXXXXXX (e.g., 3017777600)
+- Invalid/Other: Some entries appear to have non-phone data in phone fields
+
+## CENTERS WITH MULTIPLE PHONE NUMBERS:
+- Beckley: 3 leaders (IDs 25, 26, 27)
+- San Antonio - Peacock: 2 leaders (IDs 47, 53)
+- Allegany County: 4 leaders (IDs 73, 74, 75, 86)
+- Houston area: 5 leaders across different centers
+
+## NOTES:
+- IDs 81 and 100 appear to have invalid phone numbers (look like IDs/image references)
+- Phone number formatting varies significantly across entries
+- Some entries share the same phone number (likely main center line)

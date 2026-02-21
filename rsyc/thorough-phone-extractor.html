@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Thorough Phone Number Extractor</title>
+    <style>
+        body {
+            font-family: 'Courier New', monospace;
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .results {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            padding: 15px;
+            margin-top: 20px;
+            white-space: pre-wrap;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            line-height: 1.3;
+            max-height: 600px;
+            overflow-y: auto;
+        }
+        .loading {
+            color: #007bff;
+            font-weight: bold;
+        }
+        .error {
+            color: #dc3545;
+            font-weight: bold;
+        }
+        .success {
+            color: #28a745;
+            font-weight: bold;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px 0;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        .summary {
+            background: #e7f3ff;
+            border: 1px solid #b3d9ff;
+            border-radius: 4px;
+            padding: 15px;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 Thorough Phone Number Extractor</h1>
+        <p>Comprehensive search for phone numbers in RSYCLeaders.json - checks all possible fields and patterns</p>
+        
+        <button onclick="runThoroughExtraction()">Run Thorough Extraction</button>
+        
+        <div id="summary" class="summary" style="display: none;">
+            <!-- Summary will be populated here -->
+        </div>
+        
+        <div id="output" class="results">
+            Click the button above to run thorough phone number extraction from RSYCLeaders.json
+        </div>
+    </div>
+
+    <script>
+        async function runThoroughExtraction() {
+            const outputDiv = document.getElementById('output');
+            const summaryDiv = document.getElementById('summary');
+            
+            outputDiv.innerHTML = '<div class="loading">🔍 Starting thorough phone number extraction...</div>';
+            summaryDiv.style.display = 'none';
+            
+            try {
+                // Fetch the actual data
+                const response = await fetch('https://thisishoperva.org/rsyc/RSYCLeaders.json');
+                const leadersData = await response.json();
+                
+                outputDiv.innerHTML = `<div class="loading">📊 Processing ${leadersData.length} leader entries...</div>`;
+                
+                // Comprehensive phone number extraction
+                const entriesWithPhones = [];
+                
+                leadersData.forEach((leader, index) => {
+                    const phoneNumbers = [];
+                    
+                    // Check ALL possible phone number fields
+                    const phoneFields = [
+                        'PhoneNumber',
+                        'phone', 
+                        'Phone',
+                        'contactPhone',
+                        'ContactPhone',
+                        'phoneNumber',
+                        'telephone',
+                        'Telephone',
+                        'mobile',
+                        'Mobile',
+                        'cell',
+                        'Cell',
+                        'workPhone',
+                        'WorkPhone',
+                        'homePhone',
+                        'HomePhone',
+                        'businessPhone',
+                        'BusinessPhone'
+                    ];
+                    
+                    // Check direct fields
+                    phoneFields.forEach(field => {
+                        if (leader[field]) {
+                            if (typeof leader[field] === 'string' && leader[field].trim()) {
+                                phoneNumbers.push(`${field}: ${leader[field].trim()}`);
+                            } else if (leader[field].Value && typeof leader[field].Value === 'string' && leader[field].Value.trim()) {
+                                phoneNumbers.push(`${field}: ${leader[field].Value.trim()}`);
+                            }
+                        }
+                    });
+                    
+                    // Check nested Person object
+                    if (leader.Person) {
+                        phoneFields.forEach(field => {
+                            if (leader.Person[field]) {
+                                if (typeof leader.Person[field] === 'string' && leader.Person[field].trim()) {
+                                    phoneNumbers.push(`Person.${field}: ${leader.Person[field].trim()}`);
+                                } else if (leader.Person[field].Value && typeof leader.Person[field].Value === 'string' && leader.Person[field].Value.trim()) {
+                                    phoneNumbers.push(`Person.${field}: ${leader.Person[field].Value.trim()}`);
+                                }
+                            }
+                        });
+                    }
+                    
+                    // Check for phone numbers in any string field (regex pattern)
+                    const phoneRegex = /(\+?1[-.\s]?)?\(?([0-9]{3})\)?[-.\s]?([0-9]{3})[-.\s]?([0-9]{4})/g;
+                    
+                    // Check all string fields for phone number patterns
+                    Object.keys(leader).forEach(key => {
+                        if (typeof leader[key] === 'string') {
+                            const matches = leader[key].match(phoneRegex);
+                            if (matches) {
+                                matches.forEach(match => {
+                                    if (!phoneNumbers.some(p => p.includes(match))) {
+                                        phoneNumbers.push(`${key}: ${match}`);
+                                    }
+                                });
+                            }
+                        }
+                    });
+                    
+                    // If any phone numbers found, add to results
+                    if (phoneNumbers.length > 0) {
+                        const personName = leader.Person?.DisplayName || 
+                                         leader.AlternateName || 
+                                         leader.PositionTitle || 
+                                         `ID ${leader.ID}`;
+                        
+                        const center = leader.Center && leader.Center[0] ? leader.Center[0].Value : 'Unknown';
+                        const roleType = leader.RoleType && leader.RoleType.Value ? leader.RoleType.Value : 'Unknown';
+                        
+                        entriesWithPhones.push({
+                            id: leader.ID,
+                            name: personName,
+                            center: center,
+                            roleType: roleType,
+                            phoneNumbers: phoneNumbers,
+                            rawEntry: leader
+                        });
+                    }
+                });
+                
+                // Sort by ID
+                entriesWithPhones.sort((a, b) => a.id - b.id);
+                
+                // Display summary
+                const percentage = ((entriesWithPhones.length / leadersData.length) * 100).toFixed(1);
+                summaryDiv.innerHTML = `
+                    <h3>📊 Extraction Summary</h3>
+                    <p><strong>Total Leaders:</strong> ${leadersData.length}</p>
+                    <p><strong>Leaders with Phone Numbers:</strong> ${entriesWithPhones.length}</p>
+                    <p><strong>Coverage:</strong> ${percentage}%</p>
+                    <p><strong>Status:</strong> ${entriesWithPhones.length === 21 ? '✅ Found expected 21 leaders!' : `⚠️ Found ${entriesWithPhones.length} leaders (expected 21)`}</p>
+                `;
+                summaryDiv.style.display = 'block';
+                
+                // Display comprehensive results
+                let output = '='.repeat(100) + '\n';
+                output += '📋 COMPREHENSIVE PHONE NUMBER ANALYSIS RESULTS\n';
+                output += '='.repeat(100) + '\n';
+                output += `✅ Found ${entriesWithPhones.length} leaders with phone numbers (out of ${leadersData.length} total)\n`;
+                output += `📈 Coverage: ${percentage}%\n\n`;
+                
+                // Detailed breakdown
+                entriesWithPhones.forEach((entry, index) => {
+                    output += `${index + 1}. ID: ${entry.id}\n`;
+                    output += `   Name: ${entry.name}\n`;
+                    output += `   Center: ${entry.center}\n`;
+                    output += `   Role: ${entry.roleType}\n`;
+                    output += `   Phone Numbers:\n`;
+                    entry.phoneNumbers.forEach(phone => {
+                        output += `     - ${phone}\n`;
+                    });
+                    output += '\n';
+                });
+                
+                output += '='.repeat(100) + '\n';
+                output += '✅ Thorough extraction complete!\n';
+                
+                outputDiv.innerHTML = `<pre class="results">${output}</pre>`;
+                
+                console.log('Results:', entriesWithPhones);
+                
+            } catch (error) {
+                outputDiv.innerHTML = `<div class="error">❌ Error during thorough extraction: ${error.message}</div>`;
+                console.error('Error:', error);
+            }
+        }
+    </script>
+</body>
+</html>
