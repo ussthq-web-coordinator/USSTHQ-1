@@ -3694,7 +3694,33 @@ class RSYCGeneratorV2 {
                         ? s.contacts.map(x => [x.name, x.email].filter(Boolean).join(' ')).filter(Boolean).join(' | ')
                         : '';
 
+                    // show friendly start/end dates (use template helper)
+                    let dateRange = '';
+                    if (s.startDate) {
+                        if (s.endDate) {
+                            try {
+                                dateRange = this.templateEngine.formatFriendlyDateRange(s.startDate, s.endDate);
+                                // omit year if both dates are current year
+                                const currentYear = new Date().getFullYear();
+                                const sy = parseLocalDate(s.startDate).getFullYear();
+                                const ey = parseLocalDate(s.endDate).getFullYear();
+                                if (sy === currentYear && ey === currentYear) {
+                                    dateRange = dateRange.replace(/,\s*\d{4}/g, '').replace(/,\s*\d{4}\s*-\s*/g, ' - ');
+                                }
+                            } catch (e) {
+                                console.warn('Preview friendly range failed', e);
+                                dateRange = `${s.startDate} - ${s.endDate}`;
+                            }
+                        } else {
+                            try {
+                                dateRange = this.templateEngine.formatFriendlyDate(s.startDate);
+                            } catch (e) {
+                                dateRange = s.startDate;
+                            }
+                        }
+                    }
                     const keyFacts = [
+                        dateRange ? `Dates: ${dateRange}` : '',
                         joinArr(s.scheduleDays),
                         s.scheduleTime || '',
                         s.timezone ? `TZ: ${s.timezone}` : '',
@@ -3704,6 +3730,7 @@ class RSYCGeneratorV2 {
                     ].filter(Boolean).join(' • ');
 
                     const optional = [
+                        dateRange ? `Dates: ${dateRange}` : '',
                         s.subtitle ? `Subtitle: ${s.subtitle}` : '',
                         s.ageRange ? `Age range: ${s.ageRange}` : '',
                         Array.isArray(s.agesServed) && s.agesServed.length ? `Ages served: ${joinArr(s.agesServed)}` : '',

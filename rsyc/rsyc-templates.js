@@ -127,6 +127,21 @@ window.toggleScheduleInfo = function(scheduleId) {
     }
 };
 
+// utility to parse YYYY-MM-DD as local date (prevent timezone shift)
+window.parseLocalDate = function(dateStr) {
+    if (!dateStr || typeof dateStr !== 'string') return new Date(dateStr);
+    const parts = dateStr.split('-');
+    if (parts.length >= 3) {
+        const y = parseInt(parts[0], 10);
+        const m = parseInt(parts[1], 10) - 1;
+        const d = parseInt(parts[2], 10);
+        if (!isNaN(y) && !isNaN(m) && !isNaN(d)) {
+            return new Date(y, m, d);
+        }
+    }
+    return new Date(dateStr);
+};
+
 /**
  * Close modal when clicking outside content
  */
@@ -154,7 +169,29 @@ document.addEventListener('keydown', function(e) {
 if (typeof window.RSYCTemplates === 'undefined') {
 class RSYCTemplates {
     constructor() {
-        this.sections = {
+           this.sections = {
+                /**
+                 * Formats a friendly date range for display
+                 * @param {string} startDateStr
+                 * @param {string} endDateStr
+                 * @returns {string}
+                 */
+                formatFriendlyDateRange(startDateStr, endDateStr) {
+                    // Use a common implementation from your file
+                    const start = new Date(startDateStr);
+                    const end = new Date(endDateStr);
+                    if (isNaN(start) || isNaN(end)) return '';
+                    const options = { month: 'short', day: 'numeric', year: 'numeric' };
+                    if (start.getTime() === end.getTime()) {
+                        return start.toLocaleDateString(undefined, options);
+                    }
+                    // If same month/year, show as "Jan 1-3, 2026"
+                    if (start.getFullYear() === end.getFullYear() && start.getMonth() === end.getMonth()) {
+                        return `${start.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}-${end.getDate()}, ${end.getFullYear()}`;
+                    }
+                    // Otherwise, show full range
+                    return `${start.toLocaleDateString(undefined, options)} - ${end.toLocaleDateString(undefined, options)}`;
+                },
             'hero': { 
                 name: 'Hero Section', 
                 enabled: true, 
@@ -450,7 +487,7 @@ class RSYCTemplates {
                 let timeText = '';
                 
                 if (event.eventDate) {
-                    const date = new Date(event.eventDate);
+                    const date = parseLocalDate(event.eventDate);
                     if (!isNaN(date.getTime())) {
                         const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
                         dateText = date.toLocaleDateString('en-US', options);
@@ -464,6 +501,36 @@ class RSYCTemplates {
                 return { dateText, timeText };
             };
             
+            // compute friendly program dates for modal (same logic used by cards/print)
+            let scheduleDateText = '';
+            if (schedule.startDate && schedule.endDate) {
+                const currentYear = new Date().getFullYear();
+                try {
+                    const exact = this.formatFriendlyDateRange(schedule.startDate, schedule.endDate);
+                    const startYear = parseLocalDate(schedule.startDate).getFullYear();
+                    const endYear = parseLocalDate(schedule.endDate).getFullYear();
+                    const bothCurrent = startYear === currentYear && endYear === currentYear;
+                    scheduleDateText = bothCurrent ?
+                        exact.replace(/,\s*\d{4}/g, '').replace(/,\s*\d{4}\s*-\s*/g, ' - ') :
+                        exact;
+                } catch (e) {
+                    console.warn('[RSYC] modal date formatting failed', e);
+                    scheduleDateText = `${schedule.startDate} - ${schedule.endDate}`;
+                }
+            } else if (schedule.startDate && !schedule.endDate) {
+                const currentYear = new Date().getFullYear();
+                try {
+                    const exact = this.formatFriendlyDate(schedule.startDate);
+                    const startYear = parseLocalDate(schedule.startDate).getFullYear();
+                    scheduleDateText = startYear === currentYear ?
+                        this.formatFriendlyDate(schedule.startDate, false) :
+                        exact;
+                } catch (e) {
+                    console.warn('[RSYC] modal single-date formatting failed', e);
+                    scheduleDateText = schedule.startDate;
+                }
+            }
+
             const dt = formatEventDateTimeParts(schedule);
             const eventDateText = dt.dateText || '';
             const eventTimeText = dt.timeText || '';
@@ -535,11 +602,10 @@ class RSYCTemplates {
                 console.warn('[RSYC] Section not in metadata:', sectionKey);
                 return;
             }
-            
             const accordionId = `audit-accordion-${sectionKey}`;
             const isExpanded = index === 0; // Expand first item
-            const anchorId = meta.anchor.replace('#', '');
-            
+            // Safely handle undefined anchor
+            const anchorId = meta.anchor ? meta.anchor.replace('#', '') : sectionKey;
             accordionHTML += `<div class="rsyc-audit-section" data-section="${sectionKey}">
                 <div class="rsyc-audit-header" onclick="window.toggleRSYCAuditAccordion('${sectionKey}')" style="cursor: pointer; padding: 1rem; background: #f8f9fa; border: 1px solid #ddd; border-radius: 6px; margin-bottom: 0.5rem; display: flex; justify-content: space-between; align-items: center; user-select: none;">
                     <strong style="color: #333; font-size: 1rem;">${meta.name}</strong>
@@ -548,7 +614,6 @@ class RSYCTemplates {
                 <div id="${accordionId}" class="rsyc-audit-content" style="padding: 0; background: #fafbfc; border: 1px solid #ddd; border-top: none; border-radius: 0 0 6px 6px; margin-bottom: 1rem; max-height: ${isExpanded ? '800px' : '0'}; overflow: hidden; transition: all 0.3s ease-in-out;">
                     <div style="padding: 1rem;">
                         <p style="margin: 0 0 1rem 0; color: #555; line-height: 1.6;">${meta.purpose || ''}</p>
-                        
                         <div style="background: #f0f7f7; padding: 0.75rem 1rem; border-radius: 4px; margin-bottom: 1rem; border-left: 4px solid #00929C;">
                             <div style="font-size: 0.75rem; color: #666; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 0.5rem;">Anchor ID</div>
                             <div style="display: flex; gap: 0.5rem; align-items: center;">
@@ -556,14 +621,12 @@ class RSYCTemplates {
                                 <button class="copy-btn" onclick="navigator.clipboard.writeText('#${anchorId}'); this.textContent='✓'; setTimeout(() => this.textContent='Copy', 1500);" style="padding: 0.5rem 1rem; background: #00929C; color: white; border: none; border-radius: 3px; cursor: pointer; font-weight: 600; white-space: nowrap;">Copy</button>
                             </div>
                         </div>
-                        
                         <div style="margin-bottom: 1rem;">
                             <strong style="color: #333; margin-bottom: 0.5rem; display: block;">📋 Fields:</strong>
                             <div style="color: #555; line-height: 1.8;">
                                 ${Array.isArray(meta.fields) ? meta.fields.join(', ') : (meta.fields || '')}
                             </div>
                         </div>
-                        
                         <button onclick="const el = document.getElementById('${anchorId}'); if (el) { el.scrollIntoView({behavior: 'smooth'}); window.closeRSYCModal('audit'); } else { alert('Section not found'); }" style="padding: 0.5rem 1rem; background: #00929C; color: white; border: none; border-radius: 3px; cursor: pointer; font-weight: 600;">Jump to #${anchorId}</button>
                     </div>
                 </div>
@@ -572,7 +635,7 @@ class RSYCTemplates {
 
         // Build table rows for all sections in metadata
         let tableHTML = Object.entries(this.sections).map(([key, meta]) => {
-            const anchorId = meta.anchor.replace('#', '');
+            const anchorId = meta.anchor ? meta.anchor.replace('#', '') : key;
             const hasStories = key === 'stories' ? '✅' : '';
             return `<tr style="border-bottom: 1px solid #eee;">
             <td style="padding: 0.75rem 1rem; color: #333; width: 40%;">${meta.name}</td>
@@ -1021,7 +1084,7 @@ console.log('[RSYC] Audit modal initialized');
                 
                 try {
                     // Parse the date string (YYYY-MM-DD format)
-                    const date = new Date(dateStr);
+                    const date = parseLocalDate(dateStr);
                     if (isNaN(date.getTime())) return dateStr; // Return original if invalid
                     
                     const months = ['January', 'February', 'March', 'April', 'May', 'June',
@@ -1980,7 +2043,7 @@ ${modal}`;
                 
                 try {
                     // Parse the date string (YYYY-MM-DD format)
-                    const date = new Date(dateStr);
+                    const date = parseLocalDate(dateStr);
                     if (isNaN(date.getTime())) return dateStr; // Return original if invalid
                     
                     const months = ['January', 'February', 'March', 'April', 'May', 'June',
@@ -2059,28 +2122,39 @@ ${modal}`;
                 const eventCardSubtitleText = isEvent ? (eventSubtitleText || eventTypeText) : '';
 
                 // Use friendly date formatting for program schedules
+                // scheduleDateText is a friendly string used in card summaries (may omit year when both dates fall in the current year)
                 let scheduleDateText = '';
+                // scheduleExactDates will always show the full start/end range formatted nicely
+                let scheduleExactDates = '';
+                // rawProgramDates holds the literal ISO values provided in the JSON
+                let rawProgramDates = '';
                 const currentYear = new Date().getFullYear();
                 
                 if (schedule.startDate && schedule.endDate) {
-                    // Check if both dates are in current year
-                    const startYear = new Date(schedule.startDate).getFullYear();
-                    const endYear = new Date(schedule.endDate).getFullYear();
+                    rawProgramDates = `${schedule.startDate} - ${schedule.endDate}`;
+                    // build exact friendly range first
+                    scheduleExactDates = formatFriendlyDateRange(schedule.startDate, schedule.endDate);
+
+                    // Check if both dates are in current year for the card-friendly version
+                    const startYear = parseLocalDate(schedule.startDate).getFullYear();
+                    const endYear = parseLocalDate(schedule.endDate).getFullYear();
                     const bothCurrentYear = startYear === currentYear && endYear === currentYear;
                     
                     if (bothCurrentYear) {
-                        // Use format without year for current year dates
-                        scheduleDateText = formatFriendlyDateRange(schedule.startDate, schedule.endDate).replace(/,\s*\d{4}/g, '').replace(/,\s*\d{4}\s*-\s*/g, ' - ');
+                        // Use format without year for current year dates on the card
+                        scheduleDateText = scheduleExactDates.replace(/,\s*\d{4}/g, '').replace(/,\s*\d{4}\s*-\s*/g, ' - ');
                     } else {
-                        scheduleDateText = formatFriendlyDateRange(schedule.startDate, schedule.endDate);
+                        scheduleDateText = scheduleExactDates;
                     }
                 } else if (schedule.startDate && !schedule.endDate) {
-                    const startYear = new Date(schedule.startDate).getFullYear();
+                    rawProgramDates = schedule.startDate;
+                    scheduleExactDates = formatFriendlyDate(schedule.startDate);
+                    const startYear = parseLocalDate(schedule.startDate).getFullYear();
                     if (startYear === currentYear) {
-                        // Use format without year for current year date
+                        // Use format without year for current year date on the card
                         scheduleDateText = formatFriendlyDate(schedule.startDate, false);
                     } else {
-                        scheduleDateText = formatFriendlyDate(schedule.startDate);
+                        scheduleDateText = scheduleExactDates;
                     }
                 }
                 
@@ -2253,7 +2327,7 @@ ${modal}`;
                 ${hasContent(registrationMonths) ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Registration Opens:</strong><br>${this.escapeHTML(registrationMonths)}</div>` : ''}
                 ${hasContent(schedule.registrationFee) ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Registration Fee:</strong><br>${this.escapeHTML(schedule.registrationFee)}</div>` : ''}
                 ${hasContent(schedule.ageRange) ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Ages:</strong><br>${this.escapeHTML(schedule.ageRange)}</div>` : ''}
-                ${scheduleDateText ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Program Dates:</strong><br>${this.escapeHTML(scheduleDateText)}</div>` : ''}
+                ${scheduleDateText ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Program Dates:</strong><br>${this.escapeHTML(schedule.startDate||'')}${schedule.endDate ? ' - ' + this.escapeHTML(schedule.endDate) : ''}</div>` : ''}
                 ${addressText ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Address:</strong><br>${this.escapeHTML(addressText)}</div>` : ''}
                 ${hasContent(schedule.contactPhoneNumber) ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Phone:</strong><br>${this.escapeHTML(schedule.contactPhoneNumber)}</div>` : ''}
                 ${eventTypeText ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Type:</strong><br>${this.escapeHTML(eventTypeText)}</div>` : ''}
@@ -2278,7 +2352,7 @@ ${modal}`;
                 ${hasContent(schedule.openFullDayDates) ? `<div class="col-sm-12 mb-3" style="color:#333;"><strong>Open Full Days:</strong><br>${this.preserveLineBreaks(schedule.openFullDayDates)}</div>` : ''}
                 ${(() => {
                     // output any extra simple string fields not already rendered above
-                    const known = ['id','title','subtitle','description','videoEmbedCode','URLImage','imageUrl','URLThumbnailImage','thumbnailUrl','centerName','startDate','endDate','scheduleDays','scheduleTime','registrationFee','ageRange','scheduleDisclaimer','daysText','timeText','months','registrationMonths','registrationDeadline','location','cost','frequency','transportationFeeandDetails','closedDates','openHalfDayDates','openFullDayDates','orientationDetails','whatToBring','materialsProvided','contacts','contactInfo','address','city','state','postalCode','contactPhoneNumber','status','timezone'];
+                    const known = ['id','title','subtitle','description','videoEmbedCode','URLImage','imageUrl','URLThumbnailImage','thumbnailUrl','centerName','startDate','endDate','scheduleDays','scheduleTime','registrationFee','ageRange','scheduleDisclaimer','daysText','timeText','months','registrationMonths','registrationDeadline','location','cost','frequency','transportationFeeandDetails','closedDates','openHalfDayDates','openFullDayDates','orientationDetails','whatToBring','materialsProvided','contacts','contactInfo','address','city','state','postalCode','contactPhoneNumber','status','timezone','formattedDate'];
                     const extras = Object.keys(schedule).filter(k => !known.includes(k) && schedule[k] && typeof schedule[k] === 'string').map(k => `
                         <div class="col-sm-12 mb-2" style="color:#333;"><strong>${this.escapeHTML(k)}:</strong> ${this.escapeHTML(schedule[k])}</div>
                     `);
@@ -2373,6 +2447,7 @@ ${modal}`;
                             ${schedule.subtitle ? `<div class="text-muted small" style="color: #666;">${this.escapeHTML(schedule.subtitle)}</div>` : ''}
                             <p class="mb-0 mt-2" style="font-size: 0.9rem; color: #000;">
                                 ${daysText ? `<strong>Days:</strong> ${this.escapeHTML(daysText)}<br>` : ''}
+                                ${schedule.frequency ? `<strong>Frequency:</strong> ${this.escapeHTML(schedule.frequency)}<br>` : ''}
                                 ${timeText ? `<strong>Time:</strong> ${this.escapeHTML(timeText)}` : ''}
                             </p>
                         </div>
@@ -2510,11 +2585,12 @@ ${modal}`;
                                 </div>
                                 <div class="flex-grow-1">
                                     <p class="mb-0 text-wrap">
-                                        ${eventDateText ? `<strong>Date:</strong> ${this.escapeHTML(eventDateText)}<br>` : ''}
                                         ${eventTimeText ? `<strong>Time:</strong> ${this.escapeHTML(eventTimeText)}<br>` : ''}
-                                        ${scheduleDateText ? `<strong>Date:</strong> ${this.escapeHTML(scheduleDateText)}<br>` : ''}
-                                        ${!scheduleDateText && daysText ? `<strong>Days:</strong> <span class="d-inline-block text-wrap">${this.escapeHTML(daysText)}</span><br>` : ''}
+                                        ${scheduleDateText ? `<strong>Date:</strong> ${this.escapeHTML(schedule.startDate||'')}${schedule.endDate ? ' - ' + this.escapeHTML(schedule.endDate) : ''}<br>` : ''}
+                                        ${daysText ? `<strong>Days:</strong> <span class="d-inline-block text-wrap">${this.escapeHTML(daysText)}</span><br>` : ''}
+                                        ${schedule.frequency ? `<strong>Frequency:</strong> ${this.escapeHTML(schedule.frequency)}<br>` : ''}
                                         ${timeText ? `<strong>Time:</strong> ${this.escapeHTML(timeText)}<br>` : ''}
+
                                     </p>
                                 </div>
                                 <div class="flex-shrink-0">
@@ -2577,28 +2653,36 @@ ${modal}`;
                         
                         // Use the same date formatting logic as cards - check what functions are available
                         let scheduleDateText = '';
+                        // also keep exact range for consistency with modals/printing
+                        let scheduleExactDates = '';
                         
                         // Try to use the same date formatting as cards
                         if (schedule.startDate && schedule.endDate) {
                             // Use the formatFriendlyDateRange function if available, otherwise fallback
                             try {
-                                scheduleDateText = this.formatFriendlyDateRange(schedule.startDate, schedule.endDate);
+                                scheduleExactDates = this.formatFriendlyDateRange(schedule.startDate, schedule.endDate);
+                                scheduleDateText = scheduleExactDates;
                             } catch (e) {
                                 console.warn('[RSYC] formatFriendlyDateRange not available, using fallback:', e);
                                 // Simple fallback formatting
-                                const start = new Date(schedule.startDate);
-                                const end = new Date(schedule.endDate);
+                                const start = parseLocalDate(schedule.startDate);
+                                const end = parseLocalDate(schedule.endDate);
                                 const options = { month: 'short', day: 'numeric' };
-                                scheduleDateText = `${start.toLocaleDateString('en-US', options)} - ${end.toLocaleDateString('en-US', options)}`;
+                                const range = `${start.toLocaleDateString('en-US', options)} - ${end.toLocaleDateString('en-US', options)}`;
+                                scheduleExactDates = range;
+                                scheduleDateText = range;
                             }
                         } else if (schedule.startDate && !schedule.endDate) {
                             try {
-                                scheduleDateText = this.formatFriendlyDate(schedule.startDate);
+                                scheduleExactDates = this.formatFriendlyDate(schedule.startDate);
+                                scheduleDateText = scheduleExactDates;
                             } catch (e) {
                                 console.warn('[RSYC] formatFriendlyDate not available, using fallback:', e);
                                 // Simple fallback formatting
-                                const date = new Date(schedule.startDate);
-                                scheduleDateText = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+                                const date = parseLocalDate(schedule.startDate);
+                                const formatted = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+                                scheduleExactDates = formatted;
+                                scheduleDateText = formatted;
                             }
                         }
                         
@@ -2642,6 +2726,7 @@ ${modal}`;
                             eventDateText: eventDateText,
                             eventTimeText: eventTimeText,
                             scheduleDateText: scheduleDateText,
+                            scheduleExactDates: scheduleExactDates,
                             timeText: timeText,
                             daysText: daysText,
                             startDate: schedule.startDate,
@@ -2653,12 +2738,17 @@ ${modal}`;
                         // Build date/time/days display using the same logic as cards
                         let dateTimeInfo = [];
                         if (isEvent && eventDateText) dateTimeInfo.push(`<strong>Date:</strong> ${eventDateText}`);
-                        else if (scheduleDateText) dateTimeInfo.push(`<strong>Date:</strong> ${scheduleDateText}`);
+                        else if (scheduleExactDates) dateTimeInfo.push(`<strong>Date:</strong> ${scheduleExactDates}`);
                         
                         if (isEvent && eventTimeText) dateTimeInfo.push(`<strong>Time:</strong> ${eventTimeText}`);
                         else if (timeText) dateTimeInfo.push(`<strong>Time:</strong> ${timeText}`);
                         
-                        if (daysText) dateTimeInfo.push(`<strong>Days:</strong> ${daysText}`);
+                        if (daysText) {
+                            dateTimeInfo.push(`<strong>Days:</strong> ${daysText}`);
+                            if (schedule.frequency) {
+                                dateTimeInfo.push(`<strong>Frequency:</strong> ${this.escapeHTML(schedule.frequency)}`);
+                            }
+                        }
                         
                         const dateTimeDisplay = dateTimeInfo.length > 0 ? dateTimeInfo.join('<br>') : '';
                         
@@ -5060,7 +5150,7 @@ async function printRSYCModal(modalId) {
         
         try {
             // Parse the date string (YYYY-MM-DD format)
-            const date = new Date(dateStr);
+            const date = parseLocalDate(dateStr);
             if (isNaN(date.getTime())) return dateStr; // Return original if invalid
             
             const months = ['January', 'February', 'March', 'April', 'May', 'June',
@@ -5084,8 +5174,8 @@ async function printRSYCModal(modalId) {
         if (!startDateStr) return '';
         
         try {
-            const startDate = new Date(startDateStr);
-            const endDate = endDateStr ? new Date(endDateStr) : null;
+            const startDate = parseLocalDate(startDateStr);
+            const endDate = endDateStr ? parseLocalDate(endDateStr) : null;
             
             if (isNaN(startDate.getTime())) return startDateStr; // Return original if invalid
             
@@ -5253,18 +5343,38 @@ async function printRSYCModal(modalId) {
             const contentDiv = field.querySelector('div:last-child') || field;
             let contentText = contentDiv.textContent.replace(strongEl.textContent, '').trim();
             
-            // Update Program Dates
+            // Update Program Dates (ISO values only)
             if (label === 'Program Dates:' && contentText) {
-                // Check if it's a date range or single date
-                const dateParts = contentText.split(' - ');
-                if (dateParts.length === 2) {
-                    // Date range
-                    const friendlyDate = formatFriendlyDateRange(dateParts[0].trim(), dateParts[1].trim());
-                    contentDiv.innerHTML = `<strong>${label}</strong><br>${friendlyDate}`;
-                } else if (dateParts.length === 1) {
-                    // Single date
-                    const friendlyDate = formatFriendlyDate(dateParts[0].trim());
-                    contentDiv.innerHTML = `<strong>${label}</strong><br>${friendlyDate}`;
+                // only touch if content is numeric/ISO rather than already-friendly text
+                if (!/[A-Za-z]/.test(contentText)) {
+                    // Check if it's a date range or single date
+                    const dateParts = contentText.split(' - ');
+                    const currentYear = new Date().getFullYear();
+                    if (dateParts.length === 2) {
+                        // Date range
+                        let friendlyDate = formatFriendlyDateRange(dateParts[0].trim(), dateParts[1].trim());
+                        // omit year if both dates are in the current year
+                        try {
+                            const startY = parseLocalDate(dateParts[0].trim()).getFullYear();
+                            const endY = parseLocalDate(dateParts[1].trim()).getFullYear();
+                            if (startY === currentYear && endY === currentYear) {
+                                friendlyDate = friendlyDate.replace(/,\s*\d{4}/g, '').replace(/,\s*\d{4}\s*-\s*/g, ' - ');
+                            }
+                        } catch (e) {
+                            // ignore parse errors
+                        }
+                        contentDiv.innerHTML = `<strong>${label}</strong><br>${friendlyDate}`;
+                    } else if (dateParts.length === 1) {
+                        // Single date
+                        let friendlyDate = formatFriendlyDate(dateParts[0].trim());
+                        try {
+                            const startY = parseLocalDate(dateParts[0].trim()).getFullYear();
+                            if (startY === currentYear) {
+                                friendlyDate = formatFriendlyDate(dateParts[0].trim(), false);
+                            }
+                        } catch (e) {}
+                        contentDiv.innerHTML = `<strong>${label}</strong><br>${friendlyDate}`;
+                    }
                 }
             }
             // Update Days - simplify consecutive day ranges
@@ -5856,7 +5966,7 @@ async function printAllSchedules(cacheKey) {
         
         try {
             // Parse the date string (YYYY-MM-DD format)
-            const date = new Date(dateStr);
+            const date = parseLocalDate(dateStr);
             if (isNaN(date.getTime())) return dateStr; // Return original if invalid
             
             const months = ['January', 'February', 'March', 'April', 'May', 'June',
@@ -5880,8 +5990,8 @@ async function printAllSchedules(cacheKey) {
         if (!startDateStr) return '';
         
         try {
-            const startDate = new Date(startDateStr);
-            const endDate = endDateStr ? new Date(endDateStr) : null;
+            const startDate = parseLocalDate(startDateStr);
+            const endDate = endDateStr ? parseLocalDate(endDateStr) : null;
             
             if (isNaN(startDate.getTime())) return startDateStr; // Return original if invalid
             
@@ -5992,35 +6102,50 @@ async function printAllSchedules(cacheKey) {
                 timeText += ' (Central)';
             }
         }
-
+        
+        // compute friendly date for schedules (not events)
+        let scheduleDateText = '';
+        if (!isEvent) {
+            if (schedule.startDate && schedule.endDate) {
+                scheduleDateText = formatFriendlyDateRange(schedule.startDate, schedule.endDate);
+                // drop year if both dates fall in current year
+                try {
+                    const currentYear = new Date().getFullYear();
+                    const startY = parseLocalDate(schedule.startDate).getFullYear();
+                    const endY = parseLocalDate(schedule.endDate).getFullYear();
+                    if (startY === currentYear && endY === currentYear) {
+                        scheduleDateText = scheduleDateText.replace(/,\s*\d{4}/g, '').replace(/,\s*\d{4}\s*-\s*/g, ' - ');
+                    }
+                } catch (e) {}
+            } else if (schedule.startDate) {
+                scheduleDateText = formatFriendlyDate(schedule.startDate);
+                try {
+                    const currentYear = new Date().getFullYear();
+                    const startY = parseLocalDate(schedule.startDate).getFullYear();
+                    if (startY === currentYear) {
+                        scheduleDateText = formatFriendlyDate(schedule.startDate, false);
+                    }
+                } catch (e) {}
+            }
+        }
+        const registrationDeadline = schedule.registrationDeadline || '';
+        const registrationFee = schedule.registrationFee || '';
+        const ageRange = schedule.ageRange || '';
+        const location = schedule.location || '';
+        const cost = schedule.cost || '';
+        
+        // create engine to format months/registration months
         const templateEngine = new RSYCTemplates();
         const months = schedule.programRunsIn && Array.isArray(schedule.programRunsIn)
             ? templateEngine.summarizeMonths(schedule.programRunsIn)
             : '';
-            
         const registrationOpens = schedule.registrationOpensIn && Array.isArray(schedule.registrationOpensIn)
             ? templateEngine.summarizeMonths(schedule.registrationOpensIn)
             : '';
-
-        let ageRange = schedule.ageRange || '';
-        if (!ageRange && schedule.agesServed && Array.isArray(schedule.agesServed) && schedule.agesServed.length > 0) {
-            ageRange = schedule.agesServed.join(', ');
-        }
         
-        const location = schedule.location || '';
-        const cost = schedule.cost || '';
-        const registrationFee = schedule.registrationFee || '';
-        const registrationDeadline = schedule.registrationDeadline || '';
-        
-        // Use friendly date formatting for program dates
-        let programDates = '';
-        if (schedule.startDate || schedule.endDate) {
-            if (schedule.startDate && schedule.endDate) {
-                programDates = formatFriendlyDateRange(schedule.startDate, schedule.endDate);
-            } else if (schedule.startDate && !schedule.endDate) {
-                programDates = formatFriendlyDate(schedule.startDate);
-            }
-        }
+        // Program dates should use the same friendly string as the card
+        // (scheduleDateText already handles current‑year omission).
+        let programDates = scheduleDateText || '';
         
         const eventDt = isEvent ? formatEventDateTimeParts(schedule) : { dateText: '', timeText: '' };
         let eventDateText = eventDt.dateText || '';
@@ -6086,7 +6211,9 @@ async function printAllSchedules(cacheKey) {
             <div class="details">
                 ${isEvent && eventDateText ? `<div><strong>Date:</strong> ${eventDateText}</div>` : ''}
                 ${isEvent && eventTimeText ? `<div><strong>Time:</strong> ${eventTimeText}</div>` : ''}
+                ${!isEvent && scheduleDateText ? `<div><strong>Date:</strong> ${scheduleDateText}</div>` : ''}
                 ${!isEvent && daysText ? `<div><strong>Days:</strong> ${daysText}</div>` : ''}
+                ${!isEvent && schedule.frequency ? `<div><strong>Frequency:</strong> ${schedule.frequency}</div>` : ''}
                 ${!isEvent && timeText ? `<div><strong>Time:</strong> ${timeText}</div>` : ''}
                 ${months ? `<div><strong>Program Runs In:</strong> ${months}</div>` : ''}
                 ${registrationOpens ? `<div><strong>Registration Opens:</strong> ${registrationOpens}</div>` : ''}

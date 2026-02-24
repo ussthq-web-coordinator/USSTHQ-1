@@ -722,7 +722,14 @@ class RSYCDataLoader {
                 scheduleTime: schedule.ScheduleTime,
                 scheduleDisclaimer: schedule.ScheduleDisclaimer || '',
                 timezone: schedule.Timezone?.Value || schedule.TimeZone?.Value || '',
-                frequency: schedule.Frequency?.Value || '',
+                frequency: (() => {
+                    if (!schedule.Frequency) return '';
+                    // SharePoint may return an array of lookups or a single object
+                    if (Array.isArray(schedule.Frequency)) {
+                        return schedule.Frequency.map(f => f && f.Value ? f.Value : '').filter(Boolean).join(', ');
+                    }
+                    return schedule.Frequency.Value || '';
+                })(),
                 // Extract .Value from ProgramRunsIn array
                 programRunsIn: (schedule.ProgramRunsIn || []).map(m => m.Value),
                 // Extract .Value from RegistrationTypicallyOpensin array
@@ -1284,6 +1291,26 @@ class RSYCDataLoader {
             if (!aEnd && bEnd) return 1;
 
             return 0;
+        });
+
+        // Update program date to match start and end dates
+        schedulesForCenter.forEach(schedule => {
+            const startDate = schedule._startTimestamp ? new Date(schedule._startTimestamp) : null;
+            const endDate = schedule._endTimestamp ? new Date(schedule._endTimestamp) : null;
+
+            if (startDate && endDate) {
+                const sameDay = startDate.toDateString() === endDate.toDateString();
+                const dateFormat = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+
+                schedule.formattedDate = sameDay
+                    ? dateFormat.format(startDate)
+                    : `${dateFormat.format(startDate)} - ${dateFormat.format(endDate)}`;
+            } else if (startDate) {
+                const dateFormat = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+                schedule.formattedDate = dateFormat.format(startDate);
+            } else {
+                schedule.formattedDate = 'Date not available';
+            }
         });
 
         // Enrich all centers with their photos for nearby centers section
