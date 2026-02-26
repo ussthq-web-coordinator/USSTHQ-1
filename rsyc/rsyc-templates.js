@@ -427,8 +427,11 @@ class RSYCTemplates {
             console.log('[RSYC] No schedules or events data, skipping modal generation');
         }
 
-        // Add audit modal with section navigation
-        const auditModal = this.generateAuditModal(enabledSections);
+        // Add audit modal with section navigation (include photo info if available)
+        const auditModal = this.generateAuditModal(enabledSections, {
+            centers: [centerData],
+            photos: centerData.photos || []
+        });
         
         // Add joinCenter modal for front-end profiles
         const joinCenterModal = this.generateJoinCenterModal(centerData);
@@ -589,8 +592,19 @@ class RSYCTemplates {
     /**
      * Generate Audit Modal with section navigation
      */
-    generateAuditModal(enabledSections) {
+    generateAuditModal(enabledSections, data = {}) {
         console.log('[RSYC] generateAuditModal called with sections:', enabledSections);
+        const centers = data.centers || [];
+        const photos = data.photos || [];
+        // include photos found inside centers (profile-injector scenario)
+        const embedded = centers.reduce((acc, c) => {
+            if (Array.isArray(c.photos) && c.photos.length) {
+                acc.push(...c.photos);
+            }
+            return acc;
+        }, []);
+        const allPhotos = [...photos, ...embedded];
+        const hasPhotoData = allPhotos.length > 0;
         
         // Build accordion items - always include enabled sections
         let accordionHTML = '';
@@ -645,6 +659,16 @@ class RSYCTemplates {
         </tr>`;
         }).join('');
 
+        // build photo table section if data was provided
+        // always render the toggle button; container may show message if no data
+        let photoTableSection = `
+            <div style="margin-bottom: 1rem;">
+                <button id="audit-photos-toggle-btn" class="btn btn-outline-primary btn-sm" data-has-photos="${hasPhotoData ? '1' : '0'}" onclick="toggleRSYCAuditPhotosTable()">Show Center Photos Table</button>
+            </div>
+            <div id="audit-photos-container" style="display:none; max-height:400px; overflow:auto; margin-bottom:1rem;">
+                ${hasPhotoData ? this.generateAuditPhotosTable({centers, photos: allPhotos}) : '<div style="font-size:0.9rem; color:#666;">No photo data available.</div>'}
+            </div>`;
+
         return `<!-- Audit Modal -->
 <div id="rsyc-modal-audit" class="rsyc-modal" style="display: none !important;">
     <div class="rsyc-modal-content" style="max-width: 1000px;">
@@ -662,6 +686,8 @@ class RSYCTemplates {
                 </thead>
                 <tbody>${tableHTML}</tbody>
             </table>
+
+            ${photoTableSection}
 
             <h4 style="margin-bottom: 1rem; color: #333;">📖 Section Details</h4>
             <div style="border-radius: 6px; overflow: hidden;">${accordionHTML}</div>
@@ -717,10 +743,224 @@ if (!window.toggleRSYCAuditAccordion) {
         }
     };
 }
+
+// Toggle and copy photo table
+if (!window.toggleRSYCAuditPhotosTable) {
+    window.toggleRSYCAuditPhotosTable = function() {
+        const cont = document.getElementById('audit-photos-container');
+        const btn = document.getElementById('audit-photos-toggle-btn');
+        if (!cont || !btn) return;
+        const has = btn.getAttribute('data-has-photos') === '1';
+        if (cont.style.display === 'none') {
+            cont.style.display = 'block';
+            btn.textContent = 'Hide Center Photos Table';
+            if (has) {
+                try {
+                    const blob = new Blob([cont.innerHTML], { type: 'text/html' });
+                    navigator.clipboard.write([new ClipboardItem({ 'text/html': blob })]);
+                    btn.textContent = '✓ Copied & Shown';
+                    setTimeout(() => { btn.textContent = 'Hide Center Photos Table'; }, 2000);
+                } catch (e) {
+                    console.error('audit photos copy failed', e);
+                }
+            }
+        } else {
+            cont.style.display = 'none';
+            btn.textContent = 'Show Center Photos Table';
+        }
+    };
+}
 console.log('[RSYC] Audit modal initialized');
 </script>
         `;
 
+    }
+
+    // ------------------------------------------------------------------
+    // Helper: build HTML for center photos catalog (used by audit modal)
+    generateAuditPhotosTable(data) {
+        const { centers, photos } = data;
+        const esc = (v) => v ? String(v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') : '';
+        const val = (v, fallback = '') => (v === null || v === undefined || v === '' ? fallback : v);
+        const centersBySpId = new Map((centers || []).map(c => [String(c.sharePointId ?? c.id ?? c.Id), c]));
+        const getCenterName = (c) => {
+            if (!c) return '';
+            return c.name || c.Title || '';
+        };
+
+        // define model fields for center photos
+        const fieldRows = [
+            ['Center','Center','Associated center SharePoint ID'],
+            ['Status','Status','Draft or published status.'],
+            ['Modified','Modified','Last modified timestamp.'],
+            ['Modified By','ModifiedBy','User who last updated the record.'],
+            ['Center Exterior Photo','CenterExteriorPhoto','Exterior building photo.'],
+            ['Facility Features Photo','FacilityFeaturesPhoto','Inside facility photo showing features.'],
+            ['Programs Photo','ProgramsPhoto','Photo representing programs offered.'],
+            ['Nearby Centers Photo','NearbyCentersPhoto','Photo of nearby centers/community.'],
+            ['Parents Section Photo','ParentsSectionPhoto','Image used in parents section.'],
+            ['Youth Section Photo','YouthSectionPhoto','Image used in youth section.'],
+            ['Get Involved Photo','GetInvolvedPhoto','Call-to-action photo for involvement.'],
+            ['Footer Photo','FooterPhoto','Footer-area image.'],
+            ['Footer Photo Focus','FooterPhotoFocus','Crop focus point for footer photo.'],
+            ['URL Center Exterior Photo','URLCenterExteriorPhoto','(THQ use only) external image URL.'],
+            ['URL Facility Features Photo','URLFacilityFeaturesPhoto','(THQ) external URL for features photo.'],
+            ['URL Programs Photo','URLProgramsPhoto','(THQ) external URL for programs photo.'],
+            ['URL Nearby Centers Photo','URLNearbyCentersPhoto','(THQ) external URL for nearby centers photo.'],
+            ['URL Parents Section Photo','URLParentsSectionPhoto','(THQ) external URL for parents photo.'],
+            ['URL Youth Section Photo','URLYouthSectionPhoto','(THQ) external URL for youth photo.'],
+            ['URL Get Involved Photo','URLGetInvolvedPhoto','(THQ) external URL for get-involved photo.'],
+            ['URL Footer Photo','URLFooterPhoto','(THQ) external URL for footer photo.']
+        ];
+
+        // build guide table markup
+        const fieldGuide = `
+            <div style="margin-bottom:22px; font-family:'Segoe UI',Tahoma,sans-serif;">
+                <div style="background-color:#f4f4f4; padding:14px; border-left:6px solid #d93d3d; font-weight:bold; margin-bottom:14px; font-size:16px; color:#333; display:block; width:100%;">📘 Center Photos Fields (Purpose Guide)</div>
+                <div style="border:1px solid #eee; border-radius:8px; overflow:hidden; background:#fff;">
+                    <table style="width:100%; border-collapse:collapse; font-size:12px;">
+                        <thead style="background:#f8f9fa; border-bottom:1px solid #eee;">
+                            <tr>
+                                <th style="padding:10px; text-align:left; width:200px;">Field</th>
+                                <th style="padding:10px; text-align:left; width:200px;">Raw Name</th>
+                                <th style="padding:10px; text-align:left;">Purpose</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${fieldRows.map(([f,v,p], idx) => `
+                                <tr style="border-bottom:1px solid #f3f3f3; ${idx%2?'background:#fcfcfc;':''}">
+                                    <td style="padding:8px 10px; font-family:Consolas,monospace; font-size:11px; color:#333;">${esc(f)}</td>
+                                    <td style="padding:8px 10px; font-family:Consolas,monospace; font-size:11px; color:#333;">${esc(v)}</td>
+                                    <td style="padding:8px 10px; color:#555; line-height:1.5;">${esc(p)}</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        `;
+
+        const photosByCenterId = {};
+        (photos || []).forEach(p => {
+            const cid = String(p.centerId ?? '');
+            if (!cid) return;
+            if (!photosByCenterId[cid]) photosByCenterId[cid] = [];
+            photosByCenterId[cid].push(p);
+        });
+
+        // helper list of known photo types with normalized keys
+        const photoTypes = [
+            { label: 'Center Exterior Photo', key: 'urlExteriorPhoto' },
+            { label: 'Facility Features Photo', key: 'urlFacilityFeaturesPhoto' },
+            { label: 'Programs Photo', key: 'urlProgramsPhoto' },
+            { label: 'Nearby Centers Photo', key: 'urlNearbyCentersPhoto' },
+            { label: 'Parents Section Photo', key: 'urlParentsSectionPhoto' },
+            { label: 'Youth Section Photo', key: 'urlYouthSectionPhoto' },
+            { label: 'Get Involved Photo', key: 'urlGetInvolvedPhoto' },
+            { label: 'Footer Photo', key: 'urlFooterPhoto' }
+        ];
+
+        const centerBlocks = Object.keys(photosByCenterId).map(cid => {
+            const items = photosByCenterId[cid];
+            const c = centersBySpId.get(cid) || {};
+            const name = getCenterName(c);
+
+            // build rows by enumerating each photo type within each record
+            const rowsHtml = [];
+            items.forEach(p => {
+                // gather any missing types for this record (for footer row)
+                const missingImgs = photoTypes
+                    .filter(pt => !p[pt.key])
+                    .map(pt => pt.label);
+
+                photoTypes.forEach(pt => {
+                    const url = p[pt.key] ? String(p[pt.key]) : '';
+                    let imageHtml = '';
+                    if (url) {
+                        // display actual photo only, small thumbnail 100×100 so copy/paste is lightweight
+                        imageHtml = `
+                            <div style="margin:4px 0;">
+                                <img src="${esc(url)}" width="100" height="100" style="object-fit:cover; display:block; border-radius:4px;" />
+                            </div>
+                        `;
+                    } else {
+                        imageHtml = `<div style="font-size:11px; color:#a00;">No Image Provided</div>`;
+                    }
+
+                    rowsHtml.push(`
+                        <tr style="border-bottom:1px solid #f3f3f3;">
+                            <td style="padding:8px 10px; font-weight:700; font-size:12px;">${esc(pt.label)}</td>
+                            <td style="padding:8px 10px; font-size:12px; color:#555; line-height:1.5;">
+                                ${imageHtml}
+                            </td>
+                        </tr>
+                    `);
+                });
+
+                if (missingImgs.length) {
+                    rowsHtml.push(`
+                        <tr>
+                            <td colspan="2" style="padding:6px 10px; font-size:11px; color:#a00;">Missing: ${esc(missingImgs.join(', '))}</td>
+                        </tr>
+                    `);
+                }
+            });
+
+            return `
+                <div style="margin-bottom: 22px; font-family: 'Segoe UI', Tahoma, sans-serif;">
+                    <div style="background:#fff; border:1px solid #e9ecef; border-radius:10px; overflow:hidden;">
+                        <div style="padding:12px 14px; background:#f8f9fa; border-bottom:1px solid #e9ecef;">
+                            <div style="font-weight:800; color:#242424;">${esc(name)}</div>
+                            <div style="font-size:12px; color:#666;">${items.length} photo item(s)</div>
+                        </div>
+                        <table style="width:100%; border-collapse:collapse; table-layout:fixed;">
+                            <thead style="background:#fff; border-bottom:1px solid #eee;">
+                                <tr>
+                                    <th style="padding:10px; text-align:left; width:240px; font-size:11px; color:#333;">Photo Type</th>
+                                    <th style="padding:10px; text-align:left; font-size:11px; color:#333;">Details</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${rowsHtml.join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                    <br>
+                </div>
+            `;
+        }).join('');
+
+        const instructionBlock = `
+            <div style="padding: 16px; background-color: #fafafa; border-bottom: 1px solid #e0e0e0; font-family: 'Segoe UI', sans-serif; margin: 8px;">
+                <div>
+                    <div style="font-size: 16px; font-weight: 600; color: #242424; margin: 0 0 8px 0;">RSYC Center Photos Instructions</div>
+                    <p style="font-size: 14px; color: #333; line-height: 1.5; margin: 0 0 8px 0;">Please click in the area beneath each of the field labels to upload photos for each section in the form below. Changes are saved when you click out of the field.</p>
+                    <div>
+                        <a href="https://sauss.sharepoint.com/sites/ConnectCommunications/SitePages/Manage-Youth-Center-Web-Profile.aspx#center-profile-manager" target="_blank" style="font-size: 13px; color: #0078d4; text-decoration: underline; margin: 0 6px 12px 0; display: inline-block;">Learn more</a>
+                        <a href="https://southernusa.salvationarmy.org/redshieldyouth/center-locations" target="_blank" style="font-size: 13px; color: #0078d4; text-decoration: underline; margin: 0 6px 12px 0; display: inline-block;">View Your Profile</a>
+                    </div>
+                    <div style="font-size: 13px; color: #444; background-color: #fff8e1; border-left: 4px solid #f2c200; padding: 8px 10px; margin: 0 0 16px 0; line-height: 1.5;">
+                        💬 After you make changes to photos, please @mention our team in the comments on the right like this: @Shared THQ Web and Social Media, We have added new center photos ready to publish.
+                    </div>
+                </div>
+                <div style="display:flex; flex-wrap:wrap; gap:10px; margin:4px 0 0 0;">
+                    <div>
+                        <div style="font-size:15px; font-weight:600; color:#242424; margin:0 0 8px 0;">Check it out!</div>
+                        <a href="https://southernusa.salvationarmy.org/redshieldyouth/hickory" target="_blank" style="font-size:15px; color:#0078d4; text-decoration:underline;">View an example of a profile with localized photos.</a>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        return `
+            <div style="font-family: 'Segoe UI', Tahoma, sans-serif; color: #333; max-width: 1000px; line-height: 1.5;">
+                <div style="background-color: #f4f4f4; padding: 14px; border-left: 6px solid #d93d3d; font-weight: bold; margin-bottom: 25px; font-size: 18px; color: #333; display: block; width: 100%;">📸 RSYC CENTER PHOTOS CATALOG</div>
+                ${instructionBlock}
+                <p style="font-size: 14px; margin-top: 0; color: #666; margin-bottom: 18px; display: block;">Generated on ${new Date().toLocaleDateString()} • ${val((photos || []).length)} total photo item(s)</p>
+                <br>
+                ${centerBlocks || '<div style="font-size:13px; color:#999;">No photos found.</div>'}
+            </div>
+        `;
     }
 
     /**
@@ -730,21 +970,20 @@ console.log('[RSYC] Audit modal initialized');
         console.log('[RSYC] generateJoinCenterModal called');
         const { center = {} } = data;
         const centName = center.name || center.Title || 'your Red Shield Youth Center';
+        const registrationURL = center.signUpURL || center['OnlineSign_x002d_UpURL'] || center.OnlineSignUpURL || center.OnlineSignURL || '';
+        const hasRegistrationURL = registrationURL.trim() !== '';
         const modalHTML = `
 <!-- Join Center Modal -->
 <div id="rsyc-modal-joinCenter" class="rsyc-modal" style="display: none !important;">
     <div class="rsyc-modal-content">
         <div class="rsyc-modal-header">
             <h3>🌟 Join the Center</h3>
-            <div style="display: flex; gap: 0.5rem;">
-                <button class="btn btn-outline-primary" id="joinCenterJoinBtn" style="border-color:#d3d3d3; color:#d3d3d3;">
-                    <i class="bi bi-box-arrow-up-right me-2"></i>Join
-                </button>
-                <button class="btn btn-outline-primary" onclick="printJoinCenterModal()" style="border-color:#d3d3d3; color:#d3d3d3;">
-                    <i class="bi bi-printer me-2"></i>Print / Save as PDF
-                </button>
-                <button class="rsyc-modal-close" onclick="closeRSYCModal('joinCenter')">&times;</button>
-            </div>
+            <button class="rsyc-modal-close" onclick="closeRSYCModal('joinCenter')">&times;</button>
+        </div>
+        <div class="rsyc-modal-subheader" style="display: flex; justify-content:center; gap: 0.5rem; padding:0.5rem 1rem; border-bottom:1px solid #ddd;">
+            ${hasRegistrationURL ? `<button class="btn btn-outline-primary" id="joinCenterJoinBtn" data-registration-url="${this.escapeHTML(registrationURL)}" onclick="window.open('${this.escapeHTML(registrationURL)}','_blank')" style="border-color:#d3d3d3; color:#d3d3d3;"><i class="bi bi-box-arrow-up-right me-2"></i>Join</button>` : ''}
+            <button class="btn btn-outline-primary" onclick="printJoinCenterModal()" style="border-color:#d3d3d3; color:#d3d3d3;"><i class="bi bi-printer me-2"></i>Print / Save as PDF
+            </button>
         </div>
 
         <div class="rsyc-modal-body">
@@ -1255,7 +1494,10 @@ console.log('[RSYC] Audit modal initialized');
             const dt = formatEventDateTimeParts(evt);
             const dateText = dt.dateText || '';
             const timeText = dt.timeText || '';
-            
+
+            // Prefer raw start/end dates from JSON when available, but fall back to generated dateText
+            const eventExactDates = (evt.startDate || evt.endDate) ? `${evt.startDate||''}${evt.endDate ? ' - ' + evt.endDate : ''}` : '';
+
             // Add timezone to scheduleTime for schedules in events section
             let scheduleTimeWithTZ = evt.scheduleTime || '';
             if (scheduleTimeWithTZ && evt.timezone && isScheduleInEvents) {
@@ -1292,7 +1534,7 @@ console.log('[RSYC] Audit modal initialized');
                         <div class="fw-bold mb-1" style="font-size: 1.05rem; line-height: 1.3;">${this.escapeHTML(evt.title)}</div>
                         ${eventCardSubtitleText && eventCardSubtitleText !== evt.title ? `<div class="text-muted mb-2" style="font-size: 0.9rem;">${this.escapeHTML(eventCardSubtitleText)}</div>` : ''}
                         <div style="flex-grow:1; font-size: 0.9rem; line-height: 1.5;">
-                            ${dateText ? `<div><strong>Date:</strong> ${this.escapeHTML(dateText)}</div>` : ''}
+                            ${(eventExactDates || dateText) ? `<div><strong>Date:</strong> ${this.escapeHTML(eventExactDates || dateText)}</div>` : ''}
                             ${isScheduleInEvents ? `${scheduleTimeWithTZ ? `<div><strong>Time:</strong> ${this.escapeHTML(scheduleTimeWithTZ)}</div>` : ''}` : `${timeText ? `<div><strong>Time:</strong> ${this.escapeHTML(timeText)}</div>` : ''}`}
                         </div>
                         <button type="button" class="btn btn-outline-primary btn-sm mt-2" onclick="showRSYCModal('${modalType}', '${this.escapeHTML(center.name || center.Title, true)}')">View Details</button>
@@ -1308,7 +1550,7 @@ console.log('[RSYC] Audit modal initialized');
                                 <div class="fw-bold mb-1" style="font-size: 0.95rem; line-height: 1.3;">${this.escapeHTML(evt.title)}</div>
                                 ${eventCardSubtitleText && eventCardSubtitleText !== evt.title ? `<div class="text-muted mb-2" style="font-size: 0.8rem;">${this.escapeHTML(eventCardSubtitleText)}</div>` : ''}
                                 <div style="font-size: 0.8rem; line-height: 1.4; margin-bottom: 0.5rem;">
-                                    ${dateText ? `<div><strong>Date:</strong> ${this.escapeHTML(dateText)}</div>` : ''}
+                                    ${(eventExactDates || dateText) ? `<div><strong>Date:</strong> ${this.escapeHTML(eventExactDates || dateText)}</div>` : ''}
                                     ${isScheduleInEvents ? `${scheduleTimeWithTZ ? `<div><strong>Time:</strong> ${this.escapeHTML(scheduleTimeWithTZ)}</div>` : ''}` : `${timeText ? `<div><strong>Time:</strong> ${this.escapeHTML(timeText)}</div>` : ''}`}
                                 </div>
                                 <button type="button" class="btn btn-outline-primary align-self-start" style="font-size: 0.75rem; padding: 0.25rem 0.5rem;" onclick="event.stopPropagation(); showRSYCModal('${modalType}', '${this.escapeHTML(center.name || center.Title, true)}')">View Details</button>
@@ -3828,7 +4070,7 @@ ${modal}`;
         const parentPhoto = photoData?.urlParentsSectionPhoto || 'https://s3.amazonaws.com/uss-cache.salvationarmy.org/c86f2661-8584-4ec2-9a2b-efb037af243c_480824461_1048794390619512_2584431963266610630_n.jpg';
         
         // Use center's registration URL if available
-        const registrationURL = center.signUpURL;
+        const registrationURL = center.signUpURL || center['OnlineSign_x002d_UpURL'] || center.OnlineSignUpURL || center.OnlineSignURL || '';
         
         // Check if staff section has data (to show/hide Meet Our Staff button)
         const hasStaff = leaders && leaders.length > 0;
@@ -3941,8 +4183,21 @@ ${modal}`;
         const photoUrl = photoData?.urlYouthSectionPhoto || 'https://s3.amazonaws.com/uss-cache.salvationarmy.org/adcebba0-1957-44b7-b252-52047fba3012_493289641_24370578925875198_8553369015658130819_n.jpg';
 
         // Dynamic registration URLs
-        const registrationURL = center.signUpURL || 'https://online.traxsolutions.com/southernusasalvationarmy/winston-salem#/dashboard';
-        const searchURL = registrationURL.replace(/#\/dashboard$/, '#/search');
+        const registrationURL = center.signUpURL || center['OnlineSign_x002d_UpURL'] || center.OnlineSignUpURL || center.OnlineSignURL || '';
+        const hasRegistrationURL = registrationURL.trim() !== '';
+        // build search URL by swapping any trailing dashboard segment to /search
+        let searchURL = '';
+        if (registrationURL) {
+            // handle both hash and path styles
+            if (/\#\/dashboard$/.test(registrationURL)) {
+                searchURL = registrationURL.replace(/\#\/dashboard$/, '#/search');
+            } else if (/\/dashboard$/.test(registrationURL)) {
+                searchURL = registrationURL.replace(/\/dashboard$/, '/search');
+            } else {
+                // if no dashboard suffix, default to original
+                searchURL = registrationURL;
+            }
+        }
 
         // Join Center modal content
         const joinCenterModal = `
@@ -3951,15 +4206,12 @@ ${modal}`;
     <div class="rsyc-modal-content">
         <div class="rsyc-modal-header">
             <h3>🌟 Join a Center</h3>
-            <div style="display: flex; gap: 0.5rem;">
-                <button class="btn btn-outline-primary" id="joinCenterJoinBtn" style="border-color:#d3d3d3; color:#d3d3d3;">
-                    <i class="bi bi-box-arrow-up-right me-2"></i>Join
-                </button>
-                <button class="btn btn-outline-primary" onclick="printJoinCenterModal()" style="border-color:#d3d3d3; color:#d3d3d3;">
-                    <i class="bi bi-printer me-2"></i>Print / Save as PDF
-                </button>
-                <button class="rsyc-modal-close" onclick="closeRSYCModal('joinCenter')">&times;</button>
-            </div>
+            <button class="rsyc-modal-close" onclick="closeRSYCModal('joinCenter')">&times;</button>
+        </div>
+        <div class="rsyc-modal-subheader" style="display: flex; justify-content:center; gap: 0.5rem; padding:0.5rem 1rem; border-bottom:1px solid #ddd;">
+            ${hasRegistrationURL ? `<button class="btn btn-outline-primary" id="joinCenterJoinBtn" data-registration-url="${this.escapeHTML(registrationURL)}" onclick="window.open('${this.escapeHTML(registrationURL)}','_blank')" style="border-color:#d3d3d3; color:#d3d3d3;"><i class="bi bi-box-arrow-up-right me-2"></i>Join</button>` : ''}
+            <button class="btn btn-outline-primary" onclick="printJoinCenterModal()" style="border-color:#d3d3d3; color:#d3d3d3;"><i class="bi bi-printer me-2"></i>Print / Save as PDF
+            </button>
         </div>
 
         <div class="rsyc-modal-body">
@@ -4027,15 +4279,18 @@ ${modal}`;
     <div class="rsyc-modal-content">
         <div class="rsyc-modal-header">
             <h3>🚀 Join an Activity</h3>
-            <div style="display: flex; gap: 0.5rem;">
-                <button class="btn btn-outline-primary" id="joinActivitySearchBtn" style="border-color:#d3d3d3; color:#d3d3d3;">
-                    <i class="bi bi-search me-2"></i>Search Activities
-                </button>
-                <button class="btn btn-outline-primary" onclick="printJoinActivityModal()" style="border-color:#d3d3d3; color:#d3d3d3;">
-                    <i class="bi bi-printer me-2"></i>Print / Save as PDF
-                </button>
-                <button class="rsyc-modal-close" onclick="closeRSYCModal('joinActivity')">&times;</button>
-            </div>
+            <button class="rsyc-modal-close" onclick="closeRSYCModal('joinActivity')">&times;</button>
+        </div>
+        <div class="rsyc-modal-subheader" style="display:flex; justify-content:center; gap:0.5rem; padding:0.5rem 1rem; border-bottom:1px solid #ddd;">
+            ${searchURL ? `<button class="btn btn-outline-primary" id="joinActivitySearchBtn" onclick="window.open('${this.escapeHTML(searchURL)}','_blank')" style="border-color:#d3d3d3; color:#d3d3d3;">
+                <i class="bi bi-search me-2"></i>Search Activities
+            </button>` : `
+            <button class="btn btn-outline-primary" id="joinActivitySearchBtn" style="border-color:#d3d3d3; color:#d3d3d3;">
+                <i class="bi bi-search me-2"></i>Search Activities
+            </button>`}
+            <button class="btn btn-outline-primary" onclick="printJoinActivityModal()" style="border-color:#d3d3d3; color:#d3d3d3;">
+                <i class="bi bi-printer me-2"></i>Print / Save as PDF
+            </button>
         </div>
 
         <div class="rsyc-modal-body">
@@ -6644,11 +6899,12 @@ function showRSYCModal(type, centerName) {
         if (type === 'joinCenter') {
             // Get the registration URL from the button that triggered this
             const joinButton = document.querySelector('[data-registration-url]');
-            const registrationURL = joinButton ? joinButton.getAttribute('data-registration-url') : 'https://online.traxsolutions.com/southernusasalvationarmy/winston-salem#/dashboard';
+            // Use the JSON-provided registration URL if the button exists; otherwise leave empty.
+            const registrationURL = joinButton ? joinButton.getAttribute('data-registration-url') : '';
             
-            // Set the Join button URL
+            // Set the Join button URL only when we have one
             const joinBtn = document.getElementById('joinCenterJoinBtn');
-            if (joinBtn) {
+            if (joinBtn && registrationURL) {
                 joinBtn.onclick = function() {
                     window.open(registrationURL, '_blank');
                 };

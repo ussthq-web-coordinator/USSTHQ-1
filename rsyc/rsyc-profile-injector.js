@@ -431,7 +431,8 @@
                 console.log('[RSYC] generateJoinCenterModal exists:', typeof this.generateJoinCenterModal);
                 
                 if (this.generateAuditModal) {
-                    modals += '\n\n' + this.generateAuditModal(enabledSections);
+                    // pass whatever center/ photo data may exist on this object (usually none)
+                    modals += '\n\n' + this.generateAuditModal(enabledSections, { centers: this.centers || [], photos: this.photos || [] });
                     console.log('[RSYC] Audit modal added to hotfixed profile');
                 }
                 if (this.generateJoinCenterModal) {

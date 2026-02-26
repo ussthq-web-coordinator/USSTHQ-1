@@ -921,7 +921,10 @@ class RSYCGeneratorV2 {
             
             // Add audit modal
             if (this.templateEngine.generateAuditModal) {
-                modals += '\n\n' + this.templateEngine.generateAuditModal(selectedSections);
+                // When previewing a single center we only have centerData here
+                const centers = [centerData];
+                const photos = (centerData.photos && Array.isArray(centerData.photos)) ? centerData.photos : [];
+                modals += '\n\n' + this.templateEngine.generateAuditModal(selectedSections, { centers, photos });
                 console.log('[RSYC Generator V2] Audit modal added');
             }
             
@@ -3562,7 +3565,7 @@ class RSYCGeneratorV2 {
                                         <a href="https://sauss.sharepoint.com/sites/THQITDWeb/Lists/RSYCDivisionPermissions/AllItems.aspx?env=WebViewList" target="_blank" style="color:#0078d4; font-size:11px; text-decoration:underline;">View Division Profile Permissions</a>
                                     </div>
                                 </div>
-                                <p style="font-size:11px; color:#888; margin-top:12px;">Need Help? Email <a href="mailto:THQ.Web.SocialMedia@uss.salvationarmy.org" style="color:#0078d4;">Shared THQ Web and Social Media</a></p>
+                                <p style="font-size:11px; color:#888; margin-top:12px;">Need Help? Email <a href="mailto:THQ.Web.SocialMedia@uss.salvationarmy.org" target="_blank" style="color:#0078d4;">Shared THQ Web and Social Media</a></p>
                             </div>
                         </div>
                     </div>
@@ -5480,6 +5483,30 @@ class RSYCGeneratorV2 {
             });
         };
 
+        // duplicate button for "Copy Center Photos 2" in case a second table variant is needed
+        const copyPhotos2Btn = document.createElement('button');
+        copyPhotos2Btn.className = 'btn btn-success btn-sm';
+        copyPhotos2Btn.innerHTML = '<i class="bi bi-camera"></i> Copy Center Photos 2';
+        copyPhotos2Btn.onclick = () => {
+            let reportHtml;
+            const previewEl = document.getElementById('rsyc-photos-preview');
+            if (previewEl) {
+                reportHtml = previewEl.innerHTML;
+            } else {
+                // fallback to same generator; can be updated later if a separate method is added
+                reportHtml = this.generateEmailAuditPhotos({
+                    centers,
+                    photos
+                });
+            }
+            const blob = new Blob([reportHtml], { type: 'text/html' });
+            const data = [new ClipboardItem({ 'text/html': blob })];
+            navigator.clipboard.write(data).then(() => {
+                copyPhotos2Btn.textContent = '✓ Copied!';
+                setTimeout(() => copyPhotos2Btn.innerHTML = '<i class="bi bi-camera"></i> Copy Center Photos 2', 2000);
+            });
+        };
+
         const copyStaffTableBtn = document.createElement('button');
         copyStaffTableBtn.className = 'btn btn-success btn-sm';
         copyStaffTableBtn.innerHTML = '<i class="bi bi-people"></i> Copy Staff Table';
@@ -5691,6 +5718,7 @@ class RSYCGeneratorV2 {
         btnRow.appendChild(copyStoriesBtn);
         btnRow.appendChild(copyInfoPagesBtn);
         btnRow.appendChild(copyPhotosBtn);
+        btnRow.appendChild(copyPhotos2Btn);
         btnRow.appendChild(copyStaffTableBtn);
         btnRow.appendChild(copyEditorsBtn);
         btnRow.appendChild(copyDocsBtn);
