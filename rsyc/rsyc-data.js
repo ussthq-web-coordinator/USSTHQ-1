@@ -734,6 +734,20 @@ class RSYCDataLoader {
                 programRunsIn: (schedule.ProgramRunsIn || []).map(m => m.Value),
                 // Extract .Value from RegistrationTypicallyOpensin array
                 registrationOpensIn: (schedule.RegistrationTypicallyOpensin || []).map(m => m.Value),
+                // Button and attachment fields
+                primaryButtonText: getVal(schedule.PrimaryButtonText) || '',
+                primaryButtonUrl: (() => {
+                    // Try explicit URL field first
+                    let url = getVal(schedule.PrimaryButtonLink) || getVal(schedule.PrimaryButtonURL) || getVal(schedule.URLPrimaryButton) || '';
+                    // If not found and PrimaryButtonText is a URL, use that as fallback
+                    if (!url && getVal(schedule.PrimaryButtonText) && String(getVal(schedule.PrimaryButtonText)).startsWith('http')) {
+                        url = getVal(schedule.PrimaryButtonText);
+                    }
+                    return url;
+                })(),
+                secondaryButtonText: getVal(schedule.SecondaryButtonText) || '',
+                secondaryButtonUrl: getVal(schedule.SecondaryButtonLink) || getVal(schedule.SecondaryButtonURL) || getVal(schedule.URLSecondaryButton) || '',
+                attachmentUrl1: getVal(schedule.URLAttachment1) || getVal(schedule.Attachment1) || '',
                 AllRelatedPrograms: ensureArray(schedule.AllRelatedPrograms).map(p => ({
                     id: p.Id,
                     name: p.Value

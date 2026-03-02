@@ -12,9 +12,11 @@
  * Modal display function - must be globally available
  */
 window.showRSYCModal = function(type, centerName) {
-    console.log('[RSYC] showRSYCModal:', type);
+    console.log('[RSYC] showRSYCModal:', type, centerName);
     const modal = document.getElementById('rsyc-modal-' + type);
     if (modal) {
+        // Store center name so printRSYCModal can retrieve it later
+        if (centerName) modal.dataset.centerName = centerName;
         modal.style.display = 'flex';
         document.body.style.overflow = 'hidden';
     } else {
@@ -2494,13 +2496,15 @@ ${modal}`;
                 const modalType = `schedule-${schedule.id}`;
 
                 const expandableInfo = `
-                    <div class="mt-2" style="display: flex; gap: 0.5rem;">
+                    <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center;">
                         <button class="btn btn-outline-primary rsyc-details-btn-desktop view-all-btn" data-modal="rsyc-modal-${modalType}" style="font-size: 0.7rem; padding: 0.25rem 0.5rem; display: none;" onclick="showRSYCModal('${modalType}', '${this.escapeHTML(center.name || center.Title, true)}')">
                             View Full Details
                         </button>
                         <button class="btn btn-outline-primary rsyc-details-btn-mobile" style="font-size: 0.7rem; padding: 0.25rem 0.5rem; display: none;" onclick="showRSYCModal('${modalType}', '${this.escapeHTML(center.name || center.Title, true)}')">
                             View Full Details
                         </button>
+                        ${schedule.primaryButtonUrl ? `<a class="btn btn-primary" href="${this.escapeHTML(schedule.primaryButtonUrl)}" target="_blank" rel="noopener noreferrer" style="background-color:#00929C; border:none; font-size:0.7rem; padding:0.25rem 0.5rem;">${this.escapeHTML(schedule.primaryButtonText || 'Register')}</a>` : ''}
+                        ${schedule.secondaryButtonUrl ? `<a class="btn btn-outline-primary" href="${this.escapeHTML(schedule.secondaryButtonUrl)}" target="_blank" rel="noopener noreferrer" style="font-size:0.7rem; padding:0.25rem 0.5rem;">${this.escapeHTML(schedule.secondaryButtonText || 'Register')}</a>` : ''}
                     </div>
                 `;
                 
@@ -2512,19 +2516,24 @@ ${modal}`;
 <!-- Modal for Schedule Details -->
 <div id="rsyc-modal-schedule-${schedule.id}" class="rsyc-modal" style="display:none;">
     <div class="rsyc-modal-content">
-        <div class="rsyc-modal-header" style="display:flex; justify-content:space-between; align-items:center;">
-            <h3>What's Happening</h3>
-            <div style="display:flex; gap:0.25rem; align-items:center;">
+        <div class="rsyc-modal-header" style="display:flex; justify-content:space-between; align-items:center; gap:0.5rem;">
+            <h3 style="margin:0;">What's Happening</h3>
+            <div style="display:flex; gap:0.5rem; align-items:center;">
                 <button class="rsyc-modal-print" onclick="printRSYCModal('schedule-${schedule.id}')" style="background:none; border:none; cursor:pointer; font-size:1.1rem; padding:0.4rem; color:#333;" title="Print or Save as PDF"><i class="bi bi-printer"></i></button>
                 <button class="rsyc-modal-close" onclick="closeRSYCModal('schedule-${schedule.id}')" style="font-size:1.5rem; padding:0 0.5rem;">&times;</button>
             </div>
         </div>
+        ${(schedule.primaryButtonUrl || schedule.secondaryButtonUrl || schedule.attachmentUrl1) ? `
+        <div class="rsyc-modal-subheader" style="display:flex; gap:0.5rem; align-items:center; flex-wrap:wrap; padding:0.75rem 1rem; background:#f8f9fa; border-bottom:1px solid #e9ecef;">
+            ${schedule.primaryButtonUrl ? `<a class="btn btn-primary" href="${this.escapeHTML(schedule.primaryButtonUrl)}" target="_blank" rel="noopener noreferrer" style="background-color:#00929C; border:none; font-size:0.85rem; padding:0.4rem 0.8rem;">${this.escapeHTML(schedule.primaryButtonText || 'Register')}</a>` : ''}
+            ${schedule.secondaryButtonUrl ? `<a class="btn btn-outline-primary" href="${this.escapeHTML(schedule.secondaryButtonUrl)}" target="_blank" rel="noopener noreferrer" style="font-size:0.85rem; padding:0.4rem 0.8rem;">${this.escapeHTML(schedule.secondaryButtonText || 'Register')}</a>` : ''}
+            ${schedule.attachmentUrl1 ? `<a class="btn btn-outline-secondary" href="${this.escapeHTML(schedule.attachmentUrl1)}" target="_blank" rel="noopener noreferrer" style="font-size:0.85rem; padding:0.4rem 0.8rem;"><i class="bi bi-file-earmark-pdf me-1"></i>Download</a>` : ''}
+        </div>
+        ` : ''}
         <div class="rsyc-modal-body" style="color:#333;">
             ${schedule.videoEmbedCode ? `
-                <div class="mb-4">
-                    <div class="ratio ratio-16x9" style="border-radius: 12px; overflow: hidden;">
-                        ${schedule.videoEmbedCode}
-                    </div>
+                <div style="margin: 0 0 1rem 0; border-radius: 12px; overflow: hidden;">
+                    ${schedule.videoEmbedCode}
                 </div>
             ` : ''}
             ${schedule.URLImage || schedule.imageUrl ? `
@@ -2535,7 +2544,7 @@ ${modal}`;
             ${schedule.title ? `<h3 class="mb-2" style="color:#333;">${this.escapeHTML(schedule.title)}</h3>` : ''}
 
             ${schedule.subtitle ? `<p class="mb-3" style="color:#666; font-style:italic;">${this.escapeHTML(schedule.subtitle)}</p>` : ''}
-            ${schedule.description ? `<p class="mb-1 rsyc-description">${schedule.description}</p>` : ''}
+            ${schedule.description ? `<div class="mb-1 rsyc-description">${schedule.description}</div>` : ''}
             ${addressText ? `
                 <div class="mb-3 rsyc-event-location" style="background:#f8f9fa; padding:1rem; border-radius:8px; border:1px solid #e0e0e0;">
                     <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:0.75rem;">
@@ -2552,13 +2561,6 @@ ${modal}`;
                 ${eventTimeText ? `<div style="margin-top:0.5rem;"><strong>Time:</strong><br>${this.escapeHTML(eventTimeText)}</div>` : ''}
             </div>` : ''}
             ${schedule.cost ? `<div class="mb-3" style="font-size: 1.1rem; color:#333;"><strong>Cost:</strong><br>${this.escapeHTML(schedule.cost)}</div>` : ''}
-
-            ${(schedule.primaryButtonUrl || schedule.secondaryButtonUrl) ? `
-            <div class="mb-4" style="display:flex; gap:0.5rem; flex-wrap:wrap; align-items:center;">
-                ${schedule.primaryButtonUrl ? `<a class="btn btn-primary" href="${this.escapeHTML(schedule.primaryButtonUrl)}" target="_blank" rel="noopener noreferrer" style="background-color:#00929C; border:none;">${this.escapeHTML(schedule.primaryButtonText || 'Learn More')}</a>` : ''}
-                ${schedule.secondaryButtonUrl ? `<a class="btn btn-outline-primary" href="${this.escapeHTML(schedule.secondaryButtonUrl)}" target="_blank" rel="noopener noreferrer">${this.escapeHTML(schedule.secondaryButtonText || 'More Info')}</a>` : ''}
-            </div>
-            ` : ''}
             
             ${hasContent(schedule.scheduleDisclaimer) ? `<div class="mb-4 rsyc-important-dates" style="background:#fff3cd; padding:1rem; border-radius:6px; border-left:3px solid #ff6b6b; color:#000;"><strong class="rsyc-important-dates-title" style="color:#000;"><i class="bi bi-exclamation-triangle me-2"></i>Important Dates/Closures:</strong><br><div class="mt-2 rsyc-important-dates-body" style="font-size:0.95rem;">${this.escapeHTML(schedule.scheduleDisclaimer)}</div></div>` : ''}
             
@@ -2594,7 +2596,7 @@ ${modal}`;
                 ${hasContent(schedule.openFullDayDates) ? `<div class="col-sm-12 mb-3" style="color:#333;"><strong>Open Full Days:</strong><br>${this.preserveLineBreaks(schedule.openFullDayDates)}</div>` : ''}
                 ${(() => {
                     // output any extra simple string fields not already rendered above
-                    const known = ['id','title','subtitle','description','videoEmbedCode','URLImage','imageUrl','URLThumbnailImage','thumbnailUrl','centerName','startDate','endDate','scheduleDays','scheduleTime','registrationFee','ageRange','scheduleDisclaimer','daysText','timeText','months','registrationMonths','registrationDeadline','location','cost','frequency','transportationFeeandDetails','closedDates','openHalfDayDates','openFullDayDates','orientationDetails','whatToBring','materialsProvided','contacts','contactInfo','address','city','state','postalCode','contactPhoneNumber','status','timezone','formattedDate'];
+                    const known = ['id','title','subtitle','description','videoEmbedCode','URLImage','imageUrl','URLThumbnailImage','thumbnailUrl','centerName','startDate','endDate','scheduleDays','scheduleTime','registrationFee','ageRange','scheduleDisclaimer','daysText','timeText','months','registrationMonths','registrationDeadline','location','cost','frequency','transportationFeeandDetails','closedDates','openHalfDayDates','openFullDayDates','orientationDetails','whatToBring','materialsProvided','contacts','contactInfo','address','city','state','postalCode','contactPhoneNumber','status','timezone','formattedDate','primaryButtonText','primaryButtonUrl','secondaryButtonText','secondaryButtonUrl','attachmentUrl1'];
                     const extras = Object.keys(schedule).filter(k => !known.includes(k) && schedule[k] && typeof schedule[k] === 'string').map(k => `
                         <div class="col-sm-12 mb-2" style="color:#333;"><strong>${this.escapeHTML(k)}:</strong> ${this.escapeHTML(schedule[k])}</div>
                     `);
@@ -2708,9 +2710,7 @@ ${modal}`;
                         ` : ''}
                         ${schedule.title ? `<h3 class="mb-2" style="color:#333;">${this.escapeHTML(schedule.title)}</h3>` : ''}
                         ${schedule.subtitle ? `<p class="mb-3" style="color:#666; font-style:italic;">${this.escapeHTML(schedule.subtitle)}</p>` : ''}
-                        ${schedule.description ? `<p class="mb-1 rsyc-description">${schedule.description}</p>` : ''}
-                        
-                        ${hasContent(schedule.scheduleDisclaimer) ? `<div class="mb-4" style="background:#fff3cd; padding:1rem; border-radius:6px; border-left:3px solid #ff6b6b; color:#000;"><strong style="color:#000;"><i class="bi bi-exclamation-triangle me-2"></i>Important Dates/Closures:</strong><br><div class="mt-2" style="font-size:0.95rem;">${this.escapeHTML(schedule.scheduleDisclaimer)}</div></div>` : ''}
+                        ${schedule.description ? `<div class="mb-1 rsyc-description">${schedule.description}</div>` : ''}
                         
                         <div class="row">
                             ${hasContent(schedule.ageRange) ? `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Age Range:</strong><br>${this.escapeHTML(schedule.ageRange)}</div>` : ''}
@@ -3004,9 +3004,13 @@ ${modal}`;
                                 ${dateTimeDisplay ? `<div class="text-wrap small">${dateTimeDisplay}</div>` : '<div class="text-muted small">No date/time information available</div>'}
                             </td>
                             <td style="width: 10%;">
-                                <button class="btn btn-sm btn-outline-primary" onclick="showRSYCModal('schedule-${schedule.id}', '${this.escapeHTML(center.name || center.Title, true)}')">
-                                    View Details
-                                </button>
+                                <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center;">
+                                    <button class="btn btn-sm btn-outline-primary" onclick="showRSYCModal('schedule-${schedule.id}', '${this.escapeHTML(center.name || center.Title, true)}')" style="font-size: 0.7rem; padding: 0.25rem 0.5rem; line-height: 1;">
+                                        View Details
+                                    </button>
+                                    ${schedule.primaryButtonUrl ? `<a class="btn btn-sm btn-primary" href="${this.escapeHTML(schedule.primaryButtonUrl)}" target="_blank" rel="noopener noreferrer" style="background-color:#00929C; border:none; font-size:0.7rem; padding:0.25rem 0.5rem;">${this.escapeHTML(schedule.primaryButtonText || 'Register')}</a>` : ''}
+                                    ${schedule.secondaryButtonUrl ? `<a class="btn btn-sm btn-outline-primary" href="${this.escapeHTML(schedule.secondaryButtonUrl)}" target="_blank" rel="noopener noreferrer" style="font-size:0.7rem; padding:0.25rem 0.5rem;">${this.escapeHTML(schedule.secondaryButtonText || 'Register')}</a>` : ''}
+                                </div>
                             </td>
                         </tr>`;
                     }).join('')}
@@ -5539,15 +5543,22 @@ async function printRSYCModal(modalId) {
 
     // Extract center name from modal - look for specific center name patterns
     let centerName = '';
+
+    // 0. Fastest path: stored by showRSYCModal via dataset
+    if (modal.dataset && modal.dataset.centerName) {
+        centerName = modal.dataset.centerName;
+    }
     
     // Try to find center name in various ways
     // 1. Look for center name in the modal call (passed as parameter)
-    const modalCall = modal.querySelector('[onclick*="showRSYCModal"]');
-    if (modalCall) {
-        const onclickAttr = modalCall.getAttribute('onclick');
-        const centerMatch = onclickAttr.match(/showRSYCModal\([^,]+,\s*['"]([^'"]+)['"]\)/);
-        if (centerMatch && centerMatch[1]) {
-            centerName = centerMatch[1];
+    if (!centerName) {
+        const modalCall = modal.querySelector('[onclick*="showRSYCModal"]');
+        if (modalCall) {
+            const onclickAttr = modalCall.getAttribute('onclick');
+            const centerMatch = onclickAttr.match(/showRSYCModal\([^,]+,\s*['"]([^'"]+)['"]\)/);
+            if (centerMatch && centerMatch[1]) {
+                centerName = centerMatch[1];
+            }
         }
     }
     
@@ -5567,8 +5578,14 @@ async function printRSYCModal(modalId) {
     }
     
     // 3. Fallback - try to get from global data if available
-    if (!centerName && window.rsycApp && window.rsycApp.currentCenter) {
-        centerName = window.rsycApp.currentCenter.name || window.rsycApp.currentCenter.Title || '';
+    if (!centerName) {
+        centerName = window.rsycGen?.currentCenter?.name
+            || window.rsycGen?.currentCenter?.Title
+            || window.rsycApp?.currentCenter?.name
+            || window.rsycApp?.currentCenter?.Title
+            || window.currentCenter?.name
+            || window.currentCenter?.Title
+            || '';
     }
     
     // Create print window title
@@ -5680,66 +5697,7 @@ async function printRSYCModal(modalId) {
         const bodyText = modalBody.textContent || '';
         const hasScheduleFields = bodyText.includes('Days:') || bodyText.includes('Time:') || bodyText.includes('Program Runs In:');
         
-        // If no schedule fields found, try to extract from event data and add them
-        if (!hasScheduleFields) {
-            // Look for event date/time information and convert to schedule format
-            const allElements = modalBody.querySelectorAll('*');
-            let eventDateEl = null;
-            let eventTimeEl = null;
-            
-            allElements.forEach(el => {
-                const text = el.textContent || '';
-                if (text.includes('Date:') && !eventDateEl) {
-                    eventDateEl = el;
-                }
-                if (text.includes('Time:') && !eventTimeEl) {
-                    eventTimeEl = el;
-                }
-            });
-            
-            if (eventDateEl || eventTimeEl) {
-                // Create schedule fields from event information
-                const scheduleInfo = document.createElement('div');
-                scheduleInfo.className = 'row';
-                scheduleInfo.style.cssText = 'margin-top: 12pt;';
-                
-                let scheduleHTML = '';
-                
-                // Extract date and convert to Days if possible
-                if (eventDateEl) {
-                    const dateText = eventDateEl.textContent.replace('Date:', '').trim();
-                    // Try to determine day of week from date
-                    try {
-                        const dateMatch = dateText.match(/\d{4}[-/]\d{1,2}[-/]\d{1,2}/);
-                        if (dateMatch) {
-                            const eventDate = new Date(dateMatch[0]);
-                            const dayOfWeek = eventDate.toLocaleDateString('en-US', { weekday: 'long' });
-                            scheduleHTML += `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Days:</strong><br>${dayOfWeek}</div>`;
-                        }
-                    } catch (e) {
-                        // If can't parse date, use original text
-                        scheduleHTML += `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Days:</strong><br>${dateText}</div>`;
-                    }
-                }
-                
-                // Extract time
-                if (eventTimeEl) {
-                    const timeText = eventTimeEl.textContent.replace('Time:', '').trim();
-                    scheduleHTML += `<div class="col-sm-12 col-md-6 mb-3" style="color:#333;"><strong>Time:</strong><br>${timeText}</div>`;
-                }
-                
-                if (scheduleHTML) {
-                    scheduleInfo.innerHTML = scheduleHTML;
-                    // Insert before the first existing row or at the end
-                    const existingRow = modalBody.querySelector('.row');
-                    if (existingRow) {
-                        existingRow.parentNode.insertBefore(scheduleInfo, existingRow);
-                    } else {
-                        modalBody.appendChild(scheduleInfo);
-                    }
-                }
-            }
-        }
+        // Schedule fields handling removed for print - don't add extra rows
     }
 
     // Add the same image from the modal to the print content
@@ -5765,9 +5723,7 @@ async function printRSYCModal(modalId) {
         const imageSrc = mainImage.src || mainImage.getAttribute('src');
         const imageAlt = mainImage.alt || '';
         mainImageHTML = `
-        <div class="main-image-container" style="text-align: center; margin-bottom: 20pt; margin-top: 10pt;">
-            <img src="${imageSrc}" alt="${imageAlt}" style="max-width: 100%; max-height: 200pt; object-fit: contain; border-radius: 8pt;" />
-        </div>`;
+        <img src="${imageSrc}" alt="${imageAlt}" style="float: right; width: 140pt; max-height: 160pt; object-fit: contain; border-radius: 8pt; margin: 0 0 4pt 6pt;" />`;
     }
 
     // Clean up cloned content
@@ -5782,10 +5738,10 @@ async function printRSYCModal(modalId) {
         if (resp.ok) {
             logoSvgHtml = await resp.text();
         } else {
-            logoSvgHtml = `<img src="${logoUrl}" style="height:auto; width:220px; display:block;" />`;
+            logoSvgHtml = `<img src="${logoUrl}" style="height:auto; width:160px; display:block;" />`;
         }
     } catch (e) {
-        logoSvgHtml = `<img src="${logoUrl}" style="height:auto; width:220px; display:block;" />`;
+        logoSvgHtml = `<img src="${logoUrl}" style="height:auto; width:160px; display:block;" />`;
     }
 
     const printWindow = /Android/i.test(navigator.userAgent) ? null : window.open('', '', 'height=900,width=1200');
@@ -5796,17 +5752,44 @@ async function printRSYCModal(modalId) {
     
     const hideRedundantRule = `
         /* Hide redundant titles already in header, but keep description */
-        .rsyc-modal-body > div:first-of-type:not(.rsyc-event-location):not(.rsyc-important-dates):not(.rsyc-transportation),
+        .rsyc-modal-body > div:first-of-type:not(.rsyc-event-location):not(.rsyc-important-dates):not(.rsyc-transportation):not(.rsyc-description),
         .rsyc-modal-body > h3:first-of-type { display: none !important; }
         
         /* Ensure description is always visible with small font and proper layout */
         .rsyc-description { 
             display: block !important; 
             font-size: 7pt !important; 
-            line-height: 1.2 !important;
-            margin-bottom: 8pt !important;
-            margin-top: 8pt !important;
+            line-height: 1.4 !important;
+            margin-bottom: 4pt !important;
+            margin-top: 2pt !important;
             text-align: justify !important;
+        }
+        /* Only block-level children get paragraph spacing; inline elements stay inline */
+        .rsyc-description p,
+        .rsyc-description div {
+            font-size: 7pt !important;
+            line-height: 1.4 !important;
+            margin-top: 3pt !important;
+            margin-bottom: 0 !important;
+            text-align: justify !important;
+        }
+        .rsyc-description p:first-child,
+        .rsyc-description div:first-child { margin-top: 0 !important; }
+        .rsyc-description strong, .rsyc-description b {
+            font-size: 7pt !important;
+            font-weight: 700 !important;
+        }
+        .rsyc-description a { font-size: 7pt !important; }
+        .rsyc-description ul, .rsyc-description ol {
+            margin-top: 2pt !important;
+            margin-bottom: 2pt !important;
+            padding-left: 10pt !important;
+        }
+        .rsyc-description li {
+            font-size: 7pt !important;
+            line-height: 1.4 !important;
+            margin-top: 1pt !important;
+            margin-bottom: 0 !important;
         }
         `;
 
@@ -5842,7 +5825,7 @@ async function printRSYCModal(modalId) {
         .rsyc-modal-body p[style*="font-style:italic"] {
             overflow: hidden; /* Creates block formatting context */
             zoom: 1; /* IE6/7 hasLayout */
-            margin-bottom: 8pt !important;
+            margin-bottom: 3pt !important;
         }
 
         /* Ensure all text content flows around floated image */
@@ -5863,6 +5846,7 @@ async function printRSYCModal(modalId) {
 <head>
     <meta charset="UTF-8">
     <title>${printTitle}</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
     <style>
         :root {
             --rsyc-teal: #20B3A8;
@@ -5891,17 +5875,18 @@ async function printRSYCModal(modalId) {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 15pt;
+            margin-bottom: 6pt;
             border-bottom: 1.5pt solid var(--rsyc-teal);
-            padding-bottom: 10pt;
+            padding-bottom: 3pt;
         }
 
         .header-logo { width: 160pt; flex: 0 0 160pt; }
         .header-logo svg, .header-logo img { width: 100%; height: auto; display: block; }
 
         .header-text { text-align: left; }
-        .header-text h1 { color: var(--rsyc-teal); font-size: 16pt; margin-bottom: 2pt; }
-        .header-text p { font-size: 14pt; color: #666; font-style: italic; font-weight: 600; }
+        .header-text h1 { color: var(--rsyc-teal); font-size: 14pt; margin-bottom: 0pt; }
+        .header-text p { font-size: 12pt; color: #666; font-style: italic; font-weight: 600; }
+        .center-name { display: block; font-size: 11pt; color: #555; font-style: italic; font-weight: 600; margin-top: 2pt; }
 
         /* BODY CONTENT */
         .rsyc-modal-body { width: 100%; }
@@ -5918,13 +5903,13 @@ async function printRSYCModal(modalId) {
 
         .rsyc-modal-body > div > img:not([alt="Red Shield Youth Centers Logo"]) {
             float: right;
-            width: 180pt !important;
-            max-width: 35% !important;
+            width: 140pt !important;
+            max-width: 30% !important;
             height: auto !important;
-            max-height: 200pt !important;
+            max-height: 160pt !important;
             object-fit: contain !important;
             border-radius: 6pt !important;
-            margin: 0 0 10pt 12pt !important;
+            margin: 0 0 4pt 6pt !important;
             display: block !important;
         }
 
@@ -5935,10 +5920,37 @@ async function printRSYCModal(modalId) {
         .rsyc-description { 
             display: block !important; 
             font-size: 7pt !important; 
-            line-height: 1.2 !important;
-            margin-bottom: 8pt !important;
-            margin-top: 8pt !important;
+            line-height: 1.4 !important;
+            margin-bottom: 4pt !important;
+            margin-top: 2pt !important;
             text-align: justify !important;
+        }
+        /* Only block-level children get paragraph spacing; inline elements stay inline */
+        .rsyc-description p,
+        .rsyc-description div {
+            font-size: 7pt !important;
+            line-height: 1.4 !important;
+            margin-top: 3pt !important;
+            margin-bottom: 0 !important;
+            text-align: justify !important;
+        }
+        .rsyc-description p:first-child,
+        .rsyc-description div:first-child { margin-top: 0 !important; }
+        .rsyc-description strong, .rsyc-description b {
+            font-size: 7pt !important;
+            font-weight: 700 !important;
+        }
+        .rsyc-description a { font-size: 7pt !important; }
+        .rsyc-description ul, .rsyc-description ol {
+            margin-top: 2pt !important;
+            margin-bottom: 2pt !important;
+            padding-left: 10pt !important;
+        }
+        .rsyc-description li {
+            font-size: 7pt !important;
+            line-height: 1.4 !important;
+            margin-top: 1pt !important;
+            margin-bottom: 0 !important;
         }
 
         /* When image is present, make description flow around it */
@@ -5951,83 +5963,158 @@ async function printRSYCModal(modalId) {
         .rsyc-modal-body:not(:has(img:not([alt="Red Shield Youth Centers Logo"]))) .rsyc-description {
             text-align: center !important;
             max-width: 100% !important;
-            margin: 8pt auto !important;
+            margin: 4pt auto !important;
         }
 
         .rsyc-modal-body h3 { 
             color: var(--rsyc-navy); 
-            font-size: 12pt; 
-            margin: 10pt 0 8pt 0; 
+            font-size: 11pt; 
+            margin: 5pt 0 4pt 0; 
             border-bottom: 1px solid #eee;
-            padding-bottom: 4pt;
+            padding-bottom: 2pt;
         }
 
-        /* Detail Boxes (Important Dates, etc) */
+        /* Detail Boxes — preserve modal colors by only controlling spacing (backgrounds come from inline styles) */
         .rsyc-important-dates {
-            background: #f8fcfb !important;
-            border: 1px solid #e0f2f1 !important;
             border-radius: 4pt;
-            padding: 8pt !important;
-            margin-bottom: 10pt !important;
+            padding: 5pt !important;
+            margin-bottom: 4pt !important;
+        }
+
+        /* Transportation card */
+        .rsyc-transportation {
+            padding: 5pt !important;
+            margin-bottom: 4pt !important;
+        }
+
+        /* What to Bring card */
+        div[style*="background:#f0f8ff"] {
+            padding: 5pt !important;
+            margin-bottom: 4pt !important;
+        }
+
+        /* Closed Dates card */
+        div[style*="background:#ffe6e6"] {
+            padding: 5pt !important;
+            margin-bottom: 4pt !important;
         }
 
         .rsyc-orientation {
-            background: #f8fcfb !important;
-            border: 1px solid #e0f2f1 !important;
             border-radius: 4pt;
-            padding: 8pt !important;
-            margin-bottom: 0 !important; /* Remove margin below orientation */
+            padding: 5pt !important;
+            margin-bottom: 4pt !important;
+        }
+
+        /* Orientation Details card */
+        div[style*="background:#fffacd"] {
+            padding: 5pt !important;
+            margin-bottom: 4pt !important;
+        }
+
+        /* Point of Contact card */
+        div[style*="background:#f0f7f7"] {
+            padding: 5pt !important;
+            margin-bottom: 4pt !important;
         }
 
         .rsyc-contacts {
-            background: #f8fcfb !important;
-            border: 1px solid #e0f2f1 !important;
-            border-radius: 4pt;
-            padding: 8pt !important;
-            margin-top: 8pt !important; /* Small margin above contact container */
-            margin-bottom: 10pt !important;
+            padding: 5pt !important;
+            margin-top: 2pt !important;
+            margin-bottom: 4pt !important;
         }
 
         .rsyc-important-dates-title, .rsyc-orientation-title, .rsyc-contacts-title {
             color: var(--rsyc-teal) !important;
             font-weight: 700 !important;
-            font-size: 10pt !important;
-            margin-bottom: 6pt !important;
+            font-size: 9pt !important;
+            margin-bottom: 3pt !important;
             text-transform: uppercase;
         }
 
         .rsyc-important-dates-body, .rsyc-orientation-body {
-            font-size: 8.5pt !important;
-            line-height: 1.3 !important;
+            font-size: 8pt !important;
+            line-height: 1.2 !important;
         }
 
-        .rsyc-transportation-value {
-            font-size: 8.5pt !important;
-            line-height: 1.3 !important;
+        .rsyc-transportation-value,
+        .rsyc-transportation-value * {
+            font-size: 7pt !important;
+            line-height: 1.2 !important;
         }
 
-        /* POINT OF CONTACT - Compact Styling */
-        .rsyc-contact-item { margin-bottom: 6pt !important; padding: 8pt !important; }
-        .rsyc-contact-name { font-size: 9.5pt !important; font-weight: 700 !important; color: #000 !important; }
-        .rsyc-contact-job { font-size: 8.5pt !important; color: #444 !important; font-weight: 500 !important; margin-bottom: 1pt !important; }
-        .rsyc-contact-phone, .rsyc-contact-email { font-size: 8.5pt !important; color: #555 !important; line-height: 1.2 !important; }
-        
-        /* Point of Contact container with padding and margin */
-        .rsyc-contacts { padding: 12pt !important; margin-bottom: 15pt !important; }
+        /* What to Bring card body content */
+        div[style*="background:#f0f8ff"] .mt-2,
+        div[style*="background:#f0f8ff"] .mt-2 * {
+            font-size: 7pt !important;
+            line-height: 1.2 !important;
+        }
+
+        /* Orientation Details card body content */
+        div[style*="background:#fffacd"] .mt-2,
+        div[style*="background:#fffacd"] .mt-2 * {
+            font-size: 7pt !important;
+            line-height: 1.2 !important;
+        }
 
         /* Normalize User Content */
-        p, li { font-size: 8.5pt !important; margin-bottom: 6pt !important; }
-        strong { font-weight: 600; color: #000; }
+        p, li { font-size: 7pt !important; margin-bottom: 1pt !important; margin-top: 0 !important; }
+        strong { font-weight: 600; color: #000; font-size: 7pt !important; }
         
-        .row { display: flex; flex-wrap: wrap; margin-left: -5pt; margin-right: -5pt; }
-        .col-sm-12 { width: 100% !important; flex: 0 0 100% !important; padding: 0 5pt !important; margin-bottom: 10pt !important; box-sizing: border-box !important; }
-        .col-md-6 { width: 50% !important; flex: 0 0 50% !important; padding: 0 5pt !important; margin-bottom: 10pt !important; box-sizing: border-box !important; }
+        .row { display: flex; flex-wrap: wrap; margin-left: -3pt; margin-right: -3pt; }
+        .col-sm-12 { width: 100% !important; flex: 0 0 100% !important; padding: 0 3pt !important; margin-bottom: 3pt !important; box-sizing: border-box !important; font-size: 7pt !important; }
+        .col-sm-12 *, .rsyc-modal-body > p, .rsyc-modal-body > p * { font-size: 7pt !important; }
+        .col-md-6 { width: 50% !important; flex: 0 0 50% !important; padding: 0 3pt !important; margin-bottom: 3pt !important; box-sizing: border-box !important; font-size: 7pt !important; }
+        .col-md-6 * { font-size: 7pt !important; }
+        /* Icon sizes match body text */
+        .col-sm-12 i.bi, .col-md-6 i.bi { font-size: 7pt !important; display: inline-block !important; }
+        /* Bootstrap utility classes needed for print */
+        .d-flex { display: flex !important; }
+        .align-items-start { align-items: flex-start !important; }
+        .align-items-center { align-items: center !important; }
+        .fw-bold { font-weight: 700 !important; }
+        .me-1 { margin-right: 2pt !important; }
+        .me-2 { margin-right: 3pt !important; }
+        .me-3 { margin-right: 4pt !important; }
+        .mt-1 { margin-top: 1pt !important; }
+        .mt-2 { margin-top: 2pt !important; }
+        /* Related Programs section */
+        div[style*="background:#f5f5f5"] { padding: 5pt !important; margin-bottom: 4pt !important; border-radius: 4pt; }
+        div[style*="background:#f5f5f5"] strong { font-size: 7pt !important; font-weight: 700 !important; color: #333 !important; }
+        div[style*="background:#f5f5f5"] .fw-bold { font-size: 7pt !important; font-weight: 700 !important; color: #333 !important; }
+        div[style*="background:#f5f5f5"] .text-muted { font-size: 6.5pt !important; color: #666 !important; }
+        div[style*="background:#f5f5f5"] i.bi { font-size: 7pt !important; color: #20B3A8 !important; flex-shrink: 0; }
+
+        /* POINT OF CONTACT - Compact Styling (must come after col-* rules to override wildcard) */
+        .rsyc-contact-item { margin-bottom: 2pt !important; padding: 3pt !important; }
+        .rsyc-contact-name { font-size: 8pt !important; font-weight: 700 !important; color: #000 !important; }
+        .rsyc-contact-job { font-size: 7pt !important; color: #444 !important; font-weight: 500 !important; margin-bottom: 0 !important; }
+        .rsyc-contact-phone, .rsyc-contact-email { font-size: 7pt !important; color: #555 !important; line-height: 1.2 !important; }
+        
+        /* Point of Contact container with padding and margin */
+        .rsyc-contacts { padding: 5pt !important; margin-bottom: 4pt !important; }
+
+        /* Restore padding for colored cards (must come after col-* rules which strip padding) */
+        .rsyc-transportation,
+        div[style*="background:#fff9ea"],
+        div[style*="background:#f0f8ff"],
+        div[style*="background:#fffacd"],
+        div[style*="background:#ffe6e6"],
+        div[style*="background:#fff3cd"],
+        div[style*="background:#f0f7f7"] {
+            padding: 5pt !important;
+            margin-bottom: 4pt !important;
+        }
 
         /* Hide UI elements */
-        .rsyc-modal-close, .rsyc-modal-print, .rsyc-modal-actions, .btn { display: none !important; }
+        .rsyc-modal-close, .rsyc-modal-print, .rsyc-modal-actions, .rsyc-modal-subheader, .rsyc-modal-header, .btn { display: none !important; }
+
+        @page {
+            size: letter portrait;
+            margin: 0.4in;
+        }
 
         @media print {
-            body { margin: 0.4in; }
+            body { margin: 0; }
         }
 
         .date-stamp {
@@ -6055,10 +6142,24 @@ async function printRSYCModal(modalId) {
         ${printContent.innerHTML}
     </main>
 
-    <footer style="margin-top: 40pt; padding-top: 15pt; border-top: 1px solid #eee; text-align: center; font-size: 10pt; color: #777;">
+    <footer style="margin-top: 10pt; padding-top: 5pt; border-top: 1px solid #eee; text-align: center; font-size: 10pt; color: #777;">
         <p>Learn more about exciting activities and our updated contact information at <strong>www.redshieldyouth.org</strong></p>
     </footer>
     <div class="date-stamp">Printed on ${printDate}</div>
+    <script>
+        window.addEventListener('load', function () {
+            // Auto-scale body to fit one page if content is taller than the printable area.
+            // Letter at 96 DPI = 1056px tall; subtract 0.2in (19px) total vertical @page margin.
+            var pageH = 11 * 96 - 0.2 * 96;
+            var contentH = document.body.scrollHeight;
+            if (contentH > pageH) {
+                var scale = pageH / contentH;
+                document.body.style.zoom = scale.toFixed(4);
+            }
+            window.print();
+            setTimeout(function () { window.close(); }, 500);
+        });
+    <\/script>
 </body>
 </html>`;
 
@@ -6095,11 +6196,7 @@ async function printRSYCModal(modalId) {
             printWindow.document.open();
             printWindow.document.write(htmlContent);
             printWindow.document.close();
-            
-            setTimeout(() => {
-                printWindow.print();
-                setTimeout(() => { printWindow.close(); }, 500);
-            }, 800);
+            // Auto-scale + print is handled by the embedded <script> in htmlContent
         }
     } catch(e) {
         console.error('Print error:', e);
@@ -6524,20 +6621,20 @@ async function printAllSchedules(cacheKey) {
             margin-bottom: 6pt;
         }
         
-        .header-logo-container { width: 200pt; flex: 0 0 200pt; }
+        .header-logo-container { width: 160pt; flex: 0 0 160pt; }
         .header-logo-container svg, .header-logo-container img { width: 100%; height: auto; display: block; }
         
         .header-text { text-align: left; }
         .header-text h2 { 
             color: var(--rsyc-teal); 
-            font-size: 15pt; 
+            font-size: 12pt; 
             font-weight: 700; 
             margin-bottom: 0px;
             text-transform: uppercase;
         }
         
         .center-name { 
-            font-size: 14pt; 
+            font-size: 11pt; 
             color: #555; 
             font-style: italic;
         }
@@ -6580,19 +6677,19 @@ async function printAllSchedules(cacheKey) {
 
         .schedule-item h4 { 
             color: var(--rsyc-teal); 
-            font-size: 10.5pt; 
+            font-size: 9.5pt; 
             font-weight: 700; 
             margin-bottom: 2pt;
         }
 
         .subtitle { 
-            font-size: 8pt; 
+            font-size: 7.5pt; 
             color: #666; 
             margin-bottom: 3pt; 
             font-style: italic;
         }
 
-        .details { display: grid; grid-template-columns: 1fr 1fr; gap: 4pt; font-size: 7.5pt; }
+        .details { display: grid; grid-template-columns: 1fr 1fr; gap: 4pt; font-size: 7pt; }
         .details strong { color: var(--rsyc-navy); font-weight: 600; }
 
         /* FOOTER */
@@ -6895,6 +6992,8 @@ async function printStoryModal(storyId) {
 function showRSYCModal(type, centerName) {
     const modal = document.getElementById('rsyc-modal-' + type);
     if (modal) {
+        // Store center name so printRSYCModal can retrieve it
+        if (centerName) modal.dataset.centerName = centerName;
         // Special handling for joinCenter modal
         if (type === 'joinCenter') {
             // Get the registration URL from the button that triggered this

@@ -3633,6 +3633,8 @@ class RSYCGeneratorV2 {
             ['Registration is open','registrationIsOpen','When parents can prepare to apply; select months open.'],
             ['Program Runs In','programRunsIn','Months the program is actively running.'],
             ['Address','address','Street address if applicable.'],
+            ['Attachment URL1','attachmentUrl1','Download URL for related PDF/attachment.'],
+            ['Attachment URL1','attachmentUrl1','Download URL for related PDF/attachment.'],
             ['Primary Button Text','primaryButtonText','Text for main call-to-action button.'],
             ['Primary Button Link','primaryButtonLink','URL for main action button.'],
             ['Secondary Button Text','secondaryButtonText','Text for secondary action button.'],
@@ -3753,12 +3755,22 @@ class RSYCGeneratorV2 {
                         s.status ? `Status: ${s.status}` : ''
                     ].filter(Boolean);
 
+                    // build call‑to‑action links if both text and URL provided
+                    let ctaHtml = '';
+                    if (s.primaryButtonText && s.primaryButtonUrl) {
+                        ctaHtml += `<div style="font-size:11px; margin-top:4px;"><a href="${esc(s.primaryButtonUrl)}" target="_blank">${esc(s.primaryButtonText)}</a></div>`;
+                    }
+                    if (s.secondaryButtonText && s.secondaryButtonUrl) {
+                        ctaHtml += `<div style="font-size:11px; margin-top:2px;"><a href="${esc(s.secondaryButtonUrl)}" target="_blank">${esc(s.secondaryButtonText)}</a></div>`;
+                    }
+
                     return `
                         <tr style="border-bottom:1px solid #f3f3f3;">
                             <td style="padding:8px 10px; font-weight:700; font-size:12px;">${esc(s.title || '')}</td>
                             <td style="padding:8px 10px; font-size:12px; color:#555; line-height:1.5;">
                                 <div style="margin-bottom:4px;">${esc(keyFacts)}</div>
                                 ${optional.length ? `<div style=\"font-size:11px; color:#777;\">${optional.map(x => `• ${esc(x)}`).join('<br>')}</div>` : ''}
+                                ${ctaHtml}
                             </td>
                         </tr>
                     `;
@@ -3913,6 +3925,10 @@ class RSYCGeneratorV2 {
             ['Extended Care Times','extendedCareTimes','Details of any extended care options.'],
             ['What to bring','whatToBring','Include what parents should send and what the center provides.'],
             ['Orientation Details','orientationDetails','Is an orientation scheduled? Info parents need before registering.'],
+            ['Primary Button Text','primaryButtonText','Text for main call-to-action button.'],
+            ['Primary Button Link','primaryButtonLink','URL for main action button.'],
+            ['Secondary Button Text','secondaryButtonText','Text for secondary call-to-action button.'],
+            ['Secondary Button Link','secondaryButtonLink','URL for secondary action.'],
             ['Cost','cost','Example: $25 per week/child; Includes breakfast/lunch and snack.'],
             ['Transportation Fee & Details','transportationFeeandDetails','List schools and pick-up/drop-off details.'],
             ['Ages Served','agesServed','Point out whether you serve 5‑year‑olds or other age groups.'],
@@ -3989,12 +4005,22 @@ class RSYCGeneratorV2 {
                         e.subtitle ? `Subtitle: ${e.subtitle}` : ''
                     ].filter(Boolean).join(' • ');
 
+                    // CTA links
+                    let ctaHtml = '';
+                    if (e.primaryButtonText && e.primaryButtonUrl) {
+                        ctaHtml += `<div style="margin-top:4px;"><a href="${esc(e.primaryButtonUrl)}" target="_blank">${esc(e.primaryButtonText)}</a></div>`;
+                    }
+                    if (e.secondaryButtonText && e.secondaryButtonUrl) {
+                        ctaHtml += `<div style="margin-top:2px;"><a href="${esc(e.secondaryButtonUrl)}" target="_blank">${esc(e.secondaryButtonText)}</a></div>`;
+                    }
+
                     return `
                         <tr style="border-bottom:1px solid #f3f3f3;">
                             <td style="padding:8px 10px; font-weight:700; font-size:12px;">${esc(e.title || '')}</td>
                             <td style="padding:8px 10px; font-size:12px; color:#555; line-height:1.5;">
                                 <div style="margin-bottom:4px;">${esc(dateInfo)}</div>
                                 <div style="font-size:11px; color:#777;">${esc(details)}</div>
+                                ${ctaHtml}
                             </td>
                         </tr>
                     `;

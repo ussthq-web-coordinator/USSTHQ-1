@@ -38,7 +38,9 @@ html, body {
     height: 100%;
     margin: 0;
     padding: 0;
+    text-size-adjust: 100%;
     -webkit-text-size-adjust: 100%;
+    -moz-text-size-adjust: 100%;
     -webkit-font-smoothing: antialiased;
 }
 
@@ -164,6 +166,7 @@ body {
     font-weight: 500;
     cursor: pointer;
     transition: all 0.2s;
+    -webkit-user-select: none;
     user-select: none;
 }
 
@@ -201,6 +204,16 @@ body {
     gap: 0.25rem;
     white-space: nowrap;
 }
+
+/* Restore borders on Bootstrap outline buttons overridden by .btn { border: none } */
+.btn-outline-primary  { border: 1px solid #0d6efd !important; }
+.btn-outline-secondary { border: 1px solid #6c757d !important; }
+.btn-outline-success  { border: 1px solid #198754 !important; }
+.btn-outline-danger   { border: 1px solid #dc3545 !important; }
+.btn-outline-warning  { border: 1px solid #ffc107 !important; }
+.btn-outline-info     { border: 1px solid #0dcaf0 !important; }
+.btn-outline-dark     { border: 1px solid #212529 !important; }
+.btn-outline-light    { border: 1px solid #f8f9fa !important; }
 
 .btn:disabled {
     opacity: 0.5;
@@ -762,5 +775,48 @@ body {
             display: none !important;
         }
     }
+/* === Rich Content Text Normalization === */
+/* Description, transportation, what-to-bring, orientation details, and all modal grid
+   fields come from CMS data that may inject varying inline font-sizes. Normalize them. */
+
+/* Narrative/description */
+.rsyc-description,
+.rsyc-description * {
+    font-size: 0.85rem !important;
+}
+
+/* Grid detail fields (Days, Time, Ages, Registration Fee, etc.) and description */
+.rsyc-modal-body p,
+.rsyc-modal-body p *,
+.rsyc-modal-body .col-sm-12,
+.rsyc-modal-body .col-sm-12 *,
+.rsyc-modal-body .col-md-6,
+.rsyc-modal-body .col-md-6 * {
+    font-size: 0.85rem !important;
+}
+
+/* Restore contact section to slightly larger/distinct sizing */
+.rsyc-contact-name { font-size: 1rem !important; }
+.rsyc-contact-job  { font-size: 0.875rem !important; }
+.rsyc-contact-email,
+.rsyc-contact-phone { font-size: 0.85rem !important; }
+
+.rsyc-transportation-value,
+.rsyc-transportation-value * {
+    font-size: 0.85rem !important;
+}
+
+/* What to Bring card body content */
+div[style*="background:#f0f8ff"] .mt-2,
+div[style*="background:#f0f8ff"] .mt-2 * {
+    font-size: 0.85rem !important;
+}
+
+/* Orientation Details card body content */
+div[style*="background:#fffacd"] .mt-2,
+div[style*="background:#fffacd"] .mt-2 * {
+    font-size: 0.85rem !important;
+}
+
 /* === END PRINT STYLING === */
 
