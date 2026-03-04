@@ -1,0 +1,19 @@
+{
+  "name": "migration-report-prep",
+  "version": "1.0.0",
+  "description": "Migration Report Reconciliation Tool – USA Southern Territory Symphony sites",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node src/index.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "cors": "^2.8.6",
+    "dotenv": "^17.3.1",
+    "express": "^5.2.1",
+    "mysql2": "^3.16.2"
+  }
+}
