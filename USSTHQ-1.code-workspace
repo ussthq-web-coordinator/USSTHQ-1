@@ -35,6 +35,7 @@
 				"database": "mountaindew",
 				"username": "root"
 			}
-		]
+		],
+		"liveServer.settings.port": 5502
 	}
 }
