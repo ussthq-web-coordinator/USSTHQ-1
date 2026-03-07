@@ -425,6 +425,7 @@ let qaLookupMaster = {};
 // Top-level runtime state (shared across functions)
 let table, tableData = [], charts = {}, pageCache = {}, qaGroupedCache = {}, masterData;
 let tableResizeListenerAdded = false;
+let currentPageSize = parseInt(localStorage.getItem('dashboardPageSize')) || 20; // Load from localStorage or default to 20
 // Top-level chart handles (Chart.js instances) — initialized to null so renderCharts can safely destroy/create
 let statusChart = null;
 let priorityChart = null;
@@ -450,7 +451,7 @@ function transformCountsForPie(rawCounts, method = 'sqrt'){
 }
 // Application version (edit this value to bump text shown on the page)
 // Keep this value here so you can edit it directly in the JS without relying on DashboardData.json
-const APP_VERSION = '2602.08.1611';
+const APP_VERSION = '2603.07.0402';
 // Also expose to window so you can tweak at runtime in the browser console if needed
 window.APP_VERSION = window.APP_VERSION || APP_VERSION;
 
@@ -2050,7 +2051,7 @@ title: "Title",
 }
     ],
     pagination:"local",
-    paginationSize:20,
+    paginationSize: currentPageSize === 0 ? false : currentPageSize, // Use false for "All" rows
     movableColumns:true
   });
   // Diagnostics: log column fields and ZD value count after table creation
@@ -2278,6 +2279,21 @@ function initFilters(){
   const modTo = document.getElementById('filterModifiedTo');
   if (modFrom) modFrom.addEventListener('change', debounce(updateFiltersAndDashboard, 150));
   if (modTo) modTo.addEventListener('change', debounce(updateFiltersAndDashboard, 150));
+
+  // Wire page size selector
+  const pageSizeSelect = document.getElementById('pageSizeSelect');
+  if (pageSizeSelect) {
+    // Set the initial value from localStorage
+    pageSizeSelect.value = currentPageSize;
+    pageSizeSelect.addEventListener('change', function() {
+      currentPageSize = parseInt(this.value) || 20;
+      // Save to localStorage
+      localStorage.setItem('dashboardPageSize', currentPageSize);
+      // Update the select element to reflect the current value
+      this.value = currentPageSize;
+      updateDashboard();
+    });
+  }
 
   updateFiltersOptions();
 }
