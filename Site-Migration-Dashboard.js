@@ -2050,8 +2050,8 @@ title: "Title",
   }
 }
     ],
-    pagination:"local",
-    paginationSize: currentPageSize === 0 ? false : currentPageSize, // Use false for "All" rows
+    pagination: currentPageSize === 0 ? false : "local",
+    paginationSize: currentPageSize === 0 ? false : currentPageSize,
     movableColumns:true
   });
   // Diagnostics: log column fields and ZD value count after table creation
