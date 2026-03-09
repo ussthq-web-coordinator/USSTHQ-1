@@ -451,7 +451,7 @@ function transformCountsForPie(rawCounts, method = 'sqrt'){
 }
 // Application version (edit this value to bump text shown on the page)
 // Keep this value here so you can edit it directly in the JS without relying on DashboardData.json
-const APP_VERSION = '2603.07.0402';
+const APP_VERSION = '2603.09.0206';
 // Also expose to window so you can tweak at runtime in the browser console if needed
 window.APP_VERSION = window.APP_VERSION || APP_VERSION;
 
@@ -2292,6 +2292,32 @@ function initFilters(){
       // Update the select element to reflect the current value
       this.value = currentPageSize;
       updateDashboard();
+    });
+  }
+
+  // Wire clear filters button
+  const clearFiltersBtn = document.getElementById('clearFiltersBtn');
+  if (clearFiltersBtn) {
+    clearFiltersBtn.addEventListener('click', function() {
+      // Clear all filter dropdowns
+      const filterIds = ["filterDivision", "filterAC", "filterStatus", "filterPageType", "filterPubSym", "filterSymType", "filterPriority", "filterEffort", "filterSiteTitle", "filterZestyUrl"];
+      filterIds.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.value = "";
+      });
+      
+      // Clear date inputs
+      const modFrom = document.getElementById('filterModifiedFrom');
+      const modTo = document.getElementById('filterModifiedTo');
+      if (modFrom) modFrom.value = "";
+      if (modTo) modTo.value = "";
+      
+      // Clear search input if it exists
+      const searchInput = document.getElementById("searchInput");
+      if (searchInput) searchInput.value = "";
+      
+      // Update dashboard with cleared filters
+      updateFiltersAndDashboard();
     });
   }
 
