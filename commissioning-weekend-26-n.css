@@ -1708,7 +1708,6 @@ body .col-sm-8:not(footer .col-sm-8) {
 }
 
 .main-content {
-  max-width: 900px;
   margin-left: auto;
   margin-right: auto;
   margin-top: 0;
