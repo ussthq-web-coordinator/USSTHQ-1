@@ -330,6 +330,15 @@ function updateFiltersAndDashboard(){
   updateDashboard();
 }
 
+// Helper: determine if a row is marked for revamp
+function isRevampPage(row){
+  if (!row) return false;
+  const v = row['Revamp Page'] || row.RevampPage || row.revamp || '';
+  if (v === true) return true;
+  if (!v && v !== 0) return false;
+  try{ const s = String(v).toLowerCase().trim(); return s === 'true' || s === 'yes' || s === '1'; }catch(e){ return false; }
+}
+
 function getFilteredData(){
   const div = getSelectValue("filterDivision");
   const ac = getSelectValue("filterAC");
@@ -438,6 +447,8 @@ let showHidden = false;
 let show100Only = false;
 let hideProgressBars = false; // Track if progress bars should be hidden
 let userToggledHidden = false; // Track if user manually toggled the 0% visibility
+let showOnlyPending = false; // when true, breakdown shows only groups with Pending Migration
+let showOnlyRFMT = false; // when true, breakdown shows only groups with Ready for Migration Tool
 // Helper: transform raw counts to visually compressed values for pie slices
 // while preserving raw counts for tooltips. Methods: 'sqrt' (default), 'log', or 'none'.
 function transformCountsForPie(rawCounts, method = 'sqrt'){
@@ -461,10 +472,16 @@ const statusColors = {
   "Completed": "#28a745",      // green
   "In QA": "#fd7e14",          // orange
   "Needs Info": "#002056",     // navy
+  "Ready for Migration Tool": "#17a2b8", // cyan-ish (1c. RFMT)
   "Pending Migration": "#0D6FB8", // light blue
   "In Progress": "#6f42c1",    // purple
   "THQ Redirect": "#00929C",    // teal
   "Unknown": "#6c757d"         // gray
+};
+
+// Display labels for statuses when shown in UI (keep canonical keys internally)
+const statusDisplay = {
+  "Ready for Migration Tool": "Ready"
 };
 
 // Safe helper to read select values when an element may be missing
@@ -655,21 +672,23 @@ function renderQaAccordion(data){
   // Clear previous per-instance QA details to avoid accumulating duplicates across re-renders
   Object.keys(qaIssueDetailsMap).forEach(k => delete qaIssueDetailsMap[k]);
 
-  const qaRows = Array.isArray(data) ? data.filter(d => d["QA Issues.lookupValue"]) : [];
+  const qaRows = Array.isArray(data) ? data.filter(d => d["QA Issues.lookupValue"] || isRevampPage(d)) : [];
 
+  // Count unique pages affected (by title) so badge shows pages, not rows
+  const uniquePages = new Set((qaRows || []).map(d => (d.Title || d['Site Title'] || 'Untitled Page')));
   const badge = document.getElementById("qaBadge");
-  if (badge) badge.textContent = qaRows.length;
+  if (badge) badge.textContent = uniquePages.size;
 
   // Always update the View All Issues button count, even if 0
   try {
     const viewBtn = document.getElementById('viewAllQaBtn');
     const viewCount = document.getElementById('viewAllQaCount');
-    if (viewCount) viewCount.textContent = qaRows.length || 0;
-    if (viewBtn) viewBtn.style.display = (qaRows.length > 0) ? '' : 'none';
+    if (viewCount) viewCount.textContent = uniquePages.size || 0;
+    if (viewBtn) viewBtn.style.display = (uniquePages.size > 0) ? '' : 'none';
   } catch(e) {}
 
   if(!qaRows.length){
-    container.innerHTML = "<p>No QA Issues found.</p>";
+    container.innerHTML = "<p>No QA Issues or Revamp pages found.</p>";
     return;
   }
 
@@ -740,7 +759,7 @@ function renderQaAccordion(data){
     });
 
     // After building all issues for the page, render one card representing the page
-    if (pageIssueIds.length){
+    if (pageIssueIds.length || isRevampPage(page)){
       const firstIssueId = pageIssueIds[0];
       const uniqueWhys = Array.from(uniqueWhysSet);
       const subtitleBase = uniqueWhys.length ? (uniqueWhys[0].length > 120 ? uniqueWhys[0].slice(0,120) + '…' : uniqueWhys[0]) : '';
@@ -769,8 +788,15 @@ function renderQaAccordion(data){
 
   const footer = document.createElement('div'); footer.className = 'mt-auto pt-1 d-flex justify-content-center align-items-center';
   const btn = document.createElement('button'); btn.className = 'btn btn-sm btn-primary';
-  btn.innerHTML = `View Issues <span class="badge bg-warning qa-badge ms-2">${pageIssueIds.length}</span>`;
-  btn.addEventListener('click', ()=> showQaIssuesModal(firstIssueId));
+  if (pageIssueIds.length) {
+    btn.innerHTML = `View Issues <span class="badge bg-warning qa-badge ms-2">${pageIssueIds.length}</span>`;
+    btn.addEventListener('click', ()=> showQaIssuesModal(firstIssueId));
+  } else {
+    // Revamp-only page: show a Revamp button that opens the page detail modal
+    btn.className = 'btn btn-sm btn-info';
+    btn.innerHTML = `Revamp Needed <span class="badge bg-info text-dark ms-2">Open Record</span>`;
+    btn.addEventListener('click', ()=> showTableModalById(rows[0]._id));
+  }
   footer.appendChild(btn);
 
       titleEl.addEventListener('click', ()=>{ inlineDiv.classList.toggle('show'); });
@@ -795,7 +821,7 @@ function renderQaAccordion(data){
   try{
     const viewBtn = document.getElementById('viewAllQaBtn');
     const viewCount = document.getElementById('viewAllQaCount');
-    if(viewCount) viewCount.textContent = qaRows.length || 0;
+    if(viewCount) viewCount.textContent = uniquePages.size || 0;
     if(viewBtn){
       viewBtn.removeEventListener('click', showAllQaModal);
       viewBtn.addEventListener('click', showAllQaModal);
@@ -1017,21 +1043,38 @@ function showAllQaModal(){
   const issueRows = [];
   (Array.isArray(sourceData) ? sourceData : []).forEach(r => {
     const lookups = (r['QA Issues.lookupValue'] || '').toString().split(';').map(s=>s.trim()).filter(Boolean);
-    if (!lookups.length) return;
-    lookups.forEach(lv => {
-      issueRows.push({
-        ID: r.ID,
-        Title: r.Title || r['Site Title'] || '',
-        'Symphony Site Type': r['Symphony Site Type'] || '',
-        'Page URL': r['Page URL'] || '',
-        'Zesty URL Path Part': r['Zesty URL Path Part'] || '',
-        Status: r.Status || '',
-        Priority: r.Priority || '',
-        'QA Notes': r['QA Notes'] || '',
-        'QA Issue': lv,
-        'Site Title': r['Site Title'] || ''
+    if (!lookups.length) {
+      // If no QA lookup entries but page is marked for revamp, include it as a Revamp row
+      if (isRevampPage(r)) {
+        issueRows.push({
+          ID: r.ID,
+          Title: r.Title || r['Site Title'] || '',
+          'Symphony Site Type': r['Symphony Site Type'] || '',
+          'Page URL': r['Page URL'] || '',
+          'Zesty URL Path Part': r['Zesty URL Path Part'] || '',
+          Status: r.Status || '',
+          Priority: r.Priority || '',
+          'QA Notes': r['QA Notes'] || '',
+          'QA Issue': 'Revamp',
+          'Site Title': r['Site Title'] || ''
+        });
+      }
+    } else {
+      lookups.forEach(lv => {
+        issueRows.push({
+          ID: r.ID,
+          Title: r.Title || r['Site Title'] || '',
+          'Symphony Site Type': r['Symphony Site Type'] || '',
+          'Page URL': r['Page URL'] || '',
+          'Zesty URL Path Part': r['Zesty URL Path Part'] || '',
+          Status: r.Status || '',
+          Priority: r.Priority || '',
+          'QA Notes': r['QA Notes'] || '',
+          'QA Issue': lv,
+          'Site Title': r['Site Title'] || ''
+        });
       });
-    });
+    }
   });
 
   const tabData = issueRows.map(r => ({
@@ -1237,11 +1280,27 @@ function renderCards(){
     })(),
 
     "QA Issues": (() => {
-      const total = filtered.filter(d => d["QA Issues.lookupValue"]).length;
-      const high = filtered.filter(d => d["QA Issues.lookupValue"] && d.Priority === "High").length;
-      const low = total - high;
+      // Count QA issues (by lookup), QA High/Low, revamp pages, and unique total
+      const qaIds = new Set();
+      let qaHigh = 0;
+      let qaLow = 0;
+      let revampCount = 0;
+
+      filtered.forEach(d => {
+        const hasQa = d["QA Issues.lookupValue"] && String(d["QA Issues.lookupValue"]).trim();
+        if (hasQa) {
+          qaIds.add(d.ID || d._id || JSON.stringify(d));
+          if (d.Priority === 'High') qaHigh++; else qaLow++;
+        }
+        if (isRevampPage(d)) {
+          revampCount++;
+          qaIds.add(d.ID || d._id || JSON.stringify(d));
+        }
+      });
+
+      const uniqueTotal = qaIds.size;
       renderCharts(filtered);
-      return `High: ${high} | Low: ${low} | Total: ${total}`;
+      return `High: ${qaHigh} | Low: ${qaLow} | Revamp: ${revampCount} | Total: ${uniqueTotal}`;
     })()
   };
 
@@ -1260,7 +1319,8 @@ function renderCharts(filtered) {
     thqRedirect: ["THQ Redirect"],
     inProgress: ["2a. Started Content Migration","2b. Finished Content Migration; Zesty Columns Set in this list","2c. Updates Needed, See QA Notes/Comments"],
     inQA: ["3a. Ready for Area Command QA","3b. Ready for DHQ QA","3c. Ready for THQ QA"],
-    needsInfo: ["1a. Need Migration Fields set","1b. Pending Migration"],
+    needsInfo: ["1a. Need Migration Fields set"],
+    rfmt: ["1c. RFMT (THQ)"],
     unknown: [""] // fallback
 };
 
@@ -1276,6 +1336,8 @@ filtered.forEach(d => {
   s = "Do Not Migrate";
 } else if (/^2/.test(s)) {
   s = "In Progress";
+} else if (/^1c/.test(s)) {
+  s = "Ready for Migration Tool";
 } else if (/^1b/.test(s)) {
   s = "Pending Migration";
 } else if (/^1/.test(s)) {
@@ -1535,7 +1597,7 @@ function renderBreakdown(data){
   // Create button container with proper structure
   const buttonDiv = document.createElement('div');
   buttonDiv.className = 'mb-3 d-flex gap-2 flex-wrap';
-  buttonDiv.innerHTML = "<button id='toggleHiddenGroups' class='btn btn-sm btn-secondary'>Show 0% Groups</button><button id='toggleFullGroups' class='btn btn-sm btn-secondary'>Show 100% Groups</button><button id='toggleStatus' class='btn btn-sm btn-secondary'>Show Status</button><button id='toggleProgressBars' class='btn btn-sm btn-secondary'>Hide Progress Bars</button>";
+  buttonDiv.innerHTML = "<button id='toggleHiddenGroups' class='btn btn-sm btn-secondary'>Show 0% Groups</button><button id='toggleFullGroups' class='btn btn-sm btn-secondary'>Show 100% Groups</button><button id='toggleStatus' class='btn btn-sm btn-secondary'>Show Status</button><button id='toggleProgressBars' class='btn btn-sm btn-secondary'>Hide Progress Bars</button><button id='showOnlyPendingBtn' class='btn btn-sm btn-secondary'>Show only Pending Migration</button><button id='showOnlyRFMTBtn' class='btn btn-sm btn-secondary'>Show only Ready</button>";
   
   // Clear container and add buttons
   container.innerHTML = '';
@@ -1581,6 +1643,8 @@ function renderBreakdown(data){
         grouped[k].donot++;
       } else if (/^2/.test(String(status).charAt(0))) {
         statusCategory = 'In Progress';
+      } else if (/^1c/.test(String(status))) {
+        statusCategory = 'Ready for Migration Tool';
       } else if (/^1b/.test(String(status))) {
         statusCategory = 'Pending Migration';
       } else if (/^1/.test(String(status).charAt(0))) {
@@ -1629,22 +1693,94 @@ function renderBreakdown(data){
     }
 
     // --- Count entries for heading badge ---
+    // Compute total, visible, and hidden counts so badge clearly indicates what's shown
+    let totalCount = 0;
+    let visibleCount = 0;
+
+    const entryWouldBeVisible = (grp, siteTotal, prog, hiddenClass) => {
+      // Determine whether this entry would be hidden by the current toggles
+      const wouldBeHiddenByProgress = (hiddenClass === 'hidden-group' && !showHidden) || (show100Only && (hiddenClass === 'non-100-group' || hiddenClass === 'hidden-group'));
+      // honor show-only filters (Pending / RFMT)
+      if (showOnlyPending && !((grp.statusBreakdown && (grp.statusBreakdown['Pending Migration'] || 0) > 0))) return false;
+      if (showOnlyRFMT && !((grp.statusBreakdown && (grp.statusBreakdown['Ready for Migration Tool'] || 0) > 0))) return false;
+      return !wouldBeHiddenByProgress;
+    };
+
     // For Location groups with multiple sites, count each site separately
-    let groupCount = entries.length;
     if (g.field === 'Local Web Admin Group.title') {
-      groupCount = 0;
       entries.forEach(({ rawKey }) => {
         const grp = grouped[rawKey];
         const siteCount = grp.siteTitles ? grp.siteTitles.size : 0;
-        groupCount += siteCount > 1 ? siteCount : 1;
+        if (siteCount > 1) {
+          Array.from(grp.siteTitles).forEach(siteTitle => {
+            totalCount++;
+            // compute site-specific breakdown to determine visibility
+            const siteData = data.filter(d => {
+              const rawLocal = (d['Local Web Admin Group.title'] || '').toString().trim();
+              const siteKey = rawLocal || 'Not Set';
+              const siteTitleItem = (d['Site Title'] || d['SiteTitle'] || '').toString().trim();
+              return siteKey === rawKey && siteTitleItem === siteTitle;
+            });
+            const siteTotal = siteData.length;
+            let siteDone = 0; let siteDonot = 0; const siteStatusBreakdown = {};
+            siteData.forEach(d => {
+              const status = d.Status || '';
+              let statusCategory = 'Unknown';
+              if (/^4|^5/.test(String(status).charAt(0))) { statusCategory = 'Completed'; siteDone++; }
+              else if (status === 'THQ Redirect') { statusCategory = 'THQ Redirect'; siteDone++; }
+              else if (status === 'Do Not Migrate') { statusCategory = 'Do Not Migrate'; siteDonot++; }
+              else if (/^2/.test(String(status).charAt(0))) { statusCategory = 'In Progress'; }
+              else if (/^1c/.test(String(status))) { statusCategory = 'Ready for Migration Tool'; }
+              else if (/^1b/.test(String(status))) { statusCategory = 'Pending Migration'; }
+              else if (/^1/.test(String(status).charAt(0))) { statusCategory = 'Needs Info'; }
+              else if (/^3/.test(String(status).charAt(0))) { statusCategory = 'In QA'; }
+              siteStatusBreakdown[statusCategory] = (siteStatusBreakdown[statusCategory] || 0) + 1;
+            });
+            const siteProg = siteTotal ? Math.round((siteDone + siteDonot) / siteTotal * 100) : 0;
+            let hiddenClass = '';
+            if (siteProg === 0) hiddenClass = 'hidden-group';
+            else if (siteProg !== 100) hiddenClass = 'non-100-group';
+            else if (siteProg === 100) hiddenClass = 'is-100-group';
+
+            // Build a fake grp.statusBreakdown for show-only checks
+            const fakeGrp = { statusBreakdown: siteStatusBreakdown };
+            if (entryWouldBeVisible(fakeGrp, siteTotal, siteProg, hiddenClass)) visibleCount++;
+          });
+        } else {
+          totalCount++;
+          const total = grp.total;
+          const prog = total ? Math.round((grp.done + grp.donot) / total * 100) : 0;
+          let hiddenClass = '';
+          if (prog === 0) hiddenClass = 'hidden-group';
+          else if (prog !== 100) hiddenClass = 'non-100-group';
+          else if (prog === 100) hiddenClass = 'is-100-group';
+          if (g.field === 'Area Command Admin Group.title' && siteCount === 1 && prog === 0) hiddenClass = 'hidden-group';
+          if (entryWouldBeVisible(grp, total, prog, hiddenClass)) visibleCount++;
+        }
+      });
+    } else {
+      // Non-location groups: each entry represents one group
+      entries.forEach(({ rawKey }) => {
+        const grp = grouped[rawKey];
+        totalCount++;
+        const total = grp.total;
+        const prog = total ? Math.round((grp.done + grp.donot) / total * 100) : 0;
+        let hiddenClass = '';
+        if (prog === 0) hiddenClass = 'hidden-group';
+        else if (prog !== 100) hiddenClass = 'non-100-group';
+        else if (prog === 100) hiddenClass = 'is-100-group';
+        if (entryWouldBeVisible(grp, total, prog, hiddenClass)) visibleCount++;
       });
     }
+
+    const hiddenCount = totalCount - visibleCount;
+    const groupCountDisplay = `${visibleCount} shown · ${hiddenCount} hidden · ${totalCount} total`;
 
     // --- Start section HTML with badge ---
     let sectionHtml = `
       <div class="breakdown-section">
         <h3 class="mt-3 d-flex align-items-center gap-2">
-          ${g.name} <span class="badge bg-dark text-light">${groupCount}</span>
+          ${g.name} <span class="badge bg-dark text-light">${groupCountDisplay}</span>
         </h3>
     `;
 
@@ -1659,6 +1795,9 @@ function renderBreakdown(data){
     // --- Render each entry ---
     entries.forEach(({ rawKey, display }) => {
       const grp = grouped[rawKey];
+      // Apply show-only filters: if enabled, skip groups without the target status
+      if (showOnlyPending && !((grp.statusBreakdown && (grp.statusBreakdown['Pending Migration'] || 0) > 0))) return;
+      if (showOnlyRFMT && !((grp.statusBreakdown && (grp.statusBreakdown['Ready for Migration Tool'] || 0) > 0))) return;
       const siteCount = grp.siteTitles ? grp.siteTitles.size : 0;
 
       // Special handling for Location groups with multiple sites: split into individual site entries
@@ -1692,6 +1831,8 @@ function renderBreakdown(data){
               siteDonot++;
             } else if (/^2/.test(String(status).charAt(0))) {
               statusCategory = 'In Progress';
+            } else if (/^1c/.test(String(status))) {
+              statusCategory = 'Ready for Migration Tool';
             } else if (/^1b/.test(String(status))) {
               statusCategory = 'Pending Migration';
             } else if (/^1/.test(String(status).charAt(0))) {
@@ -1714,15 +1855,16 @@ function renderBreakdown(data){
           // Build progress bar for this specific site
           let progressHtml = '';
           
-          if (showStatusBreakdown) {
+            if (showStatusBreakdown) {
             progressHtml = '<div class="progress mt-1" style="height:24px;">';
-            const statusOrder = ['Do Not Migrate', 'Needs Info', 'Pending Migration', 'In Progress', 'In QA', 'THQ Redirect', 'Unknown', 'Completed'];
+            const statusOrder = ['Do Not Migrate', 'Needs Info', 'Pending Migration', 'Ready for Migration Tool', 'In Progress', 'In QA', 'THQ Redirect', 'Unknown', 'Completed'];
             statusOrder.forEach(status => {
               const count = siteStatusBreakdown[status] || 0;
               if (count > 0) {
                 const pct = Math.round(count / siteTotal * 100);
                 const color = statusColors[status] || '#6c757d';
-                progressHtml += `<div class="progress-bar" style="width:${pct}%; background-color:${color}; border-right:1px solid white;" title="${status}: ${count}"></div>`;
+                const disp = statusDisplay[status] || status;
+                progressHtml += `<div class="progress-bar" style="width:${pct}%; background-color:${color}; border-right:1px solid white;" title="${disp}: ${count}"></div>`;
               }
             });
             progressHtml += `</div><small style="text-align:right; display:block; margin-top:2px; color:#666;">${siteProg}% Complete</small>`;
@@ -1756,12 +1898,12 @@ function renderBreakdown(data){
         // Build progress bar - simple by default, status breakdown if enabled
         let progressHtml = '';
         
-        if (showStatusBreakdown) {
+          if (showStatusBreakdown) {
           // Status breakdown bar with colored segments
           progressHtml = '<div class="progress mt-1" style="height:24px;">';
           
           // Use same order as overall progress bar
-          const statusOrder = ['Do Not Migrate', 'Needs Info', 'Pending Migration', 'In Progress', 'In QA', 'THQ Redirect', 'Unknown', 'Completed'];
+          const statusOrder = ['Do Not Migrate', 'Needs Info', 'Pending Migration', 'Ready for Migration Tool', 'In Progress', 'In QA', 'THQ Redirect', 'Unknown', 'Completed'];
           const breakdown = grp.statusBreakdown || {};
           
           statusOrder.forEach(status => {
@@ -1769,7 +1911,8 @@ function renderBreakdown(data){
             if (count > 0) {
               const pct = Math.round(count / total * 100);
               const color = statusColors[status] || '#6c757d';
-              progressHtml += `<div class="progress-bar" style="width:${pct}%; background-color:${color}; border-right:1px solid white;" title="${status}: ${count}"></div>`;
+              const disp2 = statusDisplay[status] || status;
+              progressHtml += `<div class="progress-bar" style="width:${pct}%; background-color:${color}; border-right:1px solid white;" title="${disp2}: ${count}"></div>`;
             }
           });
           
@@ -1915,6 +2058,26 @@ function renderBreakdown(data){
     
     toggleProgressBtn.onclick = () => {
       hideProgressBars = !hideProgressBars;
+      renderBreakdown(data);
+    };
+  }
+
+  // --- Show-only buttons for specific statuses ---
+  const showOnlyPendingBtn = document.getElementById('showOnlyPendingBtn');
+  const showOnlyRFMTBtn = document.getElementById('showOnlyRFMTBtn');
+  if (showOnlyPendingBtn) {
+    showOnlyPendingBtn.innerText = showOnlyPending ? 'Show All Groups' : 'Show only Pending Migration';
+    showOnlyPendingBtn.onclick = () => {
+      showOnlyPending = !showOnlyPending;
+      if (showOnlyPending) showOnlyRFMT = false;
+      renderBreakdown(data);
+    };
+  }
+  if (showOnlyRFMTBtn) {
+    showOnlyRFMTBtn.innerText = showOnlyRFMT ? 'Show All Groups' : 'Show only Ready';
+    showOnlyRFMTBtn.onclick = () => {
+      showOnlyRFMT = !showOnlyRFMT;
+      if (showOnlyRFMT) showOnlyPending = false;
       renderBreakdown(data);
     };
   }
@@ -2067,7 +2230,7 @@ title: "Title",
 function renderOverallProgress(filtered){
   if (!Array.isArray(filtered)) return;
   const total = filtered.length;
-  const counts = { "Do Not Migrate":0, "Needs Info":0, "Pending Migration":0, "In Progress":0, "In QA":0, "THQ Redirect":0, Unknown:0, Completed:0 };
+  const counts = { "Do Not Migrate":0, "Needs Info":0, "Pending Migration":0, "Ready for Migration Tool":0, "In Progress":0, "In QA":0, "THQ Redirect":0, Unknown:0, Completed:0 };
   
   filtered.forEach(d=>{
     const s = getCanonicalStatus(d.Status);
@@ -2114,7 +2277,8 @@ function renderOverallProgress(filtered){
       // Add legend line formatted as: Category Name – X% (Count)
       const legendItem = document.createElement("div");
       legendItem.className = "d-flex align-items-center gap-1 legend-item";
-      legendItem.innerHTML = `<span style="display:inline-block;width:14px;height:14px;background-color:${statusColors[key]};"></span> ${key} – ${pctDisplay}% (${raw})`;
+      const displayKey = statusDisplay[key] || key;
+      legendItem.innerHTML = `<span style="display:inline-block;width:14px;height:14px;background-color:${statusColors[key]};"></span> ${displayKey} – ${pctDisplay}% (${raw})`;
       legendContainer.appendChild(legendItem);
     }
   });
@@ -2133,6 +2297,7 @@ function getCanonicalStatus(status) {
   if (status === "Do Not Migrate") return "Do Not Migrate";
   if (status === "THQ Redirect") return "THQ Redirect";
   if (/^2/.test(status)) return "In Progress";
+  if (/^1c/.test(status)) return "Ready for Migration Tool";
   if (/^1b/.test(status)) return "Pending Migration";
   if (/^1/.test(status)) return "Needs Info";
   if (/^3[a-d]/.test(status)) return "In QA";
@@ -2532,6 +2697,7 @@ function renderCharts(filtered) {
       if (/^(4|5)/.test(s)) s = "Completed";
       else if (s === "Do Not Migrate") s = "Do Not Migrate";
       else if (/^2/.test(s)) s = "In Progress";
+      else if (/^1c/.test(s)) s = "Ready for Migration Tool";
       else if (/^1b/.test(s)) s = "Pending Migration";
       else if (/^1/.test(s)) s = "Needs Info";
       else if (/^3[a-d]/.test(s)) s = "In QA";
