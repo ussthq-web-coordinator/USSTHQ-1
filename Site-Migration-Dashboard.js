@@ -1055,7 +1055,7 @@ function showAllQaModal(){
           Status: r.Status || '',
           Priority: r.Priority || '',
           'QA Notes': r['QA Notes'] || '',
-          'QA Issue': 'Revamp',
+          'QA Issue': 'Revamp Needed',
           'Site Title': r['Site Title'] || ''
         });
       }
