@@ -239,6 +239,15 @@ function adjustLabel(rawValue) {
   return rawValue;
 }
 
+function normalizeRevampFilterValue(value) {
+  if (value === undefined || value === null || String(value).trim() === '') return 'Not Set';
+  if (value === true || value === 1 || value === '1') return 'Yes';
+  const s = String(value).toLowerCase().trim();
+  if (s === 'true' || s === 'yes') return 'Yes';
+  if (s === 'false' || s === 'no' || s === '0') return 'No';
+  return String(value);
+}
+
 // Filter mapping helpers for updateFiltersOptions
 const filterMapping = {
   filterDivision: d => d.Division || "Not Set",
@@ -250,7 +259,7 @@ const filterMapping = {
   filterSymType: d => d["Symphony Site Type"] || "Not Set",
   // New filters
   filterPriority: d => d.Priority || "Not Set",
-  filterEffort: d => d["Effort Needed"] || "Not Set",
+  filterRevamp: d => normalizeRevampFilterValue(d["Revamp Page"]),
   filterZestyUrl: d => {
     const zestyUrl = d["Zesty URL Path Part"] || "";
     return (zestyUrl && zestyUrl.toString().trim()) ? "Provided" : "Not Provided";
@@ -267,7 +276,7 @@ function updateFiltersOptions() {
     filterPubSym: getSelectValue("filterPubSym"),
     filterSymType: getSelectValue("filterSymType"),
     filterPriority: getSelectValue("filterPriority"),
-    filterEffort: getSelectValue("filterEffort"),
+    filterRevamp: getSelectValue("filterRevamp"),
     filterZestyUrl: getSelectValue("filterZestyUrl")
   };
 
@@ -339,6 +348,15 @@ function isRevampPage(row){
   try{ const s = String(v).toLowerCase().trim(); return s === 'true' || s === 'yes' || s === '1'; }catch(e){ return false; }
 }
 
+// Helper: determine if a row is marked as Service Center Page
+function isServiceCenterPage(row){
+  if (!row) return false;
+  const v = row['Service Center Page'] || row.ServiceCenterPage || row.serviceCenter || '';
+  if (v === true) return true;
+  if (!v && v !== 0) return false;
+  try{ const s = String(v).toLowerCase().trim(); return s === 'true' || s === 'yes' || s === '1'; }catch(e){ return false; }
+}
+
 function getFilteredData(){
   const div = getSelectValue("filterDivision");
   const ac = getSelectValue("filterAC");
@@ -347,7 +365,7 @@ function getFilteredData(){
   const pubSym = getSelectValue("filterPubSym");
   const symType = getSelectValue("filterSymType");
   const priority = getSelectValue("filterPriority");
-  const effort = getSelectValue("filterEffort");
+  const revamp = getSelectValue("filterRevamp");
   const siteTitle = getSelectValue("filterSiteTitle");
   const zestyUrl = getSelectValue("filterZestyUrl");
   const modFromEl = document.getElementById('filterModifiedFrom');
@@ -402,11 +420,9 @@ function getFilteredData(){
         if (!isNotSet(d.Priority)) return false;
       } else if ((d.Priority || '') !== priority) return false;
     }
-    // Effort Needed
-    if (effort) {
-      if (effort === 'Not Set') {
-        if (!isNotSet(d["Effort Needed"])) return false;
-      } else if ((d["Effort Needed"] || '') !== effort) return false;
+    // Revamp Needed
+    if (revamp) {
+      if (normalizeRevampFilterValue(d["Revamp Page"]) !== revamp) return false;
     }
     // Site Title
     if (siteTitle) {
@@ -766,6 +782,20 @@ function renderQaAccordion(data){
       const moreCount = Math.max(0, uniqueWhys.length - 1);
       const subtitle = subtitleBase + (moreCount > 0 ? ` (+${moreCount} more)` : '');
 
+      const notesSet = new Set(
+        rows
+          .map(r => (r["QA Notes"] || "").toString().trim())
+          .filter(Boolean)
+      );
+      const notesList = Array.from(notesSet);
+      const notePreviewBase = notesList.length ? notesList[0] : '';
+      const notePreview = notePreviewBase.length > 160 ? `${notePreviewBase.slice(0, 160)}...` : notePreviewBase;
+      const noteExtraCount = Math.max(0, notesList.length - 1);
+
+      const statusRaw = (page.Status || '').toString().trim();
+      const statusText = statusRaw || 'Not Set';
+      const issueCount = pageIssueIds.length;
+
       const col = document.createElement('div');
       col.className = 'col-12 col-sm-6 col-md-4 col-lg-3';
       const card = document.createElement('div'); card.className = 'card h-100 qa-page-card';
@@ -780,11 +810,21 @@ function renderQaAccordion(data){
   const siteTitleEl = document.createElement('div'); siteTitleEl.className = 'card-subtitle text-muted small mb-1 mt-2'; siteTitleEl.innerText = page['Site Title'] || '';
   const lookupArray = Array.from(uniqueLookupsSet);
   const lookupText = lookupArray.length ? (lookupArray[0] + (lookupArray.length > 1 ? ` (+${lookupArray.length - 1} more)` : '')) : '';
-  const lookupEl = document.createElement('div'); lookupEl.className = 'text-muted small mb-2'; lookupEl.innerText = lookupText;
+  const lookupEl = document.createElement('div'); lookupEl.className = 'text-muted small mb-1'; lookupEl.innerText = lookupText ? `Issue: ${lookupText}` : '';
+
+  const statusEl = document.createElement('div');
+  statusEl.className = 'small mb-1';
+  statusEl.innerHTML = `<strong>Status:</strong> ${escapeHtml(statusText)}`;
+
+  const notesEl = document.createElement('div');
+  notesEl.className = 'small mb-2';
+  if (notePreview) {
+    notesEl.innerHTML = `<strong>QA Notes:</strong> ${escapeHtml(notePreview)}${noteExtraCount > 0 ? ` <span class="text-muted">(+${noteExtraCount} more)</span>` : ''}`;
+  }
 
   const inlineDiv = document.createElement('div'); inlineDiv.className = 'collapse';
       const quickWhy = uniqueWhys.length ? uniqueWhys[0] : '';
-      inlineDiv.innerHTML = `<div class="small text-muted mt-2">${escapeHtml(quickWhy)}</div>`;
+      inlineDiv.innerHTML = `<div class="small text-muted mt-2">${escapeHtml(quickWhy || subtitle)}</div>`;
 
   const footer = document.createElement('div'); footer.className = 'mt-auto pt-1 d-flex justify-content-center align-items-center';
   const btn = document.createElement('button'); btn.className = 'btn btn-sm btn-primary';
@@ -804,7 +844,9 @@ function renderQaAccordion(data){
   cardBody.appendChild(headerDiv);
   // Page name/title shown as the main heading already in header; show site title and lookup under it
   cardBody.appendChild(siteTitleEl);
+  cardBody.appendChild(statusEl);
   cardBody.appendChild(lookupEl);
+  if (notePreview) cardBody.appendChild(notesEl);
   cardBody.appendChild(inlineDiv);
       cardBody.appendChild(footer);
       card.appendChild(cardBody);
@@ -827,6 +869,103 @@ function renderQaAccordion(data){
       viewBtn.addEventListener('click', showAllQaModal);
     }
   }catch(e){ /* no-op */ }
+}
+
+function renderServiceCenterAccordion(data){
+  const container = document.getElementById('serviceCenterGroupsBody');
+  if (!container) return;
+  container.innerHTML = '';
+
+  const scRows = Array.isArray(data) ? data.filter(d => isServiceCenterPage(d)) : [];
+  const uniquePages = new Set((scRows || []).map(d => (d.Title || d['Site Title'] || 'Untitled Page')));
+
+  const badge = document.getElementById('serviceCenterBadge');
+  if (badge) badge.textContent = uniquePages.size;
+
+  if (!scRows.length) {
+    container.innerHTML = '<p>No Service Center pages found.</p>';
+    return;
+  }
+
+  const grouped = {};
+  scRows.forEach(d => {
+    const pageTitle = d.Title || d['Site Title'] || 'Untitled Page';
+    grouped[pageTitle] = grouped[pageTitle] || [];
+    grouped[pageTitle].push(d);
+  });
+
+  const rowDiv = document.createElement('div');
+  rowDiv.className = 'row g-3';
+
+  Object.keys(grouped).sort().forEach(title => {
+    const rows = grouped[title];
+    const page = pageCache[rows[0]._id] || rows[0];
+    const statusText = (page.Status || '').toString().trim() || 'Not Set';
+
+    const notesSet = new Set(
+      rows.map(r => (r['QA Notes'] || '').toString().trim()).filter(Boolean)
+    );
+    const notesList = Array.from(notesSet);
+    const notePreviewBase = notesList.length ? notesList[0] : '';
+    const notePreview = notePreviewBase.length > 160 ? `${notePreviewBase.slice(0, 160)}...` : notePreviewBase;
+    const noteExtraCount = Math.max(0, notesList.length - 1);
+
+    const col = document.createElement('div');
+    col.className = 'col-12 col-sm-6 col-md-4 col-lg-3';
+
+    const card = document.createElement('div');
+    card.className = 'card h-100 qa-page-card';
+
+    const cardBody = document.createElement('div');
+    cardBody.className = 'card-body d-flex flex-column';
+
+    const headerDiv = document.createElement('div');
+    headerDiv.className = 'd-flex flex-column align-items-center';
+
+    const titleEl = document.createElement('h6');
+    titleEl.className = 'card-title mb-1 text-center mx-3';
+    titleEl.innerText = page.Title || page['Site Title'] || title;
+    headerDiv.appendChild(titleEl);
+
+    const siteTitleEl = document.createElement('div');
+    siteTitleEl.className = 'card-subtitle text-muted small mb-1 mt-2';
+    siteTitleEl.innerText = page['Site Title'] || '';
+
+    const statusEl = document.createElement('div');
+    statusEl.className = 'small mb-1';
+    statusEl.innerHTML = `<strong>Status:</strong> ${escapeHtml(statusText)}`;
+
+    const markerEl = document.createElement('div');
+    markerEl.className = 'text-muted small mb-2';
+    markerEl.innerHTML = '<strong>Service Center:</strong> Yes';
+
+    const notesEl = document.createElement('div');
+    notesEl.className = 'small mb-2';
+    if (notePreview) {
+      notesEl.innerHTML = `<strong>QA Notes:</strong> ${escapeHtml(notePreview)}${noteExtraCount > 0 ? ` <span class="text-muted">(+${noteExtraCount} more)</span>` : ''}`;
+    }
+
+    const footer = document.createElement('div');
+    footer.className = 'mt-auto pt-1 d-flex justify-content-center align-items-center';
+    const btn = document.createElement('button');
+    btn.className = 'btn btn-sm btn-info';
+    btn.innerHTML = 'Open Record';
+    btn.addEventListener('click', () => showTableModalById(rows[0]._id));
+    footer.appendChild(btn);
+
+    cardBody.appendChild(headerDiv);
+    cardBody.appendChild(siteTitleEl);
+    cardBody.appendChild(statusEl);
+    cardBody.appendChild(markerEl);
+    if (notePreview) cardBody.appendChild(notesEl);
+    cardBody.appendChild(footer);
+
+    card.appendChild(cardBody);
+    col.appendChild(card);
+    rowDiv.appendChild(col);
+  });
+
+  requestAnimationFrame(() => { container.appendChild(rowDiv); });
 }
 
 
@@ -1028,7 +1167,7 @@ function showAllQaModal(){
   // full master dataset so "View All Issues" truly means all issues regardless of
   // currently-visible filters.
   function anyFilterActive(){
-    const ids = ["filterDivision","filterAC","filterStatus","filterPageType","filterPubSym","filterSymType","filterPriority","filterEffort","filterSiteTitle"];
+    const ids = ["filterDivision","filterAC","filterStatus","filterPageType","filterPubSym","filterSymType","filterPriority","filterRevamp","filterSiteTitle"];
     for(const id of ids){ const el = document.getElementById(id); if(el && el.value) return true; }
     const modFrom = document.getElementById('filterModifiedFrom'); const modTo = document.getElementById('filterModifiedTo');
     if ((modFrom && modFrom.value) || (modTo && modTo.value)) return true;
@@ -1241,6 +1380,96 @@ function showAllQaModal(){
 
 function renderCards(){
   const filtered = getFilteredData();
+  const dedupeRows = (rows) => {
+    const seen = new Set();
+    return (rows || []).filter((row) => {
+      const key = row && (row.ID ?? row._id ?? `${row.Title || ''}|${row['Site Title'] || ''}|${row['Page URL'] || ''}`);
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  };
+  const allRows = dedupeRows(Array.isArray(tableData) ? tableData : []);
+  const filteredTotal = filtered.length;
+  const allTotal = allRows.length || filteredTotal;
+  const hasActiveFilters = (() => {
+    const filterIds = [
+      'filterDivision',
+      'filterAC',
+      'filterStatus',
+      'filterPageType',
+      'filterPubSym',
+      'filterSymType',
+      'filterPriority',
+      'filterRevamp',
+      'filterSiteTitle',
+      'filterZestyUrl'
+    ];
+    const dropdownActive = filterIds.some((id) => {
+      const el = document.getElementById(id);
+      return !!(el && String(el.value || '').trim());
+    });
+    const modifiedFrom = document.getElementById('filterModifiedFrom');
+    const modifiedTo = document.getElementById('filterModifiedTo');
+    const dateActive = !!((modifiedFrom && modifiedFrom.value) || (modifiedTo && modifiedTo.value));
+    return dropdownActive || dateActive;
+  })();
+
+  const toPct = (count, total) => total > 0 ? ((count / total) * 100).toFixed(1) : '0.0';
+  const compareText = (count, total) => `${count} of ${total} (${toPct(count, total)}%)`;
+  const statusValue = (d) => (d.Status || '').toString().trim();
+  const completedCount = (rows) => rows.filter(d => statusValue(d).startsWith('4') || statusValue(d).startsWith('5') || statusValue(d) === 'THQ Redirect').length;
+  const doNotMigrateCount = (rows) => rows.filter(d => statusValue(d) === 'Do Not Migrate').length;
+  const migrationProgressCount = (rows) => completedCount(rows) + doNotMigrateCount(rows);
+  const weeklyCounts = (rows) => {
+    const now = new Date();
+    const thisWeekStart = new Date(now);
+    thisWeekStart.setDate(now.getDate() - 7);
+    const prevWeekStart = new Date(now);
+    prevWeekStart.setDate(now.getDate() - 14);
+    const prevWeekEnd = new Date(now);
+    prevWeekEnd.setDate(now.getDate() - 7);
+    const thisWeekCount = rows.filter(d => d.Modified && new Date(d.Modified) >= thisWeekStart).length;
+    const prevWeekCount = rows.filter(d => d.Modified && new Date(d.Modified) >= prevWeekStart && new Date(d.Modified) < prevWeekEnd).length;
+    return { thisWeekCount, prevWeekCount };
+  };
+  const qaSummary = (rows) => {
+    const qaIds = new Set();
+    let qaHigh = 0;
+    let qaLow = 0;
+    let revampCount = 0;
+
+    rows.forEach(d => {
+      const hasQa = d["QA Issues.lookupValue"] && String(d["QA Issues.lookupValue"]).trim();
+      if (hasQa) {
+        qaIds.add(d.ID || d._id || JSON.stringify(d));
+        if (d.Priority === 'High') qaHigh++; else qaLow++;
+      }
+      if (isRevampPage(d)) {
+        revampCount++;
+        qaIds.add(d.ID || d._id || JSON.stringify(d));
+      }
+    });
+
+    return {
+      qaHigh,
+      qaLow,
+      revampCount,
+      uniqueTotal: qaIds.size
+    };
+  };
+
+  const filteredProgress = migrationProgressCount(filtered);
+  const allProgress = migrationProgressCount(allRows);
+  const filteredCompleted = completedCount(filtered);
+  const allCompleted = completedCount(allRows);
+  const filteredDoNotMigrate = doNotMigrateCount(filtered);
+  const allDoNotMigrate = doNotMigrateCount(allRows);
+  const filteredWeekly = weeklyCounts(filtered);
+  const allWeekly = weeklyCounts(allRows);
+  const filteredQa = qaSummary(filtered);
+  const allQa = qaSummary(allRows);
+
   const today = new Date();
   const lastMonth = new Date(today.getFullYear(), today.getMonth()-1, today.getDate());
   renderOverallProgress(filtered);
@@ -1248,61 +1477,28 @@ function renderCards(){
 
     // --- metrics object ---
   const metrics = {
-    "Migration Progress": (() => {
-      const total = filtered.length;
-      const completed = filtered.filter(d => (d.Status || '').toString().trim().startsWith('4') || (d.Status || '').toString().trim().startsWith('5')).length;
-      // New THQ Redirect status should be treated as completed for progress totals
-      const thqRedirect = filtered.filter(d => (d.Status || '').toString().trim() === 'THQ Redirect').length;
-      const doNotMigrate = filtered.filter(d => (d.Status || '').toString().trim() === "Do Not Migrate").length;
-      const progressCount = completed + thqRedirect + doNotMigrate;
-      const progressPct = total > 0 ? Math.round((progressCount / total) * 100) : 0;
-      return `${progressPct}% (${progressCount} of ${total} Total Pages)`;
-    })(),
-    // Merge Completed and THQ Redirect into a single card while keeping progress calculation unchanged
-    "Completed (incl. THQ Redirect)": (() => {
-      const completed = filtered.filter(d => ((d.Status || '').toString().trim().startsWith('4') || (d.Status || '').toString().trim().startsWith('5'))).length;
-      const thqRedirect = filtered.filter(d => (d.Status || '').toString().trim() === 'THQ Redirect').length;
-      return completed + thqRedirect;
-    })(),
-    "Do Not Migrate": filtered.filter(d => (d.Status || '').toString().trim() === "Do Not Migrate").length,
-
-    "Weekly Modified": (() => {
-      const today = new Date();
-      const thisWeekStart = new Date(today);
-      thisWeekStart.setDate(today.getDate() - 7);
-      const thisWeekCount = filtered.filter(d => d.Modified && new Date(d.Modified) >= thisWeekStart).length;
-      const prevWeekStart = new Date(today);
-      prevWeekStart.setDate(today.getDate() - 14);
-      const prevWeekEnd = new Date(today);
-      prevWeekEnd.setDate(today.getDate() - 7);
-      const prevWeekCount = filtered.filter(d => d.Modified && new Date(d.Modified) >= prevWeekStart && new Date(d.Modified) < prevWeekEnd).length;
-      return `This Week: ${thisWeekCount} | Last Week: ${prevWeekCount}`;
-    })(),
-
-    "QA Issues": (() => {
-      // Count QA issues (by lookup), QA High/Low, revamp pages, and unique total
-      const qaIds = new Set();
-      let qaHigh = 0;
-      let qaLow = 0;
-      let revampCount = 0;
-
-      filtered.forEach(d => {
-        const hasQa = d["QA Issues.lookupValue"] && String(d["QA Issues.lookupValue"]).trim();
-        if (hasQa) {
-          qaIds.add(d.ID || d._id || JSON.stringify(d));
-          if (d.Priority === 'High') qaHigh++; else qaLow++;
-        }
-        if (isRevampPage(d)) {
-          revampCount++;
-          qaIds.add(d.ID || d._id || JSON.stringify(d));
-        }
-      });
-
-      const uniqueTotal = qaIds.size;
-      renderCharts(filtered);
-      return `High: ${qaHigh} | Low: ${qaLow} | Revamp: ${revampCount} | Total: ${uniqueTotal}`;
-    })()
+    "Migration Progress": {
+      main: `${toPct(filteredProgress, filteredTotal)}% (${compareText(filteredProgress, filteredTotal)})`,
+      sub: `Filtered share of all pages: ${compareText(filteredProgress, allTotal)}`
+    },
+    "Completed (incl. THQ Redirect)": {
+      main: `${compareText(filteredCompleted, filteredTotal)}`,
+      sub: `All pages: ${compareText(allCompleted, allTotal)}`
+    },
+    "Do Not Migrate": {
+      main: `${compareText(filteredDoNotMigrate, filteredTotal)}`,
+      sub: `All pages: ${compareText(allDoNotMigrate, allTotal)}`
+    },
+    "Weekly Modified": {
+      main: `This Week: ${filteredWeekly.thisWeekCount} | Last Week: ${filteredWeekly.prevWeekCount}`,
+      sub: `All pages this week: ${allWeekly.thisWeekCount} | last week: ${allWeekly.prevWeekCount}`
+    },
+    "QA Issues": {
+      main: `High: ${filteredQa.qaHigh} | Low: ${filteredQa.qaLow} | Revamp: ${filteredQa.revampCount} | Total: ${filteredQa.uniqueTotal}`
+    }
   };
+
+  renderCharts(filtered);
 
 
 
@@ -1537,12 +1733,16 @@ try{ addChartLegendModal(statusChart, 'Status'); }catch(e){}
 
   // Render existing metrics
   for(const key in metrics){
+    const metric = metrics[key];
+    const mainText = metric && typeof metric === 'object' ? metric.main : metric;
+    const subText = metric && typeof metric === 'object' ? metric.sub : '';
     container.innerHTML += `
       <div class="col-lg-3 col-md-6 col-sm-12 mb-1">
         <div class="card text-white" style="background-color:${colors[i++ % colors.length]}">
           <div class="card-body">
             <h5 class="card-title">${key}</h5>
-            <p class="card-text">${metrics[key]}</p>
+            <p class="card-text mb-1">${mainText}</p>
+            ${hasActiveFilters && subText ? `<p class="card-text small mb-0" style="opacity:0.92;">${subText}</p>` : ''}
           </div>
         </div>
       </div>`;
@@ -1556,7 +1756,13 @@ try{ addChartLegendModal(statusChart, 'Status'); }catch(e){}
     { status: "3c. Ready for THQ QA"}
   ];
 
-  qaStatuses.forEach(qa => {
+  const qaCardColors = [
+    '#dceaf9',
+    '#e3f3ea',
+    '#fbe9cf'
+  ];
+
+  qaStatuses.forEach((qa, idx) => {
     const counts = { high: 0, low: 0 };
     filtered.forEach(d=>{
       if(d.Status === qa.status){
@@ -1568,7 +1774,7 @@ try{ addChartLegendModal(statusChart, 'Status'); }catch(e){}
 
     container.innerHTML += `
       <div class="col-lg-3 col-md-6 col-sm-12 mb-1">
-        <div class="card text-white" style="background-color:${colors[i++ % colors.length]}">
+        <div class="card text-dark" style="background-color:${qaCardColors[idx % qaCardColors.length]}; color:#12233d;">
           <div class="card-body">
             <h5 class="card-title" style="font-size:1rem;">${qa.status}</h5>
             <div class="d-flex justify-content-around mt-2">
@@ -1586,6 +1792,7 @@ try{ addChartLegendModal(statusChart, 'Status'); }catch(e){}
 
   renderBreakdown(filtered);
   renderQaAccordion(filtered);
+  renderServiceCenterAccordion(filtered);
 }
 
 
@@ -2103,6 +2310,7 @@ function renderBreakdown(data){
 // Table rendering
 function renderTable(){
   if(table) table.destroy();
+  const isDesktopTable = window.matchMedia('(min-width: 992px)').matches;
   // Deduplicate filtered rows by ID
   const rawFiltered = getFilteredData();
   const seenIds = new Set();
@@ -2113,10 +2321,17 @@ function renderTable(){
   });
   table = new Tabulator("#tableContainer",{
     data: filtered,
-    layout:"fitDataStretch",
-  responsiveLayout:"collapse",
-  responsiveLayoutCollapseStartOpen:true,
-    rowHeight: 27,
+    layout: isDesktopTable ? "fitColumns" : "fitDataStretch",
+    responsiveLayout: isDesktopTable ? false : "collapse",
+    responsiveLayoutCollapseStartOpen: !isDesktopTable,
+    rowHeight: isDesktopTable ? 32 : 27,
+    tooltips: isDesktopTable,
+    resizableColumnFit: isDesktopTable,
+    columnDefaults: {
+      vertAlign: "middle",
+      resizable: isDesktopTable
+    },
+    paginationCounter: "rows",
     initialSort: [              
         { column: "_ModifiedMs", dir: "desc" },
   ],
@@ -2128,6 +2343,8 @@ title: "Title",
       sorter: "string",
       width: 300,       
       minWidth: 120,
+      widthGrow: isDesktopTable ? 2 : 1,
+      frozen: isDesktopTable,
       headerSort: true,
       formatter: function(cell){
         const v = cell.getValue() ?? "";
@@ -2144,6 +2361,11 @@ title: "Title",
 {
   title: "Edit", 
   field: "Form", 
+  hozAlign: "center",
+  headerHozAlign: "center",
+  width: isDesktopTable ? 84 : 72,
+  minWidth: 70,
+  frozen: isDesktopTable,
   formatter: cell => {
     const row = cell.getRow().getData();
     const id = row.ID; 
@@ -2159,8 +2381,8 @@ title: "Title",
 },
 
 
-      {title:"SD", field:"Page URL",  hozAlign:'center', formatter:cell=>cell.getValue()?`<a href="${escapeHtml(cell.getValue())}" target="_blank" rel="noopener noreferrer">&#128279;</a>`:""},
-  {title:"ZD", field:"Zesty URL Path Part", visible:true, hozAlign:"center", width:55, maxWidth:64, formatter:cell=>{
+      {title:"SD", field:"Page URL",  hozAlign:'center', headerHozAlign: 'center', width:70, minWidth:62, formatter:cell=>cell.getValue()?`<a href="${escapeHtml(cell.getValue())}" target="_blank" rel="noopener noreferrer">&#128279;</a>`:""},
+  {title:"ZD", field:"Zesty URL Path Part", visible:true, hozAlign:"center", headerHozAlign:"center", width:70, minWidth:62, maxWidth:72, formatter:cell=>{
     const v = cell.getValue();
     return v ? `<a class="zesty-link" href="https://8hxvw8tw-dev.webengine.zesty.io${escapeHtml(v)}?zpw=tsasecret123&redirect=false&_bypassError=true" target="_blank" rel="noopener noreferrer" aria-label="Open Zesty preview">🔗</a>` : "--";
   }},
@@ -2175,7 +2397,49 @@ title: "Title",
     return `<div class="col-ellipsis" title="${esc}">${esc}</div>`;
   }
       },
-      {title:"Priority", field:"Priority"},
+      {
+        title:"QA Notes",
+        field:"QA Notes",
+        width: 220,
+        minWidth: 150,
+        headerSort: true,
+        formatter: function(cell){
+          const v = cell.getValue() ?? "";
+          const esc = String(v)
+            .replace(/&/g,"&amp;")
+            .replace(/</g,"&lt;")
+            .replace(/>/g,"&gt;")
+            .replace(/\"/g,"&quot;");
+          return `<div class="col-ellipsis" title="${esc}">${esc}</div>`;
+        }
+      },
+      {
+        title:"Revamp Needed",
+        field:"Revamp Page",
+        width: 120,
+        minWidth: 100,
+        headerSort: true,
+        formatter: function(cell){
+          const v = cell.getValue();
+          if (v === true || v === 1 || v === "1") return "Yes";
+          const s = String(v ?? "").toLowerCase().trim();
+          return (s === "true" || s === "yes") ? "Yes" : "";
+        }
+      },
+      {
+        title:"Service Center",
+        field:"Service Center Page",
+        width: 120,
+        minWidth: 100,
+        headerSort: true,
+        formatter: function(cell){
+          const v = cell.getValue();
+          if (v === true || v === 1 || v === "1") return "Yes";
+          const s = String(v ?? "").toLowerCase().trim();
+          return (s === "true" || s === "yes") ? "Yes" : "";
+        }
+      },
+      {title:"Priority", field:"Priority", width: 98, minWidth: 84},
       {
   title: "Effort Needed",
   field: "Effort Needed",
@@ -2190,10 +2454,10 @@ title: "Title",
   }
 },
 
-      {title:"Published", field:"Published Symphony"},
-      {title:"Page Type", field:"Page Type"},
+      {title:"Published", field:"Published Symphony", width: 120, minWidth: 96},
+      {title:"Page Type", field:"Page Type", width: 112, minWidth: 92},
       // Use the numeric _ModifiedMs field for sorting, but display the human-friendly Modified string.
-      {title:"Modified", field:"_ModifiedMs", headerSort:true, sorter:"number", formatter: function(cell){
+      {title:"Modified", field:"_ModifiedMs", width: 124, minWidth: 110, headerSort:true, sorter:"number", formatter: function(cell){
         const row = cell.getRow().getData();
         const v = row && row.Modified ? row.Modified : '';
         const esc = String(v).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
@@ -2432,7 +2696,7 @@ function debounce(fn, wait){
 
 // Initialize filter controls: attach change listeners and populate options
 function initFilters(){
-  const filterIds = ["filterDivision","filterAC","filterStatus","filterPageType","filterPubSym","filterSymType","filterPriority","filterEffort","filterSiteTitle","filterZestyUrl"];
+  const filterIds = ["filterDivision","filterAC","filterStatus","filterPageType","filterPubSym","filterSymType","filterPriority","filterRevamp","filterSiteTitle","filterZestyUrl"];
 
   filterIds.forEach(id=>{
     const sel = document.getElementById(id);
@@ -2465,7 +2729,7 @@ function initFilters(){
   if (clearFiltersBtn) {
     clearFiltersBtn.addEventListener('click', function() {
       // Clear all filter dropdowns
-      const filterIds = ["filterDivision", "filterAC", "filterStatus", "filterPageType", "filterPubSym", "filterSymType", "filterPriority", "filterEffort", "filterSiteTitle", "filterZestyUrl"];
+      const filterIds = ["filterDivision", "filterAC", "filterStatus", "filterPageType", "filterPubSym", "filterSymType", "filterPriority", "filterRevamp", "filterSiteTitle", "filterZestyUrl"];
       filterIds.forEach(id => {
         const el = document.getElementById(id);
         if (el) el.value = "";
@@ -2550,6 +2814,11 @@ async function showTableModal(page){
   titleEl.innerText = page.Title;
 
   let html = '';
+  const yesNo = (val) => {
+    if (val === true || val === 1 || val === "1") return "Yes";
+    const s = String(val ?? "").toLowerCase().trim();
+    return (s === "true" || s === "yes") ? "Yes" : "No";
+  };
   // Load field export config
   let fieldConfig;
   try {
@@ -2592,6 +2861,8 @@ async function showTableModal(page){
   else if(type === "Corps") 
       formUrl = `https://sauss.sharepoint.com/sites/USSWEBADM/Lists/CorpsSitesPageMigrationReport/DispForm.aspx?ID=${page.ID}&e=dF11LG`;
   html += `<tr><th>Form</th><td><a href="${formUrl}" target="_blank">Edit Form</a></td></tr>`;
+  html += `<tr><th>Revamp Needed</th><td>${yesNo(page['Revamp Page'])}</td></tr>`;
+  html += `<tr><th>Service Center</th><td>${yesNo(page['Service Center Page'])}</td></tr>`;
   // Render grouped fields
   groupOrder.forEach(groupName => {
     html += `<tr class="table-group"><th colspan="2" style="background-color:#223950;color:#fff;">${groupName}</th></tr>`;

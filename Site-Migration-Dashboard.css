@@ -848,3 +848,367 @@ input#filterModifiedTo.form-control.form-control-sm {
 /* Ensure FullCalendar built-in pseudo content doesn't conflict with our glyphs */
 #migrationDatesModal .fc-prev-button::before,
 #migrationDatesModal .fc-next-button::before { content: none !important; }
+
+/* ================================
+   2026 Visual Refresh Overrides
+   ================================ */
+
+:root {
+  --dash-bg: #f3f5f2;
+  --dash-surface: rgba(255, 255, 255, 0.86);
+  --dash-border: rgba(0, 32, 86, 0.12);
+  --dash-text: #13233f;
+  --dash-muted: #5d6b80;
+  --dash-shadow: 0 14px 38px rgba(5, 28, 62, 0.08);
+  --dash-radius: 16px;
+}
+
+body {
+  background:
+    radial-gradient(circle at 6% -8%, rgba(255, 204, 0, 0.34), transparent 32%),
+    radial-gradient(circle at 96% 2%, rgba(34, 88, 161, 0.2), transparent 38%),
+    linear-gradient(180deg, #f9faf7 0%, var(--dash-bg) 58%, #edf1ef 100%);
+  color: var(--dash-text);
+  min-height: 100vh;
+}
+
+.container-fluid.my-3 {
+  max-width: 1680px;
+  margin-inline: auto;
+  padding-inline: clamp(10px, 2vw, 24px);
+}
+
+.navbar {
+  border-radius: var(--dash-radius);
+  border: 1px solid var(--dash-border);
+  background: linear-gradient(120deg, rgba(255, 255, 255, 0.94), rgba(250, 253, 255, 0.9));
+  box-shadow: var(--dash-shadow);
+  backdrop-filter: blur(6px);
+}
+
+.team-name {
+  color: var(--dash-muted);
+  letter-spacing: 0.02em;
+}
+
+.site-title {
+  color: #071a3b;
+  letter-spacing: 0.01em;
+}
+
+h3 {
+  color: #0e254d;
+  letter-spacing: 0.015em;
+}
+
+h3.mt-3,
+h3.mt-2 {
+  padding-left: 0.55rem;
+  border-left: 4px solid #ffcc00;
+}
+
+.filters-row {
+  background: var(--dash-surface);
+  border: 1px solid var(--dash-border);
+  border-radius: var(--dash-radius);
+  box-shadow: var(--dash-shadow);
+  padding: 14px 8px 4px;
+  margin-left: 5px;
+    margin-right: 5px;
+}
+
+.filters-row label {
+  font-weight: 600;
+  color: #274063;
+  margin-bottom: 0.25rem;
+}
+
+.form-select,
+.form-control {
+  border-radius: 12px;
+  border-color: rgba(0, 32, 86, 0.2);
+  box-shadow: none;
+}
+
+.form-select:focus,
+.form-control:focus {
+  border-color: rgba(34, 88, 161, 0.55);
+  box-shadow: 0 0 0 0.2rem rgba(34, 88, 161, 0.15);
+}
+
+#metricCards .card {
+  border: 1px solid var(--dash-border);
+  border-radius: var(--dash-radius);
+  background: linear-gradient(160deg, #ffffff 0%, #f7fbff 100%);
+  box-shadow: var(--dash-shadow);
+  transition: transform 180ms ease, box-shadow 180ms ease;
+}
+
+#metricCards .card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 18px 34px rgba(8, 34, 74, 0.14);
+}
+
+.progress {
+  border-radius: 999px;
+  background-color: #e6ebf1;
+  overflow: hidden;
+}
+
+.progress-bar {
+  transition: width 380ms ease;
+}
+
+.accordion-item {
+  border: 1px solid var(--dash-border);
+  border-radius: 14px;
+  overflow: hidden;
+  box-shadow: 0 8px 20px rgba(8, 34, 74, 0.07);
+}
+
+.accordion-button {
+  font-weight: 600;
+  color: #11284f;
+  background: #f9fbfe;
+}
+
+.accordion-button:not(.collapsed) {
+  color: #0d2347;
+  background: #eef4fc;
+}
+
+.chart-container {
+  background: var(--dash-surface);
+  border: 1px solid var(--dash-border);
+  border-radius: var(--dash-radius);
+  padding: 12px 10px;
+  box-shadow: var(--dash-shadow);
+}
+
+#tableContainer {
+  border-radius: var(--dash-radius);
+  border: 1px solid var(--dash-border);
+  overflow: hidden;
+  box-shadow: var(--dash-shadow);
+}
+
+.tabulator {
+  border: 0 !important;
+  background: #fcfdff;
+}
+
+.tabulator .tabulator-row:nth-child(even) {
+  background: rgba(237, 242, 250, 0.45);
+}
+
+.tabulator .tabulator-row:hover {
+  background: rgba(173, 198, 228, 0.24);
+}
+
+.modal-content {
+  border-radius: 18px;
+  border: 1px solid var(--dash-border);
+  box-shadow: 0 22px 50px rgba(7, 34, 72, 0.2);
+}
+
+.modal-header {
+  background: linear-gradient(90deg, rgba(0, 32, 86, 0.06), rgba(34, 88, 161, 0.05));
+}
+
+.btn {
+  border-radius: 10px;
+  font-weight: 600;
+}
+
+#refreshDate {
+  font-weight: 500;
+  color: #415774 !important;
+}
+
+@media (max-width: 991px) {
+  .container-fluid.my-3 {
+    padding-inline: 10px;
+  }
+
+  .filters-row {
+    padding: 12px 6px 8px;
+  }
+
+  .chart-container {
+    min-height: 260px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #metricCards .card,
+  .progress-bar {
+    transition: none;
+  }
+}
+
+/* Desktop-only table UX upgrades (mobile behavior remains unchanged) */
+@media (min-width: 992px) {
+  #tableContainer .tabulator {
+    font-size: 0.86rem;
+  }
+
+  #tableContainer .tabulator .tabulator-header .tabulator-col {
+    min-height: 42px;
+    border-right: 1px solid rgba(255, 255, 255, 0.15);
+  }
+
+  #tableContainer .tabulator .tabulator-col .tabulator-col-content {
+    padding: 8px 10px;
+  }
+
+  #tableContainer .tabulator .tabulator-row .tabulator-cell {
+    padding: 7px 10px;
+    border-right: 1px solid rgba(0, 32, 86, 0.06);
+  }
+
+  #tableContainer .tabulator .tabulator-footer {
+    background: #f2f6fb;
+    border-top: 1px solid rgba(0, 32, 86, 0.14);
+    padding: 8px;
+  }
+
+  #tableContainer .tabulator .tabulator-paginator .tabulator-page {
+    border-radius: 8px;
+    border: 1px solid rgba(0, 32, 86, 0.16);
+    background: #ffffff;
+    color: #163768;
+    min-width: 34px;
+  }
+
+  #tableContainer .tabulator .tabulator-paginator .tabulator-page.active {
+    background: #002056;
+    color: #ffffff;
+    border-color: #002056;
+  }
+}
+
+/* ================================
+   Contrast Safety Refinements
+   ================================ */
+
+:root {
+  --dash-on-light: #13233f;
+  --dash-on-dark: #ffffff;
+  --dash-link: #0a4f9c;
+  --dash-link-hover: #083a73;
+}
+
+.navbar,
+.filters-row,
+.chart-container,
+.card,
+.modal-content,
+#tableContainer .tabulator,
+.accordion-item,
+.dropdown-menu {
+  color: var(--dash-on-light);
+}
+
+.navbar .nav-link {
+  color: #0f2d57 !important;
+  border-radius: 8px;
+}
+
+.navbar .nav-link:hover,
+.navbar .nav-link:focus,
+.navbar .nav-link.active {
+  color: #0a1f44 !important;
+  background-color: rgba(34, 88, 161, 0.12);
+}
+
+.dropdown-menu {
+  background: #ffffff;
+  border: 1px solid rgba(0, 32, 86, 0.14);
+}
+
+.dropdown-item {
+  color: #17345f;
+}
+
+.dropdown-item:hover,
+.dropdown-item:focus {
+  background: #e8f0fb;
+  color: #0a224a;
+}
+
+.form-select,
+.form-control {
+  color: #112b4f;
+  background-color: #ffffff;
+}
+
+.form-select::placeholder,
+.form-control::placeholder {
+  color: #5f7390;
+}
+
+#metricCards .card-title,
+#metricCards .card-text,
+.charts-row .chart-container p,
+#refreshDate,
+.accordion-button,
+.accordion-body,
+.modal-title,
+.modal-body,
+.modal-footer {
+  color: var(--dash-on-light);
+}
+
+.table-link,
+.zesty-link,
+#tableContainer .tabulator-cell a,
+.modal-body a {
+  color: var(--dash-link);
+}
+
+.table-link:hover,
+.zesty-link:hover,
+#tableContainer .tabulator-cell a:hover,
+.modal-body a:hover {
+  color: var(--dash-link-hover);
+}
+
+/* Ensure badge text always contrasts with background utility class */
+.badge.bg-primary,
+.badge.bg-secondary,
+.badge.bg-success,
+.badge.bg-danger,
+.badge.bg-dark,
+.badge.text-bg-primary,
+.badge.text-bg-secondary,
+.badge.text-bg-success,
+.badge.text-bg-danger,
+.badge.text-bg-dark {
+  color: var(--dash-on-dark) !important;
+}
+
+.badge.bg-warning,
+.badge.bg-info,
+.badge.bg-light,
+.badge.text-bg-warning,
+.badge.text-bg-info,
+.badge.text-bg-light {
+  color: #1c2b44 !important;
+}
+
+/* Pagination and table states */
+#tableContainer .tabulator .tabulator-page,
+#tableContainer .tabulator .tabulator-page-size,
+#tableContainer .tabulator .tabulator-footer,
+#tableContainer .tabulator .tabulator-header,
+#tableContainer .tabulator .tabulator-header .tabulator-col,
+#tableContainer .tabulator .tabulator-row .tabulator-cell {
+  color: var(--dash-on-light);
+}
+
+/* Keep dark header readable */
+#tableContainer .tabulator .tabulator-header,
+#tableContainer .tabulator .tabulator-header .tabulator-col,
+#tableContainer .tabulator .tabulator-header .tabulator-col .tabulator-col-title {
+  color: var(--dash-on-dark) !important;
+}

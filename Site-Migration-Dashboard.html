@@ -8,7 +8,7 @@
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
 <link href="https://unpkg.com/tabulator-tables@5.5.0/dist/css/tabulator.min.css" rel="stylesheet">
 <!-- Add a cache-busting query param so browsers pick up CSS edits during development -->
-<link href="Site-Migration-Dashboard.css?v=20251004" rel="stylesheet">
+<link href="Site-Migration-Dashboard.css?v=20260420b" rel="stylesheet">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Bona+Nova:ital,wght@0,400;0,700;1,400&family=East+Sea+Dokdo&family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&family=Montserrat&family=Rock+Salt&display=swap" rel="stylesheet">
@@ -103,8 +103,8 @@
     <select id="filterPriority" class="form-select"></select>
   </div>
   <div class="col-lg-2 col-md-4 col-sm-6 mb-2">
-    <label for="filterEffort">Effort Needed</label>
-    <select id="filterEffort" class="form-select"></select>
+    <label for="filterRevamp">Revamp Needed</label>
+    <select id="filterRevamp" class="form-select"></select>
   </div>
   <div class="col-lg-2 col-md-4 col-sm-6 mb-2">
     <label for="filterPageType">Page Type</label>
@@ -140,7 +140,7 @@
 <div class="row d-flex justify-content-between align-items-center mb-2 mt-3">
   <div class="col-12">
     <div class="d-flex justify-content-between align-items-start mb-2">
-      <h3 class="mb-2">Overall Progress</h3>
+      <h3 class="mt-2 mb-2">Overall Progress</h3>
       <a href="#" id="migrationDatesLink" class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#migrationDatesModal">View Migration Dates</a>
     </div>
 
@@ -233,6 +233,28 @@
         </div>
       <div class="accordion-body" id="qaGroupsBody">
         <!-- QA cards will be injected here -->
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Accordion for Service Center Pages -->
+<div class="accordion mt-2" id="serviceCenterAccordion">
+  <div class="accordion-item">
+    <h2 class="accordion-header" id="headingServiceCenter">
+      <div class="d-flex align-items-center justify-content-between w-100">
+        <button class="accordion-button collapsed flex-grow-1 text-start"
+                type="button" data-bs-toggle="collapse"
+                data-bs-target="#collapseServiceCenter" aria-expanded="false"
+                aria-controls="collapseServiceCenter">
+          Service Center Pages
+          <span id="serviceCenterBadge" class="badge bg-warning ms-2">0</span>
+        </button>
+      </div>
+    </h2>
+    <div id="collapseServiceCenter" class="accordion-collapse collapse" aria-labelledby="headingServiceCenter" data-bs-parent="#serviceCenterAccordion">
+      <div class="accordion-body" id="serviceCenterGroupsBody">
+        <!-- Service Center cards will be injected here -->
       </div>
     </div>
   </div>
