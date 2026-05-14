@@ -3310,15 +3310,20 @@ function renderMigrationInsights(filteredData){
 
     const dateStr = page['Last Migrated'] ? new Date(page['Last Migrated']).toLocaleDateString() : 'Unknown';
     const title = page.Title || page['Site Title'] || 'Untitled';
+    
+    // Build migration notes HTML
+    const notesHtml = page['Migration Notes'] 
+      ? `<div class="mt-2">${parseNotes(page['Migration Notes']).map(note => 
+          `<span class="badge border border-warning text-dark me-1">${escapeHtml(note.text)}</span>`
+        ).join('')}</div>`
+      : '';
 
     itemDiv.innerHTML = `
       <div class="timeline-marker bg-warning"></div>
       <div class="timeline-content">
         <h6 class="mb-1">${escapeHtml(title)}</h6>
         <small class="text-muted">${dateStr}</small>
-        ${page['Migration Notes'] ? `<div class="mt-2">${parseNotes(page['Migration Notes']).map(note => 
-          `<span class="badge border border-warning text-dark me-1">${escapeHtml(note.text)}</span>`
-        ).join('')}</div>` : ''}
+        ${notesHtml}
       </div>
     `;
 
