@@ -2439,6 +2439,43 @@ title: "Title",
           return (s === "true" || s === "yes") ? "Yes" : "";
         }
       },
+      {
+        title:"Slide Handling",
+        field:"Slide Handling",
+        width: 120,
+        minWidth: 100,
+        headerSort: true,
+        formatter: function(cell){
+          const v = cell.getValue() ?? "";
+          const esc = String(v).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/\"/g,"&quot;");
+          return `<div class="col-ellipsis" title="${esc}">${esc}</div>`;
+        }
+      },
+      {
+        title:"QA Post Migration",
+        field:"QA Post Migration Review Completed",
+        width: 136,
+        minWidth: 116,
+        headerSort: true,
+        formatter: function(cell){
+          const v = cell.getValue() ?? "";
+          const esc = String(v).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/\"/g,"&quot;");
+          return `<div class="col-ellipsis" title="${esc}">${esc}</div>`;
+        }
+      },
+      {
+  title:"Site Title", 
+  field:"Site Title",
+  width: 110,        
+  minWidth: 80,
+  headerSort: true, 
+  formatter: function(cell){
+    const v = cell.getValue() ?? "";
+    // escape html so long content can't break markup
+    const esc = String(v).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/\"/g,"&quot;");
+    return `<div class="col-ellipsis" title="${esc}">${esc}</div>`;  
+  }
+},
       {title:"Priority", field:"Priority", width: 98, minWidth: 84},
       {
   title: "Effort Needed",
@@ -2462,20 +2499,7 @@ title: "Title",
         const v = row && row.Modified ? row.Modified : '';
         const esc = String(v).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
         return `<div class="col-ellipsis" title="${esc}">${esc}</div>`;
-      }},
-      {
-  title:"Site Title", 
-  field:"Site Title",
-  width: 110,        
-  minWidth: 80,
-  headerSort: true, 
-  formatter: function(cell){
-    const v = cell.getValue() ?? "";
-    // escape html so long content can't break markup
-    const esc = String(v).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
-    return `<div class="col-ellipsis" title="${esc}">${esc}</div>`;  
-  }
-}
+      }}
     ],
     pagination: currentPageSize === 0 ? false : "local",
     paginationSize: currentPageSize === 0 ? false : currentPageSize,
@@ -2814,10 +2838,21 @@ async function showTableModal(page){
   titleEl.innerText = page.Title;
 
   let html = '';
+  const renderedKeys = new Set();
   const yesNo = (val) => {
     if (val === true || val === 1 || val === "1") return "Yes";
     const s = String(val ?? "").toLowerCase().trim();
     return (s === "true" || s === "yes") ? "Yes" : "No";
+  };
+  const toDateLabel = (raw) => {
+    if (!raw) return '';
+    const d = new Date(raw);
+    if (isNaN(d.getTime())) return String(raw);
+    return d.toLocaleString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
   };
   // Load field export config
   let fieldConfig;
@@ -2852,6 +2887,34 @@ async function showTableModal(page){
     if (idxB !== -1) return 1;
     return a.localeCompare(b);
   });
+
+  // Migration accordion shown above record details
+  const lastMigrationRaw = page['Last Migrated'] || page['Last Migration'] || '';
+  const lastMigrationLabel = toDateLabel(lastMigrationRaw) || 'Not Set';
+  const migrationNotes = page['Migration Notes'] || 'No migration notes available.';
+  const migrationDateEsc = escapeHtml(lastMigrationLabel);
+  const migrationNotesEsc = escapeHtml(String(migrationNotes)).replace(/\n/g, '<br>');
+  const migrationAccordionId = `lastMigrationAccordion_${page.ID || page._id || 'x'}`;
+  const migrationCollapseId = `lastMigrationCollapse_${page.ID || page._id || 'x'}`;
+  html += `
+    <div class="accordion mb-3" id="${migrationAccordionId}">
+      <div class="accordion-item">
+        <h2 class="accordion-header" id="${migrationAccordionId}_heading">
+          <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#${migrationCollapseId}" aria-expanded="false" aria-controls="${migrationCollapseId}">
+            Last Migration: ${migrationDateEsc}
+          </button>
+        </h2>
+        <div id="${migrationCollapseId}" class="accordion-collapse collapse" aria-labelledby="${migrationAccordionId}_heading" data-bs-parent="#${migrationAccordionId}">
+          <div class="accordion-body">
+            <div><strong>Date:</strong> ${migrationDateEsc}</div>
+            <div class="mt-2"><strong>Migration Notes:</strong></div>
+            <div>${migrationNotesEsc}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+
   html += '<table class="table table-bordered">';
   // --- Form link ---
   const type = (page["Symphony Site Type"] || "").trim();
@@ -2875,6 +2938,7 @@ async function showTableModal(page){
     });
     groupFields.forEach(f => {
       const k = f.FormField;
+      renderedKeys.add(k);
       let val = page[k];
       // Use Page Editor.title for Page Editor field
       if (k === "Page Editor") {
@@ -2893,6 +2957,8 @@ async function showTableModal(page){
           val = "--";
         }
       }
+      if(k==="Zesty Preview Migration" && val)
+          val = `<a href="${val}" target="_blank" rel="noopener noreferrer">${val}</a>`;
       if(k==="Migration URL" && val) 
           val = `<a href="${val}" target="_blank">${val}</a>`;
 
@@ -2920,7 +2986,32 @@ async function showTableModal(page){
       let displayName = f.FieldGroupSort && f.FieldGroupSort.trim() ? f.FieldGroupSort : (f.FieldPreferredName && f.FieldPreferredName.trim() ? f.FieldPreferredName : k);
       html += `<tr><th>${displayName}</th><td>${val ?? ''}</td></tr>`;
     });
+
+    // Ensure requested IDs and redirect values appear in these detail groups.
+    if (groupName === 'Page Migration Report Details') {
+      if (!renderedKeys.has('idDocument')) {
+        html += `<tr><th>idDocument</th><td>${page['idDocument'] ?? ''}</td></tr>`;
+      }
+      if (!renderedKeys.has('idSite')) {
+        html += `<tr><th>idSite</th><td>${page['idSite'] ?? ''}</td></tr>`;
+      }
+    }
+    if (groupName === 'Symphony Details' && !renderedKeys.has('Webmanager Redirect External URL')) {
+      html += `<tr><th>Webmanager Redirect External URL</th><td>${page['Webmanager Redirect External URL'] ?? ''}</td></tr>`;
+    }
   });
+
+  // Fallbacks if groups are missing from FieldExport configuration
+  if (!renderedKeys.has('idDocument')) {
+    html += `<tr><th>idDocument</th><td>${page['idDocument'] ?? ''}</td></tr>`;
+  }
+  if (!renderedKeys.has('idSite')) {
+    html += `<tr><th>idSite</th><td>${page['idSite'] ?? ''}</td></tr>`;
+  }
+  if (!renderedKeys.has('Webmanager Redirect External URL')) {
+    html += `<tr><th>Webmanager Redirect External URL</th><td>${page['Webmanager Redirect External URL'] ?? ''}</td></tr>`;
+  }
+
   html += "</table>";
   bodyEl.innerHTML = html;
   if (modalEl) {
@@ -3161,6 +3252,97 @@ function renderCharts(filtered) {
   }catch(err){ console.warn('renderCharts failed', err); }
 }
 
+// --- Migration Insights rendering ---
+function renderMigrationInsights(filteredData){
+  const container = document.getElementById("migrationInsightsBody");
+  if (!container) return;
+  container.innerHTML = "";
+
+  if (!Array.isArray(filteredData)) filteredData = getFilteredData();
+
+  // Filter pages with migration data
+  const migratedPages = filteredData.filter(d => d['Last Migrated'] || d['Migration Notes']);
+
+  // Sort by Last Migrated descending
+  migratedPages.sort((a, b) => {
+    const aDate = new Date(a['Last Migrated'] || 0);
+    const bDate = new Date(b['Last Migrated'] || 0);
+    return bDate - aDate;
+  });
+
+  const badge = document.getElementById("migrationInsightsBadge");
+  if (badge) badge.textContent = migratedPages.length;
+
+  if (!migratedPages.length) {
+    container.innerHTML = "<p>No migration data available for filtered pages.</p>";
+    return;
+  }
+
+  // Show summary
+  const summaryDiv = document.createElement('div');
+  summaryDiv.className = 'mb-3';
+  summaryDiv.innerHTML = `<strong>Migration Summary:</strong> Showing all ${migratedPages.length} pages with migration data.`;
+  container.appendChild(summaryDiv);
+
+  // Parse notes function
+  const parseNotes = (notes) => {
+    if (!notes) return [];
+    const lines = notes.split(/\n|;/).map(s => s.trim()).filter(Boolean);
+    const parsed = [];
+    lines.forEach(line => {
+      const lower = line.toLowerCase();
+      let category = 'info';
+      if (lower.includes('completed') || lower.includes('done')) category = 'success';
+      else if (lower.includes('issue') || lower.includes('error') || lower.includes('problem')) category = 'danger';
+      else if (lower.includes('pending') || lower.includes('todo')) category = 'warning';
+      parsed.push({ text: line, category });
+    });
+    return parsed;
+  };
+
+  // Create a timeline-like layout
+  const timelineDiv = document.createElement('div');
+  timelineDiv.className = 'timeline';
+
+  migratedPages.forEach(page => { // Show all
+    const itemDiv = document.createElement('div');
+    itemDiv.className = 'timeline-item mb-3';
+
+    const dateStr = page['Last Migrated'] ? new Date(page['Last Migrated']).toLocaleDateString() : 'Unknown';
+    const title = page.Title || page['Site Title'] || 'Untitled';
+
+    itemDiv.innerHTML = `
+      <div class="timeline-marker bg-warning"></div>
+      <div class="timeline-content">
+        <h6 class="mb-1">${escapeHtml(title)}</h6>
+        <small class="text-muted">${dateStr}</small>
+        ${page['Migration Notes'] ? `<div class="mt-2">${parseNotes(page['Migration Notes']).map(note => 
+          `<span class="badge border border-warning text-dark me-1">${escapeHtml(note.text)}</span>`
+        ).join('')}</div>` : ''}
+      </div>
+    `;
+
+    timelineDiv.appendChild(itemDiv);
+  });
+
+  container.appendChild(timelineDiv);
+
+  // Add some CSS for timeline
+  if (!document.getElementById('timeline-css')) {
+    const css = `
+      .timeline { position: relative; padding-left: 30px; }
+      .timeline::before { content: ''; position: absolute; left: 15px; top: 0; bottom: 0; width: 2px; background: #e9ecef; }
+      .timeline-item { position: relative; }
+      .timeline-marker { position: absolute; left: -22px; top: 5px; width: 12px; height: 12px; border-radius: 50%; background: #007bff; border: 2px solid #fff; }
+      .timeline-content { background: #f8f9fa; padding: 10px; border-radius: 5px; }
+    `;
+    const style = document.createElement('style');
+    style.id = 'timeline-css';
+    style.textContent = css;
+    document.head.appendChild(style);
+  }
+}
+
 function updateDashboard(){
   // Reset user toggle flag when filters change so smart default applies again
   userToggledHidden = false;
@@ -3177,6 +3359,9 @@ function updateDashboard(){
   }
 
   try { renderOverallProgress(getFilteredData()); } catch(e){ console.warn('renderOverallProgress failed', e); }
+
+  // Render Migration Insights
+  try { renderMigrationInsights(getFilteredData()); } catch(e){ console.warn('renderMigrationInsights failed', e); }
 
   // Update Page Details badge with current filtered count
   try{
