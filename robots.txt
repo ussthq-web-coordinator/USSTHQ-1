@@ -5,7 +5,6 @@ Disallow: /index.html
 Disallow: /Site-Migration-Dashboard.html
 Disallow: /Site-Migration-Dashboard
 Disallow: /DashboardData.json
-Disallow: /Site-Migration-Dashboard.js
 Disallow: /Demo-1.html
 Disallow: /Demo-1
 Disallow: /Site-Migration-Dashboard-Backup-2
