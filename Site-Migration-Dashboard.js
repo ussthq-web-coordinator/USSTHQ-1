@@ -3311,10 +3311,18 @@ function renderMigrationInsights(filteredData){
     const dateStr = page['Last Migrated'] ? new Date(page['Last Migrated']).toLocaleDateString() : 'Unknown';
     const title = page.Title || page['Site Title'] || 'Untitled';
     
-    // Build migration notes HTML
+    // Build migration notes HTML with linkified URLs
+    const linkifyText = (text) => {
+      const urlRegex = /(https?:\/\/[^\s]+|www\.[^\s]+)/g;
+      return escapeHtml(text).replace(urlRegex, (match) => {
+        const url = match.startsWith('http') ? match : 'https://' + match;
+        return `<a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer" style="text-decoration: underline; color: inherit;">${escapeHtml(match)}</a>`;
+      });
+    };
+    
     const notesHtml = page['Migration Notes'] 
       ? `<div class="mt-2">${parseNotes(page['Migration Notes']).map(note => 
-          `<span class="badge border border-dark text-dark" style="background-color: transparent;">${escapeHtml(note.text)}</span>`
+          `<span class="badge border border-dark text-dark" style="background-color: transparent;">${linkifyText(note.text)}</span>`
         ).join('')}</div>`
       : '';
 
