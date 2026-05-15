@@ -3314,7 +3314,7 @@ function renderMigrationInsights(filteredData){
     // Build migration notes HTML
     const notesHtml = page['Migration Notes'] 
       ? `<div class="mt-2">${parseNotes(page['Migration Notes']).map(note => 
-          `<span class="badge border border-warning text-dark me-1">${escapeHtml(note.text)}</span>`
+          `<span class="badge border border-dark text-dark" style="background-color: transparent;">${escapeHtml(note.text)}</span>`
         ).join('')}</div>`
       : '';
 
@@ -3335,11 +3335,20 @@ function renderMigrationInsights(filteredData){
   // Add some CSS for timeline
   if (!document.getElementById('timeline-css')) {
     const css = `
-      .timeline { position: relative; padding-left: 30px; }
-      .timeline::before { content: ''; position: absolute; left: 15px; top: 0; bottom: 0; width: 2px; background: #e9ecef; }
-      .timeline-item { position: relative; }
-      .timeline-marker { position: absolute; left: -22px; top: 5px; width: 12px; height: 12px; border-radius: 50%; background: #007bff; border: 2px solid #fff; }
-      .timeline-content { background: #f8f9fa; padding: 10px; border-radius: 5px; }
+      .timeline { position: relative; padding-left: 20px; }
+      .timeline::before { content: ''; position: absolute; left: 5px; top: 0; bottom: 0; width: 2px; background: #e9ecef; }
+      .timeline-item { position: relative; margin-bottom: 15px; }
+      .timeline-marker { position: absolute; left: -18px; top: 5px; width: 12px; height: 12px; border-radius: 50%; background: #ffc107; border: 2px solid #fff; box-shadow: 0 0 0 2px #ffc107; }
+      .timeline-content { background: #f8f9fa; padding: 12px; border-radius: 5px; word-wrap: break-word; overflow-wrap: break-word; }
+      .timeline-content h6 { word-wrap: break-word; overflow-wrap: break-word; margin-bottom: 6px; }
+      .timeline-content .mt-2 { display: flex; flex-wrap: wrap; gap: 6px; }
+      .timeline-content .badge { display: inline-block; word-wrap: break-word; overflow-wrap: break-word; white-space: normal; max-width: 100%; }
+      @media (max-width: 576px) {
+        .timeline { padding-left: 15px; }
+        .timeline::before { left: 2px; }
+        .timeline-marker { left: -14px; }
+        .timeline-content { padding: 10px; font-size: 0.9rem; }
+      }
     `;
     const style = document.createElement('style');
     style.id = 'timeline-css';
