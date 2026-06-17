@@ -3261,13 +3261,17 @@ function renderMigrationInsights(filteredData){
   if (!Array.isArray(filteredData)) filteredData = getFilteredData();
 
   // Broadened filter: include anything with migration activity or handle-marks
-  const migratedPages = filteredData.filter(d => 
-    d['Last Migrated'] || 
-    d['Migration Notes'] || 
-    d['QA Notes'] || 
-    (d['Status'] && d['Status'].includes('Redirect')) ||
-    d['QA Post Migration Review Completed'] === 'True'
-  );
+  const migratedPages = filteredData.filter(d => {
+    // Check for a valid migration date first (primary requirement)
+    let dStr = d['Last Migrated'] || d['Last Migration'];
+    if (!dStr && d['Migration Notes']) {
+      const match = d['Migration Notes'].match(/(\d{1,2}\/\d{1,2}\/\d{2,4})|(\d{4}-\d{2}-\d{2})/);
+      if (match) dStr = match[0];
+    }
+    
+    // Only include if a date was found
+    return !!dStr;
+  });
 
   const badge = document.getElementById("migrationInsightsBadge");
   if (badge) badge.textContent = migratedPages.length;
@@ -3620,9 +3624,9 @@ function updateDashboard(){
       }
     };
     
-    // If we have both site and page title, make the display richer
-    if (r['Site Title'] && (r['Page Title'] || r.pageTitle)) {
-      ev.title = `${r['Site Title']} - ${r['Page Title'] || r.pageTitle}`;
+    // If we have both site and page title, make the display richer: Page Title - Site Title
+    if ((r['Page Title'] || r.pageTitle) && r['Site Title']) {
+      ev.title = `${r['Page Title'] || r.pageTitle} - ${r['Site Title']}`;
     }
 
     if (isDateOnly) ev.allDay = true;
@@ -3674,7 +3678,7 @@ function updateDashboard(){
           item = document.createElement('div');
           item.className = 'list-group-item d-flex justify-content-between align-items-start';
         }
-        const title = (r['Site Title'] && r['Page Title']) ? `${r['Site Title']} - ${r['Page Title']}` : (r['Site Title'] || r['Page Title'] || '(No Title)');
+        const title = (r['Page Title'] && r['Site Title']) ? `${r['Page Title']} - ${r['Site Title']}` : (r['Page Title'] || r['Site Title'] || '(No Title)');
         const left = document.createElement('div'); left.innerHTML = '<div class="fw-bold">'+escapeHtml(title)+'</div>'+(r['Division']?'<small class="text-muted">'+escapeHtml(r['Division'])+'</small>':'');
         const right = document.createElement('div'); right.className='text-end'; right.innerHTML = '<div>'+formatDateISO(r._displayDate)+'</div>'+(url?'<div><small class="text-primary">Visit</small></div>':'');
         item.appendChild(left); item.appendChild(right); list.appendChild(item);
