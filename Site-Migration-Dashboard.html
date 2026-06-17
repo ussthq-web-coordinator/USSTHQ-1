@@ -264,15 +264,20 @@
 <div class="accordion mt-2" id="migrationInsightsAccordion">
   <div class="accordion-item">
     <h2 class="accordion-header" id="headingMigrationInsights">
-      <div class="d-flex align-items-center justify-content-between w-100">
-        <button class="accordion-button collapsed flex-grow-1 text-start"
+        <button class="accordion-button collapsed"
                 type="button" data-bs-toggle="collapse"
                 data-bs-target="#collapseMigrationInsights" aria-expanded="false"
                 aria-controls="collapseMigrationInsights">
-          Migration Insights
-          <span id="migrationInsightsBadge" class="badge bg-warning ms-2">0</span>
+          <div class="d-flex justify-content-between align-items-center w-100 pe-4">
+            <div>
+              Migration Insights
+              <span id="migrationInsightsBadge" class="badge bg-warning ms-2">0</span>
+            </div>
+            <span class="view-calendar-label fw-bold text-primary" style="cursor: pointer; text-decoration: underline; font-size: 0.85rem;" onclick="event.stopPropagation(); window.dispatchEvent(new CustomEvent('openMigrationCalendar'));">
+              🗓️ View Detailed Calendar
+            </span>
+          </div>
         </button>
-      </div>
     </h2>
     <div id="collapseMigrationInsights" class="accordion-collapse collapse" aria-labelledby="headingMigrationInsights" data-bs-parent="#migrationInsightsAccordion">
       <div class="accordion-body" id="migrationInsightsBody">

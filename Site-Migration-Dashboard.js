@@ -3260,31 +3260,24 @@ function renderMigrationInsights(filteredData){
 
   if (!Array.isArray(filteredData)) filteredData = getFilteredData();
 
-  // Filter pages with migration data
-  const migratedPages = filteredData.filter(d => d['Last Migrated'] || d['Migration Notes']);
-
-  // Sort by Last Migrated descending
-  migratedPages.sort((a, b) => {
-    const aDate = new Date(a['Last Migrated'] || 0);
-    const bDate = new Date(b['Last Migrated'] || 0);
-    return bDate - aDate;
-  });
+  // Broadened filter: include anything with migration activity or handle-marks
+  const migratedPages = filteredData.filter(d => 
+    d['Last Migrated'] || 
+    d['Migration Notes'] || 
+    d['QA Notes'] || 
+    (d['Status'] && d['Status'].includes('Redirect')) ||
+    d['QA Post Migration Review Completed'] === 'True'
+  );
 
   const badge = document.getElementById("migrationInsightsBadge");
   if (badge) badge.textContent = migratedPages.length;
 
   if (!migratedPages.length) {
-    container.innerHTML = "<p>No migration data available for filtered pages.</p>";
+    container.innerHTML = "<div class='alert alert-info'>No migration data available for filtered pages.</div>";
     return;
   }
 
-  // Show summary
-  const summaryDiv = document.createElement('div');
-  summaryDiv.className = 'mb-3';
-  summaryDiv.innerHTML = `<strong>Migration Summary:</strong> Showing all ${migratedPages.length} pages with migration data.`;
-  container.appendChild(summaryDiv);
-
-  // Parse notes function
+  // Parse notes function (categorizes by keywords)
   const parseNotes = (notes) => {
     if (!notes) return [];
     const lines = notes.split(/\n|;/).map(s => s.trim()).filter(Boolean);
@@ -3292,74 +3285,256 @@ function renderMigrationInsights(filteredData){
     lines.forEach(line => {
       const lower = line.toLowerCase();
       let category = 'info';
-      if (lower.includes('completed') || lower.includes('done')) category = 'success';
-      else if (lower.includes('issue') || lower.includes('error') || lower.includes('problem')) category = 'danger';
-      else if (lower.includes('pending') || lower.includes('todo')) category = 'warning';
+      if (lower.includes('completed') || lower.includes('done') || lower.includes('success')) category = 'success';
+      else if (lower.includes('issue') || lower.includes('error') || lower.includes('problem') || lower.includes('broken')) category = 'danger';
+      else if (lower.includes('pending') || lower.includes('todo') || lower.includes('wait')) category = 'warning';
       parsed.push({ text: line, category });
     });
     return parsed;
   };
 
-  // Create a timeline-like layout
-  const timelineDiv = document.createElement('div');
-  timelineDiv.className = 'timeline';
+  // Helper to linkify URLs in text
+  const linkifyText = (text) => {
+    if (!text) return "";
+    const urlRegex = /(https?:\/\/[^\s]+|www\.[^\s]+)/g;
+    return escapeHtml(text).replace(urlRegex, (match) => {
+      const url = match.startsWith('http') ? match : 'https://' + match;
+      return `<a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer" style="text-decoration: underline; color: inherit;">${escapeHtml(match)}</a>`;
+    });
+  };
 
-  migratedPages.forEach(page => { // Show all
-    const itemDiv = document.createElement('div');
-    itemDiv.className = 'timeline-item mb-3';
-
-    const dateStr = page['Last Migrated'] ? new Date(page['Last Migrated']).toLocaleDateString() : 'Unknown';
-    const title = page.Title || page['Site Title'] || 'Untitled';
+  // Group by Site Title
+  const sitesMap = {};
+  migratedPages.forEach(page => {
+    const siteTitle = page['Site Title'] || 'Other / Individual Pages';
+    if (!sitesMap[siteTitle]) {
+      sitesMap[siteTitle] = {
+        title: siteTitle,
+        pages: [],
+        latestDate: 0,
+        allDates: new Set(),
+        division: page.Division || '',
+        siteType: page['Site Type'] || page['Symphony Site Type'] || ''
+      };
+    }
+    sitesMap[siteTitle].pages.push(page);
     
-    // Build migration notes HTML with linkified URLs
-    const linkifyText = (text) => {
-      const urlRegex = /(https?:\/\/[^\s]+|www\.[^\s]+)/g;
-      return escapeHtml(text).replace(urlRegex, (match) => {
-        const url = match.startsWith('http') ? match : 'https://' + match;
-        return `<a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer" style="text-decoration: underline; color: inherit;">${escapeHtml(match)}</a>`;
-      });
-    };
+    // Primary: Last Migrated -> Last Migration -> Fallback to Migration Notes regex
+    let dStr = page['Last Migrated'] || page['Last Migration'];
+    if (!dStr && page['Migration Notes']) {
+      const match = page['Migration Notes'].match(/(\d{1,2}\/\d{1,2}\/\d{2,4})|(\d{4}-\d{2}-\d{2})/);
+      if (match) dStr = match[0];
+    }
     
-    const notesHtml = page['Migration Notes'] 
-      ? `<div class="mt-2">${parseNotes(page['Migration Notes']).map(note => 
-          `<span class="badge border border-dark text-dark" style="background-color: transparent;">${linkifyText(note.text)}</span>`
-        ).join('')}</div>`
-      : '';
-
-    itemDiv.innerHTML = `
-      <div class="timeline-marker bg-warning"></div>
-      <div class="timeline-content">
-        <h6 class="mb-1">${escapeHtml(title)}</h6>
-        <small class="text-muted">${dateStr}</small>
-        ${notesHtml}
-      </div>
-    `;
-
-    timelineDiv.appendChild(itemDiv);
+    if (dStr) {
+      const d = new Date(dStr).getTime();
+      if (!isNaN(d)) {
+        if (d > sitesMap[siteTitle].latestDate) sitesMap[siteTitle].latestDate = d;
+        sitesMap[siteTitle].allDates.add(new Date(dStr).toLocaleDateString());
+      }
+    }
   });
 
-  container.appendChild(timelineDiv);
+  // Sort sites by latest migration date descending
+  const sortedSites = Object.values(sitesMap).sort((a, b) => b.latestDate - a.latestDate);
 
-  // Add some CSS for timeline
-  if (!document.getElementById('timeline-css')) {
-    const css = `
-      .timeline { position: relative; padding-left: 20px; }
-      .timeline::before { content: ''; position: absolute; left: 5px; top: 0; bottom: 0; width: 2px; background: #e9ecef; }
-      .timeline-item { position: relative; margin-bottom: 15px; }
-      .timeline-marker { position: absolute; left: -18px; top: 5px; width: 12px; height: 12px; border-radius: 50%; background: #ffc107; border: 2px solid #fff; box-shadow: 0 0 0 2px #ffc107; }
-      .timeline-content { background: #f8f9fa; padding: 12px; border-radius: 5px; word-wrap: break-word; overflow-wrap: break-word; }
-      .timeline-content h6 { word-wrap: break-word; overflow-wrap: break-word; margin-bottom: 6px; }
-      .timeline-content .mt-2 { display: flex; flex-wrap: wrap; gap: 6px; }
-      .timeline-content .badge { display: inline-block; word-wrap: break-word; overflow-wrap: break-word; white-space: normal; max-width: 100%; }
-      @media (max-width: 576px) {
-        .timeline { padding-left: 15px; }
-        .timeline::before { left: 2px; }
-        .timeline-marker { left: -14px; }
-        .timeline-content { padding: 10px; font-size: 0.9rem; }
+  // Show summary header
+  const summaryDiv = document.createElement('div');
+  summaryDiv.className = 'mb-4 p-3 bg-white border rounded shadow-sm d-flex justify-content-between align-items-center';
+  summaryDiv.innerHTML = `
+    <div>
+        <h5 class="mb-1 fw-bold text-dark">Recent Site Migration Insights</h5>
+        <span class="text-muted small">Showing highlights for <strong>${migratedPages.length}</strong> pages across <strong>${sortedSites.length}</strong> sites.</span>
+    </div>
+    <div class="text-end">
+        <span class="badge bg-primary rounded-pill px-3">${sortedSites.length} Active Sites</span>
+    </div>
+  `;
+  container.appendChild(summaryDiv);
+
+  // Render Site Sections
+  sortedSites.forEach((site, siteIndex) => {
+    const siteCard = document.createElement('div');
+    siteCard.className = 'site-insight-card mb-4';
+    
+    // Unique ID for accordion functionality
+    const collapseId = `siteCollapse_${siteIndex}`;
+    
+    // Sort pages within site by date descending
+    site.pages.sort((a,b) => {
+      let daStr = a['Last Migrated'] || a['Last Migration'];
+      if (!daStr && a['Migration Notes']) {
+        const m = a['Migration Notes'].match(/(\d{1,2}\/\d{1,2}\/\d{2,4})|(\d{4}-\d{2}-\d{2})/);
+        if (m) daStr = m[0];
       }
+      let dbStr = b['Last Migrated'] || b['Last Migration'];
+      if (!dbStr && b['Migration Notes']) {
+        const m = b['Migration Notes'].match(/(\d{1,2}\/\d{1,2}\/\d{2,4})|(\d{4}-\d{2}-\d{2})/);
+        if (m) dbStr = m[0];
+      }
+      return new Date(dbStr || 0) - new Date(daStr || 0);
+    });
+
+    const datesList = Array.from(site.allDates).sort((a,b) => new Date(b) - new Date(a));
+    const datesHtml = datesList.length 
+      ? datesList.map(dt => `<span class="badge bg-light text-dark border me-1">${dt}</span>`).join('')
+      : '<span class="text-muted small">Date Pending</span>';
+
+    siteCard.innerHTML = `
+      <div class="card border-0 shadow-sm overflow-hidden">
+        <div class="card-header bg-dark text-white p-0">
+          <button class="btn btn-dark w-100 text-start p-3 border-0 d-flex justify-content-between align-items-start collapse-trigger collapsed" 
+                  type="button" data-bs-toggle="collapse" data-bs-target="#${collapseId}" 
+                  aria-expanded="false" aria-controls="${collapseId}">
+            <div class="flex-grow-1">
+              <h5 class="mb-0 fw-bold d-flex align-items-center">
+                <span class="badge bg-warning text-dark me-2 px-2" style="font-size: 0.7rem;">SITE</span>
+                ${escapeHtml(site.title)}
+                <i class="ms-2 opacity-50 small pe-7s-angle-down"></i>
+              </h5>
+              <div class="d-flex align-items-center mt-1">
+                <small class="opacity-75 me-2">${escapeHtml(site.division)}</small>
+                ${site.siteType ? `<span class="badge bg-secondary opacity-75" style="font-size: 0.65rem;">${escapeHtml(site.siteType)}</span>` : ''}
+              </div>
+            </div>
+            <div class="text-end" style="min-width: 150px;">
+              <div class="small fw-bold mb-1 opacity-75" style="font-size: 0.7rem;">MIGRATION DATES:</div>
+              <div class="d-flex flex-wrap justify-content-end gap-1">${datesHtml}</div>
+            </div>
+          </button>
+        </div>
+        <div id="${collapseId}" class="collapse">
+          <div class="card-body p-0">
+            <div class="table-responsive">
+              <table class="table table-hover table-striped mb-0 align-middle">
+                <thead class="table-light small text-uppercase fw-bold">
+                  <tr>
+                    <th style="padding-left: 1.5rem; width: 35%;">Page Title & URL</th>
+                    <th style="width: 15%;">Date</th>
+                    <th style="padding-right: 1.5rem;">Notes & Summaries</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${site.pages.map(page => {
+                    const pTitle = page.Title || page['Page Title'] || 'Untitled Page';
+                    let pDateStr = page['Last Migrated'] || page['Last Migration'];
+                    if (!pDateStr && page['Migration Notes']) {
+                      const m = page['Migration Notes'].match(/(\d{1,2}\/\d{1,2}\/\d{2,4})|(\d{4}-\d{2}-\d{2})/);
+                      if (m) pDateStr = m[0];
+                    }
+                    const pDate = pDateStr ? new Date(pDateStr).toLocaleDateString() : '-';
+                    
+                    // Comprehensive activity summary with improved badges
+                    const tags = [];
+                    
+                    // Priority Badge
+                    const priority = page['Priority'];
+                    if (priority && priority !== 'None') {
+                      let pClass = 'secondary';
+                      if (priority.includes('1')) pClass = 'danger';
+                      else if (priority.includes('2')) pClass = 'warning text-dark';
+                      tags.push(`<span class="badge bg-${pClass} text-uppercase me-1" title="Priority">P: ${escapeHtml(priority)}</span>`);
+                    }
+
+                    // Effort Badge
+                    const effort = page['Effort Needed'];
+                    if (effort && !effort.includes('0')) {
+                      tags.push(`<span class="badge bg-light text-dark border me-1" title="Level of Effort">Effort: ${escapeHtml(effort.split('.')[0])}</span>`);
+                    }
+
+                    if (page['Revamp Page'] && page['Revamp Page'] !== 'None') {
+                      tags.push(`<span class="badge bg-info text-white me-1">Revamp: ${escapeHtml(page['Revamp Page'])}</span>`);
+                    }
+                    
+                    if (page['Service Center Page'] && page['Service Center Page'] !== 'No' && page['Service Center Page'] !== '0') {
+                      tags.push(`<span class="badge bg-dark text-white me-1">Service Center</span>`);
+                    }
+                    
+                    if (page['Status'] === 'THQ Redirect') {
+                      tags.push(`<span class="badge bg-secondary text-white me-1">Redirect Active</span>`);
+                    }
+                    
+                    // QA Issues count
+                    const qaIssues = page['QA Issues'] || page['QA Issues.lookupValue'];
+                    if (qaIssues) {
+                      tags.push(`<span class="badge bg-danger text-white me-1">QA Issues Found</span>`);
+                    }
+
+                    const tagsHtml = tags.length ? `<div class="mb-2 d-flex flex-wrap gap-1">${tags.join('')}</div>` : '';
+
+                    // Combine all possible summary fields
+                    const combinedNotes = [
+                      page['Migration Notes'], 
+                      page['QA Notes']
+                    ].filter(Boolean).join('; ');
+                    
+                    const notes = parseNotes(combinedNotes);
+                    const notesHtml = notes.length 
+                      ? notes.map(n => `
+                          <div class="d-flex align-items-start mb-1 notes-line">
+                            <span class="badge bg-${n.category} p-0 mt-2 me-2" style="min-width: 6px; height: 6px; border-radius: 50%; opacity: 0.8;">&nbsp;</span>
+                            <span class="small text-dark">${linkifyText(n.text)}</span>
+                          </div>
+                        `).join('')
+                      : '<span class="text-muted italic small opacity-50">No activity summaries available</span>';
+                    
+                    return `
+                      <tr>
+                        <td style="padding-left: 1.5rem;">
+                          <div class="fw-bold text-primary" style="font-size: 0.9rem;">${escapeHtml(pTitle)}</div>
+                          <div class="small text-muted text-truncate" style="max-width: 250px; font-size: 0.75rem;">${escapeHtml(page['Page URL'] || '')}</div>
+                        </td>
+                        <td>
+                          <div class="small fw-medium">${pDate}</div>
+                        </td>
+                        <td style="padding-right: 1.5rem;">
+                          <div class="py-2">
+                            ${tagsHtml}
+                            <div class="notes-container">${notesHtml}</div>
+                          </div>
+                        </td>
+                      </tr>
+                    `;
+                  }).join('')}
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <div class="card-footer bg-light p-2 text-center border-top-0">
+              <small class="text-muted fw-bold" style="font-size: 0.7rem;">Total Migrated Items in Site: ${site.pages.length}</small>
+          </div>
+        </div>
+      </div>
+    `;
+    container.appendChild(siteCard);
+  });
+
+  // Updated CSS for the site-centric insights
+  if (!document.getElementById('migration-insights-css')) {
+    const css = `
+      .site-insight-card .card { border-radius: 10px; border: 1px solid #e0e0e0; }
+      .site-insight-card .card-header { background: #212529 !important; border-bottom: none; border-radius: 10px 10px 0 0; }
+      .site-insight-card .card-header .btn { border-radius: 0; box-shadow: none !important; }
+      .site-insight-card .collapse-trigger::after {
+        content: '\\25BC';
+        font-size: 0.7rem;
+        transition: transform 0.3s;
+        opacity: 0.5;
+        margin-left: 1rem;
+        margin-top: 0.5rem;
+      }
+      .site-insight-card .collapse-trigger:not(.collapsed)::after {
+        transform: rotate(-180deg);
+      }
+      .site-insight-card .table th { background: #f8f9fa; color: #6c757d; font-size: 0.7rem; border-bottom: 1px solid #dee2e6; letter-spacing: 0.05em; }
+      .site-insight-card .table td { border-bottom: 1px solid #f2f2f2; padding-top: 0.75rem; padding-bottom: 0.75rem; }
+      .site-insight-card .text-primary { color: #004a99 !important; }
+      .notes-line { line-height: 1.4; }
+      .notes-container { max-height: 150px; overflow-y: auto; scrollbar-width: thin; }
+      .site-insight-card .badge { border-radius: 4px; font-weight: 500; }
     `;
     const style = document.createElement('style');
-    style.id = 'timeline-css';
+    style.id = 'migration-insights-css';
     style.textContent = css;
     document.head.appendChild(style);
   }
@@ -3424,33 +3599,56 @@ function updateDashboard(){
   }
   
   function toEvent(r){
-    const raw = r['Migration Date'] || r.migrationDate || r.MigrationDate || null;
+    // Priority: 'Migration Date' (if mapped) -> 'Last Migrated' -> 'Last Migration'
+    let raw = r['Migration Date'] || r.migrationDate || r['Last Migrated'] || r['Last Migration'] || null;
+    
+    // Fallback: Try to find a date in 'Migration Notes'
+    if (!raw && r['Migration Notes']) {
+      const match = r['Migration Notes'].match(/(\d{1,2}\/\d{1,2}\/\d{2,4})|(\d{4}-\d{2}-\d{2})/);
+      if (match) raw = match[0];
+    }
+
     const isDateOnly = typeof raw === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(raw);
     const parsed = parseDateForDisplay(raw);
     const ev = {
       title: r['Site Title'] || r.siteTitle || '(No Title)',
       start: parsed || null,
       url: r['View Website URL'] || r.viewUrl || r.viewWebsiteUrl || null,
-      extendedProps: { division: r['Division'] || r.division || '' }
+      extendedProps: { 
+        division: r['Division'] || r.division || '',
+        pageTitle: r['Page Title'] || r.pageTitle || ''
+      }
     };
+    
+    // If we have both site and page title, make the display richer
+    if (r['Site Title'] && (r['Page Title'] || r.pageTitle)) {
+      ev.title = `${r['Site Title']} - ${r['Page Title'] || r.pageTitle}`;
+    }
+
     if (isDateOnly) ev.allDay = true;
     return ev;
   }
 
   function buildAgendaHTML(data){
     const groups = data.reduce((acc,row)=>{
-      const raw = row['Migration Date'];
+      // Priority: 'Migration Date' -> 'Last Migrated' -> 'Last Migration'
+      let raw = row['Migration Date'] || row['Last Migrated'] || row['Last Migration'] || null;
+      if (!raw && row['Migration Notes']) {
+        const match = row['Migration Notes'].match(/(\d{1,2}\/\d{1,2}\/\d{2,4})|(\d{4}-\d{2}-\d{2})/);
+        if (match) raw = match[0];
+      }
+      
       const pd = parseDateForDisplay(raw);
       const key = pd ? pd.toLocaleString('en-US',{year:'numeric',month:'long', timeZone: E_TZ}) : 'Unscheduled';
-      (acc[key]=acc[key]||[]).push(row);
+      (acc[key]=acc[key]||[]).push({ ...row, _displayDate: raw });
       return acc;
     },{});
 
     const keys = Object.keys(groups).sort((a,b)=>{
       if (a==='Unscheduled') return 1;
       if (b==='Unscheduled') return -1;
-      const da = new Date(groups[a][0]['Migration Date']);
-      const db = new Date(groups[b][0]['Migration Date']);
+      const da = new Date(groups[a][0]._displayDate);
+      const db = new Date(groups[b][0]._displayDate);
       return da - db;
     });
 
@@ -3458,12 +3656,12 @@ function updateDashboard(){
     container.className = 'migration-agenda';
 
     keys.forEach(k=>{
-      const section = document.createElement('div');
+      const section = sectionClone = document.createElement('div');
       section.className = 'mb-3';
       const h = document.createElement('h6'); h.textContent = k; section.appendChild(h);
       const list = document.createElement('div'); list.className = 'list-group';
 
-  groups[k].sort((a,b)=> new Date(a['Migration Date']||8640000000000000) - new Date(b['Migration Date']||8640000000000000)).forEach(r=>{
+  groups[k].sort((a,b)=> new Date(a._displayDate||8640000000000000) - new Date(b._displayDate||8640000000000000)).forEach(r=>{
         const url = r['View Website URL'] || r.viewUrl || r.viewWebsiteUrl || '';
         let item;
         if (url) {
@@ -3476,8 +3674,9 @@ function updateDashboard(){
           item = document.createElement('div');
           item.className = 'list-group-item d-flex justify-content-between align-items-start';
         }
-        const left = document.createElement('div'); left.innerHTML = '<div class="fw-bold">'+(r['Site Title']||'(No Title)')+'</div>'+(r['Division']?'<small class="text-muted">'+r['Division']+'</small>':'');
-        const right = document.createElement('div'); right.className='text-end'; right.innerHTML = '<div>'+formatDateISO(r['Migration Date'])+'</div>'+(url?'<div><small class="text-primary">Visit</small></div>':'');
+        const title = (r['Site Title'] && r['Page Title']) ? `${r['Site Title']} - ${r['Page Title']}` : (r['Site Title'] || r['Page Title'] || '(No Title)');
+        const left = document.createElement('div'); left.innerHTML = '<div class="fw-bold">'+escapeHtml(title)+'</div>'+(r['Division']?'<small class="text-muted">'+escapeHtml(r['Division'])+'</small>':'');
+        const right = document.createElement('div'); right.className='text-end'; right.innerHTML = '<div>'+formatDateISO(r._displayDate)+'</div>'+(url?'<div><small class="text-primary">Visit</small></div>':'');
         item.appendChild(left); item.appendChild(right); list.appendChild(item);
       });
 
@@ -3499,7 +3698,17 @@ function updateDashboard(){
     const el = document.getElementById('migrationFullCalendar'); if(!el || typeof FullCalendar==='undefined') return;
     // Use provided filteredResults if present, otherwise migrationData, otherwise sample data
     const source = Array.isArray(filteredResults) ? filteredResults : ((Array.isArray(migrationData) && migrationData.length) ? migrationData : (typeof _migrationSampleData !== 'undefined' ? _migrationSampleData : []));
-    const events = (Array.isArray(source) ? source : []).filter(r=>r['Migration Date']).map(toEvent);
+    
+    // Extract events using primary + fallback logic
+    const events = (Array.isArray(source) ? source : []).filter(r => {
+      let d = r['Migration Date'] || r['Last Migrated'] || r['Last Migration'];
+      if (!d && r['Migration Notes']) {
+        const match = r['Migration Notes'].match(/(\d{1,2}\/\d{1,2}\/\d{2,4})|(\d{4}-\d{2}-\d{2})/);
+        if (match) d = match[0];
+      }
+      return d;
+    }).map(toEvent);
+    
     if (!fullCalendar){
       fullCalendar = new FullCalendar.Calendar(el,{
         initialView: 'dayGridMonth',
@@ -3626,14 +3835,51 @@ function updateDashboard(){
 
     if (exportBtn) exportBtn.addEventListener('click', function(e){ e.preventDefault(); const blob=new Blob([JSON.stringify(migrationData,null,2)],{type:'application/json'}); const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download='migration-dates.json'; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url); });
 
-  // default to Agenda view on open (will set 'active' on the Agenda button)
-  if (btnAgenda) btnAgenda.click();
+  // Add event listener for the inline "View Calendar" in Migration Insights
+  window.addEventListener('openMigrationCalendar', () => {
+    // Collect specific migration data from the dashboard's current filtered set
+    const currentResults = getFilteredData();
+    const specificData = currentResults.filter(r => {
+      let d = r['Last Migrated'] || r['Last Migration'];
+      if (!d && r['Migration Notes']) {
+        const match = r['Migration Notes'].match(/(\d{1,2}\/\d{1,2}\/\d{2,4})|(\d{4}-\d{2}-\d{2})/);
+        if (match) d = match[0];
+      }
+      return d;
+    }).map(r => {
+      let d = r['Last Migrated'] || r['Last Migration'];
+      if (!d && r['Migration Notes']) {
+        const match = r['Migration Notes'].match(/(\d{1,2}\/\d{1,2}\/\d{2,4})|(\d{4}-\d{2}-\d{2})/);
+        if (match) d = match[0];
+      }
+      return {
+        'Site Title': r['Site Title'] || '',
+        'Page Title': r['Page Title'] || r.Title || '',
+        'Migration Date': d,
+        'View Website URL': r['Page URL'] || r.MigrationURL || '',
+        'Division': r['Division'] || ''
+      };
+    });
+
+    // Load this specific data into the modal context
+    window.setMigrationData(specificData);
+    
+    // Open the modal
+    const modalEl = document.getElementById('migrationDatesModal');
+    if (modalEl) {
+      const bsModal = bootstrap.Modal.getOrCreateInstance(modalEl);
+      bsModal.show();
+      // Ensure calendar is visible first
+      const btnCal = document.getElementById('viewCalendarBtn');
+      if (btnCal) btnCal.click();
+    }
   });
 
   window.setMigrationData = function(dataArray){
     if (!Array.isArray(dataArray)) return;
     migrationData = dataArray.map(r=>({
       'Site Title': r['Site Title'] || r.siteTitle || '',
+      'Page Title': r['Page Title'] || r.pageTitle || '',
       'Migration Date': r['Migration Date'] || r.migrationDate || r.MigrationDate || '',
       'View Website URL': r['View Website URL'] || r.viewUrl || r.viewWebsiteUrl || '',
       'Division': r['Division'] || r.division || ''
@@ -3641,9 +3887,12 @@ function updateDashboard(){
 
     const modalEl = document.getElementById('migrationDatesModal');
     if (modalEl && modalEl.classList.contains('show')){
-      renderAgenda(migrationData); initTable(migrationData); refreshFullCalendar();
+      renderAgenda(migrationData); refreshFullCalendar(migrationData);
     }
   };
 
+  // default to Agenda view on open (will set 'active' on the Agenda button)
+  if (btnAgenda) btnAgenda.click();
+  });
 })();
 
