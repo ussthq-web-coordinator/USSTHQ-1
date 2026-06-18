@@ -3431,6 +3431,15 @@ function renderMigrationInsights(filteredData){
                     // Comprehensive activity summary with improved badges
                     const tags = [];
                     
+                    // Status Badge (Priority)
+                    const status = page['Status'];
+                    if (status) {
+                      let sClass = 'primary';
+                      if (status.includes('Complete') || status.includes('Ready')) sClass = 'success';
+                      else if (status.includes('Review') || status.includes('Redirect')) sClass = 'warning text-dark';
+                      tags.push(`<span class="badge border border-${sClass} text-${sClass} text-uppercase me-1" style="font-size: 0.6rem;">${escapeHtml(status)}</span>`);
+                    }
+
                     // Priority Badge
                     const priority = page['Priority'];
                     if (priority && priority !== 'None') {
@@ -3448,6 +3457,11 @@ function renderMigrationInsights(filteredData){
 
                     if (page['Revamp Page'] && page['Revamp Page'] !== 'None') {
                       tags.push(`<span class="badge bg-info text-white me-1">Revamp: ${escapeHtml(page['Revamp Page'])}</span>`);
+                    }
+
+                    // Show Revamp Publish if 'No'
+                    if (page['Revamp Publish Y/N'] === 'No' || page['Revamp Publish Y/N'] === 'no') {
+                      tags.push(`<span class="badge text-white me-1" style="background-color: darkorange;" title="Revamp Publish Status">Not Published Live</span>`);
                     }
                     
                     if (page['Service Center Page'] && page['Service Center Page'] !== 'No' && page['Service Center Page'] !== '0') {
@@ -3485,8 +3499,10 @@ function renderMigrationInsights(filteredData){
                     return `
                       <tr>
                         <td style="padding-left: 1.5rem;">
-                          <div class="fw-bold text-primary" style="font-size: 0.9rem;">${escapeHtml(pTitle)}</div>
-                          <div class="small text-muted text-truncate" style="max-width: 250px; font-size: 0.75rem;">${escapeHtml(page['Page URL'] || '')}</div>
+                          <a href="${escapeHtml(page['Page URL'] || '#')}" target="_blank" rel="noopener noreferrer" class="text-decoration-none">
+                            <div class="fw-bold text-primary" style="font-size: 0.9rem;">${escapeHtml(pTitle)}</div>
+                            <div class="small text-muted text-truncate" style="max-width: 250px; font-size: 0.75rem;">${escapeHtml(page['Page URL'] || '')}</div>
+                          </a>
                         </td>
                         <td>
                           <div class="small fw-medium">${pDate}</div>
