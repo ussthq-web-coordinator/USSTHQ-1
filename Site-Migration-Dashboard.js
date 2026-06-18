@@ -1378,6 +1378,711 @@ function showAllQaModal(){
 
 // (duplicate escapeHtml removed - single definition exists earlier)
 
+// Global function to generate site summary table (must be outside renderCards)
+function generateSiteSummaryTable() {
+  const summary = {}; // { Division: { SiteTitle: { 1a: 0, 1b: 0, 1c: 0, 2.x: 0, 3.x: 0, Live: 0, Redirect: 0, DNM: 0, Total: 0 } } }
+  const dataToUse = getFilteredData();
+  
+  // Initialize stats tracking
+  const statusCategories = ['1a', '1b', '1c', '2.x', '3.x', 'Live', 'Redirect', 'DNM'];
+  
+  dataToUse.forEach(d => {
+    const div = (d.Division || 'Other').toString().trim();
+    let site = (d['Site Title'] || d['Site'] || 'Unknown').toString().trim();
+    const isServiceCenter = d['Service Center Page'] && d['Service Center Page'] !== 'No' && d['Service Center Page'] !== '0';
+    if (isServiceCenter && d['Service Center Site Name']) {
+      site = d['Service Center Site Name'];
+    }
+    
+    if (!summary[div]) summary[div] = {};
+    if (!summary[div][site]) {
+      summary[div][site] = { 
+        '1a': 0, '1b': 0, '1c': 0, 
+        '2.x': 0, '2c': 0, '3.x': 0, 
+        'Live': 0, '4b': 0, '5x': 0, 'Redirect': 0, 'DNM': 0, 
+        Total: 0,
+        isDivisional: false
+      };
+    }
+    
+    // Mark if site is divisional: either a service center or site name contains 'division'
+    try {
+      const siteLower = (site || '').toString().toLowerCase();
+      if (isServiceCenter || siteLower.indexOf('division') !== -1) {
+        summary[div][site].isDivisional = true;
+      }
+    } catch(e) { /* fallback: leave as default false */ }
+    
+    summary[div][site].Total++;
+    
+    const s = (d.Status || '').toString().trim();
+    let statusKey = 'DNM';
+    
+    if (s.startsWith('1a')) statusKey = '1a';
+    else if (s.startsWith('1b')) statusKey = '1b';
+    else if (s.startsWith('1c')) statusKey = '1c';
+    else if (s.startsWith('2')) {
+      statusKey = '2.x';
+      if (s.startsWith('2c')) summary[div][site]['2c'] = (summary[div][site]['2c'] || 0) + 1;
+    }
+    else if (s.startsWith('3')) statusKey = '3.x';
+    else if (s.startsWith('4')) {
+      statusKey = 'Live';
+      if (s.startsWith('4b')) summary[div][site]['4b'] = (summary[div][site]['4b'] || 0) + 1;
+    }
+    else if (s.startsWith('5')) { statusKey = 'Live'; summary[div][site]['5x'] = (summary[div][site]['5x'] || 0) + 1; }
+    else if (s === 'THQ Redirect') statusKey = 'Redirect';
+    else if (s === 'Do Not Migrate') statusKey = 'DNM';
+    
+    summary[div][site][statusKey]++;
+  });
+
+  // Count sites per majority status category (with D/L breakdown)
+  const statusSiteCounts = {
+    'NotMigrated': { divisional: new Set(), local: new Set() }, // 1a
+    'MigrationStarted': { divisional: new Set(), local: new Set() }, // 1b/1c/2.x
+    'InQA': { divisional: new Set(), local: new Set() }, // 3.x
+    'Live': { divisional: new Set(), local: new Set() } // Live (majority)
+  };
+
+  // Also track per-division aggregated majority counts for the division rows
+  const divisionMajorCounts = {}; // { division: { NotMigrated:0, MigrationStarted:0, InQA:0, Live:0 } }
+  // Map per-site display category for later per-division breakdowns
+  const siteDisplay = {}; // { division: { site: displayCat } }
+
+  // Prepare sets to capture sites that have any pages in '5' status, and divisions that have any 5.x pages
+  const fiveSiteSets = { divisional: new Set(), local: new Set() };
+  const fiveDivisions = new Set();
+
+  Object.keys(summary).forEach(div => {
+    divisionMajorCounts[div] = { NotMigrated: 0, MigrationStarted: 0, InQA: 0, Live: 0 };
+    siteDisplay[div] = siteDisplay[div] || {};
+    Object.keys(summary[div]).forEach(site => {
+      const stats = summary[div][site];
+      const siteKey = `${div}|${site}`;
+      const isDiv = stats.isDivisional;
+
+      // Determine majority status for this site (pick the status with highest page count)
+      const counts = {
+        '1a': stats['1a'] || 0,
+        '1b': stats['1b'] || 0,
+        '1c': stats['1c'] || 0,
+        '2.x': stats['2.x'] || 0,
+        '2c': stats['2c'] || 0,
+        '3.x': stats['3.x'] || 0,
+        'Live': stats['Live'] || 0,
+        '4b': stats['4b'] || 0,
+        'Redirect': stats['Redirect'] || 0,
+        'DNM': stats['DNM'] || 0
+      };
+
+      // Find max key (if tie, prefer more advanced statuses: Live > 3.x > 2.x > 1c > 1b > 1a)
+      const order = ['Live', '3.x', '2.x', '1c', '1b', '1a', 'Redirect', 'DNM'];
+      let maxKey = '1a';
+      let maxVal = -1;
+      Object.keys(counts).forEach(k => {
+        const v = counts[k];
+        if (v > maxVal) { maxVal = v; maxKey = k; }
+        else if (v === maxVal && v > 0) {
+          // tie-breaker using order
+          const prevIdx = order.indexOf(maxKey);
+          const curIdx = order.indexOf(k);
+          if (curIdx < prevIdx) { maxKey = k; }
+        }
+      });
+
+      // Map detailed key to display categories using explicit rule set.
+      // In Zesty/QA: any 2c, 3.x, or 4b pages.
+      // Migration Started: any 1b/1c or 2-starting pages (2.x excluding 2c).
+      let displayCat = 'NotMigrated';
+      const hasInQaStatus = (stats['2c'] || 0) > 0 || (stats['3.x'] || 0) > 0 || (stats['4b'] || 0) > 0;
+      const hasMigrationStartedStatus = (stats['1b'] || 0) > 0 || (stats['1c'] || 0) > 0 || ((stats['2.x'] || 0) - (stats['2c'] || 0)) > 0;
+
+      if (isDiv) displayCat = 'Live';
+      else if (hasInQaStatus) displayCat = 'InQA';
+      else if (hasMigrationStartedStatus) displayCat = 'MigrationStarted';
+      else if (maxKey === '1a') displayCat = 'NotMigrated';
+      else if (maxKey === 'Live') displayCat = 'Live';
+      else displayCat = 'NotMigrated';
+
+      // store per-site display category for later use
+      siteDisplay[div][site] = displayCat;
+
+      // Increment global and division counts
+      statusSiteCounts[displayCat][isDiv ? 'divisional' : 'local'].add(siteKey);
+      divisionMajorCounts[div][displayCat]++;
+      // Track sites that have any pages in the '5' status (Total Live requirement)
+      if (stats['5x'] && stats['5x'] > 0) {
+        fiveSiteSets[isDiv ? 'divisional' : 'local'].add(siteKey);
+        if (isDiv) fiveDivisions.add(div);
+      }
+    });
+  });
+
+  // Calculate totals
+  const totalSites = Object.values(summary).reduce((sum, div) => sum + Object.keys(div).length, 0);
+  // Compute division-level majority: assign each division to the category
+  const divisionLevelCounts = { NotMigrated: new Set(), MigrationStarted: new Set(), InQA: new Set(), Live: new Set() };
+  Object.keys(divisionMajorCounts).forEach(div => {
+    const c = divisionMajorCounts[div];
+    // determine max category across sites in this division
+    const order = ['Live', 'InQA', 'MigrationStarted', 'NotMigrated'];
+    let maxCat = 'NotMigrated';
+    let maxVal = -1;
+    Object.keys(c).forEach(k => {
+      const v = c[k] || 0;
+      if (v > maxVal) { maxVal = v; maxCat = k; }
+      else if (v === maxVal && v > 0) {
+        const prevIdx = order.indexOf(maxCat);
+        const curIdx = order.indexOf(k);
+        if (curIdx < prevIdx) { maxCat = k; }
+      }
+    });
+    divisionLevelCounts[maxCat].add(div);
+  });
+
+  // Territory header D counts should reflect site-level counts for divisional sites
+  const notMigD = statusSiteCounts['NotMigrated'].divisional.size;
+  const notMigL = statusSiteCounts['NotMigrated'].local.size;
+  const migratingD = statusSiteCounts['MigrationStarted'].divisional.size;
+  const migratingL = statusSiteCounts['MigrationStarted'].local.size;
+  const qaD = statusSiteCounts['InQA'].divisional.size;
+  const qaL = statusSiteCounts['InQA'].local.size;
+  const liveD = statusSiteCounts['Live'].divisional.size;
+  const liveL = statusSiteCounts['Live'].local.size;
+  // Sites with any pages in status 5.x (site-level totals)
+  const fiveSitesD = fiveSiteSets.divisional.size;
+  const fiveSitesL = fiveSiteSets.local.size;
+  // Divisions that have at least one site with 5.x pages (division-level D count)
+  const fiveDivCount = fiveDivisions.size;
+
+  // Display rule: Not Migrated includes Migration Started (both are not live)
+  const notLiveD = notMigD + migratingD;
+  const notLiveL = notMigL + migratingL;
+  
+  // Generate unique ID for this modal's chart
+  const chartId = `territoryChart_${Math.random().toString(36).substr(2, 9)}`;
+  
+  // Start HTML at the All Territories Migration Status section (trim header/legend)
+  let html = `<div class="territory-content" style="padding: 20px;">
+      <style>
+        .territory-content .sc-bottom-scroll {
+          max-height: 320px;
+          overflow: auto;
+        }
+        .territory-content .sc-bottom-scroll.site-audit-scroll {
+          max-height: 960px;
+        }
+        .territory-content .sc-report-table thead th {
+          position: sticky;
+          top: 0;
+          z-index: 2;
+          background: #f8f9fa;
+        }
+      </style>
+      <!-- Chart -->
+      <div style="margin-bottom: 20px;">
+        <h5 style="margin-bottom: 8px; font-weight: 600;">Site Migration Status</h5>
+        <div style="position: relative; height: 100px;">
+          <canvas id="${chartId}" style="max-height: 100px; width: 100%;"></canvas>
+        </div>
+      </div>
+
+      <!-- Summary Stats Card (condensed) -->
+      <div style="background: #fff; margin-bottom: 12px;">
+        <h5 style="margin-bottom: 8px; font-weight: 600;"><i class="bi bi-bar-chart"></i> Territory Summary</h5>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px;">
+          <div style="padding: 8px; border: 1px solid #ddd; border-radius: 4px; text-align: center;">
+            <h3 style="margin: 0 0 4px; color: #dc3545; font-weight: 700; font-size: 1.2rem;">${notLiveD + notLiveL}</h3>
+            <p style="margin: 0 0 4px; color: #333; font-weight: 600;">Not Migrated</p>
+            <small style="color: #666;">D: ${notLiveD} | L: ${notLiveL}</small>
+          </div>
+          <div style="padding: 8px; border: 1px solid #ddd; border-radius: 4px; text-align: center;">
+            <h3 style="margin: 0 0 4px; color: #ffc107; font-weight: 700; font-size: 1.2rem;">${migratingD + migratingL}</h3>
+            <p style="margin: 0 0 4px; color: #333; font-weight: 600;">Migration Started</p>
+            <small style="color: #666;">D: ${migratingD} | L: ${migratingL}</small>
+          </div>
+          <div style="padding: 8px; border: 1px solid #ddd; border-radius: 4px; text-align: center;">
+            <h3 style="margin: 0 0 4px; color: #17a2b8; font-weight: 700; font-size: 1.2rem;">${qaD + qaL}</h3>
+            <p style="margin: 0 0 4px; color: #333; font-weight: 600;">In Zesty/QA</p>
+            <small style="color: #666;">D: ${qaD} | L: ${qaL}</small>
+          </div>
+          <div style="padding: 8px; border: 1px solid #ddd; border-radius: 4px; text-align: center;">
+            <h3 style="margin: 0 0 4px; color: #28a745; font-weight: 700; font-size: 1.2rem;">${fiveSitesD + fiveSitesL}</h3>
+            <p style="margin: 0 0 4px; color: #333; font-weight: 600;">Total Live</p>
+            <small style="color: #666;">D: ${fiveDivCount} | L: ${fiveSitesL}</small>
+          </div>
+        </div>
+      </div>
+
+      <!-- Divisions -->
+      <div style="margin-top: 4px;">
+        <h5 style="margin: 0 0 8px; font-weight: 600;"><i class="bi bi-diagram-3"></i> Division Group Summary</h5>
+        <div class="sc-division-table-wrap" style="border:1px solid #e0e0e0; border-radius:4px; overflow:auto;">
+          <table style="width:100%; border-collapse:collapse; font-size:0.84rem; min-width:760px; table-layout:fixed;">
+            <thead>
+              <tr style="background:#f8f9fa;">
+                <th style="text-align:left; padding:8px; border-bottom:1px solid #e0e0e0; width:220px;">Division</th>
+                <th style="text-align:center; padding:8px; border-bottom:1px solid #e0e0e0; width:90px;">Status</th>
+                <th style="text-align:center; padding:8px; border-bottom:1px solid #e0e0e0;"><i class="bi bi-x-circle text-danger"></i> Not Migrated</th>
+                <th style="text-align:center; padding:8px; border-bottom:1px solid #e0e0e0;"><i class="bi bi-hourglass-split text-warning"></i> Migration Started</th>
+                <th style="text-align:center; padding:8px; border-bottom:1px solid #e0e0e0;"><i class="bi bi-gear text-info"></i> In Zesty/QA</th>
+                <th style="text-align:center; padding:8px; border-bottom:1px solid #e0e0e0;"><i class="bi bi-check-circle text-success"></i> Live</th>
+              </tr>
+            </thead>
+            <tbody>`;
+
+  const sortedDivs = Object.keys(summary).sort();
+  if (sortedDivs.length === 0) {
+    return `<div class="p-4 text-center text-muted">No data available for the current filters.</div>`;
+  }
+
+  sortedDivs.forEach(div => {
+    const divStats = summary[div];
+    const divStatus = 'Live';
+    const badgeClass = 'bg-success';
+
+    // Build per-category divisional/local breakdown for titles
+    const perCat = {
+      NotMigrated: { div: 0, local: 0 },
+      MigrationStarted: { div: 0, local: 0 },
+      InQA: { div: 0, local: 0 },
+      Live: { div: 0, local: 0 }
+    };
+
+    Object.keys(divStats).forEach(site => {
+      const st = divStats[site] || {};
+      const isDiv = !!st.isDivisional;
+      let cat = 'NotMigrated';
+
+      // Requested rule priority:
+      // 1) In Zesty/QA = any site with 2c, 3.x, or 4b pages
+      // 2) Migration Started = any site with 1b, 1c, or 2-starting pages (2.x excluding 2c)
+      // 3) Live = any site with any Live/5.x pages
+      // 4) Not Migrated = fallback (1a/other)
+      if (isDiv) cat = 'Live';
+      else if ((st['2c'] || 0) > 0 || (st['3.x'] || 0) > 0 || (st['4b'] || 0) > 0) cat = 'InQA';
+      else if ((st['1b'] || 0) > 0 || (st['1c'] || 0) > 0 || ((st['2.x'] || 0) - (st['2c'] || 0)) > 0) cat = 'MigrationStarted';
+      else if ((st['Live'] || 0) > 0 || (st['5x'] || 0) > 0) cat = 'Live';
+      else cat = 'NotMigrated';
+
+      if (!perCat[cat]) perCat[cat] = { div: 0, local: 0 };
+      if (isDiv) perCat[cat].div++;
+      else perCat[cat].local++;
+    });
+
+    const nmOnlyTotal = (perCat.NotMigrated.div || 0) + (perCat.NotMigrated.local || 0);
+    const msTotal = (perCat.MigrationStarted.div || 0) + (perCat.MigrationStarted.local || 0);
+    // Display rule: Not Migrated includes Migration Started (both are not live)
+    const nmTotal = nmOnlyTotal + msTotal;
+    const iqTotal = (perCat.InQA.div || 0) + (perCat.InQA.local || 0);
+    const liveTotal = (perCat.Live.div || 0) + (perCat.Live.local || 0);
+
+    html += `<tr>
+      <td style="padding:8px; border-bottom:1px solid #f0f0f0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${escapeHtml(div)}">${escapeHtml(div)}</td>
+      <td style="padding:8px; border-bottom:1px solid #f0f0f0; text-align:center;"><span class="badge ${badgeClass}" style="font-size:0.72rem;">${divStatus}</span></td>
+      <td style="padding:8px; border-bottom:1px solid #f0f0f0; text-align:center;" title="Not Migrated (includes Migration Started) (Divisional: ${(perCat.NotMigrated.div || 0) + (perCat.MigrationStarted.div || 0)}, Local: ${(perCat.NotMigrated.local || 0) + (perCat.MigrationStarted.local || 0)})">${nmTotal}</td>
+      <td style="padding:8px; border-bottom:1px solid #f0f0f0; text-align:center;" title="Migration Started (Divisional: ${perCat.MigrationStarted.div || 0}, Local: ${perCat.MigrationStarted.local || 0})">${msTotal}</td>
+      <td style="padding:8px; border-bottom:1px solid #f0f0f0; text-align:center;" title="In Zesty/QA (Divisional: ${perCat.InQA.div || 0}, Local: ${perCat.InQA.local || 0})">${iqTotal}</td>
+      <td style="padding:8px; border-bottom:1px solid #f0f0f0; text-align:center;" title="Live (Divisional: ${perCat.Live.div || 0}, Local: ${perCat.Live.local || 0})">${liveTotal}</td>
+    </tr>`;
+  });
+
+  // Build detailed site-level audit rows and division page-total rows.
+  const siteAuditRows = [];
+  const divisionTotalsRows = [];
+
+  sortedDivs.forEach(div => {
+    const divStats = summary[div] || {};
+    const totals = {
+      sites: 0,
+      divisionalSites: 0,
+      localSites: 0,
+      totalPages: 0,
+      '1a': 0,
+      '1b': 0,
+      '1c': 0,
+      '2.x': 0,
+      '2c': 0,
+      '3.x': 0,
+      '4.x': 0,
+      '4b': 0,
+      'Live': 0,
+      '5x': 0,
+      'Redirect': 0,
+      'DNM': 0
+    };
+
+    Object.keys(divStats).sort((a, b) => a.localeCompare(b)).forEach(site => {
+      const st = divStats[site] || {};
+      const livePages = st['Live'] || 0;
+      const fivePages = st['5x'] || 0;
+      const fourPages = Math.max(0, livePages - fivePages);
+      const isDiv = !!st.isDivisional;
+      const categories = [];
+
+      // Allow multiple category membership so users can identify all applicable pulls.
+      const hasNotLive = (st['1a'] || 0) > 0 || (st['1b'] || 0) > 0 || (st['1c'] || 0) > 0 || (st['2.x'] || 0) > 0 || (st['2c'] || 0) > 0;
+      const hasMigrationStarted = (st['1b'] || 0) > 0 || (st['2.x'] || 0) > 0;
+      const hasReady = (st['1c'] || 0) > 0;
+      const hasInQa = (st['2c'] || 0) > 0 || (st['3.x'] || 0) > 0 || (st['4b'] || 0) > 0;
+      const hasRedirectNoFive = (st['Redirect'] || 0) > 0 && fivePages === 0;
+      // Keep Live pill aligned with the Live/5 column: require at least one status 5 page.
+      const hasLive = fivePages > 0;
+      const hasOnlyDnm = (st['DNM'] || 0) > 0 && (st.Total || 0) === (st['DNM'] || 0);
+
+      if (hasNotLive || hasOnlyDnm || hasRedirectNoFive) categories.push('Not Migrated');
+      if (hasMigrationStarted || hasRedirectNoFive) categories.push('Migration Started');
+      if (hasReady) categories.push('Ready');
+      if (hasInQa) categories.push('In Zesty/QA');
+      if (hasLive) categories.push('Live');
+      if (!categories.length) categories.push('Unclassified');
+
+      siteAuditRows.push({
+        division: div,
+        siteTitle: site,
+        type: isDiv ? 'D' : 'L',
+        categories: categories,
+        totalPages: st.Total || 0,
+        '1a': st['1a'] || 0,
+        '1b': st['1b'] || 0,
+        '1c': st['1c'] || 0,
+        '2.x': st['2.x'] || 0,
+        '2c': st['2c'] || 0,
+        '3.x': st['3.x'] || 0,
+        '4.x': fourPages,
+        '4b': st['4b'] || 0,
+        'Live': livePages,
+        '5x': st['5x'] || 0,
+        'Redirect': st['Redirect'] || 0,
+        'DNM': st['DNM'] || 0
+      });
+
+      totals.sites += 1;
+      totals.divisionalSites += isDiv ? 1 : 0;
+      totals.localSites += isDiv ? 0 : 1;
+      totals.totalPages += st.Total || 0;
+      totals['1a'] += st['1a'] || 0;
+      totals['1b'] += st['1b'] || 0;
+      totals['1c'] += st['1c'] || 0;
+      totals['2.x'] += st['2.x'] || 0;
+      totals['2c'] += st['2c'] || 0;
+      totals['3.x'] += st['3.x'] || 0;
+      totals['4.x'] += fourPages;
+      totals['4b'] += st['4b'] || 0;
+      totals['Live'] += st['Live'] || 0;
+      totals['5x'] += st['5x'] || 0;
+      totals['Redirect'] += st['Redirect'] || 0;
+      totals['DNM'] += st['DNM'] || 0;
+    });
+
+    divisionTotalsRows.push({ division: div, totals: totals });
+  });
+
+  const categoryPillHtml = function(cat) {
+    if (cat === 'Not Migrated') return '<span style="display:inline-block;padding:2px 6px;border-radius:999px;background:#f8d7da;color:#842029;font-size:0.72rem;margin:1px;">Not Migrated</span>';
+    if (cat === 'Migration Started') return '<span style="display:inline-block;padding:2px 6px;border-radius:999px;background:#fff3cd;color:#664d03;font-size:0.72rem;margin:1px;">Migration Started</span>';
+    if (cat === 'Ready') return '<span style="display:inline-block;padding:2px 6px;border-radius:999px;background:#e7f1ff;color:#0a3d91;font-size:0.72rem;margin:1px;">Ready</span>';
+    if (cat === 'In Zesty/QA') return '<span style="display:inline-block;padding:2px 6px;border-radius:999px;background:#cff4fc;color:#055160;font-size:0.72rem;margin:1px;">In Zesty/QA</span>';
+    if (cat === 'Live') return '<span style="display:inline-block;padding:2px 6px;border-radius:999px;background:#d1e7dd;color:#0f5132;font-size:0.72rem;margin:1px;">Live</span>';
+    return '<span style="display:inline-block;padding:2px 6px;border-radius:999px;background:#e2e3e5;color:#41464b;font-size:0.72rem;margin:1px;">Unclassified</span>';
+  };
+
+  const siteRowsHtml = siteAuditRows.map(r => `
+      <tr>
+        <td style="width:90px; max-width:90px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${escapeHtml(r.division)}">${escapeHtml(r.division)}</td>
+        <td style="width:220px; max-width:220px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${escapeHtml(r.siteTitle)}">${escapeHtml(r.siteTitle)}</td>
+        <td style="text-align:center;">${r.type}</td>
+        <td>${r.categories.map(categoryPillHtml).join('')}</td>
+        <td style="text-align:right;">${r.totalPages}</td>
+        <td style="text-align:right;">${r['1a']}</td>
+        <td style="text-align:right;">${r['1b']}</td>
+        <td style="text-align:right;">${r['1c']}</td>
+        <td style="text-align:right;">${r['2.x']}</td>
+        <td style="text-align:right;">${r['2c']}</td>
+        <td style="text-align:right;">${r['3.x']}</td>
+        <td style="text-align:right;">${(r['4.x'] || 0) + (r['4b'] || 0)}</td>
+        <td style="text-align:right;">${r['5x']}</td>
+        <td style="text-align:right;">${r['Redirect']}</td>
+        <td style="text-align:right;">${r['DNM']}</td>
+      </tr>`).join('');
+
+  const divisionRowsHtml = divisionTotalsRows.map(r => `
+      <tr>
+        <td style="width:100px; max-width:100px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${escapeHtml(r.division)}">${escapeHtml(r.division)}</td>
+        <td style="text-align:right;">${r.totals.sites}</td>
+        <td style="text-align:right;">${r.totals.divisionalSites}</td>
+        <td style="text-align:right;">${r.totals.localSites}</td>
+        <td style="text-align:right;">${r.totals.totalPages}</td>
+        <td style="text-align:right;">${r.totals['1a']}</td>
+        <td style="text-align:right;">${r.totals['1b']}</td>
+        <td style="text-align:right;">${r.totals['1c']}</td>
+        <td style="text-align:right;">${r.totals['2.x']}</td>
+        <td style="text-align:right;">${r.totals['2c']}</td>
+        <td style="text-align:right;">${r.totals['3.x']}</td>
+        <td style="text-align:right;">${(r.totals['4.x'] || 0) + (r.totals['4b'] || 0)}</td>
+        <td style="text-align:right;">${r.totals['5x']}</td>
+        <td style="text-align:right;">${r.totals['Redirect']}</td>
+        <td style="text-align:right;">${r.totals['DNM']}</td>
+      </tr>`).join('');
+
+  const siteGrandTotals = siteAuditRows.reduce((acc, r) => {
+    acc.totalPages += r.totalPages || 0;
+    acc['1a'] += r['1a'] || 0;
+    acc['1b'] += r['1b'] || 0;
+    acc['1c'] += r['1c'] || 0;
+    acc['2.x'] += r['2.x'] || 0;
+    acc['2c'] += r['2c'] || 0;
+    acc['3.x'] += r['3.x'] || 0;
+    acc['4.x/4b'] += (r['4.x'] || 0) + (r['4b'] || 0);
+    acc['Live/5'] += r['5x'] || 0;
+    acc['R'] += r['Redirect'] || 0;
+    acc['DNM'] += r['DNM'] || 0;
+    if (r.type === 'D') acc.divisionalSites += 1;
+    else acc.localSites += 1;
+    return acc;
+  }, {
+    totalPages: 0,
+    '1a': 0,
+    '1b': 0,
+    '1c': 0,
+    '2.x': 0,
+    '2c': 0,
+    '3.x': 0,
+    '4.x/4b': 0,
+    'Live/5': 0,
+    'R': 0,
+    'DNM': 0,
+    divisionalSites: 0,
+    localSites: 0
+  });
+
+  const categoryPullTotals = siteAuditRows.reduce((acc, r) => {
+    (r.categories || []).forEach((cat) => {
+      acc[cat] = (acc[cat] || 0) + 1;
+    });
+    return acc;
+  }, {
+    'Not Migrated': 0,
+    'Migration Started': 0,
+    'Ready': 0,
+    'In Zesty/QA': 0,
+    'Live': 0,
+    'Unclassified': 0
+  });
+
+  const categoryPullTotalsHtml = ['Not Migrated', 'Migration Started', 'Ready', 'In Zesty/QA', 'Live', 'Unclassified']
+    .filter(cat => (categoryPullTotals[cat] || 0) > 0)
+    .map(cat => `${categoryPillHtml(cat).replace('</span>', `: ${categoryPullTotals[cat]}</span>`)}`)
+    .join('');
+
+  const siteTotalsRowHtml = `
+      <tr style="background:#f8f9fa; font-weight:600;">
+        <td style="padding:8px; border-top:2px solid #d0d7de;">Sum</td>
+        <td style="padding:8px; border-top:2px solid #d0d7de;">All Sites (${siteAuditRows.length})</td>
+        <td style="text-align:center; padding:8px; border-top:2px solid #d0d7de;">D:${siteGrandTotals.divisionalSites} L:${siteGrandTotals.localSites}</td>
+        <td style="padding:8px; border-top:2px solid #d0d7de;">${categoryPullTotalsHtml || '<span style="color:#6c757d;">-</span>'}</td>
+        <td style="text-align:right; padding:8px; border-top:2px solid #d0d7de;">${siteGrandTotals.totalPages}</td>
+        <td style="text-align:right; padding:8px; border-top:2px solid #d0d7de;">${siteGrandTotals['1a']}</td>
+        <td style="text-align:right; padding:8px; border-top:2px solid #d0d7de;">${siteGrandTotals['1b']}</td>
+        <td style="text-align:right; padding:8px; border-top:2px solid #d0d7de;">${siteGrandTotals['1c']}</td>
+        <td style="text-align:right; padding:8px; border-top:2px solid #d0d7de;">${siteGrandTotals['2.x']}</td>
+        <td style="text-align:right; padding:8px; border-top:2px solid #d0d7de;">${siteGrandTotals['2c']}</td>
+        <td style="text-align:right; padding:8px; border-top:2px solid #d0d7de;">${siteGrandTotals['3.x']}</td>
+        <td style="text-align:right; padding:8px; border-top:2px solid #d0d7de;">${siteGrandTotals['4.x/4b']}</td>
+        <td style="text-align:right; padding:8px; border-top:2px solid #d0d7de;">${siteGrandTotals['Live/5']}</td>
+        <td style="text-align:right; padding:8px; border-top:2px solid #d0d7de;">${siteGrandTotals['R']}</td>
+        <td style="text-align:right; padding:8px; border-top:2px solid #d0d7de;">${siteGrandTotals['DNM']}</td>
+      </tr>`;
+
+  const divisionGrandTotals = divisionTotalsRows.reduce((acc, r) => {
+    const t = r.totals || {};
+    acc.sites += t.sites || 0;
+    acc.divisionalSites += t.divisionalSites || 0;
+    acc.localSites += t.localSites || 0;
+    acc.totalPages += t.totalPages || 0;
+    acc['1a'] += t['1a'] || 0;
+    acc['1b'] += t['1b'] || 0;
+    acc['1c'] += t['1c'] || 0;
+    acc['2.x'] += t['2.x'] || 0;
+    acc['2c'] += t['2c'] || 0;
+    acc['3.x'] += t['3.x'] || 0;
+    acc['4.x/4b'] += (t['4.x'] || 0) + (t['4b'] || 0);
+    acc['Live/5'] += t['5x'] || 0;
+    acc['R'] += t['Redirect'] || 0;
+    acc['DNM'] += t['DNM'] || 0;
+    return acc;
+  }, {
+    sites: 0,
+    divisionalSites: 0,
+    localSites: 0,
+    totalPages: 0,
+    '1a': 0,
+    '1b': 0,
+    '1c': 0,
+    '2.x': 0,
+    '2c': 0,
+    '3.x': 0,
+    '4.x/4b': 0,
+    'Live/5': 0,
+    'R': 0,
+    'DNM': 0
+  });
+
+  const divisionTotalsRowHtml = `
+      <tr style="background:#f8f9fa; font-weight:600;">
+        <td style="padding:8px; border-top:2px solid #d0d7de;">Sum</td>
+        <td style="text-align:right; padding:8px; border-top:2px solid #d0d7de;">${divisionGrandTotals.sites}</td>
+        <td style="text-align:right; padding:8px; border-top:2px solid #d0d7de;">${divisionGrandTotals.divisionalSites}</td>
+        <td style="text-align:right; padding:8px; border-top:2px solid #d0d7de;">${divisionGrandTotals.localSites}</td>
+        <td style="text-align:right; padding:8px; border-top:2px solid #d0d7de;">${divisionGrandTotals.totalPages}</td>
+        <td style="text-align:right; padding:8px; border-top:2px solid #d0d7de;">${divisionGrandTotals['1a']}</td>
+        <td style="text-align:right; padding:8px; border-top:2px solid #d0d7de;">${divisionGrandTotals['1b']}</td>
+        <td style="text-align:right; padding:8px; border-top:2px solid #d0d7de;">${divisionGrandTotals['1c']}</td>
+        <td style="text-align:right; padding:8px; border-top:2px solid #d0d7de;">${divisionGrandTotals['2.x']}</td>
+        <td style="text-align:right; padding:8px; border-top:2px solid #d0d7de;">${divisionGrandTotals['2c']}</td>
+        <td style="text-align:right; padding:8px; border-top:2px solid #d0d7de;">${divisionGrandTotals['3.x']}</td>
+        <td style="text-align:right; padding:8px; border-top:2px solid #d0d7de;">${divisionGrandTotals['4.x/4b']}</td>
+        <td style="text-align:right; padding:8px; border-top:2px solid #d0d7de;">${divisionGrandTotals['Live/5']}</td>
+        <td style="text-align:right; padding:8px; border-top:2px solid #d0d7de;">${divisionGrandTotals['R']}</td>
+        <td style="text-align:right; padding:8px; border-top:2px solid #d0d7de;">${divisionGrandTotals['DNM']}</td>
+      </tr>`;
+
+  html += `
+        </tbody>
+      </table>
+    </div>
+
+      <div style="margin-top: 16px; border-top: 1px solid #e9ecef; padding-top: 12px;">
+        <h5 style="margin: 0 0 8px; font-weight: 600;"><i class="bi bi-table"></i> Site Category Audit Table</h5>
+        <small style="color:#666; display:block; margin-bottom:8px;">Each site can appear in one or multiple categories based on page statuses.</small>
+        <div class="sc-table-wrap" style="border:1px solid #e0e0e0; border-radius:4px; overflow:hidden;">
+          <div class="sc-top-scroll" style="overflow-x:auto; overflow-y:hidden; height:14px; border-bottom:1px solid #e0e0e0; background:#fafbfc;">
+            <div class="sc-top-scroll-inner" style="height:1px;"></div>
+          </div>
+          <div class="sc-bottom-scroll site-audit-scroll" style="overflow:auto;">
+          <table class="sc-report-table" style="width:100%; border-collapse:collapse; font-size:0.82rem; min-width:1260px; table-layout:fixed;">
+            <thead>
+              <tr>
+                <th style="text-align:left; padding:8px; border-bottom:1px solid #e0e0e0; width:90px; max-width:90px;">Division</th>
+                <th style="text-align:left; padding:8px; border-bottom:1px solid #e0e0e0; width:220px; max-width:220px;">Site Title</th>
+                <th style="text-align:center; padding:8px; border-bottom:1px solid #e0e0e0;">D/L</th>
+                <th style="text-align:left; padding:8px; border-bottom:1px solid #e0e0e0; width:260px; min-width:260px;">Category Pull(s)</th>
+                <th style="text-align:right; padding:8px; border-bottom:1px solid #e0e0e0;">Total</th>
+                <th style="text-align:right; padding:8px; border-bottom:1px solid #e0e0e0;">1a</th>
+                <th style="text-align:right; padding:8px; border-bottom:1px solid #e0e0e0;">1b</th>
+                <th style="text-align:right; padding:8px; border-bottom:1px solid #e0e0e0;">1c</th>
+                <th style="text-align:right; padding:8px; border-bottom:1px solid #e0e0e0;">2.x</th>
+                <th style="text-align:right; padding:8px; border-bottom:1px solid #e0e0e0;">2c</th>
+                <th style="text-align:right; padding:8px; border-bottom:1px solid #e0e0e0;">3.x</th>
+                <th style="text-align:right; padding:8px; border-bottom:1px solid #e0e0e0;">4.x/4b</th>
+                <th style="text-align:right; padding:8px; border-bottom:1px solid #e0e0e0;">Live/5</th>
+                <th style="text-align:right; padding:8px; border-bottom:1px solid #e0e0e0;">R</th>
+                <th style="text-align:right; padding:8px; border-bottom:1px solid #e0e0e0;">DNM</th>
+              </tr>
+            </thead>
+            <tbody>${siteRowsHtml}</tbody>
+            <tfoot>${siteTotalsRowHtml}</tfoot>
+          </table>
+          </div>
+        </div>
+      </div>
+
+      <div style="margin-top: 16px; border-top: 1px solid #e9ecef; padding-top: 12px;">
+        <h5 style="margin: 0 0 8px; font-weight: 600;"><i class="bi bi-collection"></i> Division Page Totals By Status</h5>
+        <div class="sc-table-wrap" style="border:1px solid #e0e0e0; border-radius:4px; overflow:hidden;">
+          <div class="sc-top-scroll" style="overflow-x:auto; overflow-y:hidden; height:14px; border-bottom:1px solid #e0e0e0; background:#fafbfc;">
+            <div class="sc-top-scroll-inner" style="height:1px;"></div>
+          </div>
+          <div class="sc-bottom-scroll" style="overflow:auto;">
+          <table class="sc-report-table" style="width:100%; border-collapse:collapse; font-size:0.82rem; min-width:1180px; table-layout:fixed;">
+            <thead>
+              <tr>
+                <th style="text-align:left; padding:8px; border-bottom:1px solid #e0e0e0; width:100px; max-width:100px;">Division</th>
+                <th style="text-align:right; padding:8px; border-bottom:1px solid #e0e0e0;">Sites</th>
+                <th style="text-align:right; padding:8px; border-bottom:1px solid #e0e0e0;">Div Sites</th>
+                <th style="text-align:right; padding:8px; border-bottom:1px solid #e0e0e0;">Local Sites</th>
+                <th style="text-align:right; padding:8px; border-bottom:1px solid #e0e0e0;">Total</th>
+                <th style="text-align:right; padding:8px; border-bottom:1px solid #e0e0e0;">1a</th>
+                <th style="text-align:right; padding:8px; border-bottom:1px solid #e0e0e0;">1b</th>
+                <th style="text-align:right; padding:8px; border-bottom:1px solid #e0e0e0;">1c</th>
+                <th style="text-align:right; padding:8px; border-bottom:1px solid #e0e0e0;">2.x</th>
+                <th style="text-align:right; padding:8px; border-bottom:1px solid #e0e0e0;">2c</th>
+                <th style="text-align:right; padding:8px; border-bottom:1px solid #e0e0e0;">3.x</th>
+                <th style="text-align:right; padding:8px; border-bottom:1px solid #e0e0e0;">4.x/4b</th>
+                <th style="text-align:right; padding:8px; border-bottom:1px solid #e0e0e0;">Live/5</th>
+                <th style="text-align:right; padding:8px; border-bottom:1px solid #e0e0e0;">R</th>
+                <th style="text-align:right; padding:8px; border-bottom:1px solid #e0e0e0;">DNM</th>
+              </tr>
+            </thead>
+            <tbody>${divisionRowsHtml}</tbody>
+            <tfoot>${divisionTotalsRowHtml}</tfoot>
+          </table>
+          </div>
+        </div>
+      </div>`;
+  
+  html += `</div></div></div>`;
+  
+  // Store territory chart data globally for rendering later (show site distribution)
+  const siteChartData = [
+    notMigD + notMigL,
+    migratingD + migratingL,
+    qaD + qaL,
+    liveD + liveL
+  ];
+  
+  window.territoryChartData = {
+    chartId: chartId,
+    labels: ['Not Migrated', 'Migration Started', 'In QA', 'Live'],
+    data: siteChartData
+  };
+  
+  return html;
+}
+
+// Add a synchronized top horizontal scrollbar for long report tables.
+function initTopTableScrollbars(rootEl) {
+  const root = rootEl || document;
+  const wraps = root.querySelectorAll('.sc-table-wrap');
+  wraps.forEach(wrap => {
+    const top = wrap.querySelector('.sc-top-scroll');
+    const topInner = wrap.querySelector('.sc-top-scroll-inner');
+    const bottom = wrap.querySelector('.sc-bottom-scroll');
+    const table = bottom ? bottom.querySelector('table') : null;
+    if (!top || !topInner || !bottom || !table) return;
+
+    const refreshWidth = () => {
+      try {
+        topInner.style.width = `${table.scrollWidth}px`;
+      } catch (e) { /* no-op */ }
+    };
+
+    refreshWidth();
+
+    let syncing = false;
+    top.onscroll = () => {
+      if (syncing) return;
+      syncing = true;
+      bottom.scrollLeft = top.scrollLeft;
+      syncing = false;
+    };
+    bottom.onscroll = () => {
+      if (syncing) return;
+      syncing = true;
+      top.scrollLeft = bottom.scrollLeft;
+      syncing = false;
+    };
+
+    if (typeof ResizeObserver !== 'undefined') {
+      try {
+        const ro = new ResizeObserver(refreshWidth);
+        ro.observe(table);
+      } catch (e) { /* no-op */ }
+    }
+  });
+}
+
 function renderCards(){
   const filtered = getFilteredData();
   const dedupeRows = (rows) => {
@@ -1470,6 +2175,68 @@ function renderCards(){
   const filteredQa = qaSummary(filtered);
   const allQa = qaSummary(allRows);
 
+  const siteMigrationProgress = (rows) => {
+    const sites = {};
+    rows.forEach(d => {
+      // Align grouping with 'Migration Tool Insights' (Service Centers are treated as their own sites)
+      let site = (d['Site Title'] || d['Site'] || 'Unknown').toString().trim();
+      const isServiceCenter = d['Service Center Page'] && d['Service Center Page'] !== 'No' && d['Service Center Page'] !== '0';
+      if (isServiceCenter && d['Service Center Site Name']) {
+        site = d['Service Center Site Name'];
+      }
+
+      if (!sites[site]) sites[site] = { total: 0, finished: 0 };
+      sites[site].total++;
+      const s = statusValue(d);
+      
+      // A site is not completed if any page is still in 1b/1c or other non-end statuses.
+      // End statuses are strictly limited to 4.x, 5.x, Redirect, and Do Not Migrate.
+      if (s.startsWith('4') || s.startsWith('5') || s === 'THQ Redirect' || s === 'Do Not Migrate') {
+        sites[site].finished++;
+      }
+    });
+    const siteList = Object.values(sites);
+    const total = siteList.length;
+    const completed = siteList.filter(s => s.finished === s.total).length;
+    return { completed, total };
+  };
+
+  const filteredSiteStats = siteMigrationProgress(filtered);
+  const allSiteStats = siteMigrationProgress(allRows);
+
+  // Site Status Summary for management report trigger
+  const siteStatusSummary = (() => {
+    const summary = {}; // { Division: { SiteTitle: { Completed: 0, InProgress: 0, InQA: 0, NeedsInfo: 0, Total: 0 } } }
+    filtered.forEach(d => {
+      const div = (d.Division || 'Other').toString().trim();
+      let site = (d['Site Title'] || d['Site'] || 'Unknown').toString().trim();
+      const isServiceCenter = d['Service Center Page'] && d['Service Center Page'] !== 'No' && d['Service Center Page'] !== '0';
+      if (isServiceCenter && d['Service Center Site Name']) {
+        site = d['Service Center Site Name'];
+      }
+      
+      if (!summary[div]) summary[div] = {};
+      if (!summary[div][site]) summary[div][site] = { Completed: 0, InProgress: 0, InQA: 0, NeedsInfo: 0, Total: 0 };
+      
+      summary[div][site].Total++;
+      const s = statusValue(d);
+      if (s.startsWith('4') || s.startsWith('5') || s === 'THQ Redirect' || s === 'Do Not Migrate') summary[div][site].Completed++;
+      else if (s.startsWith('2')) summary[div][site].InProgress++;
+      else if (s.startsWith('3')) summary[div][site].InQA++;
+      else summary[div][site].NeedsInfo++;
+    });
+    return summary;
+  })();
+
+  // Update footer with Weekly Modified info
+  const refreshEl = document.getElementById('refreshDate');
+  if (refreshEl) {
+    const currentTextMatch = refreshEl.innerHTML.match(/Data last refreshed: [^<]+/);
+    const currentText = currentTextMatch ? currentTextMatch[0] : '';
+    const ver = (window.APP_VERSION || APP_VERSION);
+    refreshEl.innerHTML = `v${ver} · ${currentText} <br> <span class="opacity-75" style="font-size: 0.8rem;">Weekly Modified: This Week: <strong>${filteredWeekly.thisWeekCount}</strong> | Last Week: <strong>${filteredWeekly.prevWeekCount}</strong> (Total this week: ${allWeekly.thisWeekCount})</span>`;
+  }
+
   const today = new Date();
   const lastMonth = new Date(today.getFullYear(), today.getMonth()-1, today.getDate());
   renderOverallProgress(filtered);
@@ -1477,21 +2244,21 @@ function renderCards(){
 
     // --- metrics object ---
   const metrics = {
-    "Migration Progress": {
+    "Site Migration Progress": {
+      main: `${toPct(filteredSiteStats.completed, filteredSiteStats.total)}% (${filteredSiteStats.completed} of ${filteredSiteStats.total} Sites)`,
+      sub: `All sites: ${allSiteStats.completed} of ${allSiteStats.total} (${toPct(allSiteStats.completed, allSiteStats.total)}%)`
+    },
+    "Page Migration Progress": {
       main: `${toPct(filteredProgress, filteredTotal)}% (${compareText(filteredProgress, filteredTotal)})`,
       sub: `Filtered share of all pages: ${compareText(filteredProgress, allTotal)}`
     },
-    "Completed (incl. THQ Redirect)": {
+    "Completed Pages": {
       main: `${compareText(filteredCompleted, filteredTotal)}`,
       sub: `All pages: ${compareText(allCompleted, allTotal)}`
     },
     "Do Not Migrate": {
       main: `${compareText(filteredDoNotMigrate, filteredTotal)}`,
       sub: `All pages: ${compareText(allDoNotMigrate, allTotal)}`
-    },
-    "Weekly Modified": {
-      main: `This Week: ${filteredWeekly.thisWeekCount} | Last Week: ${filteredWeekly.prevWeekCount}`,
-      sub: `All pages this week: ${allWeekly.thisWeekCount} | last week: ${allWeekly.prevWeekCount}`
     },
     "QA Issues": {
       main: `High: ${filteredQa.qaHigh} | Low: ${filteredQa.qaLow} | Revamp: ${filteredQa.revampCount} | Total: ${filteredQa.uniqueTotal}`
@@ -1736,18 +2503,24 @@ try{ addChartLegendModal(statusChart, 'Status'); }catch(e){}
     const metric = metrics[key];
     const mainText = metric && typeof metric === 'object' ? metric.main : metric;
     const subText = metric && typeof metric === 'object' ? metric.sub : '';
+    const isSiteCard = key === "Site Migration Progress";
+    
     container.innerHTML += `
       <div class="col-lg-3 col-md-6 col-sm-12 mb-1">
-        <div class="card text-white" style="background-color:${colors[i++ % colors.length]}">
+        <div class="card text-white site-metric-card" 
+             ${isSiteCard ? `id="site-progress-card" data-bs-toggle="modal" data-bs-target="#siteManagementModal" style="cursor: pointer;"` : ''}
+             style="background-color:${colors[i++ % colors.length]}">
           <div class="card-body">
-            <h5 class="card-title">${key}</h5>
+            <h5 class="card-title d-flex align-items-center justify-content-center gap-1 mb-2" style="line-height:1.2;">
+              <span>${key}</span>
+              ${isSiteCard ? '<span style="color:rgba(19,35,63,0.78); font-size:0.68rem; font-weight:700; font-family:Arial,sans-serif; line-height:1; display:inline-flex; align-items:center; justify-content:center; width:16px; height:16px; flex:0 0 16px; background:rgba(19,35,63,0.1); border:1px solid rgba(19,35,63,0.24); border-radius:50%;" title="Click to open Site Status Management Report" aria-label="Clickable card">i</span>' : ''}
+            </h5>
             <p class="card-text mb-1">${mainText}</p>
             ${hasActiveFilters && subText ? `<p class="card-text small mb-0" style="opacity:0.92;">${subText}</p>` : ''}
           </div>
         </div>
       </div>`;
   }
-
 
   // QA statuses breakdown (AC, DHQ, THQ) with High/Low/Total
   const qaStatuses = [
@@ -1793,6 +2566,131 @@ try{ addChartLegendModal(statusChart, 'Status'); }catch(e){}
   renderBreakdown(filtered);
   renderQaAccordion(filtered);
   renderServiceCenterAccordion(filtered);
+
+  // Attach click handler AFTER all DOM manipulations (this ensures it survives all innerHTML changes)
+  setTimeout(() => {
+    const siteMgmtCard = document.getElementById('site-progress-card');
+    if (siteMgmtCard) {
+      siteMgmtCard.onclick = function siteCardClick() {
+        console.log('Site Migration Card clicked...');
+        const modalBody = document.getElementById('siteManagementModalBody');
+        if (modalBody) {
+          const content = generateSiteSummaryTable();
+          console.log('Table content length:', content.length);
+          modalBody.innerHTML = content;
+          initTopTableScrollbars(modalBody);
+          
+          // Render territory chart after content is injected
+          setTimeout(() => {
+            if (window.territoryChartData && typeof Chart !== 'undefined') {
+              const canvas = document.getElementById(window.territoryChartData.chartId);
+              if (canvas) {
+                try {
+                  const ctx = canvas.getContext('2d');
+                  // Render as a single horizontal stacked bar to save vertical space
+                  const labels = window.territoryChartData.labels;
+                  const counts = window.territoryChartData.data;
+                  const colors = ['#dc3545', '#ffc107', '#17a2b8', '#28a745'];
+                  const datasets = labels.map((lbl, i) => ({
+                    label: lbl,
+                    data: [counts[i] || 0],
+                    backgroundColor: colors[i] || '#ccc',
+                    borderColor: '#fff',
+                    borderWidth: 1,
+                    stack: 'a'
+                  }));
+
+                  new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                      labels: [''],
+                      datasets: datasets
+                    },
+                    options: {
+                      indexAxis: 'y',
+                      responsive: true,
+                      maintainAspectRatio: false,
+                      layout: {
+                        padding: { right: 30 }
+                      },
+                      plugins: {
+                        legend: {
+                          position: 'right',
+                          align: 'start',
+                          labels: { boxWidth: 10, padding: 8, font: { size: 11 } }
+                        },
+                        tooltip: { callbacks: { label: function(context){ return context.dataset.label + ': ' + (context.parsed.x || context.parsed); } } }
+                      },
+                      scales: {
+                        x: { stacked: true, ticks: { beginAtZero: true }, grace: '10%' },
+                        y: { stacked: true }
+                      }
+                    }
+                  });
+                } catch (e) {
+                  console.error('Error rendering territory chart:', e);
+                }
+              }
+            }
+          }, 50);
+        } else {
+          console.error('Modal body #siteManagementModalBody not found!');
+          const fallbackBody = document.querySelector('#siteManagementModal .modal-body');
+          if (fallbackBody) {
+            fallbackBody.innerHTML = generateSiteSummaryTable();
+            initTopTableScrollbars(fallbackBody);
+            // Render chart here too
+            setTimeout(() => {
+              if (window.territoryChartData && typeof Chart !== 'undefined') {
+                const canvas = document.getElementById(window.territoryChartData.chartId);
+                if (canvas) {
+                  try {
+                    const ctx = canvas.getContext('2d');
+                    // Render stacked horizontal bar in fallback path as well
+                    const labels = window.territoryChartData.labels;
+                    const counts = window.territoryChartData.data;
+                    const colors = ['#dc3545', '#ffc107', '#17a2b8', '#28a745'];
+                    const datasets = labels.map((lbl, i) => ({
+                      label: lbl,
+                      data: [counts[i] || 0],
+                      backgroundColor: colors[i] || '#ccc',
+                      borderColor: '#fff',
+                      borderWidth: 1,
+                      stack: 'a'
+                    }));
+
+                    new Chart(ctx, {
+                      type: 'bar',
+                      data: { labels: [''], datasets: datasets },
+                      options: {
+                        indexAxis: 'y',
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        layout: {
+                          padding: { right: 30 }
+                        },
+                        plugins: {
+                          legend: {
+                            position: 'right',
+                            align: 'start',
+                            labels: { boxWidth: 10, padding: 8, font: { size: 11 } }
+                          },
+                          tooltip: { callbacks: { label: function(context){ return context.dataset.label + ': ' + (context.parsed.x || context.parsed); } } }
+                        },
+                        scales: { x: { stacked: true, ticks: { beginAtZero: true }, grace: '10%' }, y: { stacked: true } }
+                      }
+                    });
+                  } catch (e) {
+                    console.error('Error rendering territory chart:', e);
+                  }
+                }
+              }
+            }, 50);
+          }
+        }
+      };
+    }
+  }, 0);
 }
 
 
@@ -3254,7 +4152,7 @@ function renderCharts(filtered) {
 
 // --- Migration Insights rendering ---
 function renderMigrationInsights(filteredData){
-  const container = document.getElementById("migrationInsightsBody");
+  const container = document.getElementById("siteInsightsParent") || document.getElementById("migrationInsightsBody");
   if (!container) return;
   container.innerHTML = "";
 
@@ -3300,28 +4198,46 @@ function renderMigrationInsights(filteredData){
   // Helper to linkify URLs in text
   const linkifyText = (text) => {
     if (!text) return "";
-    const urlRegex = /(https?:\/\/[^\s]+|www\.[^\s]+)/g;
-    return escapeHtml(text).replace(urlRegex, (match) => {
+    
+    // Improved SharePoint App link handling vs general URLs
+    // Example: SharePoint App ([6/16/2026 11:56 AM](https://...))
+    const spRegex = /SharePoint App \(\[([^\]]+)\]\((https?:\/\/[^\)]+)\)\)/g;
+    let processed = escapeHtml(text).replace(spRegex, (match, dateLabel, url) => {
+      return `<a href="${url}" target="_blank" rel="noopener noreferrer" class="text-primary fw-bold" style="text-decoration: underline;">SP Migration Log (${dateLabel})</a>`;
+    });
+
+    const urlRegex = /(https?:\/\/[^\s\)]+|www\.[^\s\)]+)/g;
+    return processed.replace(urlRegex, (match) => {
+      // Don't re-linkify what we already processed for SP
+      if (match.includes('sauss.sharepoint.com') && processed.includes('SP Migration Log')) return match;
       const url = match.startsWith('http') ? match : 'https://' + match;
-      return `<a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer" style="text-decoration: underline; color: inherit;">${escapeHtml(match)}</a>`;
+      return `<a href="${url}" target="_blank" rel="noopener noreferrer" style="text-decoration: underline; color: inherit;">${match}</a>`;
     });
   };
 
   // Group by Site Title
   const sitesMap = {};
   migratedPages.forEach(page => {
-    const siteTitle = page['Site Title'] || 'Other / Individual Pages';
-    if (!sitesMap[siteTitle]) {
-      sitesMap[siteTitle] = {
-        title: siteTitle,
+    // If it's a service center page, the "Site" it belongs to for grouping is the Service Center Site Name
+    let groupTitle = page['Site Title'] || 'Other / Individual Pages';
+    const isServiceCenter = page['Service Center Page'] && page['Service Center Page'] !== 'No' && page['Service Center Page'] !== '0';
+    
+    if (isServiceCenter && page['Service Center Site Name']) {
+      groupTitle = page['Service Center Site Name'];
+    }
+
+    if (!sitesMap[groupTitle]) {
+      sitesMap[groupTitle] = {
+        title: groupTitle,
         pages: [],
         latestDate: 0,
         allDates: new Set(),
         division: page.Division || '',
-        siteType: page['Site Type'] || page['Symphony Site Type'] || ''
+        siteType: page['Site Type'] || page['Symphony Site Type'] || '',
+        isServiceCenterCluster: (isServiceCenter && page['Service Center Site Name'] === groupTitle)
       };
     }
-    sitesMap[siteTitle].pages.push(page);
+    sitesMap[groupTitle].pages.push(page);
     
     // Primary: Last Migrated -> Last Migration -> Fallback to Migration Notes regex
     let dStr = page['Last Migrated'] || page['Last Migration'];
@@ -3333,8 +4249,8 @@ function renderMigrationInsights(filteredData){
     if (dStr) {
       const d = new Date(dStr).getTime();
       if (!isNaN(d)) {
-        if (d > sitesMap[siteTitle].latestDate) sitesMap[siteTitle].latestDate = d;
-        sitesMap[siteTitle].allDates.add(new Date(dStr).toLocaleDateString());
+        if (d > sitesMap[groupTitle].latestDate) sitesMap[groupTitle].latestDate = d;
+        sitesMap[groupTitle].allDates.add(new Date(dStr).toLocaleDateString());
       }
     }
   });
@@ -3347,11 +4263,11 @@ function renderMigrationInsights(filteredData){
   summaryDiv.className = 'mb-4 p-3 bg-white border rounded shadow-sm d-flex justify-content-between align-items-center';
   summaryDiv.innerHTML = `
     <div>
-        <h5 class="mb-1 fw-bold text-dark">Recent Site Migration Insights</h5>
-        <span class="text-muted small">Showing highlights for <strong>${migratedPages.length}</strong> pages across <strong>${sortedSites.length}</strong> sites.</span>
+        <h5 class="mb-1 fw-bold text-dark">Recent Site Migration Tool Insights</h5>
+        <span class="text-muted small">Showing highlights for <strong>${migratedPages.length}</strong> pages across <strong>${sortedSites.length}</strong> grouped site buckets.</span>
     </div>
     <div class="text-end">
-        <span class="badge bg-primary rounded-pill px-3">${sortedSites.length} Active Sites</span>
+        <span class="badge bg-primary rounded-pill px-3">${sortedSites.length} Active Buckets</span>
     </div>
   `;
   container.appendChild(summaryDiv);
@@ -3385,14 +4301,14 @@ function renderMigrationInsights(filteredData){
       : '<span class="text-muted small">Date Pending</span>';
 
     siteCard.innerHTML = `
-      <div class="card border-0 shadow-sm overflow-hidden">
+      <div class="card border-0 shadow-sm overflow-hidden mb-2">
         <div class="card-header bg-dark text-white p-0">
           <button class="btn btn-dark w-100 text-start p-3 border-0 d-flex justify-content-between align-items-start collapse-trigger collapsed" 
                   type="button" data-bs-toggle="collapse" data-bs-target="#${collapseId}" 
                   aria-expanded="false" aria-controls="${collapseId}">
             <div class="flex-grow-1">
               <h5 class="mb-0 fw-bold d-flex align-items-center">
-                <span class="badge bg-warning text-dark me-2 px-2" style="font-size: 0.7rem;">SITE</span>
+                <span class="badge ${site.isServiceCenterCluster ? 'bg-primary' : 'bg-warning text-dark'} me-2 px-2" style="font-size: 0.7rem;">${site.isServiceCenterCluster ? 'SERVICE CENTER' : 'SITE'}</span>
                 ${escapeHtml(site.title)}
                 <i class="ms-2 opacity-50 small pe-7s-angle-down"></i>
               </h5>
@@ -3407,7 +4323,7 @@ function renderMigrationInsights(filteredData){
             </div>
           </button>
         </div>
-        <div id="${collapseId}" class="collapse">
+        <div id="${collapseId}" class="collapse" data-bs-parent="#siteInsightsParent">
           <div class="card-body p-0">
             <div class="table-responsive">
               <table class="table table-hover table-striped mb-0 align-middle">
@@ -3440,6 +4356,11 @@ function renderMigrationInsights(filteredData){
                       tags.push(`<span class="badge border border-${sClass} text-${sClass} text-uppercase me-1" style="font-size: 0.6rem;">${escapeHtml(status)}</span>`);
                     }
 
+                    // Site Info (if Service Center, show original site)
+                    if (site.isServiceCenterCluster && page['Site Title'] && page['Site Title'] !== site.title) {
+                      tags.push(`<span class="badge bg-secondary text-white me-1">From: ${escapeHtml(page['Site Title'])}</span>`);
+                    }
+
                     // Priority Badge
                     const priority = page['Priority'];
                     if (priority && priority !== 'None') {
@@ -3455,7 +4376,7 @@ function renderMigrationInsights(filteredData){
                       tags.push(`<span class="badge bg-light text-dark border me-1" title="Level of Effort">Effort: ${escapeHtml(effort.split('.')[0])}</span>`);
                     }
 
-                    if (page['Revamp Page'] && page['Revamp Page'] !== 'None') {
+                    if (page['Revamp Page'] && page['Revamp Page'] !== 'None' && page['Revamp Page'] !== 'false' && page['Revamp Page'] !== false && String(page['Revamp Page']).toLowerCase() !== 'false') {
                       tags.push(`<span class="badge bg-info text-white me-1">Revamp: ${escapeHtml(page['Revamp Page'])}</span>`);
                     }
 
@@ -3465,7 +4386,7 @@ function renderMigrationInsights(filteredData){
                     }
                     
                     if (page['Service Center Page'] && page['Service Center Page'] !== 'No' && page['Service Center Page'] !== '0') {
-                      tags.push(`<span class="badge bg-dark text-white me-1">Service Center</span>`);
+                      tags.push(`<span class="badge bg-primary text-white me-1">Service Center Page</span>`);
                     }
                     
                     if (page['Status'] === 'THQ Redirect') {
@@ -3521,7 +4442,7 @@ function renderMigrationInsights(filteredData){
             </div>
           </div>
           <div class="card-footer bg-light p-2 text-center border-top-0">
-              <small class="text-muted fw-bold" style="font-size: 0.7rem;">Total Migrated Items in Site: ${site.pages.length}</small>
+              <small class="text-muted fw-bold" style="font-size: 0.7rem;">Total Migrated Items in Site Cluster: ${site.pages.length}</small>
           </div>
         </div>
       </div>
