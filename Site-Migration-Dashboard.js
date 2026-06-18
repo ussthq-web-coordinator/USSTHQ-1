@@ -679,6 +679,70 @@ async function loadQaLookupCsv(){
   }
 })();
 
+function anyDashboardFilterActive(){
+  const ids = ["filterDivision","filterAC","filterStatus","filterPageType","filterPubSym","filterSymType","filterPriority","filterRevamp","filterSiteTitle"];
+  for (const id of ids) {
+    const el = document.getElementById(id);
+    if (el && el.value) return true;
+  }
+  const modFrom = document.getElementById('filterModifiedFrom');
+  const modTo = document.getElementById('filterModifiedTo');
+  if ((modFrom && modFrom.value) || (modTo && modTo.value)) return true;
+  return false;
+}
+
+function getQaSourceData(preferredData){
+  if (!anyDashboardFilterActive() && Array.isArray(masterData) && masterData.length) {
+    return masterData;
+  }
+  if (Array.isArray(preferredData) && preferredData.length) return preferredData;
+  if (typeof getFilteredData === 'function') return getFilteredData();
+  return tableData;
+}
+
+function buildExpandedQaIssueRows(sourceData){
+  const issueRows = [];
+  (Array.isArray(sourceData) ? sourceData : []).forEach(r => {
+    const lookups = (r['QA Issues.lookupValue'] || '').toString().split(';').map(s => s.trim()).filter(Boolean);
+    if (!lookups.length) {
+      if (isRevampPage(r)) {
+        const isNotPublished = ((r['Revamp Publish Y/N'] || '').toString().trim().toLowerCase() === 'no');
+        issueRows.push({
+          ID: r.ID,
+          Title: r.Title || r['Site Title'] || '',
+          'Symphony Site Type': r['Symphony Site Type'] || '',
+          'Page URL': r['Page URL'] || '',
+          'Zesty URL Path Part': r['Zesty URL Path Part'] || '',
+          Status: r.Status || '',
+          Priority: r.Priority || '',
+          'QA Notes': r['QA Notes'] || '',
+          'QA Issue': 'Revamp Needed',
+          'Not Published': isNotPublished ? 'Yes' : '',
+          'Site Title': r['Site Title'] || ''
+        });
+      }
+    } else {
+      lookups.forEach(lv => {
+        const isNotPublished = ((r['Revamp Publish Y/N'] || '').toString().trim().toLowerCase() === 'no');
+        issueRows.push({
+          ID: r.ID,
+          Title: r.Title || r['Site Title'] || '',
+          'Symphony Site Type': r['Symphony Site Type'] || '',
+          'Page URL': r['Page URL'] || '',
+          'Zesty URL Path Part': r['Zesty URL Path Part'] || '',
+          Status: r.Status || '',
+          Priority: r.Priority || '',
+          'QA Notes': r['QA Notes'] || '',
+          'QA Issue': lv,
+          'Not Published': isNotPublished ? 'Yes' : '',
+          'Site Title': r['Site Title'] || ''
+        });
+      });
+    }
+  });
+  return issueRows;
+}
+
 // --- QA Accordion rendering (one card per page, aggregated issues) ---
 function renderQaAccordion(data){
   const container = document.getElementById("qaGroupsBody");
@@ -689,18 +753,24 @@ function renderQaAccordion(data){
   Object.keys(qaIssueDetailsMap).forEach(k => delete qaIssueDetailsMap[k]);
 
   const qaRows = Array.isArray(data) ? data.filter(d => d["QA Issues.lookupValue"] || isRevampPage(d)) : [];
+  const qaSourceData = getQaSourceData(data);
+  const qaExpandedIssueRows = buildExpandedQaIssueRows(qaSourceData);
 
-  // Count unique pages affected (by title) so badge shows pages, not rows
-  const uniquePages = new Set((qaRows || []).map(d => (d.Title || d['Site Title'] || 'Untitled Page')));
+  const qaPageCount = qaRows.filter(d => d["QA Issues.lookupValue"] && String(d["QA Issues.lookupValue"]).trim()).length;
+  const qaIssueTotal = qaExpandedIssueRows.length;
+  const revampCount = qaRows.filter(d => isRevampPage(d)).length;
+  const notPublishedCount = qaRows.filter(d => ((d['Revamp Publish Y/N'] || '').toString().trim().toLowerCase() === 'no')).length;
+  const qaSummaryEl = document.getElementById('qaAccordionSummary');
+  if (qaSummaryEl) qaSummaryEl.innerHTML = `<strong>Pages:</strong> ${qaPageCount} &nbsp;|&nbsp; <strong>Revamp:</strong> ${revampCount} &nbsp;|&nbsp; <strong>Not Published:</strong> ${notPublishedCount}`;
   const badge = document.getElementById("qaBadge");
-  if (badge) badge.textContent = uniquePages.size;
+  if (badge) badge.textContent = qaIssueTotal;
 
   // Always update the View All Issues button count, even if 0
   try {
     const viewBtn = document.getElementById('viewAllQaBtn');
     const viewCount = document.getElementById('viewAllQaCount');
-    if (viewCount) viewCount.textContent = uniquePages.size || 0;
-    if (viewBtn) viewBtn.style.display = (uniquePages.size > 0) ? '' : 'none';
+    if (viewCount) viewCount.textContent = qaIssueTotal || 0;
+    if (viewBtn) viewBtn.style.display = (qaIssueTotal > 0) ? '' : 'none';
   } catch(e) {}
 
   if(!qaRows.length){
@@ -795,6 +865,7 @@ function renderQaAccordion(data){
       const statusRaw = (page.Status || '').toString().trim();
       const statusText = statusRaw || 'Not Set';
       const issueCount = pageIssueIds.length;
+      const hasNotPublished = rows.some(r => ((r['Revamp Publish Y/N'] || '').toString().trim().toLowerCase() === 'no'));
 
       const col = document.createElement('div');
       col.className = 'col-12 col-sm-6 col-md-4 col-lg-3';
@@ -815,6 +886,12 @@ function renderQaAccordion(data){
   const statusEl = document.createElement('div');
   statusEl.className = 'small mb-1';
   statusEl.innerHTML = `<strong>Status:</strong> ${escapeHtml(statusText)}`;
+
+  const notPublishedBadgeWrap = document.createElement('div');
+  notPublishedBadgeWrap.className = 'mb-1';
+  if (hasNotPublished) {
+    notPublishedBadgeWrap.innerHTML = '<span class="badge bg-danger">Not Published</span>';
+  }
 
   const notesEl = document.createElement('div');
   notesEl.className = 'small mb-2';
@@ -845,6 +922,7 @@ function renderQaAccordion(data){
   // Page name/title shown as the main heading already in header; show site title and lookup under it
   cardBody.appendChild(siteTitleEl);
   cardBody.appendChild(statusEl);
+  if (hasNotPublished) cardBody.appendChild(notPublishedBadgeWrap);
   cardBody.appendChild(lookupEl);
   if (notePreview) cardBody.appendChild(notesEl);
   cardBody.appendChild(inlineDiv);
@@ -863,7 +941,7 @@ function renderQaAccordion(data){
   try{
     const viewBtn = document.getElementById('viewAllQaBtn');
     const viewCount = document.getElementById('viewAllQaCount');
-    if(viewCount) viewCount.textContent = uniquePages.size || 0;
+    if(viewCount) viewCount.textContent = qaIssueTotal || 0;
     if(viewBtn){
       viewBtn.removeEventListener('click', showAllQaModal);
       viewBtn.addEventListener('click', showAllQaModal);
@@ -1163,58 +1241,8 @@ function showAllQaModal(){
   const modalEl = document.getElementById('allQaModal');
   const modalBody = document.getElementById('allQaModalBody');
   if(!modalEl || !modalBody) return console.warn('All QA modal elements missing');
-  // Determine whether any dashboard filter is active. If none are active, prefer the
-  // full master dataset so "View All Issues" truly means all issues regardless of
-  // currently-visible filters.
-  function anyFilterActive(){
-    const ids = ["filterDivision","filterAC","filterStatus","filterPageType","filterPubSym","filterSymType","filterPriority","filterRevamp","filterSiteTitle"];
-    for(const id of ids){ const el = document.getElementById(id); if(el && el.value) return true; }
-    const modFrom = document.getElementById('filterModifiedFrom'); const modTo = document.getElementById('filterModifiedTo');
-    if ((modFrom && modFrom.value) || (modTo && modTo.value)) return true;
-    return false;
-  }
-
-  // Use masterData (all rows) when no filters are active so the modal shows everything.
-  const sourceData = (!anyFilterActive() && Array.isArray(masterData) && masterData.length) ? masterData : (typeof getFilteredData === 'function' ? getFilteredData() : tableData);
-
-  // Expand multi-lookup rows into one row per individual lookup so the table shows
-  // every issue separately (instead of one row per page with semicolon-separated lookups).
-  const issueRows = [];
-  (Array.isArray(sourceData) ? sourceData : []).forEach(r => {
-    const lookups = (r['QA Issues.lookupValue'] || '').toString().split(';').map(s=>s.trim()).filter(Boolean);
-    if (!lookups.length) {
-      // If no QA lookup entries but page is marked for revamp, include it as a Revamp row
-      if (isRevampPage(r)) {
-        issueRows.push({
-          ID: r.ID,
-          Title: r.Title || r['Site Title'] || '',
-          'Symphony Site Type': r['Symphony Site Type'] || '',
-          'Page URL': r['Page URL'] || '',
-          'Zesty URL Path Part': r['Zesty URL Path Part'] || '',
-          Status: r.Status || '',
-          Priority: r.Priority || '',
-          'QA Notes': r['QA Notes'] || '',
-          'QA Issue': 'Revamp Needed',
-          'Site Title': r['Site Title'] || ''
-        });
-      }
-    } else {
-      lookups.forEach(lv => {
-        issueRows.push({
-          ID: r.ID,
-          Title: r.Title || r['Site Title'] || '',
-          'Symphony Site Type': r['Symphony Site Type'] || '',
-          'Page URL': r['Page URL'] || '',
-          'Zesty URL Path Part': r['Zesty URL Path Part'] || '',
-          Status: r.Status || '',
-          Priority: r.Priority || '',
-          'QA Notes': r['QA Notes'] || '',
-          'QA Issue': lv,
-          'Site Title': r['Site Title'] || ''
-        });
-      });
-    }
-  });
+  const sourceData = getQaSourceData();
+  const issueRows = buildExpandedQaIssueRows(sourceData);
 
   const tabData = issueRows.map(r => ({
     ID: r.ID,
@@ -1223,9 +1251,9 @@ function showAllQaModal(){
     'Page URL': r['Page URL'],
     'Zesty URL Path Part': r['Zesty URL Path Part'],
     Status: r.Status,
-    Priority: r.Priority,
     'QA Notes': r['QA Notes'],
     'QA Issue': escapeHtml(r['QA Issue'] || ''),
+    'Not Published': r['Not Published'] || '',
     'Site Title': r['Site Title'] || ''
   }));
 // Hold these columns for reference if we want to add them later
@@ -1265,7 +1293,7 @@ function showAllQaModal(){
           {title:'SD', field:'Page URL', hozAlign:'center', width:55, maxWidth:64, formatter: function(cell){ const v = cell.getValue(); return v ? `<a href="${escapeHtml(v)}" target="_blank">🔗</a>` : ''; } },
           {title:'ZD', field:'Zesty URL Path Part', hozAlign:'center', width:55, maxWidth:64, formatter: function(cell){ const v = cell.getValue(); return v ? `<a class="zesty-link" href="https://8hxvw8tw-dev.webengine.zesty.io${escapeHtml(v)}?zpw=tsasecret123&redirect=false&_bypassError=true" target="_blank" rel="noopener noreferrer" aria-label="Open Zesty preview">🔗</a>` : ''; } },
           {title:'Status', field:'Status', formatter: function(cell){ return escapeHtml(cell.getValue()); } },
-          {title:'Priority', field:'Priority', width:55, maxWidth:64, formatter: function(cell){ return escapeHtml(cell.getValue()); } },
+          {title:'Not Published', field:'Not Published', hozAlign:'center', width:82, minWidth:70, maxWidth:92, headerWordWrap:true, formatter: function(cell){ return (cell.getValue() === 'Yes') ? '<span style="display:inline-block; max-width:64px; padding:2px 6px; border-radius:10px; background:#dc3545; color:#fff; font-size:0.72rem; font-weight:600; line-height:1.05; white-space:normal; text-align:center;">Not Published</span>' : ''; } },
           {title:'QA Notes', field:'QA Notes', formatter: function(cell){ return escapeHtml(cell.getValue()); } },
           {title:'QA Issue', field:'QA Issue', formatter: function(cell){ return cell.getValue(); } },
           // New column: Site Title placed at the end per request
@@ -1405,10 +1433,10 @@ function generateSiteSummaryTable() {
       };
     }
     
-    // Mark if site is divisional: either a service center or site name contains 'division'
+    // Mark divisional records strictly by site-title naming.
     try {
       const siteLower = (site || '').toString().toLowerCase();
-      if (isServiceCenter || siteLower.indexOf('division') !== -1) {
+      if (siteLower.indexOf('division') !== -1 || siteLower.indexOf('territory') !== -1) {
         summary[div][site].isDivisional = true;
       }
     } catch(e) { /* fallback: leave as default false */ }
@@ -1556,9 +1584,7 @@ function generateSiteSummaryTable() {
   // Divisions that have at least one site with 5.x pages (division-level D count)
   const fiveDivCount = fiveDivisions.size;
 
-  // Display rule: Not Migrated includes Migration Started (both are not live)
-  const notLiveD = notMigD + migratingD;
-  const notLiveL = notMigL + migratingL;
+  // Not Migrated is tracked independently from Migration Started.
   
   // Generate unique ID for this modal's chart
   const chartId = `territoryChart_${Math.random().toString(36).substr(2, 9)}`;
@@ -1579,6 +1605,12 @@ function generateSiteSummaryTable() {
           z-index: 2;
           background: #f8f9fa;
         }
+        .territory-content table tbody tr:nth-child(odd) td {
+          background: #ffffff;
+        }
+        .territory-content table tbody tr:nth-child(even) td {
+          background: #f7f9fc;
+        }
       </style>
       <!-- Chart -->
       <div style="margin-bottom: 20px;">
@@ -1593,9 +1625,9 @@ function generateSiteSummaryTable() {
         <h5 style="margin-bottom: 8px; font-weight: 600;"><i class="bi bi-bar-chart"></i> Territory Summary</h5>
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px;">
           <div style="padding: 8px; border: 1px solid #ddd; border-radius: 4px; text-align: center;">
-            <h3 style="margin: 0 0 4px; color: #dc3545; font-weight: 700; font-size: 1.2rem;">${notLiveD + notLiveL}</h3>
+            <h3 style="margin: 0 0 4px; color: #dc3545; font-weight: 700; font-size: 1.2rem;">${notMigD + notMigL}</h3>
             <p style="margin: 0 0 4px; color: #333; font-weight: 600;">Not Migrated</p>
-            <small style="color: #666;">D: ${notLiveD} | L: ${notLiveL}</small>
+            <small style="color: #666;">D: ${notMigD} | L: ${notMigL}</small>
           </div>
           <div style="padding: 8px; border: 1px solid #ddd; border-radius: 4px; text-align: center;">
             <h3 style="margin: 0 0 4px; color: #ffc107; font-weight: 700; font-size: 1.2rem;">${migratingD + migratingL}</h3>
@@ -1673,15 +1705,14 @@ function generateSiteSummaryTable() {
 
     const nmOnlyTotal = (perCat.NotMigrated.div || 0) + (perCat.NotMigrated.local || 0);
     const msTotal = (perCat.MigrationStarted.div || 0) + (perCat.MigrationStarted.local || 0);
-    // Display rule: Not Migrated includes Migration Started (both are not live)
-    const nmTotal = nmOnlyTotal + msTotal;
+    const nmTotal = nmOnlyTotal;
     const iqTotal = (perCat.InQA.div || 0) + (perCat.InQA.local || 0);
     const liveTotal = (perCat.Live.div || 0) + (perCat.Live.local || 0);
 
     html += `<tr>
       <td style="padding:8px; border-bottom:1px solid #f0f0f0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${escapeHtml(div)}">${escapeHtml(div)}</td>
       <td style="padding:8px; border-bottom:1px solid #f0f0f0; text-align:center;"><span class="badge ${badgeClass}" style="font-size:0.72rem;">${divStatus}</span></td>
-      <td style="padding:8px; border-bottom:1px solid #f0f0f0; text-align:center;" title="Not Migrated (includes Migration Started) (Divisional: ${(perCat.NotMigrated.div || 0) + (perCat.MigrationStarted.div || 0)}, Local: ${(perCat.NotMigrated.local || 0) + (perCat.MigrationStarted.local || 0)})">${nmTotal}</td>
+      <td style="padding:8px; border-bottom:1px solid #f0f0f0; text-align:center;" title="Not Migrated (Divisional: ${perCat.NotMigrated.div || 0}, Local: ${perCat.NotMigrated.local || 0})">${nmTotal}</td>
       <td style="padding:8px; border-bottom:1px solid #f0f0f0; text-align:center;" title="Migration Started (Divisional: ${perCat.MigrationStarted.div || 0}, Local: ${perCat.MigrationStarted.local || 0})">${msTotal}</td>
       <td style="padding:8px; border-bottom:1px solid #f0f0f0; text-align:center;" title="In Zesty/QA (Divisional: ${perCat.InQA.div || 0}, Local: ${perCat.InQA.local || 0})">${iqTotal}</td>
       <td style="padding:8px; border-bottom:1px solid #f0f0f0; text-align:center;" title="Live (Divisional: ${perCat.Live.div || 0}, Local: ${perCat.Live.local || 0})">${liveTotal}</td>
@@ -1968,7 +1999,7 @@ function generateSiteSummaryTable() {
                 <th style="text-align:left; padding:8px; border-bottom:1px solid #e0e0e0; width:220px; max-width:220px;">Site Title</th>
                 <th style="text-align:center; padding:8px; border-bottom:1px solid #e0e0e0;">D/L</th>
                 <th style="text-align:left; padding:8px; border-bottom:1px solid #e0e0e0; width:260px; min-width:260px;">Category Pull(s)</th>
-                <th style="text-align:right; padding:8px; border-bottom:1px solid #e0e0e0;">Total</th>
+                <th style="text-align:right; padding:8px; border-bottom:1px solid #e0e0e0;">Total Pages</th>
                 <th style="text-align:right; padding:8px; border-bottom:1px solid #e0e0e0;">1a</th>
                 <th style="text-align:right; padding:8px; border-bottom:1px solid #e0e0e0;">1b</th>
                 <th style="text-align:right; padding:8px; border-bottom:1px solid #e0e0e0;">1c</th>
@@ -2002,7 +2033,7 @@ function generateSiteSummaryTable() {
                 <th style="text-align:right; padding:8px; border-bottom:1px solid #e0e0e0;">Sites</th>
                 <th style="text-align:right; padding:8px; border-bottom:1px solid #e0e0e0;">Div Sites</th>
                 <th style="text-align:right; padding:8px; border-bottom:1px solid #e0e0e0;">Local Sites</th>
-                <th style="text-align:right; padding:8px; border-bottom:1px solid #e0e0e0;">Total</th>
+                <th style="text-align:right; padding:8px; border-bottom:1px solid #e0e0e0;">Total Pages</th>
                 <th style="text-align:right; padding:8px; border-bottom:1px solid #e0e0e0;">1a</th>
                 <th style="text-align:right; padding:8px; border-bottom:1px solid #e0e0e0;">1b</th>
                 <th style="text-align:right; padding:8px; border-bottom:1px solid #e0e0e0;">1c</th>
@@ -2139,28 +2170,30 @@ function renderCards(){
     return { thisWeekCount, prevWeekCount };
   };
   const qaSummary = (rows) => {
-    const qaIds = new Set();
     let qaHigh = 0;
     let qaLow = 0;
     let revampCount = 0;
+    let notPublishedCount = 0;
 
     rows.forEach(d => {
       const hasQa = d["QA Issues.lookupValue"] && String(d["QA Issues.lookupValue"]).trim();
       if (hasQa) {
-        qaIds.add(d.ID || d._id || JSON.stringify(d));
         if (d.Priority === 'High') qaHigh++; else qaLow++;
       }
       if (isRevampPage(d)) {
         revampCount++;
-        qaIds.add(d.ID || d._id || JSON.stringify(d));
       }
+
+      const revampPublish = (d['Revamp Publish Y/N'] || '').toString().trim().toLowerCase();
+      if (revampPublish === 'no') notPublishedCount++;
     });
 
     return {
       qaHigh,
       qaLow,
       revampCount,
-      uniqueTotal: qaIds.size
+      notPublishedCount,
+      pageCount: qaHigh + qaLow
     };
   };
 
@@ -2261,7 +2294,7 @@ function renderCards(){
       sub: `All pages: ${compareText(allDoNotMigrate, allTotal)}`
     },
     "QA Issues": {
-      main: `High: ${filteredQa.qaHigh} | Low: ${filteredQa.qaLow} | Revamp: ${filteredQa.revampCount} | Total: ${filteredQa.uniqueTotal}`
+      main: `Page: ${filteredQa.pageCount} | Revamp: ${filteredQa.revampCount} | Not Published: ${filteredQa.notPublishedCount}`
     }
   };
 
