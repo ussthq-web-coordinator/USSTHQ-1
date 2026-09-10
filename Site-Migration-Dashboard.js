@@ -357,6 +357,130 @@ function isServiceCenterPage(row){
   try{ const s = String(v).toLowerCase().trim(); return s === 'true' || s === 'yes' || s === '1'; }catch(e){ return false; }
 }
 
+// Helper: read the automated redirect-verification note (Redirect Status field) and
+// classify it. Most non-blank values start with "Redirect verified" (OK); anything
+// else non-blank (e.g. "Redirect goes to the wrong page …") is a real QA flag.
+function getRedirectCheckStatus(row){
+  const raw = (row && row['Redirect Status'] || '').toString().trim();
+  if (!raw) return { checked: false, flagged: false, raw: '' };
+  const flagged = !/^redirect verified/i.test(raw);
+  return { checked: true, flagged, raw };
+}
+
+// The site a page should be counted under. "Service Center Site Name" is how the team
+// marks a page that landed on its own site in Zesty (or a similar re-home), so whenever
+// that field is set it wins — including for rows where the Service Center Page checkbox
+// was never ticked. Without this, 9 distinct sites existed only as a Service Center Site
+// Name and were never counted as sites at all.
+function getSiteGroupTitle(row){
+  if (!row) return 'Unknown';
+  const scName = (row['Service Center Site Name'] || '').toString().trim();
+  if (scName) return scName;
+  return (row['Site Title'] || row['Site'] || 'Unknown').toString().trim() || 'Unknown';
+}
+
+// Distinguish a page that was genuinely migrated into Zesty from one that was only
+// redirected. A truly migrated page has BOTH Zesty coordinates — the mobile editor path
+// and the URL path part; a redirect-only page is missing one or both (and its migration
+// notes typically describe a redirect check rather than a migration run).
+function isFullyMigratedPage(row){
+  if (!row) return false;
+  const editor = (row['Zesty Content Mobile Editor Path'] || '').toString().trim();
+  const pathPart = (row['Zesty URL Path Part'] || '').toString().trim();
+  return !!(editor && pathPart);
+}
+
+// Resolve a row's best true migration-completion date: Migration Date -> Last Migrated ->
+// Last Migration -> a date found inside Migration Notes. That last fallback is skipped
+// when Migration Notes is itself a later redirect-verification stamp (e.g. "Redirect
+// verified — … (2026-09-05 22:48)") rather than an actual PROD migration report — the
+// redirect checker overwrites Migration Notes with its own note+date after the real
+// migration, so blindly regex-matching a date out of it would show the verification date
+// as if it were the migration date. Used everywhere a "when was this page migrated" date
+// is needed: the velocity chart, footer activity figure, Migration Tool Insights, and the
+// Migration Dates calendar/agenda.
+function resolveMigrationDateStr(row){
+  if (!row) return null;
+  let raw = row['Migration Date'] || row.migrationDate || row['Last Migrated'] || row['Last Migration'] || null;
+  if (!raw && row['Migration Notes']) {
+    const notes = String(row['Migration Notes']);
+    const isVerificationNote = /^redirect (verified|goes to|works with)/i.test(notes.trim());
+    if (!isVerificationNote) {
+      const match = notes.match(/(\d{1,2}\/\d{1,2}\/\d{2,4})|(\d{4}-\d{2}-\d{2})/);
+      if (match) raw = match[0];
+    }
+  }
+  return raw || null;
+}
+
+// Render the footer: the "Data last refreshed" line plus one clear activity figure.
+// Activity is based on the genuine per-page "Last Migrated" timestamp — not
+// "Modified", which is bulk-touched by the sync app and isn't a real activity signal
+// (see the Migration Velocity chart for the same reasoning). Uses the full dataset,
+// not the active filters, since this is a global status line.
+function updateFooterStats(){
+  const refreshEl = document.getElementById('refreshDate');
+  if (!refreshEl) return;
+  const ver = (window.APP_VERSION || APP_VERSION);
+
+  const now = new Date();
+  const thisWeekStart = new Date(now); thisWeekStart.setDate(now.getDate() - 7);
+  const lastWeekStart = new Date(now); lastWeekStart.setDate(now.getDate() - 14);
+
+  let thisWeekCount = 0, lastWeekCount = 0;
+  (Array.isArray(tableData) ? tableData : []).forEach(d => {
+    const canon = getCanonicalStatus(d.Status);
+    if (canon !== 'Completed' && canon !== 'THQ Redirect') return;
+    const dStr = resolveMigrationDateStr(d);
+    if (!dStr) return;
+    const dt = new Date(dStr);
+    if (isNaN(dt)) return;
+    if (dt >= thisWeekStart) thisWeekCount++;
+    else if (dt >= lastWeekStart) lastWeekCount++;
+  });
+
+  const rows = Array.isArray(tableData) ? tableData : [];
+  const totalPages = rows.length;
+  const resolved = rows.filter(d => {
+    const canon = getCanonicalStatus(d.Status);
+    return canon === 'Completed' || canon === 'THQ Redirect' || canon === 'Do Not Migrate';
+  }).length;
+  const pctResolved = totalPages ? ((resolved / totalPages) * 100).toFixed(1) : '0.0';
+
+  const delta = thisWeekCount - lastWeekCount;
+  const trendClass = delta > 0 ? 'up' : delta < 0 ? 'down' : 'flat';
+  const trendIcon = delta > 0 ? 'bi-arrow-up-right' : delta < 0 ? 'bi-arrow-down-right' : 'bi-dash';
+  const trendText = delta === 0
+    ? 'level with last week'
+    : `${Math.abs(delta)} ${delta > 0 ? 'more' : 'fewer'} than last week`;
+
+  refreshEl.innerHTML = `
+    <div class="footer-brand">
+      <span class="footer-mark"><i class="bi bi-rocket-takeoff"></i></span>
+      <span>
+        <span class="footer-title">Sites Page Migration</span>
+        <span class="footer-meta">v${ver} · Data refreshed ${escapeHtml(dashboardRefreshedText || 'unknown')}</span>
+      </span>
+    </div>
+    <div class="footer-stats">
+      <div class="footer-stat">
+        <span class="footer-stat-value">${pctResolved}%</span>
+        <span class="footer-stat-label">Overall resolved</span>
+      </div>
+      <div class="footer-stat">
+        <span class="footer-stat-value">${resolved.toLocaleString()}<span class="footer-stat-of"> / ${totalPages.toLocaleString()}</span></span>
+        <span class="footer-stat-label">Pages</span>
+      </div>
+      <div class="footer-stat">
+        <span class="footer-stat-value">${thisWeekCount}
+          <span class="footer-trend ${trendClass}"><i class="bi ${trendIcon}"></i></span>
+        </span>
+        <span class="footer-stat-label">Completed this week · ${trendText}</span>
+      </div>
+    </div>
+  `;
+}
+
 function getFilteredData(){
   const div = getSelectValue("filterDivision");
   const ac = getSelectValue("filterAC");
@@ -450,6 +574,7 @@ let qaLookupMaster = {};
 // Top-level runtime state (shared across functions)
 let table, tableData = [], charts = {}, pageCache = {}, qaGroupedCache = {}, masterData;
 let tableResizeListenerAdded = false;
+let dashboardRefreshedText = ''; // "Data last refreshed" text, set once on load, read by updateFooterStats()
 let currentPageSize = parseInt(localStorage.getItem('dashboardPageSize')) || 20; // Load from localStorage or default to 20
 // Top-level chart handles (Chart.js instances) — initialized to null so renderCharts can safely destroy/create
 let statusChart = null;
@@ -457,6 +582,7 @@ let priorityChart = null;
 let pageTypeChart = null;
 let pubSymChart = null;
 let effortChart = null;
+let velocityChart = null;
 // Breakdown toggle states
 let showStatusBreakdown = false;
 let showHidden = false;
@@ -499,6 +625,197 @@ const statusColors = {
 const statusDisplay = {
   "Ready for Migration Tool": "Ready"
 };
+
+// Scroll-triggered reveal for every major section down the page: each one starts
+// slightly lowered and transparent, then settles as it scrolls into view, with a small
+// stagger between neighbours so sections arrive in sequence rather than all at once.
+(function initScrollReveal(){
+  const SECTION_SELECTORS = [
+    '.filters-row',
+    '#metricCards',
+    '.dash-panel',
+    '.accordion',
+    '.charts-scroll-wrapper',
+    '.chart-container',
+    '.dashboard-footer',
+    'h3'
+  ].join(',');
+
+  function start(){
+    if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+
+    const nodes = Array.from(document.querySelectorAll(SECTION_SELECTORS))
+      // Don't animate accordions nested inside another animated accordion — the parent
+      // reveal already covers them, and nesting the effect looks jittery.
+      .filter(el => !el.closest('.modal') && !el.parentElement.closest('.accordion'));
+
+    if (!nodes.length || typeof IntersectionObserver === 'undefined') return;
+
+    nodes.forEach(el => el.classList.add('dash-reveal'));
+
+    let lastRevealTime = 0;
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (!entry.isIntersecting) return;
+        const el = entry.target;
+        // Stagger anything that becomes visible in the same burst.
+        const now = performance.now();
+        const sinceLast = now - lastRevealTime;
+        const delay = sinceLast < 400 ? Math.min(320, 90 + sinceLast / 4) : 0;
+        lastRevealTime = now;
+        setTimeout(() => {
+          el.classList.add('is-visible');
+          // Once it has settled, take it out of the transition path entirely so it
+          // isn't an animation candidate during normal interaction.
+          setTimeout(() => el.classList.add('reveal-done'), 700);
+        }, delay);
+        observer.unobserve(el);
+      });
+    }, { threshold: 0.06, rootMargin: '0px 0px -40px 0px' });
+
+    nodes.forEach(el => observer.observe(el));
+
+    // Safety net: if anything never intersects (hidden container, odd layout), show it
+    // rather than leaving it invisible.
+    setTimeout(() => {
+      document.querySelectorAll('.dash-reveal:not(.is-visible)').forEach(el => {
+        const r = el.getBoundingClientRect();
+        if (r.top < window.innerHeight) el.classList.add('is-visible');
+      });
+    }, 2500);
+  }
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
+  else start();
+})();
+
+// Rich hover tooltip: any element with a `data-rich-tooltip` attribute (HTML content,
+// built via buildRichTooltipHtml) gets a nicely styled floating panel near the cursor
+// instead of the plain native browser title tooltip. Single delegated listener + one
+// shared floating element, so this scales to any number of bars/segments on the page.
+(function initRichTooltip(){
+  let tipEl = null;
+  function ensureTip(){
+    if (tipEl) return tipEl;
+    tipEl = document.createElement('div');
+    tipEl.className = 'rich-tooltip';
+    tipEl.style.display = 'none';
+    document.body.appendChild(tipEl);
+    return tipEl;
+  }
+  function findTarget(el){
+    while (el && el !== document.body && el.nodeType === 1) {
+      if (el.hasAttribute && el.hasAttribute('data-rich-tooltip')) return el;
+      el = el.parentElement;
+    }
+    return null;
+  }
+  function positionTip(tip, x, y){
+    // Generous offset so the panel clears the cursor itself — large/custom mouse
+    // pointers can be 32-48px, and a tight offset put the tooltip under the pointer.
+    const padX = 34;
+    const padY = 30;
+    const rect = tip.getBoundingClientRect();
+    let left = x + padX;
+    let top = y + padY;
+    // Flip to the other side when it would run off-screen
+    if (left + rect.width > window.innerWidth - 10) left = x - rect.width - padX;
+    if (top + rect.height > window.innerHeight - 10) top = y - rect.height - padY;
+    tip.style.left = Math.max(10, left) + 'px';
+    tip.style.top = Math.max(10, top) + 'px';
+  }
+  document.addEventListener('mouseover', (e) => {
+    const target = findTarget(e.target);
+    if (!target) return;
+    const tip = ensureTip();
+    tip.innerHTML = target.getAttribute('data-rich-tooltip') || '';
+    tip.style.display = 'block';
+    positionTip(tip, e.clientX, e.clientY);
+  });
+  // Only tracks while a tooltip is actually showing, and at most once per frame —
+  // a per-move reposition on every pointer event made the page feel heavy.
+  let rafPending = false;
+  document.addEventListener('mousemove', (e) => {
+    if (!tipEl || tipEl.style.display === 'none' || rafPending) return;
+    rafPending = true;
+    const { clientX, clientY } = e;
+    requestAnimationFrame(() => {
+      rafPending = false;
+      if (tipEl && tipEl.style.display !== 'none') positionTip(tipEl, clientX, clientY);
+    });
+  }, { passive: true });
+  document.addEventListener('mouseout', (e) => {
+    const target = findTarget(e.target);
+    if (target && !findTarget(e.relatedTarget)) {
+      if (tipEl) tipEl.style.display = 'none';
+    }
+  });
+  // Hide on scroll (e.g. a modal's internal scroll container) so a tooltip never gets stuck.
+  document.addEventListener('scroll', () => { if (tipEl) tipEl.style.display = 'none'; }, true);
+})();
+
+// Build the HTML content for a rich hover tooltip (a title line + a color-swatched row
+// per segment). The returned string is meant to be HTML-attribute-escaped and set as a
+// `data-rich-tooltip` attribute — see initRichTooltip().
+function buildRichTooltipHtml(titleText, rows) {
+  const rowsHtml = rows.map(r => `<div class="rich-tooltip-row"><span class="swatch" style="background:${r.color || '#888'};"></span><span>${escapeHtml(r.label)}: <strong>${r.n}</strong>${r.note ? escapeHtml(r.note) : ''}</span></div>`).join('');
+  return `<div class="rich-tooltip-title">${escapeHtml(titleText)}</div>${rowsHtml}`;
+}
+
+// Plain-text variant of the rich tooltip (no swatched rows) — used for icon badges like
+// "QA Notes" where the content is free text rather than a breakdown.
+function buildRichTooltipTextHtml(text, titleText) {
+  return `${titleText ? `<div class="rich-tooltip-title">${escapeHtml(titleText)}</div>` : ''}<div class="rich-tooltip-text">${escapeHtml(text || '')}</div>`;
+}
+
+// Build a compact stacked mini-bar showing the canonical-status breakdown for a set of
+// pages. Used in the Site Migration Status modal in place of dense numeric columns —
+// hover (or tap) the bar to see the full breakdown in a rich tooltip, including the
+// 2c/4b/5x sub-detail that isn't broken out as its own segment.
+function buildStatusMiniBarHtml(stats, total) {
+  stats = stats || {};
+  const segments = [
+    { key: '1a', label: 'Needs Info', color: statusColors['Needs Info'] },
+    { key: '1b', label: 'Pending Migration', color: statusColors['Pending Migration'] },
+    { key: '1c', label: 'Ready for Migration Tool', color: statusColors['Ready for Migration Tool'] },
+    { key: '2.x', label: 'In Progress', color: statusColors['In Progress'] },
+    { key: '3.x', label: 'In QA', color: statusColors['In QA'] },
+    { key: 'Live', label: 'Completed', color: statusColors['Completed'] },
+    { key: 'Redirect', label: 'THQ Redirect', color: statusColors['THQ Redirect'] },
+    { key: 'DNM', label: 'Do Not Migrate', color: statusColors['Do Not Migrate'] }
+  ];
+  const t = total || segments.reduce((a, s) => a + (stats[s.key] || 0), 0);
+  if (!t) return '<span class="text-muted small">—</span>';
+
+  const tooltipRows = [];
+  const bars = segments.map(seg => {
+    const n = stats[seg.key] || 0;
+    if (!n) return '';
+    let note = '';
+    if (seg.key === '2.x' && stats['2c']) note = ` (incl. ${stats['2c']} flagged "Updates Needed")`;
+    if (seg.key === 'Live') {
+      const fivePages = stats['5x'] || 0;
+      const fourPages = Math.max(0, n - fivePages);
+      if (fivePages || fourPages) note = ` (${fivePages} published & redirected, ${fourPages} QA-complete/pending publish)`;
+    }
+    tooltipRows.push({ label: seg.label, n, note, color: seg.color });
+    return `<span style="flex:${Math.max(n, t * 0.02)} 0 0%; background:${seg.color};"></span>`;
+  }).join('');
+
+  const tooltipHtml = buildRichTooltipHtml(`Status Breakdown — Total: ${t}`, tooltipRows);
+  return `<div class="status-mini-bar" style="display:flex; height:14px; width:100%; min-width:70px; border-radius:3px; overflow:hidden; background:#e9ecef;" data-rich-tooltip="${escapeHtml(tooltipHtml)}">${bars}</div>`;
+}
+
+// Generic compact stacked segment bar (unlike buildStatusMiniBarHtml, not tied to the
+// canonical status buckets) — used for the QA Issues metric card.
+function buildSegmentBarHtml(segments, total) {
+  const segs = (segments || []).filter(s => (s.n || 0) > 0);
+  const t = total || segs.reduce((a, s) => a + (s.n || 0), 0);
+  if (!t) return '<span class="text-white-50 small">—</span>';
+  const tooltipHtml = buildRichTooltipHtml(`Total: ${t}`, segs);
+  const bars = segs.map(s => `<span style="flex:${Math.max(s.n, t * 0.02)} 0 0%; background:${s.color};"></span>`).join('');
+  return `<div class="status-mini-bar" style="display:flex; height:100%; width:100%; border-radius:3px; overflow:hidden;" data-rich-tooltip="${escapeHtml(tooltipHtml)}">${bars}</div>`;
+}
 
 // Safe helper to read select values when an element may be missing
 function getSelectValue(id){
@@ -590,19 +907,16 @@ async function loadQaLookupCsv(){
       }
     }
 
-    // Show refreshDate if present (use window.APP_VERSION as the authoritative version)
+    // Store refreshDate text if present; updateFooterStats() (called once tableData is
+    // populated below) renders the full footer, including the activity figure.
     if (json && (json.refreshDate || json.refresh_date || json.refresh)){
-      const refreshEl = document.getElementById('refreshDate');
-      if (refreshEl){
-        const raw = json.refreshDate || json.refresh_date || json.refresh;
-        let formatted = raw;
-        const parsedDate = new Date(raw);
-        if (!isNaN(parsedDate.getTime())){
-          formatted = parsedDate.toLocaleString('en-US', { year:'numeric', month:'long', day:'numeric', hour:'numeric', minute:'2-digit', hour12:true, timeZoneName:'short' });
-        }
-        const ver = (window.APP_VERSION || APP_VERSION);
-        refreshEl.textContent = `v${ver} · Data last refreshed: ${formatted}`;
+      const raw = json.refreshDate || json.refresh_date || json.refresh;
+      let formatted = raw;
+      const parsedDate = new Date(raw);
+      if (!isNaN(parsedDate.getTime())){
+        formatted = parsedDate.toLocaleString('en-US', { year:'numeric', month:'long', day:'numeric', hour:'numeric', minute:'2-digit', hour12:true, timeZoneName:'short' });
       }
+      dashboardRefreshedText = formatted;
     }
 
     // Load QA lookup CSV (best-effort) so we can enrich per-page QA details
@@ -704,6 +1018,8 @@ function buildExpandedQaIssueRows(sourceData){
   const issueRows = [];
   (Array.isArray(sourceData) ? sourceData : []).forEach(r => {
     const lookups = (r['QA Issues.lookupValue'] || '').toString().split(';').map(s => s.trim()).filter(Boolean);
+    const redirectInfo = getRedirectCheckStatus(r);
+    const redirectCheck = redirectInfo.flagged ? redirectInfo.raw : '';
     if (!lookups.length) {
       if (isRevampPage(r)) {
         const isNotPublished = ((r['Revamp Publish Y/N'] || '').toString().trim().toLowerCase() === 'no');
@@ -718,6 +1034,7 @@ function buildExpandedQaIssueRows(sourceData){
           'QA Notes': r['QA Notes'] || '',
           'QA Issue': 'Revamp Needed',
           'Not Published': isNotPublished ? 'Yes' : '',
+          'Redirect Check': redirectCheck,
           'Site Title': r['Site Title'] || ''
         });
       }
@@ -735,12 +1052,84 @@ function buildExpandedQaIssueRows(sourceData){
           'QA Notes': r['QA Notes'] || '',
           'QA Issue': lv,
           'Not Published': isNotPublished ? 'Yes' : '',
+          'Redirect Check': redirectCheck,
           'Site Title': r['Site Title'] || ''
         });
       });
     }
   });
   return issueRows;
+}
+
+// Build a compact, fixed-height info card shared by the QA, Redirect Verification Flags,
+// and Service Center sections. Detail that used to be printed as variable-length paragraph
+// text (QA notes, issue names, etc.) is now shown as small hoverable icon badges instead —
+// the full text lives in the badge's native tooltip — so every card in the grid renders at
+// the same height regardless of how much text a given page has.
+function buildCompactInfoCard(opts) {
+  const { title, siteTitle, statusText, statusColor, icons, footerHtml, footerClass, onClick, onTitleClick } = opts;
+
+  const col = document.createElement('div');
+  col.className = 'col-12 col-sm-6 col-md-4 col-lg-3';
+
+  const card = document.createElement('div');
+  card.className = 'card h-100 compact-info-card';
+
+  const cardBody = document.createElement('div');
+  cardBody.className = 'card-body d-flex flex-column';
+
+  const titleEl = document.createElement('h6');
+  titleEl.className = 'card-title mb-1 text-center text-truncate';
+  titleEl.title = title || '';
+  titleEl.textContent = title || '';
+  if (onTitleClick) { titleEl.style.cursor = 'pointer'; titleEl.addEventListener('click', onTitleClick); }
+  cardBody.appendChild(titleEl);
+
+  const siteEl = document.createElement('div');
+  siteEl.className = 'card-subtitle text-muted small mb-2 text-center text-truncate';
+  siteEl.title = siteTitle || '';
+  siteEl.textContent = siteTitle || '';
+  cardBody.appendChild(siteEl);
+
+  if (statusText) {
+    const statusRow = document.createElement('div');
+    statusRow.className = 'text-center mb-2';
+    const statusBadge = document.createElement('span');
+    statusBadge.className = 'badge compact-status-badge';
+    statusBadge.style.backgroundColor = statusColor || '#6c757d';
+    statusBadge.title = `Status: ${statusText}`;
+    statusBadge.textContent = statusText;
+    statusRow.appendChild(statusBadge);
+    cardBody.appendChild(statusRow);
+  }
+
+  const iconRow = document.createElement('div');
+  iconRow.className = 'compact-icon-row d-flex justify-content-center flex-wrap gap-1 mb-1';
+  (icons || []).forEach(ic => {
+    const span = document.createElement('span');
+    span.className = `compact-icon-badge${ic.variant ? ' variant-' + ic.variant : ''}`;
+    span.setAttribute('data-rich-tooltip', buildRichTooltipTextHtml(ic.label || ''));
+    span.innerHTML = ic.icon;
+    iconRow.appendChild(span);
+  });
+  cardBody.appendChild(iconRow);
+
+  const spacer = document.createElement('div');
+  spacer.className = 'flex-grow-1';
+  cardBody.appendChild(spacer);
+
+  const footer = document.createElement('div');
+  footer.className = 'mt-auto pt-1 d-flex justify-content-center align-items-center';
+  const btn = document.createElement('button');
+  btn.className = `btn btn-sm ${footerClass || 'btn-primary'}`;
+  btn.innerHTML = footerHtml || 'Open';
+  if (onClick) btn.addEventListener('click', onClick);
+  footer.appendChild(btn);
+  cardBody.appendChild(footer);
+
+  card.appendChild(cardBody);
+  col.appendChild(card);
+  return col;
 }
 
 // --- QA Accordion rendering (one card per page, aggregated issues) ---
@@ -753,6 +1142,7 @@ function renderQaAccordion(data){
   Object.keys(qaIssueDetailsMap).forEach(k => delete qaIssueDetailsMap[k]);
 
   const qaRows = Array.isArray(data) ? data.filter(d => d["QA Issues.lookupValue"] || isRevampPage(d)) : [];
+  const redirectFlaggedRows = Array.isArray(data) ? data.filter(d => getRedirectCheckStatus(d).flagged) : [];
   const qaSourceData = getQaSourceData(data);
   const qaExpandedIssueRows = buildExpandedQaIssueRows(qaSourceData);
 
@@ -773,7 +1163,7 @@ function renderQaAccordion(data){
     if (viewBtn) viewBtn.style.display = (qaIssueTotal > 0) ? '' : 'none';
   } catch(e) {}
 
-  if(!qaRows.length){
+  if(!qaRows.length && !redirectFlaggedRows.length){
     container.innerHTML = "<p>No QA Issues or Revamp pages found.</p>";
     return;
   }
@@ -846,94 +1236,99 @@ function renderQaAccordion(data){
 
     // After building all issues for the page, render one card representing the page
     if (pageIssueIds.length || isRevampPage(page)){
-      const firstIssueId = pageIssueIds[0];
-      const uniqueWhys = Array.from(uniqueWhysSet);
-      const subtitleBase = uniqueWhys.length ? (uniqueWhys[0].length > 120 ? uniqueWhys[0].slice(0,120) + '…' : uniqueWhys[0]) : '';
-      const moreCount = Math.max(0, uniqueWhys.length - 1);
-      const subtitle = subtitleBase + (moreCount > 0 ? ` (+${moreCount} more)` : '');
-
       const notesSet = new Set(
         rows
           .map(r => (r["QA Notes"] || "").toString().trim())
           .filter(Boolean)
       );
       const notesList = Array.from(notesSet);
-      const notePreviewBase = notesList.length ? notesList[0] : '';
-      const notePreview = notePreviewBase.length > 160 ? `${notePreviewBase.slice(0, 160)}...` : notePreviewBase;
-      const noteExtraCount = Math.max(0, notesList.length - 1);
 
       const statusRaw = (page.Status || '').toString().trim();
       const statusText = statusRaw || 'Not Set';
-      const issueCount = pageIssueIds.length;
       const hasNotPublished = rows.some(r => ((r['Revamp Publish Y/N'] || '').toString().trim().toLowerCase() === 'no'));
+      const lookupArray = Array.from(uniqueLookupsSet);
 
-      const col = document.createElement('div');
-      col.className = 'col-12 col-sm-6 col-md-4 col-lg-3';
-      const card = document.createElement('div'); card.className = 'card h-100 qa-page-card';
-      const cardBody = document.createElement('div'); cardBody.className = 'card-body d-flex flex-column';
+      const icons = [];
+      if (pageIssueIds.length) {
+        icons.push({
+          icon: `<i class="bi bi-clipboard2-pulse"></i><span class="compact-icon-count">${pageIssueIds.length}</span>`,
+          label: `${pageIssueIds.length} QA issue${pageIssueIds.length === 1 ? '' : 's'}: ${lookupArray.join('; ')}`,
+          variant: 'warning'
+        });
+      }
+      if (notesList.length) {
+        icons.push({
+          icon: '<i class="bi bi-sticky"></i>',
+          label: `QA Notes: ${notesList.join(' | ')}`,
+          variant: 'info'
+        });
+      }
+      if (hasNotPublished) {
+        icons.push({ icon: '<i class="bi bi-eye-slash"></i>', label: 'Not Published', variant: 'danger' });
+      }
+      if (isRevampPage(page)) {
+        icons.push({ icon: '<i class="bi bi-arrow-repeat"></i>', label: 'Revamp Needed', variant: 'info' });
+      }
 
-    // Center the title within the card header
-    const headerDiv = document.createElement('div'); headerDiv.className = 'd-flex flex-column align-items-center';
-    const titleEl = document.createElement('h6'); titleEl.className = 'card-title mb-1 text-center mx-3'; titleEl.style.cursor = 'pointer'; titleEl.innerText = page.Title || page['Site Title'] || title;
-    headerDiv.appendChild(titleEl);
-
-  // Site title (small muted) and lookup info
-  const siteTitleEl = document.createElement('div'); siteTitleEl.className = 'card-subtitle text-muted small mb-1 mt-2'; siteTitleEl.innerText = page['Site Title'] || '';
-  const lookupArray = Array.from(uniqueLookupsSet);
-  const lookupText = lookupArray.length ? (lookupArray[0] + (lookupArray.length > 1 ? ` (+${lookupArray.length - 1} more)` : '')) : '';
-  const lookupEl = document.createElement('div'); lookupEl.className = 'text-muted small mb-1'; lookupEl.innerText = lookupText ? `Issue: ${lookupText}` : '';
-
-  const statusEl = document.createElement('div');
-  statusEl.className = 'small mb-1';
-  statusEl.innerHTML = `<strong>Status:</strong> ${escapeHtml(statusText)}`;
-
-  const notPublishedBadgeWrap = document.createElement('div');
-  notPublishedBadgeWrap.className = 'mb-1';
-  if (hasNotPublished) {
-    notPublishedBadgeWrap.innerHTML = '<span class="badge bg-danger">Not Published</span>';
-  }
-
-  const notesEl = document.createElement('div');
-  notesEl.className = 'small mb-2';
-  if (notePreview) {
-    notesEl.innerHTML = `<strong>QA Notes:</strong> ${escapeHtml(notePreview)}${noteExtraCount > 0 ? ` <span class="text-muted">(+${noteExtraCount} more)</span>` : ''}`;
-  }
-
-  const inlineDiv = document.createElement('div'); inlineDiv.className = 'collapse';
-      const quickWhy = uniqueWhys.length ? uniqueWhys[0] : '';
-      inlineDiv.innerHTML = `<div class="small text-muted mt-2">${escapeHtml(quickWhy || subtitle)}</div>`;
-
-  const footer = document.createElement('div'); footer.className = 'mt-auto pt-1 d-flex justify-content-center align-items-center';
-  const btn = document.createElement('button'); btn.className = 'btn btn-sm btn-primary';
-  if (pageIssueIds.length) {
-    btn.innerHTML = `View Issues <span class="badge bg-warning qa-badge ms-2">${pageIssueIds.length}</span>`;
-    btn.addEventListener('click', ()=> showQaIssuesModal(firstIssueId));
-  } else {
-    // Revamp-only page: show a Revamp button that opens the page detail modal
-    btn.className = 'btn btn-sm btn-info';
-    btn.innerHTML = `Revamp Needed <span class="badge bg-info text-dark ms-2">Open Record</span>`;
-    btn.addEventListener('click', ()=> showTableModalById(rows[0]._id));
-  }
-  footer.appendChild(btn);
-
-      titleEl.addEventListener('click', ()=>{ inlineDiv.classList.toggle('show'); });
-
-  cardBody.appendChild(headerDiv);
-  // Page name/title shown as the main heading already in header; show site title and lookup under it
-  cardBody.appendChild(siteTitleEl);
-  cardBody.appendChild(statusEl);
-  if (hasNotPublished) cardBody.appendChild(notPublishedBadgeWrap);
-  cardBody.appendChild(lookupEl);
-  if (notePreview) cardBody.appendChild(notesEl);
-  cardBody.appendChild(inlineDiv);
-      cardBody.appendChild(footer);
-      card.appendChild(cardBody);
-      col.appendChild(card);
+      const col = buildCompactInfoCard({
+        title: page.Title || page['Site Title'] || title,
+        siteTitle: page['Site Title'] || '',
+        statusText,
+        statusColor: statusColors[getCanonicalStatus(statusText)] || '#6c757d',
+        icons,
+        footerHtml: pageIssueIds.length
+          ? `View Issues <span class="badge bg-warning qa-badge ms-2">${pageIssueIds.length}</span>`
+          : `Revamp Needed <span class="badge bg-info text-dark ms-2">Open Record</span>`,
+        footerClass: pageIssueIds.length ? 'btn-primary' : 'btn-info',
+        onClick: pageIssueIds.length
+          ? (() => showQaIssuesModal(pageIssueIds[0]))
+          : (() => showTableModalById(rows[0]._id))
+      });
       rowDiv.appendChild(col);
     }
   });
 
   frag.appendChild(rowDiv);
+
+  // --- Redirect Verification Flags (from the automated "Redirect Status" check) ---
+  if (redirectFlaggedRows.length) {
+    const redirectGrouped = {};
+    redirectFlaggedRows.forEach(d => {
+      const pageTitle = d.Title || d['Site Title'] || 'Untitled Page';
+      redirectGrouped[pageTitle] = redirectGrouped[pageTitle] || [];
+      redirectGrouped[pageTitle].push(d);
+    });
+
+    const redirectHeading = document.createElement('h5');
+    redirectHeading.className = 'mt-4 mb-2';
+    redirectHeading.innerHTML = `🔁 Redirect Verification Flags <span class="badge bg-danger ms-1">${redirectFlaggedRows.length}</span>`;
+
+    const redirectRowDiv = document.createElement('div');
+    redirectRowDiv.className = 'row g-3';
+
+    Object.keys(redirectGrouped).sort().forEach(title => {
+      const rows = redirectGrouped[title];
+      const page = pageCache[rows[0]._id] || rows[0];
+      const statusText = (page.Status || '').toString().trim() || 'Not Set';
+      const redirectInfo = getRedirectCheckStatus(page);
+
+      const col = buildCompactInfoCard({
+        title: page.Title || page['Site Title'] || title,
+        siteTitle: page['Site Title'] || '',
+        statusText,
+        statusColor: statusColors[getCanonicalStatus(statusText)] || '#6c757d',
+        icons: [{ icon: '<i class="bi bi-signpost-split"></i>', label: `Redirect Issue: ${redirectInfo.raw}`, variant: 'danger' }],
+        footerHtml: 'Open Record',
+        footerClass: 'btn-info',
+        onClick: () => showTableModalById(rows[0]._id)
+      });
+      redirectRowDiv.appendChild(col);
+    });
+
+    frag.appendChild(redirectHeading);
+    frag.appendChild(redirectRowDiv);
+  }
+
   // Defer appending to avoid layout thrash when many nodes are created
   requestAnimationFrame(()=>{ container.appendChild(frag); });
 
@@ -984,62 +1379,22 @@ function renderServiceCenterAccordion(data){
       rows.map(r => (r['QA Notes'] || '').toString().trim()).filter(Boolean)
     );
     const notesList = Array.from(notesSet);
-    const notePreviewBase = notesList.length ? notesList[0] : '';
-    const notePreview = notePreviewBase.length > 160 ? `${notePreviewBase.slice(0, 160)}...` : notePreviewBase;
-    const noteExtraCount = Math.max(0, notesList.length - 1);
 
-    const col = document.createElement('div');
-    col.className = 'col-12 col-sm-6 col-md-4 col-lg-3';
-
-    const card = document.createElement('div');
-    card.className = 'card h-100 qa-page-card';
-
-    const cardBody = document.createElement('div');
-    cardBody.className = 'card-body d-flex flex-column';
-
-    const headerDiv = document.createElement('div');
-    headerDiv.className = 'd-flex flex-column align-items-center';
-
-    const titleEl = document.createElement('h6');
-    titleEl.className = 'card-title mb-1 text-center mx-3';
-    titleEl.innerText = page.Title || page['Site Title'] || title;
-    headerDiv.appendChild(titleEl);
-
-    const siteTitleEl = document.createElement('div');
-    siteTitleEl.className = 'card-subtitle text-muted small mb-1 mt-2';
-    siteTitleEl.innerText = page['Site Title'] || '';
-
-    const statusEl = document.createElement('div');
-    statusEl.className = 'small mb-1';
-    statusEl.innerHTML = `<strong>Status:</strong> ${escapeHtml(statusText)}`;
-
-    const markerEl = document.createElement('div');
-    markerEl.className = 'text-muted small mb-2';
-    markerEl.innerHTML = '<strong>Service Center:</strong> Yes';
-
-    const notesEl = document.createElement('div');
-    notesEl.className = 'small mb-2';
-    if (notePreview) {
-      notesEl.innerHTML = `<strong>QA Notes:</strong> ${escapeHtml(notePreview)}${noteExtraCount > 0 ? ` <span class="text-muted">(+${noteExtraCount} more)</span>` : ''}`;
+    const icons = [{ icon: '<i class="bi bi-building"></i>', label: 'Service Center', variant: 'info' }];
+    if (notesList.length) {
+      icons.push({ icon: '<i class="bi bi-sticky"></i>', label: `QA Notes: ${notesList.join(' | ')}`, variant: 'info' });
     }
 
-    const footer = document.createElement('div');
-    footer.className = 'mt-auto pt-1 d-flex justify-content-center align-items-center';
-    const btn = document.createElement('button');
-    btn.className = 'btn btn-sm btn-info';
-    btn.innerHTML = 'Open Record';
-    btn.addEventListener('click', () => showTableModalById(rows[0]._id));
-    footer.appendChild(btn);
-
-    cardBody.appendChild(headerDiv);
-    cardBody.appendChild(siteTitleEl);
-    cardBody.appendChild(statusEl);
-    cardBody.appendChild(markerEl);
-    if (notePreview) cardBody.appendChild(notesEl);
-    cardBody.appendChild(footer);
-
-    card.appendChild(cardBody);
-    col.appendChild(card);
+    const col = buildCompactInfoCard({
+      title: page.Title || page['Site Title'] || title,
+      siteTitle: page['Site Title'] || '',
+      statusText,
+      statusColor: statusColors[getCanonicalStatus(statusText)] || '#6c757d',
+      icons,
+      footerHtml: 'Open Record',
+      footerClass: 'btn-info',
+      onClick: () => showTableModalById(rows[0]._id)
+    });
     rowDiv.appendChild(col);
   });
 
@@ -1254,6 +1609,7 @@ function showAllQaModal(){
     'QA Notes': r['QA Notes'],
     'QA Issue': escapeHtml(r['QA Issue'] || ''),
     'Not Published': r['Not Published'] || '',
+    'Redirect Check': r['Redirect Check'] || '',
     'Site Title': r['Site Title'] || ''
   }));
 // Hold these columns for reference if we want to add them later
@@ -1296,6 +1652,7 @@ function showAllQaModal(){
           {title:'Not Published', field:'Not Published', hozAlign:'center', width:82, minWidth:70, maxWidth:92, headerWordWrap:true, formatter: function(cell){ return (cell.getValue() === 'Yes') ? '<span style="display:inline-block; max-width:64px; padding:2px 6px; border-radius:10px; background:#dc3545; color:#fff; font-size:0.72rem; font-weight:600; line-height:1.05; white-space:normal; text-align:center;">Not Published</span>' : ''; } },
           {title:'QA Notes', field:'QA Notes', formatter: function(cell){ return escapeHtml(cell.getValue()); } },
           {title:'QA Issue', field:'QA Issue', formatter: function(cell){ return cell.getValue(); } },
+          {title:'Redirect Check', field:'Redirect Check', formatter: function(cell){ const v = cell.getValue(); return v ? `<span class="badge bg-danger" style="white-space:normal;">${escapeHtml(v)}</span>` : ''; } },
           // New column: Site Title placed at the end per request
           {title:'Site Title', field:'Site Title', formatter: function(cell){ return escapeHtml(cell.getValue()); } }
         ],
@@ -1416,12 +1773,8 @@ function generateSiteSummaryTable() {
   
   dataToUse.forEach(d => {
     const div = (d.Division || 'Other').toString().trim();
-    let site = (d['Site Title'] || d['Site'] || 'Unknown').toString().trim();
-    const isServiceCenter = d['Service Center Page'] && d['Service Center Page'] !== 'No' && d['Service Center Page'] !== '0';
-    if (isServiceCenter && d['Service Center Site Name']) {
-      site = d['Service Center Site Name'];
-    }
-    
+    const site = getSiteGroupTitle(d);
+
     if (!summary[div]) summary[div] = {};
     if (!summary[div][site]) {
       summary[div][site] = { 
@@ -1596,8 +1949,18 @@ function generateSiteSummaryTable() {
           max-height: 320px;
           overflow: auto;
         }
+        /* Site Category Audit Table: cap to ~70% of the viewport so the top and bottom
+           edges of the scroll region are always visually obvious, however many sites
+           there are. */
         .territory-content .sc-bottom-scroll.site-audit-scroll {
-          max-height: 960px;
+          max-height: 70vh;
+        }
+        /* Division Page Totals By Status: short, compact table (one row per division,
+           now just a mini status bar instead of 10 numeric columns) — no need for its
+           own internal scrollbar. */
+        .territory-content .sc-bottom-scroll.division-totals-scroll {
+          max-height: none;
+          overflow: visible;
         }
         .territory-content .sc-report-table thead th {
           position: sticky;
@@ -1612,6 +1975,16 @@ function generateSiteSummaryTable() {
           background: #f7f9fc;
         }
       </style>
+
+      <!-- Data caveat: site counts here are derived from this list's Site Title /
+           Service Center grouping and don't always map 1:1 to real-world sites. -->
+      <div class="alert alert-warning py-2 px-3 mb-3" style="font-size: 0.8rem;">
+        <i class="bi bi-exclamation-triangle me-1"></i>
+        Site counts here may not perfectly reflect reality: some sites were launched to their own
+        site from a location or division site and aren't broken out separately, and some locations
+        may have migrated directly to Zesty without prior Symphony coverage.
+      </div>
+
       <!-- Chart -->
       <div style="margin-bottom: 20px;">
         <h5 style="margin-bottom: 8px; font-weight: 600;">Site Migration Status</h5>
@@ -1822,39 +2195,21 @@ function generateSiteSummaryTable() {
   const siteRowsHtml = siteAuditRows.map(r => `
       <tr>
         <td style="width:90px; max-width:90px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${escapeHtml(r.division)}">${escapeHtml(r.division)}</td>
-        <td style="width:220px; max-width:220px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${escapeHtml(r.siteTitle)}">${escapeHtml(r.siteTitle)}</td>
+        <td style="width:200px; max-width:200px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${escapeHtml(r.siteTitle)}">${escapeHtml(r.siteTitle)}</td>
         <td style="text-align:center;">${r.type}</td>
         <td>${r.categories.map(categoryPillHtml).join('')}</td>
         <td style="text-align:right;">${r.totalPages}</td>
-        <td style="text-align:right;">${r['1a']}</td>
-        <td style="text-align:right;">${r['1b']}</td>
-        <td style="text-align:right;">${r['1c']}</td>
-        <td style="text-align:right;">${r['2.x']}</td>
-        <td style="text-align:right;">${r['2c']}</td>
-        <td style="text-align:right;">${r['3.x']}</td>
-        <td style="text-align:right;">${(r['4.x'] || 0) + (r['4b'] || 0)}</td>
-        <td style="text-align:right;">${r['5x']}</td>
-        <td style="text-align:right;">${r['Redirect']}</td>
-        <td style="text-align:right;">${r['DNM']}</td>
+        <td style="padding:6px 8px;">${buildStatusMiniBarHtml(r, r.totalPages)}</td>
       </tr>`).join('');
 
   const divisionRowsHtml = divisionTotalsRows.map(r => `
       <tr>
-        <td style="width:100px; max-width:100px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${escapeHtml(r.division)}">${escapeHtml(r.division)}</td>
+        <td style="width:130px; max-width:130px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${escapeHtml(r.division)}">${escapeHtml(r.division)}</td>
         <td style="text-align:right;">${r.totals.sites}</td>
         <td style="text-align:right;">${r.totals.divisionalSites}</td>
         <td style="text-align:right;">${r.totals.localSites}</td>
         <td style="text-align:right;">${r.totals.totalPages}</td>
-        <td style="text-align:right;">${r.totals['1a']}</td>
-        <td style="text-align:right;">${r.totals['1b']}</td>
-        <td style="text-align:right;">${r.totals['1c']}</td>
-        <td style="text-align:right;">${r.totals['2.x']}</td>
-        <td style="text-align:right;">${r.totals['2c']}</td>
-        <td style="text-align:right;">${r.totals['3.x']}</td>
-        <td style="text-align:right;">${(r.totals['4.x'] || 0) + (r.totals['4b'] || 0)}</td>
-        <td style="text-align:right;">${r.totals['5x']}</td>
-        <td style="text-align:right;">${r.totals['Redirect']}</td>
-        <td style="text-align:right;">${r.totals['DNM']}</td>
+        <td style="padding:6px 8px;">${buildStatusMiniBarHtml(r.totals, r.totals.totalPages)}</td>
       </tr>`).join('');
 
   const siteGrandTotals = siteAuditRows.reduce((acc, r) => {
@@ -1907,6 +2262,12 @@ function generateSiteSummaryTable() {
     .map(cat => `${categoryPillHtml(cat).replace('</span>', `: ${categoryPullTotals[cat]}</span>`)}`)
     .join('');
 
+  const siteTotalsBarStats = {
+    '1a': siteGrandTotals['1a'], '1b': siteGrandTotals['1b'], '1c': siteGrandTotals['1c'],
+    '2.x': siteGrandTotals['2.x'], '2c': siteGrandTotals['2c'], '3.x': siteGrandTotals['3.x'],
+    'Live': siteGrandTotals['Live/5'], '5x': siteGrandTotals['Live/5'],
+    'Redirect': siteGrandTotals['R'], 'DNM': siteGrandTotals['DNM']
+  };
   const siteTotalsRowHtml = `
       <tr style="background:#f8f9fa; font-weight:600;">
         <td style="padding:8px; border-top:2px solid #d0d7de;">Sum</td>
@@ -1914,16 +2275,7 @@ function generateSiteSummaryTable() {
         <td style="text-align:center; padding:8px; border-top:2px solid #d0d7de;">D:${siteGrandTotals.divisionalSites} L:${siteGrandTotals.localSites}</td>
         <td style="padding:8px; border-top:2px solid #d0d7de;">${categoryPullTotalsHtml || '<span style="color:#6c757d;">-</span>'}</td>
         <td style="text-align:right; padding:8px; border-top:2px solid #d0d7de;">${siteGrandTotals.totalPages}</td>
-        <td style="text-align:right; padding:8px; border-top:2px solid #d0d7de;">${siteGrandTotals['1a']}</td>
-        <td style="text-align:right; padding:8px; border-top:2px solid #d0d7de;">${siteGrandTotals['1b']}</td>
-        <td style="text-align:right; padding:8px; border-top:2px solid #d0d7de;">${siteGrandTotals['1c']}</td>
-        <td style="text-align:right; padding:8px; border-top:2px solid #d0d7de;">${siteGrandTotals['2.x']}</td>
-        <td style="text-align:right; padding:8px; border-top:2px solid #d0d7de;">${siteGrandTotals['2c']}</td>
-        <td style="text-align:right; padding:8px; border-top:2px solid #d0d7de;">${siteGrandTotals['3.x']}</td>
-        <td style="text-align:right; padding:8px; border-top:2px solid #d0d7de;">${siteGrandTotals['4.x/4b']}</td>
-        <td style="text-align:right; padding:8px; border-top:2px solid #d0d7de;">${siteGrandTotals['Live/5']}</td>
-        <td style="text-align:right; padding:8px; border-top:2px solid #d0d7de;">${siteGrandTotals['R']}</td>
-        <td style="text-align:right; padding:8px; border-top:2px solid #d0d7de;">${siteGrandTotals['DNM']}</td>
+        <td style="padding:6px 8px; border-top:2px solid #d0d7de;">${buildStatusMiniBarHtml(siteTotalsBarStats, siteGrandTotals.totalPages)}</td>
       </tr>`;
 
   const divisionGrandTotals = divisionTotalsRows.reduce((acc, r) => {
@@ -1960,6 +2312,12 @@ function generateSiteSummaryTable() {
     'DNM': 0
   });
 
+  const divisionTotalsBarStats = {
+    '1a': divisionGrandTotals['1a'], '1b': divisionGrandTotals['1b'], '1c': divisionGrandTotals['1c'],
+    '2.x': divisionGrandTotals['2.x'], '2c': divisionGrandTotals['2c'], '3.x': divisionGrandTotals['3.x'],
+    'Live': divisionGrandTotals['Live/5'], '5x': divisionGrandTotals['Live/5'],
+    'Redirect': divisionGrandTotals['R'], 'DNM': divisionGrandTotals['DNM']
+  };
   const divisionTotalsRowHtml = `
       <tr style="background:#f8f9fa; font-weight:600;">
         <td style="padding:8px; border-top:2px solid #d0d7de;">Sum</td>
@@ -1967,16 +2325,7 @@ function generateSiteSummaryTable() {
         <td style="text-align:right; padding:8px; border-top:2px solid #d0d7de;">${divisionGrandTotals.divisionalSites}</td>
         <td style="text-align:right; padding:8px; border-top:2px solid #d0d7de;">${divisionGrandTotals.localSites}</td>
         <td style="text-align:right; padding:8px; border-top:2px solid #d0d7de;">${divisionGrandTotals.totalPages}</td>
-        <td style="text-align:right; padding:8px; border-top:2px solid #d0d7de;">${divisionGrandTotals['1a']}</td>
-        <td style="text-align:right; padding:8px; border-top:2px solid #d0d7de;">${divisionGrandTotals['1b']}</td>
-        <td style="text-align:right; padding:8px; border-top:2px solid #d0d7de;">${divisionGrandTotals['1c']}</td>
-        <td style="text-align:right; padding:8px; border-top:2px solid #d0d7de;">${divisionGrandTotals['2.x']}</td>
-        <td style="text-align:right; padding:8px; border-top:2px solid #d0d7de;">${divisionGrandTotals['2c']}</td>
-        <td style="text-align:right; padding:8px; border-top:2px solid #d0d7de;">${divisionGrandTotals['3.x']}</td>
-        <td style="text-align:right; padding:8px; border-top:2px solid #d0d7de;">${divisionGrandTotals['4.x/4b']}</td>
-        <td style="text-align:right; padding:8px; border-top:2px solid #d0d7de;">${divisionGrandTotals['Live/5']}</td>
-        <td style="text-align:right; padding:8px; border-top:2px solid #d0d7de;">${divisionGrandTotals['R']}</td>
-        <td style="text-align:right; padding:8px; border-top:2px solid #d0d7de;">${divisionGrandTotals['DNM']}</td>
+        <td style="padding:6px 8px; border-top:2px solid #d0d7de;">${buildStatusMiniBarHtml(divisionTotalsBarStats, divisionGrandTotals.totalPages)}</td>
       </tr>`;
 
   html += `
@@ -1992,24 +2341,15 @@ function generateSiteSummaryTable() {
             <div class="sc-top-scroll-inner" style="height:1px;"></div>
           </div>
           <div class="sc-bottom-scroll site-audit-scroll" style="overflow:auto;">
-          <table class="sc-report-table" style="width:100%; border-collapse:collapse; font-size:0.82rem; min-width:1260px; table-layout:fixed;">
+          <table class="sc-report-table" style="width:100%; border-collapse:collapse; font-size:0.82rem; min-width:780px; table-layout:fixed;">
             <thead>
               <tr>
                 <th style="text-align:left; padding:8px; border-bottom:1px solid #e0e0e0; width:90px; max-width:90px;">Division</th>
-                <th style="text-align:left; padding:8px; border-bottom:1px solid #e0e0e0; width:220px; max-width:220px;">Site Title</th>
-                <th style="text-align:center; padding:8px; border-bottom:1px solid #e0e0e0;">D/L</th>
-                <th style="text-align:left; padding:8px; border-bottom:1px solid #e0e0e0; width:260px; min-width:260px;">Category Pull(s)</th>
-                <th style="text-align:right; padding:8px; border-bottom:1px solid #e0e0e0;">Total Pages</th>
-                <th style="text-align:right; padding:8px; border-bottom:1px solid #e0e0e0;">1a</th>
-                <th style="text-align:right; padding:8px; border-bottom:1px solid #e0e0e0;">1b</th>
-                <th style="text-align:right; padding:8px; border-bottom:1px solid #e0e0e0;">1c</th>
-                <th style="text-align:right; padding:8px; border-bottom:1px solid #e0e0e0;">2.x</th>
-                <th style="text-align:right; padding:8px; border-bottom:1px solid #e0e0e0;">2c</th>
-                <th style="text-align:right; padding:8px; border-bottom:1px solid #e0e0e0;">3.x</th>
-                <th style="text-align:right; padding:8px; border-bottom:1px solid #e0e0e0;">4.x/4b</th>
-                <th style="text-align:right; padding:8px; border-bottom:1px solid #e0e0e0;">Live/5</th>
-                <th style="text-align:right; padding:8px; border-bottom:1px solid #e0e0e0;">R</th>
-                <th style="text-align:right; padding:8px; border-bottom:1px solid #e0e0e0;">DNM</th>
+                <th style="text-align:left; padding:8px; border-bottom:1px solid #e0e0e0; width:200px; max-width:200px;">Site Title</th>
+                <th style="text-align:center; padding:8px; border-bottom:1px solid #e0e0e0; width:40px;">D/L</th>
+                <th style="text-align:left; padding:8px; border-bottom:1px solid #e0e0e0; width:220px; min-width:220px;">Category Pull(s)</th>
+                <th style="text-align:right; padding:8px; border-bottom:1px solid #e0e0e0; width:60px;">Pages</th>
+                <th style="text-align:left; padding:8px; border-bottom:1px solid #e0e0e0; min-width:160px;" title="Hover any bar for the exact status breakdown">Status Breakdown</th>
               </tr>
             </thead>
             <tbody>${siteRowsHtml}</tbody>
@@ -2025,25 +2365,16 @@ function generateSiteSummaryTable() {
           <div class="sc-top-scroll" style="overflow-x:auto; overflow-y:hidden; height:14px; border-bottom:1px solid #e0e0e0; background:#fafbfc;">
             <div class="sc-top-scroll-inner" style="height:1px;"></div>
           </div>
-          <div class="sc-bottom-scroll" style="overflow:auto;">
-          <table class="sc-report-table" style="width:100%; border-collapse:collapse; font-size:0.82rem; min-width:1180px; table-layout:fixed;">
+          <div class="sc-bottom-scroll division-totals-scroll" style="overflow:auto;">
+          <table class="sc-report-table" style="width:100%; border-collapse:collapse; font-size:0.82rem; min-width:680px; table-layout:fixed;">
             <thead>
               <tr>
-                <th style="text-align:left; padding:8px; border-bottom:1px solid #e0e0e0; width:100px; max-width:100px;">Division</th>
-                <th style="text-align:right; padding:8px; border-bottom:1px solid #e0e0e0;">Sites</th>
-                <th style="text-align:right; padding:8px; border-bottom:1px solid #e0e0e0;">Div Sites</th>
-                <th style="text-align:right; padding:8px; border-bottom:1px solid #e0e0e0;">Local Sites</th>
-                <th style="text-align:right; padding:8px; border-bottom:1px solid #e0e0e0;">Total Pages</th>
-                <th style="text-align:right; padding:8px; border-bottom:1px solid #e0e0e0;">1a</th>
-                <th style="text-align:right; padding:8px; border-bottom:1px solid #e0e0e0;">1b</th>
-                <th style="text-align:right; padding:8px; border-bottom:1px solid #e0e0e0;">1c</th>
-                <th style="text-align:right; padding:8px; border-bottom:1px solid #e0e0e0;">2.x</th>
-                <th style="text-align:right; padding:8px; border-bottom:1px solid #e0e0e0;">2c</th>
-                <th style="text-align:right; padding:8px; border-bottom:1px solid #e0e0e0;">3.x</th>
-                <th style="text-align:right; padding:8px; border-bottom:1px solid #e0e0e0;">4.x/4b</th>
-                <th style="text-align:right; padding:8px; border-bottom:1px solid #e0e0e0;">Live/5</th>
-                <th style="text-align:right; padding:8px; border-bottom:1px solid #e0e0e0;">R</th>
-                <th style="text-align:right; padding:8px; border-bottom:1px solid #e0e0e0;">DNM</th>
+                <th style="text-align:left; padding:8px; border-bottom:1px solid #e0e0e0; width:130px; max-width:130px;">Division</th>
+                <th style="text-align:right; padding:8px; border-bottom:1px solid #e0e0e0; width:55px;">Sites</th>
+                <th style="text-align:right; padding:8px; border-bottom:1px solid #e0e0e0; width:65px;">Div Sites</th>
+                <th style="text-align:right; padding:8px; border-bottom:1px solid #e0e0e0; width:75px;">Local Sites</th>
+                <th style="text-align:right; padding:8px; border-bottom:1px solid #e0e0e0; width:60px;">Pages</th>
+                <th style="text-align:left; padding:8px; border-bottom:1px solid #e0e0e0; min-width:220px;" title="Hover any bar for the exact status breakdown">Status Breakdown</th>
               </tr>
             </thead>
             <tbody>${divisionRowsHtml}</tbody>
@@ -2154,26 +2485,19 @@ function renderCards(){
   const toPct = (count, total) => total > 0 ? ((count / total) * 100).toFixed(1) : '0.0';
   const compareText = (count, total) => `${count} of ${total} (${toPct(count, total)}%)`;
   const statusValue = (d) => (d.Status || '').toString().trim();
-  const completedCount = (rows) => rows.filter(d => statusValue(d).startsWith('4') || statusValue(d).startsWith('5') || statusValue(d) === 'THQ Redirect').length;
+  const isCompletedRow = (d) => statusValue(d).startsWith('4') || statusValue(d).startsWith('5') || statusValue(d) === 'THQ Redirect';
+  const completedCount = (rows) => rows.filter(isCompletedRow).length;
+  // Of the completed pages: those actually rebuilt in Zesty vs those only redirected.
+  const migratedCount = (rows) => rows.filter(d => isCompletedRow(d) && isFullyMigratedPage(d)).length;
+  const redirectedOnlyCount = (rows) => rows.filter(d => isCompletedRow(d) && !isFullyMigratedPage(d)).length;
   const doNotMigrateCount = (rows) => rows.filter(d => statusValue(d) === 'Do Not Migrate').length;
   const migrationProgressCount = (rows) => completedCount(rows) + doNotMigrateCount(rows);
-  const weeklyCounts = (rows) => {
-    const now = new Date();
-    const thisWeekStart = new Date(now);
-    thisWeekStart.setDate(now.getDate() - 7);
-    const prevWeekStart = new Date(now);
-    prevWeekStart.setDate(now.getDate() - 14);
-    const prevWeekEnd = new Date(now);
-    prevWeekEnd.setDate(now.getDate() - 7);
-    const thisWeekCount = rows.filter(d => d.Modified && new Date(d.Modified) >= thisWeekStart).length;
-    const prevWeekCount = rows.filter(d => d.Modified && new Date(d.Modified) >= prevWeekStart && new Date(d.Modified) < prevWeekEnd).length;
-    return { thisWeekCount, prevWeekCount };
-  };
   const qaSummary = (rows) => {
     let qaHigh = 0;
     let qaLow = 0;
     let revampCount = 0;
     let notPublishedCount = 0;
+    let redirectFlagCount = 0;
 
     rows.forEach(d => {
       const hasQa = d["QA Issues.lookupValue"] && String(d["QA Issues.lookupValue"]).trim();
@@ -2186,6 +2510,8 @@ function renderCards(){
 
       const revampPublish = (d['Revamp Publish Y/N'] || '').toString().trim().toLowerCase();
       if (revampPublish === 'no') notPublishedCount++;
+
+      if (getRedirectCheckStatus(d).flagged) redirectFlagCount++;
     });
 
     return {
@@ -2193,31 +2519,26 @@ function renderCards(){
       qaLow,
       revampCount,
       notPublishedCount,
+      redirectFlagCount,
       pageCount: qaHigh + qaLow
     };
   };
 
   const filteredProgress = migrationProgressCount(filtered);
   const allProgress = migrationProgressCount(allRows);
-  const filteredCompleted = completedCount(filtered);
-  const allCompleted = completedCount(allRows);
+  const filteredMigrated = migratedCount(filtered);
+  const allMigrated = migratedCount(allRows);
+  const filteredRedirectedOnly = redirectedOnlyCount(filtered);
+  const allRedirectedOnly = redirectedOnlyCount(allRows);
   const filteredDoNotMigrate = doNotMigrateCount(filtered);
   const allDoNotMigrate = doNotMigrateCount(allRows);
-  const filteredWeekly = weeklyCounts(filtered);
-  const allWeekly = weeklyCounts(allRows);
   const filteredQa = qaSummary(filtered);
   const allQa = qaSummary(allRows);
 
   const siteMigrationProgress = (rows) => {
     const sites = {};
     rows.forEach(d => {
-      // Align grouping with 'Migration Tool Insights' (Service Centers are treated as their own sites)
-      let site = (d['Site Title'] || d['Site'] || 'Unknown').toString().trim();
-      const isServiceCenter = d['Service Center Page'] && d['Service Center Page'] !== 'No' && d['Service Center Page'] !== '0';
-      if (isServiceCenter && d['Service Center Site Name']) {
-        site = d['Service Center Site Name'];
-      }
-
+      const site = getSiteGroupTitle(d);
       if (!sites[site]) sites[site] = { total: 0, finished: 0 };
       sites[site].total++;
       const s = statusValue(d);
@@ -2242,12 +2563,8 @@ function renderCards(){
     const summary = {}; // { Division: { SiteTitle: { Completed: 0, InProgress: 0, InQA: 0, NeedsInfo: 0, Total: 0 } } }
     filtered.forEach(d => {
       const div = (d.Division || 'Other').toString().trim();
-      let site = (d['Site Title'] || d['Site'] || 'Unknown').toString().trim();
-      const isServiceCenter = d['Service Center Page'] && d['Service Center Page'] !== 'No' && d['Service Center Page'] !== '0';
-      if (isServiceCenter && d['Service Center Site Name']) {
-        site = d['Service Center Site Name'];
-      }
-      
+      const site = getSiteGroupTitle(d);
+
       if (!summary[div]) summary[div] = {};
       if (!summary[div][site]) summary[div][site] = { Completed: 0, InProgress: 0, InQA: 0, NeedsInfo: 0, Total: 0 };
       
@@ -2261,265 +2578,116 @@ function renderCards(){
     return summary;
   })();
 
-  // Update footer with Weekly Modified info
-  const refreshEl = document.getElementById('refreshDate');
-  if (refreshEl) {
-    const currentTextMatch = refreshEl.innerHTML.match(/Data last refreshed: [^<]+/);
-    const currentText = currentTextMatch ? currentTextMatch[0] : '';
-    const ver = (window.APP_VERSION || APP_VERSION);
-    refreshEl.innerHTML = `v${ver} · ${currentText} <br> <span class="opacity-75" style="font-size: 0.8rem;">Weekly Modified: This Week: <strong>${filteredWeekly.thisWeekCount}</strong> | Last Week: <strong>${filteredWeekly.prevWeekCount}</strong> (Total this week: ${allWeekly.thisWeekCount})</span>`;
-  }
+  updateFooterStats();
 
   const today = new Date();
   const lastMonth = new Date(today.getFullYear(), today.getMonth()-1, today.getDate());
   renderOverallProgress(filtered);
 
 
-    // --- metrics object ---
+  // --- Extra data for the visual metric cards (replacing the unused 3a/3b/3c cards) ---
+  const sitePct = filteredSiteStats.total > 0 ? (filteredSiteStats.completed / filteredSiteStats.total) * 100 : 0;
+  const pagePct = filteredTotal > 0 ? (filteredProgress / filteredTotal) * 100 : 0;
+  const migratedPct = filteredTotal > 0 ? (filteredMigrated / filteredTotal) * 100 : 0;
+  const redirectedPct = filteredTotal > 0 ? (filteredRedirectedOnly / filteredTotal) * 100 : 0;
+  const dnmPct = filteredTotal > 0 ? (filteredDoNotMigrate / filteredTotal) * 100 : 0;
+
+  // Work queue for the teammate who sets migration fields / does the pre-migration review.
+  const needsFieldsCount = filtered.filter(d => statusValue(d).startsWith('1a')).length;
+
+  const qaTotal = filteredQa.pageCount + filteredQa.revampCount + filteredQa.notPublishedCount + filteredQa.redirectFlagCount;
+
+  // --- metrics object ---
+  // Every card follows the same shape: a big bold hero number/word, a one-line detail
+  // under it, and either a thin progress bar (percentage cards) or an icon chip (count
+  // cards) — so cards read consistently and none of them are "just text."
   const metrics = {
     "Site Migration Progress": {
-      main: `${toPct(filteredSiteStats.completed, filteredSiteStats.total)}% (${filteredSiteStats.completed} of ${filteredSiteStats.total} Sites)`,
-      sub: `All sites: ${allSiteStats.completed} of ${allSiteStats.total} (${toPct(allSiteStats.completed, allSiteStats.total)}%)`
+      hero: `${toPct(filteredSiteStats.completed, filteredSiteStats.total)}%`,
+      detail: `${filteredSiteStats.completed} of ${filteredSiteStats.total} sites`,
+      compareSub: `All sites: ${allSiteStats.completed} of ${allSiteStats.total} (${toPct(allSiteStats.completed, allSiteStats.total)}%)`,
+      bar: { pct: sitePct, color: '#ffffff' }
     },
     "Page Migration Progress": {
-      main: `${toPct(filteredProgress, filteredTotal)}% (${compareText(filteredProgress, filteredTotal)})`,
-      sub: `Filtered share of all pages: ${compareText(filteredProgress, allTotal)}`
+      hero: `${toPct(filteredProgress, filteredTotal)}%`,
+      detail: `${filteredProgress} of ${filteredTotal} pages`,
+      compareSub: `Filtered share of all pages: ${compareText(filteredProgress, allTotal)}`,
+      bar: { pct: pagePct, color: '#ffffff' }
     },
-    "Completed Pages": {
-      main: `${compareText(filteredCompleted, filteredTotal)}`,
-      sub: `All pages: ${compareText(allCompleted, allTotal)}`
+    "Migrated Pages": {
+      hero: `${filteredMigrated}`,
+      detail: `Rebuilt in Zesty — ${toPct(filteredMigrated, filteredTotal)}% of ${filteredTotal} pages`,
+      compareSub: `All pages: ${compareText(allMigrated, allTotal)}`,
+      bar: { pct: migratedPct, color: '#6ee7a8' },
+      alwaysShowSub: false
+    },
+    "Redirected Pages": {
+      hero: `${filteredRedirectedOnly}`,
+      detail: `Redirect only, no Zesty page — ${toPct(filteredRedirectedOnly, filteredTotal)}% of ${filteredTotal}`,
+      compareSub: `All pages: ${compareText(allRedirectedOnly, allTotal)}`,
+      bar: { pct: redirectedPct, color: '#9be3ee' }
     },
     "Do Not Migrate": {
-      main: `${compareText(filteredDoNotMigrate, filteredTotal)}`,
-      sub: `All pages: ${compareText(allDoNotMigrate, allTotal)}`
+      hero: `${filteredDoNotMigrate}`,
+      detail: `${toPct(filteredDoNotMigrate, filteredTotal)}% of ${filteredTotal} pages`,
+      compareSub: `All pages: ${compareText(allDoNotMigrate, allTotal)}`,
+      bar: { pct: dnmPct, color: '#ff8a80' }
     },
     "QA Issues": {
-      main: `Page: ${filteredQa.pageCount} | Revamp: ${filteredQa.revampCount} | Not Published: ${filteredQa.notPublishedCount}`
+      hero: `${qaTotal}`,
+      // Icons rather than a long text line — the text wrapped to two lines and pushed
+      // this card's bar out of alignment with the others. Hover any icon for the label.
+      detail: '',
+      iconRow: [
+        { icon: 'bi-clipboard2-pulse', count: filteredQa.pageCount, label: 'Pages with QA issues', color: '#8a6a1c' },
+        { icon: 'bi-arrow-repeat', count: filteredQa.revampCount, label: 'Pages needing revamp', color: '#b8912b' },
+        { icon: 'bi-eye-slash', count: filteredQa.notPublishedCount, label: 'Revamped but not published', color: '#d4af37' },
+        { icon: 'bi-signpost-split', count: filteredQa.redirectFlagCount, label: 'Redirect checks flagged', color: '#eed58a' }
+      ],
+      // Shades of gold rather than four unrelated hues — the segments read as one
+      // measure split into parts instead of four competing categories.
+      segmentBar: [
+        { n: filteredQa.pageCount, color: '#8a6a1c', label: 'QA Issues' },
+        { n: filteredQa.revampCount, color: '#b8912b', label: 'Revamp' },
+        { n: filteredQa.notPublishedCount, color: '#d4af37', label: 'Not Published' },
+        { n: filteredQa.redirectFlagCount, color: '#eed58a', label: 'Redirects' }
+      ]
+    },
+    "Redirect Verification": {
+      hero: filteredQa.redirectFlagCount ? `${filteredQa.redirectFlagCount}` : '0',
+      detail: filteredQa.redirectFlagCount ? 'Pages flagged by the automated check' : 'All redirects verified',
+      icon: filteredQa.redirectFlagCount ? 'bi-signpost-split' : 'bi-check-circle',
+      iconVariant: filteredQa.redirectFlagCount ? 'danger' : 'success'
+    },
+    "Needs Migration Fields": {
+      hero: `${needsFieldsCount}`,
+      detail: 'Pages still needing fields set before review (1a)',
+      icon: 'bi-pencil-square',
+      iconVariant: 'warning'
     }
   };
 
-  renderCharts(filtered);
-
-
-
-function renderCharts(filtered) {
-  const ctxStatus = document.getElementById("statusChart").getContext("2d");
-  const ctxPriority = document.getElementById("priorityChart").getContext("2d");
-  const ctxPageType = document.getElementById("pageTypeChart").getContext("2d");
-  const ctxPubSym = document.getElementById("pubSymChart").getContext("2d");
-
-
-  const canonicalStatus = {
-    completed: ["4. THQ QA Complete, THQ will publish on migration date","5. THQ Published and URL Redirected"],
-    doNotMigrate: ["Do Not Migrate"],
-    thqRedirect: ["THQ Redirect"],
-    inProgress: ["2a. Started Content Migration","2b. Finished Content Migration; Zesty Columns Set in this list","2c. Updates Needed, See QA Notes/Comments"],
-    inQA: ["3a. Ready for Area Command QA","3b. Ready for DHQ QA","3c. Ready for THQ QA"],
-    needsInfo: ["1a. Need Migration Fields set"],
-    rfmt: ["1c. RFMT (THQ)"],
-    unknown: [""] // fallback
-};
-
-
-
-const statusCounts = {};
-filtered.forEach(d => {
-  let s = normalizeStatus(d.Status) || "Unknown";
-
- if (/^(4|5)/.test(s)) {
-  s = "Completed";
-} else if (s === "Do Not Migrate") {
-  s = "Do Not Migrate";
-} else if (/^2/.test(s)) {
-  s = "In Progress";
-} else if (/^1c/.test(s)) {
-  s = "Ready for Migration Tool";
-} else if (/^1b/.test(s)) {
-  s = "Pending Migration";
-} else if (/^1/.test(s)) {
-  s = "Needs Info";
-} else if (/^3[a-d]/.test(s)) {
-  s = "In QA";
-} else if (s === "Needs Info") {
-  s = "Needs Info";
-} else {
-  s = "Unknown";
-}
-
-
-  statusCounts[s] = (statusCounts[s] || 0) + 1;
-});
-
-  // Status chart
-
-
-// Prepare data for chart
-const labels = Object.keys(statusCounts);
-const data = Object.values(statusCounts);
-const backgroundColor = labels.map(label => statusColors[label] || "#6c757d"); // fallback gray
-
-// Status chart (use transformed values for visual scaling)
-if(statusChart) statusChart.destroy();
-statusChart = new Chart(ctxStatus, {
-  type: "pie",
-  data: {
-    labels: labels,
-    datasets: [{
-      // Use sqrt scaling so small categories remain visible
-      data: transformCountsForPie(data, 'sqrt'),
-      // Keep raw counts nearby so tooltips can reference them
-      _rawCounts: data,
-      backgroundColor: backgroundColor
-    }]
-  },
-  options: {
-    plugins: {
-      legend: { display: false },
-      tooltip: {
-        enabled: true,
-        callbacks: {
-          label: function(ctx){
-            try{
-              const ds = ctx.dataset;
-              const raw = ds._rawCounts && ds._rawCounts[ctx.dataIndex] ? ds._rawCounts[ctx.dataIndex] : ctx.parsed || 0;
-              const total = ds._rawCounts ? ds._rawCounts.reduce((a,b)=>a+(Number(b)||0),0) : ctx.chart._metasets[ctx.datasetIndex].total;
-              const pct = total ? ((raw/total)*100).toFixed(1) : '0.0';
-              return `${raw} (${pct}%)`;
-            }catch(e){ return `${ctx.parsed}`; }
-          }
-        }
-      },
-      datalabels: { anchor: 'end', align: 'top' }
-    }
-  },
-});
-try{ addChartLegendModal(statusChart, 'Status'); }catch(e){}
-
-
-
-
-  // Priority chart (now pie)
-  const priorityCounts = {};
-  filtered.forEach(d => {
-    const p = d.Priority || "None";
-    priorityCounts[p] = (priorityCounts[p] || 0) + 1;
-  });
-
-  if(priorityChart) priorityChart.destroy();
-  priorityChart = new Chart(ctxPriority, {
-    type: "pie",
-    data: {
-      labels: Object.keys(priorityCounts),
-      datasets: [{
-        data: transformCountsForPie(Object.values(priorityCounts), 'sqrt'),
-        _rawCounts: Object.values(priorityCounts),
-        backgroundColor: ["#002056","#f1c40f","#f39c12","#e74c3c","#3498db","#9b59b6","#16a085","#d35400","#ff6b6b"]
-      }]
-    },
-    options: {
-      plugins: {
-        legend: { display: false },
-        tooltip: {
-          enabled: true,
-          callbacks: {
-            label: function(ctx){
-              try{
-                const ds = ctx.dataset;
-                const raw = ds._rawCounts && ds._rawCounts[ctx.dataIndex] ? ds._rawCounts[ctx.dataIndex] : ctx.parsed || 0;
-                const total = ds._rawCounts ? ds._rawCounts.reduce((a,b)=>a+(Number(b)||0),0) : ctx.chart._metasets[ctx.datasetIndex].total;
-                const pct = total ? ((raw/total)*100).toFixed(1) : '0.0';
-                return `${raw} (${pct}%)`;
-              }catch(e){ return `${ctx.parsed}`; }
-            }
-          }
-        },
-        datalabels: { anchor: 'end', align: 'top' }
-      }
-    },
-  });
-  try{ addChartLegendModal(priorityChart, 'Priority'); }catch(e){}
-
-  // Page Type chart
-  const pageTypeCounts = {};
-  filtered.forEach(d => {
-    const pt = d["Page Type"] || "Not Set";
-    pageTypeCounts[pt] = (pageTypeCounts[pt] || 0) + 1;
-  });
-
-  if(pageTypeChart) pageTypeChart.destroy();
-  pageTypeChart = new Chart(ctxPageType, {
-    type: "pie",
-    data: {
-      labels: Object.keys(pageTypeCounts),
-      datasets: [{
-        data: transformCountsForPie(Object.values(pageTypeCounts), 'sqrt'),
-        _rawCounts: Object.values(pageTypeCounts),
-        backgroundColor: ["#002056","#2ecc71","#e74c3c","#f39c12","#3498db","#6f42c1"]
-      }]
-    },
-    options: {
-      plugins: {
-        legend: { display: false },
-        tooltip: {
-          enabled: true,
-          callbacks: {
-            label: function(ctx){
-              try{ const ds = ctx.dataset; const raw = ds._rawCounts && ds._rawCounts[ctx.dataIndex] ? ds._rawCounts[ctx.dataIndex] : ctx.parsed || 0; const total = ds._rawCounts ? ds._rawCounts.reduce((a,b)=>a+(Number(b)||0),0) : 0; const pct = total ? ((raw/total)*100).toFixed(1) : '0.0'; return `${raw} (${pct}%)`; }catch(e){ return `${ctx.parsed}`; }
-            }
-          }
-        },
-      }
-    }
-  });
-    try{ addChartLegendModal(pageTypeChart, 'Page Type'); }catch(e){}
-
-  // Published Symphony chart
-  const pubSymCounts = {};
-  filtered.forEach(d => {
-    const ps = d["Published Symphony"] || "Not Set";
-    pubSymCounts[ps] = (pubSymCounts[ps] || 0) + 1;
-  });
-
-  if(pubSymChart) pubSymChart.destroy();
-  pubSymChart = new Chart(ctxPubSym,{
-    type:"pie",
-    data:{
-      labels:Object.keys(pubSymCounts),
-      datasets:[{
-        data: transformCountsForPie(Object.values(pubSymCounts), 'sqrt'),
-        _rawCounts: Object.values(pubSymCounts),
-        backgroundColor:["#002056","#e74c3c","#f39c12","#3498db","#9b59b6"]
-      }]
-    },
-    options: {
-      plugins: {
-        legend: { display: false },
-        tooltip: {
-          enabled: true,
-          callbacks: {
-            label: function(ctx){ try{ const ds = ctx.dataset; const raw = ds._rawCounts && ds._rawCounts[ctx.dataIndex] ? ds._rawCounts[ctx.dataIndex] : ctx.parsed || 0; const total = ds._rawCounts ? ds._rawCounts.reduce((a,b)=>a+(Number(b)||0),0) : 0; const pct = total ? ((raw/total)*100).toFixed(1) : '0.0'; return `${raw} (${pct}%)`; }catch(e){ return `${ctx.parsed}`; } }
-          }
-        }
-      }
-    }
-  });
-      try{ addChartLegendModal(pubSymChart, 'Published Symphony'); }catch(e){}
-}
-    // (No global exposures required — keep functions top-level and add runtime guards.)
+  // Charts are rendered once, via the top-level renderCharts(getFilteredData())
+  // call in updateDashboard() — see the full 6-chart implementation later in this file.
+  // (A duplicate 4-chart copy used to be nested here and ran on every refresh
+  // alongside the real one; it was removed as dead weight.)
 
 // Cards rendering
 // Old Colors '#f1c40f','#2ecc71','#e74c3c','#f39c12','#3498db','#9b59b6','#16a085','#d35400','#ff6b6b', '#f7b32b', '#4ecdc4'
   // ['#132230', '#1a3245', '#22445a', '#2b5770', '#33688a', '#3c7aa0', '#448cba', '#4d9ecf', '#55b0e5', '#5dc3f5', '#66d6ff'];
 //['#0b1622', '#0f1b2d', '#132230', '#18293a', '#1d3145', '#223950', '#27415b', '#2c4966', '#315171', '#365a7c', '#3b637f'];
+  // Capped at #2258a1 (not the brighter blues that used to go up to #2f80f5) — the
+  // brighter shades pushed white text below WCAG AA contrast (as low as 2.9:1 for the
+  // detail line). Every shade here keeps white text at 5.6:1 or better.
   const colors = [
-  '#132230', 
-  '#16304d', 
-  '#1a3d69', 
-  '#1e4a85', 
-  '#2258a1', 
-  '#2765bd', 
-  '#2b73d9', 
-  '#2f80f5'
+  '#132230',
+  '#16304d',
+  '#1a3d69',
+  '#1e4a85',
+  '#2258a1',
+  '#16304d',
+  '#1a3d69',
+  '#1e4a85'
 ];
 
 
@@ -2531,67 +2699,58 @@ try{ addChartLegendModal(statusChart, 'Status'); }catch(e){}
   container.innerHTML = "";
   let i=0;
 
-  // Render existing metrics
+  // Render metrics. Every card follows the same layout — icon chip OR nothing up top,
+  // a big bold hero number, a one-line detail, then a thin progress bar (percentage
+  // cards) or wider segment bar (QA Issues) — fixed card height keeps them all matching.
   for(const key in metrics){
-    const metric = metrics[key];
-    const mainText = metric && typeof metric === 'object' ? metric.main : metric;
-    const subText = metric && typeof metric === 'object' ? metric.sub : '';
+    const metric = metrics[key] || {};
     const isSiteCard = key === "Site Migration Progress";
-    
+
+    const iconChipHtml = metric.icon
+      ? `<div class="metric-icon-chip variant-${metric.iconVariant || 'info'}"><i class="bi ${metric.icon}"></i></div>`
+      : '';
+
+    const barHtml = metric.bar
+      ? `<div class="metric-bar-track"><div class="metric-bar-fill" style="width:${Math.max(0, Math.min(100, metric.bar.pct || 0)).toFixed(1)}%; background:${metric.bar.color};"></div></div>`
+      : '';
+
+    const segmentBarHtml = metric.segmentBar
+      ? `<div class="metric-segment-bar">${buildSegmentBarHtml(metric.segmentBar)}</div>`
+      : '';
+
+    // Compact icon+count row (used where a text breakdown would wrap and throw the
+    // card's bar out of alignment) — hover any icon for its label.
+    const iconRowHtml = metric.iconRow
+      ? `<div class="metric-count-row">${metric.iconRow.map(ic => `
+          <span class="metric-count-chip" data-rich-tooltip="${escapeHtml(buildRichTooltipTextHtml(`${ic.label}: ${ic.count}`))}">
+            <i class="bi ${ic.icon}" style="color:${ic.color};"></i><span class="metric-count-value">${ic.count}</span>
+          </span>`).join('')}</div>`
+      : '';
+
+    const compareSubHtml = (hasActiveFilters && metric.compareSub)
+      ? `<p class="metric-compare-sub mb-0">${metric.compareSub}</p>`
+      : '';
+
     container.innerHTML += `
       <div class="col-lg-3 col-md-6 col-sm-12 mb-1">
-        <div class="card text-white site-metric-card" 
-             ${isSiteCard ? `id="site-progress-card" data-bs-toggle="modal" data-bs-target="#siteManagementModal" style="cursor: pointer;"` : ''}
+        <div class="card text-white site-metric-card"
              style="background-color:${colors[i++ % colors.length]}">
-          <div class="card-body">
-            <h5 class="card-title d-flex align-items-center justify-content-center gap-1 mb-2" style="line-height:1.2;">
+          <div class="card-body d-flex flex-column align-items-center justify-content-center h-100">
+            <h5 class="card-title d-flex align-items-center justify-content-center gap-1 mb-1" style="line-height:1.2;">
               <span>${key}</span>
-              ${isSiteCard ? '<span style="color:rgba(19,35,63,0.78); font-size:0.68rem; font-weight:700; font-family:Arial,sans-serif; line-height:1; display:inline-flex; align-items:center; justify-content:center; width:16px; height:16px; flex:0 0 16px; background:rgba(19,35,63,0.1); border:1px solid rgba(19,35,63,0.24); border-radius:50%;" title="Click to open Site Status Management Report" aria-label="Clickable card">i</span>' : ''}
+              ${isSiteCard ? '<span style="color:rgba(19,35,63,0.78); font-size:0.68rem; font-weight:700; font-family:Arial,sans-serif; line-height:1; display:inline-flex; align-items:center; justify-content:center; width:16px; height:16px; flex:0 0 16px; background:rgba(19,35,63,0.1); border:1px solid rgba(19,35,63,0.24); border-radius:50%;" title="See the full breakdown in the Site Migration Status section below">i</span>' : ''}
             </h5>
-            <p class="card-text mb-1">${mainText}</p>
-            ${hasActiveFilters && subText ? `<p class="card-text small mb-0" style="opacity:0.92;">${subText}</p>` : ''}
+            ${iconChipHtml}
+            <div class="metric-hero">${metric.hero}</div>
+            ${metric.detail ? `<p class="metric-detail mb-0">${metric.detail}</p>` : ''}
+            ${iconRowHtml}
+            ${barHtml}
+            ${segmentBarHtml}
+            ${compareSubHtml}
           </div>
         </div>
       </div>`;
   }
-
-  // QA statuses breakdown (AC, DHQ, THQ) with High/Low/Total
-  const qaStatuses = [
-    { status: "3a. Ready for AC QA"},
-    { status: "3b. Ready for DHQ QA"},
-    { status: "3c. Ready for THQ QA"}
-  ];
-
-  const qaCardColors = [
-    '#dceaf9',
-    '#e3f3ea',
-    '#fbe9cf'
-  ];
-
-  qaStatuses.forEach((qa, idx) => {
-    const counts = { high: 0, low: 0 };
-    filtered.forEach(d=>{
-      if(d.Status === qa.status){
-        if(d.Priority==="High") counts.high++;
-        else counts.low++;
-      }
-    });
-    const total = counts.high + counts.low;
-
-    container.innerHTML += `
-      <div class="col-lg-3 col-md-6 col-sm-12 mb-1">
-        <div class="card text-dark" style="background-color:${qaCardColors[idx % qaCardColors.length]}; color:#12233d;">
-          <div class="card-body">
-            <h5 class="card-title" style="font-size:1rem;">${qa.status}</h5>
-            <div class="d-flex justify-content-around mt-2">
-              <div class="text-center" style="font-size:0.9rem;">
-                High: ${counts.high} | Low: ${counts.low} | Total: ${total}
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>`;
-  });
 
   renderOverallProgress(getFilteredData());
 
@@ -2599,131 +2758,72 @@ try{ addChartLegendModal(statusChart, 'Status'); }catch(e){}
   renderBreakdown(filtered);
   renderQaAccordion(filtered);
   renderServiceCenterAccordion(filtered);
+  renderSiteManagementSection();
+  try { renderTitleCloud(filtered); } catch(e){ console.warn('renderTitleCloud failed', e); }
+}
 
-  // Attach click handler AFTER all DOM manipulations (this ensures it survives all innerHTML changes)
+// Site Migration Status: used to be a modal opened by clicking the "Site Migration
+// Progress" metric card; now rendered inline on the main page (like the other
+// accordions) so it doesn't require a click to discover.
+function renderSiteManagementSection(){
+  const body = document.getElementById('siteManagementBody');
+  if (!body) return;
+  body.innerHTML = generateSiteSummaryTable();
+  initTopTableScrollbars(body);
+
+  // Render the territory chart after content is injected
   setTimeout(() => {
-    const siteMgmtCard = document.getElementById('site-progress-card');
-    if (siteMgmtCard) {
-      siteMgmtCard.onclick = function siteCardClick() {
-        console.log('Site Migration Card clicked...');
-        const modalBody = document.getElementById('siteManagementModalBody');
-        if (modalBody) {
-          const content = generateSiteSummaryTable();
-          console.log('Table content length:', content.length);
-          modalBody.innerHTML = content;
-          initTopTableScrollbars(modalBody);
-          
-          // Render territory chart after content is injected
-          setTimeout(() => {
-            if (window.territoryChartData && typeof Chart !== 'undefined') {
-              const canvas = document.getElementById(window.territoryChartData.chartId);
-              if (canvas) {
-                try {
-                  const ctx = canvas.getContext('2d');
-                  // Render as a single horizontal stacked bar to save vertical space
-                  const labels = window.territoryChartData.labels;
-                  const counts = window.territoryChartData.data;
-                  const colors = ['#dc3545', '#ffc107', '#17a2b8', '#28a745'];
-                  const datasets = labels.map((lbl, i) => ({
-                    label: lbl,
-                    data: [counts[i] || 0],
-                    backgroundColor: colors[i] || '#ccc',
-                    borderColor: '#fff',
-                    borderWidth: 1,
-                    stack: 'a'
-                  }));
+    if (window.territoryChartData && typeof Chart !== 'undefined') {
+      const canvas = document.getElementById(window.territoryChartData.chartId);
+      if (canvas) {
+        try {
+          const ctx = canvas.getContext('2d');
+          // Render as a single horizontal stacked bar to save vertical space
+          const labels = window.territoryChartData.labels;
+          const counts = window.territoryChartData.data;
+          const colors = ['#dc3545', '#ffc107', '#17a2b8', '#28a745'];
+          const datasets = labels.map((lbl, i) => ({
+            label: lbl,
+            data: [counts[i] || 0],
+            backgroundColor: colors[i] || '#ccc',
+            borderColor: '#fff',
+            borderWidth: 1,
+            stack: 'a'
+          }));
 
-                  new Chart(ctx, {
-                    type: 'bar',
-                    data: {
-                      labels: [''],
-                      datasets: datasets
-                    },
-                    options: {
-                      indexAxis: 'y',
-                      responsive: true,
-                      maintainAspectRatio: false,
-                      layout: {
-                        padding: { right: 30 }
-                      },
-                      plugins: {
-                        legend: {
-                          position: 'right',
-                          align: 'start',
-                          labels: { boxWidth: 10, padding: 8, font: { size: 11 } }
-                        },
-                        tooltip: { callbacks: { label: function(context){ return context.dataset.label + ': ' + (context.parsed.x || context.parsed); } } }
-                      },
-                      scales: {
-                        x: { stacked: true, ticks: { beginAtZero: true }, grace: '10%' },
-                        y: { stacked: true }
-                      }
-                    }
-                  });
-                } catch (e) {
-                  console.error('Error rendering territory chart:', e);
-                }
+          new Chart(ctx, {
+            type: 'bar',
+            data: {
+              labels: [''],
+              datasets: datasets
+            },
+            options: {
+              indexAxis: 'y',
+              responsive: true,
+              maintainAspectRatio: false,
+              layout: {
+                padding: { right: 30 }
+              },
+              plugins: {
+                legend: {
+                  position: 'right',
+                  align: 'start',
+                  labels: { boxWidth: 10, padding: 8, font: { size: 11 } }
+                },
+                tooltip: { callbacks: { label: function(context){ return context.dataset.label + ': ' + (context.parsed.x || context.parsed); } } }
+              },
+              scales: {
+                x: { stacked: true, ticks: { beginAtZero: true }, grace: '10%' },
+                y: { stacked: true }
               }
             }
-          }, 50);
-        } else {
-          console.error('Modal body #siteManagementModalBody not found!');
-          const fallbackBody = document.querySelector('#siteManagementModal .modal-body');
-          if (fallbackBody) {
-            fallbackBody.innerHTML = generateSiteSummaryTable();
-            initTopTableScrollbars(fallbackBody);
-            // Render chart here too
-            setTimeout(() => {
-              if (window.territoryChartData && typeof Chart !== 'undefined') {
-                const canvas = document.getElementById(window.territoryChartData.chartId);
-                if (canvas) {
-                  try {
-                    const ctx = canvas.getContext('2d');
-                    // Render stacked horizontal bar in fallback path as well
-                    const labels = window.territoryChartData.labels;
-                    const counts = window.territoryChartData.data;
-                    const colors = ['#dc3545', '#ffc107', '#17a2b8', '#28a745'];
-                    const datasets = labels.map((lbl, i) => ({
-                      label: lbl,
-                      data: [counts[i] || 0],
-                      backgroundColor: colors[i] || '#ccc',
-                      borderColor: '#fff',
-                      borderWidth: 1,
-                      stack: 'a'
-                    }));
-
-                    new Chart(ctx, {
-                      type: 'bar',
-                      data: { labels: [''], datasets: datasets },
-                      options: {
-                        indexAxis: 'y',
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        layout: {
-                          padding: { right: 30 }
-                        },
-                        plugins: {
-                          legend: {
-                            position: 'right',
-                            align: 'start',
-                            labels: { boxWidth: 10, padding: 8, font: { size: 11 } }
-                          },
-                          tooltip: { callbacks: { label: function(context){ return context.dataset.label + ': ' + (context.parsed.x || context.parsed); } } }
-                        },
-                        scales: { x: { stacked: true, ticks: { beginAtZero: true }, grace: '10%' }, y: { stacked: true } }
-                      }
-                    });
-                  } catch (e) {
-                    console.error('Error rendering territory chart:', e);
-                  }
-                }
-              }
-            }, 50);
-          }
+          });
+        } catch (e) {
+          console.error('Error rendering territory chart:', e);
         }
-      };
+      }
     }
-  }, 0);
+  }, 50);
 }
 
 
@@ -3464,43 +3564,406 @@ function renderOverallProgress(filtered){
   if (!legendContainer) return;
   legendContainer.innerHTML = "";
 
-  // Compute percentages from raw counts. Percentages are (count / total) * 100
-  // and rounded to one decimal place for display. Widths use the raw percentage
-  // so visual segments match the textual percentages (minor rounding differences
-  // may cause the sums to be ~100%).
-  // Prepare arrays for sqrt-scaling widths while keeping raw percentages for text
-  const keys = Object.keys(counts);
-  const rawCounts = keys.map(k => counts[k] || 0);
-  const scaledCounts = transformCountsForPie(rawCounts, 'sqrt');
-  const scaledTotal = scaledCounts.reduce((a,b)=>a+b,0) || 1;
+  // Segment widths are TRUE proportions of the total. (They used to be sqrt-scaled,
+  // which made a 0.2% sliver look like a meaningful chunk — the bar disagreed with its
+  // own labels.) Ordered from "not started" through to "done" so the bar reads as a
+  // pipeline left-to-right, and only segments with room show their inline label.
+  const ORDER = [
+    'Needs Info', 'Pending Migration', 'Ready for Migration Tool', 'In Progress',
+    'In QA', 'Completed', 'THQ Redirect', 'Do Not Migrate', 'Unknown'
+  ];
+  const keys = ORDER.filter(k => (counts[k] || 0) > 0);
 
-  keys.forEach((key, idx) => {
-    const raw = rawCounts[idx] || 0;
+  // Headline above the bar: the single number people actually want.
+  const doneCount = (counts['Completed'] || 0) + (counts['THQ Redirect'] || 0) + (counts['Do Not Migrate'] || 0);
+  const donePct = total > 0 ? (doneCount / total) * 100 : 0;
+  const headline = document.getElementById('progressHeadline');
+  if (headline) {
+    const remaining = total - doneCount;
+    headline.innerHTML = `
+      <div class="progress-headline-figure">${donePct.toFixed(1)}%</div>
+      <div class="progress-headline-text">
+        <div class="progress-headline-main">${doneCount.toLocaleString()} of ${total.toLocaleString()} pages resolved</div>
+        <div class="progress-headline-sub">${remaining.toLocaleString()} still to work through — migrated, redirected or marked Do Not Migrate all count as resolved</div>
+      </div>`;
+  }
+
+  keys.forEach((key) => {
+    const raw = counts[key] || 0;
     const pct = total > 0 ? (raw / total) * 100 : 0;
-    const pctDisplay = pct.toFixed(1); // one decimal place
+    const pctDisplay = pct.toFixed(1);
+    const displayKey = statusDisplay[key] || key;
 
-    if (raw > 0) { // render only non-zero categories
-      const scaled = scaledCounts[idx] || 0;
-      const widthPct = scaledTotal ? (scaled / scaledTotal) * 100 : 0;
+    const div = document.createElement("div");
+    div.className = "progress-bar";
+    div.style.width = pct + "%";
+    div.style.backgroundColor = statusColors[key];
+    div.style.display = "flex";
+    div.style.alignItems = "center";
+    div.style.justifyContent = "center";
+    div.style.overflow = "hidden";
+    div.style.whiteSpace = "nowrap";
+    // Only label segments wide enough to hold text; the rest rely on the legend + hover.
+    div.innerText = pct >= 7 ? `${displayKey} · ${pctDisplay}%` : (pct >= 3.5 ? `${pctDisplay}%` : '');
+    // NOTE: no escapeHtml() here. setAttribute stores the string verbatim (unlike an
+    // attribute written into an innerHTML string, where the parser decodes entities),
+    // so escaping it would make the tooltip display its own markup as text.
+    div.setAttribute('data-rich-tooltip', buildRichTooltipHtml(
+      displayKey,
+      [{ label: 'Pages', n: raw.toLocaleString(), color: statusColors[key] },
+       { label: 'Share of total', n: `${pctDisplay}%`, color: statusColors[key] }]
+    ));
+    container.appendChild(div);
 
-      const div = document.createElement("div");
-      div.className = "progress-bar";
-      div.style.width = widthPct + "%"; // use sqrt-scaled percentage for visual width
-      div.style.backgroundColor = statusColors[key];
-      div.style.display = "flex";
-      div.style.alignItems = "center";
-      div.style.justifyContent = "center";
-      div.innerText = `${pctDisplay}% (${raw})`; // textual percentage uses raw counts
-      container.appendChild(div);
+    const legendItem = document.createElement("div");
+    legendItem.className = "d-flex align-items-center gap-1 legend-item";
+    legendItem.innerHTML = `<span style="display:inline-block;width:12px;height:12px;border-radius:3px;background-color:${statusColors[key]};"></span> ${displayKey} – ${pctDisplay}% (${raw.toLocaleString()})`;
+    legendContainer.appendChild(legendItem);
+  });
 
-      // Add legend line formatted as: Category Name – X% (Count)
-      const legendItem = document.createElement("div");
-      legendItem.className = "d-flex align-items-center gap-1 legend-item";
-      const displayKey = statusDisplay[key] || key;
-      legendItem.innerHTML = `<span style="display:inline-block;width:14px;height:14px;background-color:${statusColors[key]};"></span> ${displayKey} – ${pctDisplay}% (${raw})`;
-      legendContainer.appendChild(legendItem);
+  // --- Division at-a-glance: ranked % complete by Division ---
+  const divisionGlanceContainer = document.getElementById("divisionGlance");
+  if (divisionGlanceContainer) {
+    const divisionStats = {};
+    filtered.forEach(d => {
+      const div = (d.Division || 'Other').toString().trim() || 'Other';
+      if (!divisionStats[div]) divisionStats[div] = { total: 0, done: 0 };
+      divisionStats[div].total++;
+      const canon = getCanonicalStatus(d.Status);
+      if (canon === 'Completed' || canon === 'THQ Redirect' || canon === 'Do Not Migrate') {
+        divisionStats[div].done++;
+      }
+    });
+
+    const divisionRows = Object.keys(divisionStats)
+      .map(div => {
+        const stats = divisionStats[div];
+        const pct = stats.total > 0 ? (stats.done / stats.total) * 100 : 0;
+        return { div, total: stats.total, done: stats.done, pct };
+      })
+      .sort((a, b) => b.pct - a.pct);
+
+    if (divisionRows.length) {
+      divisionGlanceContainer.innerHTML = `
+        <div class="small text-muted mb-2">Division progress at a glance <span class="text-muted">— click a division for its site-by-site breakdown</span></div>
+        <div class="d-flex flex-column gap-1">
+          ${divisionRows.map((r, idx) => `
+            <div class="division-glance-row d-flex align-items-center gap-2" role="button" tabindex="0"
+                 data-division="${escapeHtml(r.div)}" style="animation-delay:${60 + idx * 55}ms;"
+                 title="Click for the site-by-site breakdown of ${escapeHtml(r.div)}">
+              <div class="small text-truncate" style="min-width:220px; max-width:220px;">${escapeHtml(r.div)}</div>
+              <div class="progress flex-grow-1" style="height:10px;">
+                <div class="progress-bar" role="progressbar" style="width:${r.pct.toFixed(1)}%; background-color:#2258a1;" aria-valuenow="${r.pct.toFixed(1)}" aria-valuemin="0" aria-valuemax="100"></div>
+              </div>
+              <div class="small text-muted" style="min-width:110px; text-align:right;">${r.pct.toFixed(1)}% (${r.done}/${r.total})</div>
+            </div>
+          `).join('')}
+        </div>`;
+
+      divisionGlanceContainer.querySelectorAll('.division-glance-row').forEach(row => {
+        const open = () => showDivisionSitesModal(row.getAttribute('data-division'));
+        row.addEventListener('click', open);
+        row.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); }
+        });
+      });
+    } else {
+      divisionGlanceContainer.innerHTML = '';
+    }
+  }
+}
+
+// Page Title Cloud
+// ─────────────────
+// The same page titles repeat across sites — "Home" on ~299 pages, "Advisory Board" on
+// ~112 — so a cloud reads the shape of the work far faster than a table: bigger text
+// means the title recurs on more pages, and the colour says how far that title has got.
+// Click any title for the site-by-site breakdown.
+function renderTitleCloud(data){
+  const container = document.getElementById('titleCloudBody');
+  if (!container) return;
+  const rows = Array.isArray(data) ? data : getFilteredData();
+
+  const scopeEl = document.getElementById('titleCloudScope');
+  const limit = parseInt(scopeEl && scopeEl.value, 10) || 60;
+
+  const groups = {};
+  rows.forEach(r => {
+    const title = (r['Page Title'] || r.Title || '').toString().trim();
+    if (!title) return;
+    if (!groups[title]) groups[title] = { title, total: 0, done: 0, dnm: 0, open: 0, sites: new Set() };
+    const g = groups[title];
+    g.total++;
+    g.sites.add(getSiteGroupTitle(r));
+    const canon = getCanonicalStatus(r.Status);
+    if (canon === 'Completed' || canon === 'THQ Redirect') g.done++;
+    else if (canon === 'Do Not Migrate') g.dnm++;
+    else g.open++;
+  });
+
+  const all = Object.values(groups);
+  if (!all.length) {
+    container.innerHTML = '<div class="text-muted small">No page titles in the current filter.</div>';
+    return;
+  }
+
+  const top = all.sort((a, b) => b.total - a.total).slice(0, limit);
+  const maxCount = top[0].total;
+  const minCount = top[top.length - 1].total;
+
+  // sqrt scaling keeps the long tail readable — a linear map would shrink everything
+  // below the few huge titles into illegibility.
+  const MIN_REM = 0.78, MAX_REM = 2.6;
+  const sizeFor = (n) => {
+    if (maxCount === minCount) return (MIN_REM + MAX_REM) / 2;
+    const t = (Math.sqrt(n) - Math.sqrt(minCount)) / (Math.sqrt(maxCount) - Math.sqrt(minCount));
+    return MIN_REM + t * (MAX_REM - MIN_REM);
+  };
+
+  // Colour carries the second dimension: how much of that title is finished.
+  const colorFor = (pct) => {
+    if (pct >= 90) return '#1c7a34';
+    if (pct >= 60) return '#2f7d4f';
+    if (pct >= 35) return '#2258a1';
+    if (pct >= 15) return '#8a6a1c';
+    return '#b02a37';
+  };
+
+  // Shuffle so sizes interleave and it reads as a cloud rather than a sorted list,
+  // but keep it deterministic per render so it doesn't jump around on every refresh.
+  const shuffled = top.slice();
+  let seed = shuffled.length;
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    seed = (seed * 9301 + 49297) % 233280;
+    const j = Math.floor((seed / 233280) * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+
+  const items = shuffled.map(g => {
+    const pct = g.total ? (g.done / g.total) * 100 : 0;
+    const tooltip = buildRichTooltipHtml(g.title, [
+      { label: 'Pages with this title', n: g.total.toLocaleString(), color: '#2258a1' },
+      { label: 'Sites', n: g.sites.size.toLocaleString(), color: '#5d6b80' },
+      { label: 'Migrated', n: `${g.done} (${pct.toFixed(0)}%)`, color: '#28a745' },
+      { label: 'Still open', n: g.open.toLocaleString(), color: '#E74C3C' },
+      { label: 'Do Not Migrate', n: g.dnm.toLocaleString(), color: '#6c757d' }
+    ]);
+    return `<button type="button" class="title-cloud-word" data-title="${escapeHtml(g.title)}"
+              style="font-size:${sizeFor(g.total).toFixed(2)}rem; color:${colorFor(pct)};"
+              data-rich-tooltip="${escapeHtml(tooltip)}">${escapeHtml(g.title)}</button>`;
+  }).join('');
+
+  const totalPages = all.reduce((a, g) => a + g.total, 0);
+  const shownPages = top.reduce((a, g) => a + g.total, 0);
+
+  container.innerHTML = `
+    <div class="title-cloud">${items}</div>
+    <div class="title-cloud-footer">
+      <div class="title-cloud-legend">
+        <span class="title-cloud-legend-label">Migrated:</span>
+        <span class="title-cloud-key" style="color:#b02a37;">under 15%</span>
+        <span class="title-cloud-key" style="color:#8a6a1c;">15–35%</span>
+        <span class="title-cloud-key" style="color:#2258a1;">35–60%</span>
+        <span class="title-cloud-key" style="color:#2f7d4f;">60–90%</span>
+        <span class="title-cloud-key" style="color:#1c7a34;">90%+</span>
+      </div>
+      <div class="title-cloud-meta">
+        Showing the ${top.length} most common of ${all.length.toLocaleString()} distinct titles
+        (${shownPages.toLocaleString()} of ${totalPages.toLocaleString()} pages). Click a title for its site-by-site breakdown.
+      </div>
+    </div>`;
+
+  container.querySelectorAll('.title-cloud-word').forEach(btn => {
+    btn.addEventListener('click', () => showTitleDetailModal(btn.getAttribute('data-title'), rows));
+  });
+
+  if (scopeEl && !scopeEl._cloudBound) {
+    scopeEl._cloudBound = true;
+    scopeEl.addEventListener('change', () => renderTitleCloud(getFilteredData()));
+  }
+}
+
+// Every site that has a page with this title, and where each one stands.
+function showTitleDetailModal(title, sourceRows){
+  const modalEl = document.getElementById('titleDetailModal');
+  const bodyEl = document.getElementById('titleDetailModalBody');
+  const labelEl = document.getElementById('titleDetailModalLabel');
+  if (!modalEl || !bodyEl) return;
+
+  const matched = (sourceRows || getFilteredData()).filter(r =>
+    ((r['Page Title'] || r.Title || '').toString().trim() === title));
+
+  if (labelEl) labelEl.textContent = `“${title}” — ${matched.length} page${matched.length === 1 ? '' : 's'}`;
+
+  const bySite = {};
+  matched.forEach(r => {
+    const site = getSiteGroupTitle(r);
+    if (!bySite[site]) bySite[site] = [];
+    bySite[site].push(r);
+  });
+
+  const openFirst = Object.keys(bySite).sort((a, b) => {
+    const openA = bySite[a].filter(r => !['Completed', 'THQ Redirect', 'Do Not Migrate'].includes(getCanonicalStatus(r.Status))).length;
+    const openB = bySite[b].filter(r => !['Completed', 'THQ Redirect', 'Do Not Migrate'].includes(getCanonicalStatus(r.Status))).length;
+    return openB - openA || a.localeCompare(b);
+  });
+
+  bodyEl.innerHTML = `
+    <p class="text-muted small">Every site with a page called “${escapeHtml(title)}”, sites with the most outstanding work first.</p>
+    <div class="table-responsive division-sites-scroll">
+      <table class="table table-hover align-middle mb-0 division-sites-table">
+        <thead><tr><th>Site</th><th>Division</th><th>Status</th><th>Page</th></tr></thead>
+        <tbody>
+          ${openFirst.map(site => bySite[site].map(r => {
+            const url = (r['Page URL'] || '').toString();
+            const canon = getCanonicalStatus(r.Status);
+            const color = statusColors[canon] || '#6c757d';
+            return `
+              <tr>
+                <td class="fw-semibold">${escapeHtml(site)}</td>
+                <td class="small text-muted">${escapeHtml(r.Division || '')}</td>
+                <td><span class="badge" style="background:${color};">${escapeHtml(statusDisplay[canon] || canon)}</span></td>
+                <td>${url ? `<a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer">Open</a>` : '<span class="text-muted">—</span>'}</td>
+              </tr>`;
+          }).join('')).join('')}
+        </tbody>
+      </table>
+    </div>`;
+
+  bootstrap.Modal.getOrCreateInstance(modalEl).show();
+}
+
+// Division drill-down: every distinct Site Title in the division, with the data that
+// matters per site — page counts, the canonical status mix, migrated vs redirect-only,
+// QA flags and the most recent migration date.
+function showDivisionSitesModal(divisionName){
+  const modalEl = document.getElementById('divisionSitesModal');
+  const bodyEl = document.getElementById('divisionSitesModalBody');
+  const titleEl = document.getElementById('divisionSitesModalLabel');
+  if (!modalEl || !bodyEl) return;
+
+  const rows = getFilteredData().filter(d => ((d.Division || 'Other').toString().trim() || 'Other') === divisionName);
+  if (titleEl) titleEl.textContent = `${divisionName} — Site Breakdown`;
+
+  // Group by site (Service Center pages roll up under their service center, matching
+  // how sites are counted elsewhere on the dashboard).
+  const sites = {};
+  rows.forEach(d => {
+    const site = getSiteGroupTitle(d);
+    if (!sites[site]) {
+      sites[site] = {
+        site, total: 0, done: 0, migrated: 0, redirected: 0, dnm: 0,
+        qaIssues: 0, redirectFlags: 0, latestDate: 0,
+        counts: { '1a':0, '1b':0, '1c':0, '2.x':0, '2c':0, '3.x':0, 'Live':0, '5x':0, 'Redirect':0, 'DNM':0 }
+      };
+    }
+    const s = sites[site];
+    s.total++;
+
+    const status = (d.Status || '').toString().trim();
+    const canon = getCanonicalStatus(status);
+    if (status.startsWith('1a')) s.counts['1a']++;
+    else if (status.startsWith('1b')) s.counts['1b']++;
+    else if (status.startsWith('1c')) s.counts['1c']++;
+    else if (status.startsWith('2')) { s.counts['2.x']++; if (status.startsWith('2c')) s.counts['2c']++; }
+    else if (status.startsWith('3')) s.counts['3.x']++;
+    else if (status.startsWith('4') || status.startsWith('5')) { s.counts['Live']++; if (status.startsWith('5')) s.counts['5x']++; }
+    else if (status === 'THQ Redirect') s.counts['Redirect']++;
+    else if (status === 'Do Not Migrate') s.counts['DNM']++;
+
+    const isDone = canon === 'Completed' || canon === 'THQ Redirect' || canon === 'Do Not Migrate';
+    if (isDone) s.done++;
+    if (canon === 'Do Not Migrate') s.dnm++;
+    if ((canon === 'Completed' || canon === 'THQ Redirect')) {
+      if (isFullyMigratedPage(d)) s.migrated++; else s.redirected++;
+    }
+    if ((d['QA Issues.lookupValue'] || '').toString().trim() || isRevampPage(d)) s.qaIssues++;
+    if (getRedirectCheckStatus(d).flagged) s.redirectFlags++;
+
+    const dStr = resolveMigrationDateStr(d);
+    if (dStr) {
+      const t = new Date(dStr).getTime();
+      if (!isNaN(t) && t > s.latestDate) s.latestDate = t;
     }
   });
+
+  const siteList = Object.values(sites).sort((a, b) => {
+    const pa = a.total ? a.done / a.total : 0;
+    const pb = b.total ? b.done / b.total : 0;
+    return pa - pb || b.total - a.total; // least complete first — where attention is needed
+  });
+
+  const totals = siteList.reduce((acc, s) => {
+    acc.total += s.total; acc.done += s.done; acc.migrated += s.migrated;
+    acc.redirected += s.redirected; acc.dnm += s.dnm; acc.qaIssues += s.qaIssues;
+    acc.redirectFlags += s.redirectFlags;
+    return acc;
+  }, { total: 0, done: 0, migrated: 0, redirected: 0, dnm: 0, qaIssues: 0, redirectFlags: 0 });
+
+  const pctOf = (n, t) => t > 0 ? ((n / t) * 100).toFixed(1) : '0.0';
+  const dateText = (ms) => ms ? new Date(ms).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—';
+
+  const statCard = (icon, value, label, variant) => `
+    <div class="division-stat-card variant-${variant}">
+      <div class="division-stat-icon"><i class="bi ${icon}"></i></div>
+      <div>
+        <div class="division-stat">${value}</div>
+        <div class="division-stat-label">${label}</div>
+      </div>
+    </div>`;
+
+  bodyEl.innerHTML = `
+    <div class="division-modal-summary mb-3">
+      ${statCard('bi-buildings', siteList.length, 'Sites', 'neutral')}
+      ${statCard('bi-file-earmark-text', totals.total, 'Pages', 'neutral')}
+      ${statCard('bi-check2-circle', pctOf(totals.done, totals.total) + '%', 'Complete', 'success')}
+      ${statCard('bi-box-arrow-in-down', totals.migrated, 'Migrated', 'success')}
+      ${statCard('bi-signpost-split', totals.redirected, 'Redirect only', 'info')}
+      ${statCard('bi-slash-circle', totals.dnm, 'Do Not Migrate', 'danger')}
+      ${statCard('bi-clipboard2-pulse', totals.qaIssues, 'QA flags', 'warning')}
+    </div>
+    <div class="table-responsive division-sites-scroll">
+      <table class="table table-hover align-middle mb-0 division-sites-table">
+        <thead>
+          <tr>
+            <th style="min-width:210px;">Site Title</th>
+            <th class="text-end" style="width:70px;">Pages</th>
+            <th style="min-width:150px;">Complete</th>
+            <th style="min-width:150px;">Status Breakdown</th>
+            <th class="text-end" style="width:90px;">Migrated</th>
+            <th class="text-end" style="width:95px;">Redirect only</th>
+            <th class="text-end" style="width:80px;">QA</th>
+            <th style="width:120px;">Last Migrated</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${siteList.map(s => {
+            const pct = s.total ? (s.done / s.total) * 100 : 0;
+            const barColor = pct >= 99 ? '#28a745' : pct >= 50 ? '#2258a1' : '#E74C3C';
+            return `
+            <tr>
+              <td class="fw-semibold">${escapeHtml(s.site)}</td>
+              <td class="text-end">${s.total}</td>
+              <td>
+                <div class="d-flex align-items-center gap-2">
+                  <div class="progress flex-grow-1" style="height:8px; min-width:60px;">
+                    <div class="progress-bar" style="width:${pct.toFixed(1)}%; background-color:${barColor};"></div>
+                  </div>
+                  <span class="small text-muted" style="min-width:44px; text-align:right;">${pct.toFixed(0)}%</span>
+                </div>
+              </td>
+              <td>${buildStatusMiniBarHtml(s.counts, s.total)}</td>
+              <td class="text-end">${s.migrated}</td>
+              <td class="text-end">${s.redirected}</td>
+              <td class="text-end">${s.qaIssues ? `<span class="badge bg-warning text-dark">${s.qaIssues}</span>` : '—'}${s.redirectFlags ? ` <span class="badge bg-danger" title="Redirect check flagged">${s.redirectFlags}</span>` : ''}</td>
+              <td class="small text-muted">${dateText(s.latestDate)}</td>
+            </tr>`;
+          }).join('')}
+        </tbody>
+      </table>
+    </div>`;
+
+  bootstrap.Modal.getOrCreateInstance(modalEl).show();
 }
 
 // Normalize status string
@@ -3976,6 +4439,7 @@ function renderCharts(filtered) {
   const ctxPageTypeEl = document.getElementById("pageTypeChart");
   const ctxPubSymEl = document.getElementById("pubSymChart");
   const ctxEffortEl = document.getElementById("effortChart");
+  const ctxVelocityEl = document.getElementById("velocityChart");
   if (!ctxStatusEl || !ctxPriorityEl || !ctxPageTypeEl || !ctxPubSymEl || !ctxEffortEl) return;
 
   const ctxStatus = ctxStatusEl.getContext("2d");
@@ -3983,6 +4447,7 @@ function renderCharts(filtered) {
   const ctxPageType = ctxPageTypeEl.getContext("2d");
   const ctxPubSym = ctxPubSymEl.getContext("2d");
   const ctxEffort = ctxEffortEl.getContext("2d");
+  const ctxVelocity = ctxVelocityEl ? ctxVelocityEl.getContext("2d") : null;
 
     const statusCounts = {};
     filtered.forEach(d => {
@@ -4180,6 +4645,120 @@ function renderCharts(filtered) {
         }
       });
       try { addChartLegendModal(effortChart, 'Effort Needed'); } catch (e) {}
+
+      // Migration Velocity: pages completed per week, using the "Last Migrated" timestamp
+      // (a genuine per-page completion date), not "Modified" (bulk-touched by the sync app
+      // and unusable for a real trend).
+      if (ctxVelocity) {
+        const resolveMigrationDate = (d) => {
+          const dStr = resolveMigrationDateStr(d);
+          if (!dStr) return null;
+          const dt = new Date(dStr);
+          return isNaN(dt) ? null : dt;
+        };
+
+        // ISO 8601 week key, e.g. "2026-W36"
+        const isoWeekKey = (date) => {
+          const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+          const dayNum = d.getUTCDay() || 7;
+          d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+          const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+          const weekNo = Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+          return `${d.getUTCFullYear()}-W${String(weekNo).padStart(2, '0')}`;
+        };
+
+        const weeklyCompleted = {};
+        filtered.forEach(d => {
+          const canon = getCanonicalStatus(d.Status);
+          if (canon !== 'Completed' && canon !== 'THQ Redirect') return;
+          const dt = resolveMigrationDate(d);
+          if (!dt) return;
+          const key = isoWeekKey(dt);
+          weeklyCompleted[key] = (weeklyCompleted[key] || 0) + 1;
+        });
+
+        const activeWeeks = Object.keys(weeklyCompleted).sort();
+        const recentWeeks = activeWeeks.slice(-12);
+        const velocityData = recentWeeks.map(wk => weeklyCompleted[wk]);
+        // "2026-W34" means nothing at a glance — label each bar with the week's start
+        // date ("Aug 17") instead, which reads instantly.
+        const velocityLabels = recentWeeks.map(wk => {
+          const [yearStr, weekStr] = wk.split('-W');
+          const year = Number(yearStr), week = Number(weekStr);
+          const jan4 = new Date(Date.UTC(year, 0, 4));
+          const weekStart = new Date(jan4);
+          weekStart.setUTCDate(jan4.getUTCDate() - ((jan4.getUTCDay() || 7) - 1) + (week - 1) * 7);
+          return weekStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });
+        });
+
+        if (velocityChart) try { velocityChart.destroy(); } catch (e) {}
+        velocityChart = new Chart(ctxVelocity, {
+          type: 'bar',
+          data: {
+            labels: velocityLabels,
+            datasets: [{
+              label: 'Pages completed',
+              data: velocityData,
+              backgroundColor: '#2258a1',
+              hoverBackgroundColor: '#2f80f5',
+              borderRadius: 6,
+              borderSkipped: false,
+              maxBarThickness: 26
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            devicePixelRatio: window.devicePixelRatio || 2,
+            layout: { padding: { top: 6, bottom: 2 } },
+            plugins: {
+              legend: { display: false },
+              tooltip: {
+                displayColors: false,
+                backgroundColor: '#13233f',
+                borderColor: '#d4af37',
+                borderWidth: 1,
+                padding: 10,
+                callbacks: {
+                  title: (items) => `Week of ${items[0].label}`,
+                  label: (ctx) => `${ctx.parsed.y} page${ctx.parsed.y === 1 ? '' : 's'} completed`
+                }
+              }
+            },
+            scales: {
+              x: {
+                grid: { display: false },
+                border: { display: false },
+                ticks: {
+                  maxRotation: 0,
+                  autoSkip: true,
+                  maxTicksLimit: 6,
+                  color: '#5d6b80',
+                  font: { size: 11 }
+                }
+              },
+              y: {
+                beginAtZero: true,
+                grace: '8%',
+                border: { display: false },
+                grid: { color: 'rgba(19,35,63,0.07)' },
+                ticks: { precision: 0, maxTicksLimit: 4, color: '#5d6b80', font: { size: 11 } }
+              }
+            }
+          }
+        });
+
+        const statEl = document.getElementById('velocityChartStat');
+        if (statEl) {
+          if (recentWeeks.length) {
+            const total = velocityData.reduce((a, b) => a + b, 0);
+            const avg = (total / recentWeeks.length).toFixed(1);
+            statEl.textContent = `Avg ${avg} pages/week over the last ${recentWeeks.length} active week${recentWeeks.length === 1 ? '' : 's'} (based on Last Migrated)`;
+          } else {
+            statEl.textContent = 'No completion dates available yet for the current filters.';
+          }
+        }
+      }
   }catch(err){ console.warn('renderCharts failed', err); }
 }
 
@@ -4193,15 +4772,8 @@ function renderMigrationInsights(filteredData){
 
   // Broadened filter: include anything with migration activity or handle-marks
   const migratedPages = filteredData.filter(d => {
-    // Check for a valid migration date first (primary requirement)
-    let dStr = d['Last Migrated'] || d['Last Migration'];
-    if (!dStr && d['Migration Notes']) {
-      const match = d['Migration Notes'].match(/(\d{1,2}\/\d{1,2}\/\d{2,4})|(\d{4}-\d{2}-\d{2})/);
-      if (match) dStr = match[0];
-    }
-    
-    // Only include if a date was found
-    return !!dStr;
+    // Only include if a genuine migration date was found (primary requirement)
+    return !!resolveMigrationDateStr(d);
   });
 
   const badge = document.getElementById("migrationInsightsBadge");
@@ -4251,13 +4823,8 @@ function renderMigrationInsights(filteredData){
   // Group by Site Title
   const sitesMap = {};
   migratedPages.forEach(page => {
-    // If it's a service center page, the "Site" it belongs to for grouping is the Service Center Site Name
-    let groupTitle = page['Site Title'] || 'Other / Individual Pages';
-    const isServiceCenter = page['Service Center Page'] && page['Service Center Page'] !== 'No' && page['Service Center Page'] !== '0';
-    
-    if (isServiceCenter && page['Service Center Site Name']) {
-      groupTitle = page['Service Center Site Name'];
-    }
+    const groupTitle = getSiteGroupTitle(page);
+    const isServiceCenter = !!(page['Service Center Site Name'] || '').toString().trim();
 
     if (!sitesMap[groupTitle]) {
       sitesMap[groupTitle] = {
@@ -4272,13 +4839,7 @@ function renderMigrationInsights(filteredData){
     }
     sitesMap[groupTitle].pages.push(page);
     
-    // Primary: Last Migrated -> Last Migration -> Fallback to Migration Notes regex
-    let dStr = page['Last Migrated'] || page['Last Migration'];
-    if (!dStr && page['Migration Notes']) {
-      const match = page['Migration Notes'].match(/(\d{1,2}\/\d{1,2}\/\d{2,4})|(\d{4}-\d{2}-\d{2})/);
-      if (match) dStr = match[0];
-    }
-    
+    const dStr = resolveMigrationDateStr(page);
     if (dStr) {
       const d = new Date(dStr).getTime();
       if (!isNaN(d)) {
@@ -4315,16 +4876,8 @@ function renderMigrationInsights(filteredData){
     
     // Sort pages within site by date descending
     site.pages.sort((a,b) => {
-      let daStr = a['Last Migrated'] || a['Last Migration'];
-      if (!daStr && a['Migration Notes']) {
-        const m = a['Migration Notes'].match(/(\d{1,2}\/\d{1,2}\/\d{2,4})|(\d{4}-\d{2}-\d{2})/);
-        if (m) daStr = m[0];
-      }
-      let dbStr = b['Last Migrated'] || b['Last Migration'];
-      if (!dbStr && b['Migration Notes']) {
-        const m = b['Migration Notes'].match(/(\d{1,2}\/\d{1,2}\/\d{2,4})|(\d{4}-\d{2}-\d{2})/);
-        if (m) dbStr = m[0];
-      }
+      const daStr = resolveMigrationDateStr(a);
+      const dbStr = resolveMigrationDateStr(b);
       return new Date(dbStr || 0) - new Date(daStr || 0);
     });
 
@@ -4370,11 +4923,7 @@ function renderMigrationInsights(filteredData){
                 <tbody>
                   ${site.pages.map(page => {
                     const pTitle = page.Title || page['Page Title'] || 'Untitled Page';
-                    let pDateStr = page['Last Migrated'] || page['Last Migration'];
-                    if (!pDateStr && page['Migration Notes']) {
-                      const m = page['Migration Notes'].match(/(\d{1,2}\/\d{1,2}\/\d{2,4})|(\d{4}-\d{2}-\d{2})/);
-                      if (m) pDateStr = m[0];
-                    }
+                    const pDateStr = resolveMigrationDateStr(page);
                     const pDate = pDateStr ? new Date(pDateStr).toLocaleDateString() : '-';
                     
                     // Comprehensive activity summary with improved badges
@@ -4434,14 +4983,24 @@ function renderMigrationInsights(filteredData){
 
                     const tagsHtml = tags.length ? `<div class="mb-2 d-flex flex-wrap gap-1">${tags.join('')}</div>` : '';
 
-                    // Combine all possible summary fields
+                    // Combine all possible summary fields. QA Notes is generally written
+                    // during the pre-migration review, Migration Notes when the migration
+                    // tool actually ran — so Migration Notes comes last (more recent).
                     const combinedNotes = [
-                      page['Migration Notes'], 
-                      page['QA Notes']
+                      page['QA Notes'],
+                      page['Migration Notes']
                     ].filter(Boolean).join('; ');
-                    
-                    const notes = parseNotes(combinedNotes);
-                    const notesHtml = notes.length 
+
+                    // Keep only the most recent line per category (success/danger/warning/info)
+                    // instead of stacking every historical line — a later note (e.g. "migration
+                    // completed successfully") supersedes an older one in the same category
+                    // (e.g. a pre-migration QA note flagging an issue that may since be resolved),
+                    // so the old one doesn't need to stay flagged.
+                    const allNotes = parseNotes(combinedNotes);
+                    const latestByCategory = {};
+                    allNotes.forEach(n => { latestByCategory[n.category] = n; });
+                    const notes = Object.values(latestByCategory);
+                    const notesHtml = notes.length
                       ? notes.map(n => `
                           <div class="d-flex align-items-start mb-1 notes-line">
                             <span class="badge bg-${n.category} p-0 mt-2 me-2" style="min-width: 6px; height: 6px; border-radius: 50%; opacity: 0.8;">&nbsp;</span>
@@ -4541,10 +5100,15 @@ function updateDashboard(){
   }catch(e){}
 }
 
-/* Migration Dates module: FullCalendar (grid) + Agenda (list) + Table (Tabulator) */
+/* Migration Dates module: activity heatmap (fast, day-by-day) + Agenda (grouped list).
+   Both the top "View Calendar" button and the inline one in Migration Tool Insights call
+   the same openMigrationCalendarModal(), which always builds fresh data from the current
+   dashboard filters — previously these were two inconsistent paths (one could open on
+   stale/sample data), and the old FullCalendar month-grid rendered a DOM event per page,
+   which got slow once locations (not just divisions) started migrating. */
 (function(){
   let migrationData = [];
-  let fullCalendar = null;
+  let selectedDay = null; // 'YYYY-MM-DD' (local) or null — set by clicking a heatmap day
   const E_TZ = 'America/New_York';
 
   // Parse a date value for display in the configured timezone.
@@ -4552,7 +5116,7 @@ function updateDashboard(){
   // by creating a UTC-noon instant so timezone conversions won't push it to the previous day.
   function parseDateForDisplay(v){
     if (!v) return null;
-    if (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$$/.test(v)){
+    if (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v)){
       // Use UTC noon to avoid timezone day shifting when formatting
       return new Date(v + 'T12:00:00Z');
     }
@@ -4571,283 +5135,333 @@ function updateDashboard(){
       return dt.toLocaleDateString();
     }
   }
-  
-  function toEvent(r){
-    // Priority: 'Migration Date' (if mapped) -> 'Last Migrated' -> 'Last Migration'
-    let raw = r['Migration Date'] || r.migrationDate || r['Last Migrated'] || r['Last Migration'] || null;
-    
-    // Fallback: Try to find a date in 'Migration Notes'
-    if (!raw && r['Migration Notes']) {
-      const match = r['Migration Notes'].match(/(\d{1,2}\/\d{1,2}\/\d{2,4})|(\d{4}-\d{2}-\d{2})/);
-      if (match) raw = match[0];
-    }
 
-    const isDateOnly = typeof raw === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(raw);
-    const parsed = parseDateForDisplay(raw);
-    const ev = {
-      title: r['Site Title'] || r.siteTitle || '(No Title)',
-      start: parsed || null,
-      url: r['View Website URL'] || r.viewUrl || r.viewWebsiteUrl || null,
-      extendedProps: { 
-        division: r['Division'] || r.division || '',
-        pageTitle: r['Page Title'] || r.pageTitle || ''
-      }
-    };
-    
-    // If we have both site and page title, make the display richer: Page Title - Site Title
-    if ((r['Page Title'] || r.pageTitle) && r['Site Title']) {
-      ev.title = `${r['Page Title'] || r.pageTitle} - ${r['Site Title']}`;
-    }
+  // Resolve a row's best-guess migration date string: Migration Date -> Last Migrated ->
+  // Last Migration -> a date found inside Migration Notes.
+  // Delegates to the shared resolveMigrationDateStr() (top of file), which skips
+  // redirect-verification stamps so they don't get mistaken for the actual migration date.
+  const resolveDateStr = resolveMigrationDateStr;
 
-    if (isDateOnly) ev.allDay = true;
-    return ev;
+  // Local (browser-timezone) YYYY-MM-DD key for grouping into heatmap day cells.
+  function localDayKey(date){
+    return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`;
   }
 
   function buildAgendaHTML(data){
+    if (!data.length) {
+      const empty = document.createElement('div');
+      empty.className = 'text-muted small';
+      empty.textContent = selectedDay ? 'No pages migrated on this day.' : 'No migration data available.';
+      return empty;
+    }
+    const DONE_NO_DATE = 'Migrated — date not recorded';
+    const NOT_MIGRATED = 'Not yet migrated';
+
     const groups = data.reduce((acc,row)=>{
-      // Priority: 'Migration Date' -> 'Last Migrated' -> 'Last Migration'
-      let raw = row['Migration Date'] || row['Last Migrated'] || row['Last Migration'] || null;
-      if (!raw && row['Migration Notes']) {
-        const match = row['Migration Notes'].match(/(\d{1,2}\/\d{1,2}\/\d{2,4})|(\d{4}-\d{2}-\d{2})/);
-        if (match) raw = match[0];
-      }
-      
+      const raw = resolveDateStr(row);
       const pd = parseDateForDisplay(raw);
-      const key = pd ? pd.toLocaleString('en-US',{year:'numeric',month:'long', timeZone: E_TZ}) : 'Unscheduled';
+      let key;
+      if (pd) {
+        key = pd.toLocaleString('en-US',{year:'numeric',month:'long', timeZone: E_TZ});
+      } else {
+        // A page that's already done but carries no migration date isn't "unscheduled" —
+        // it's migrated, we just don't have the date. Keep those separate from work that
+        // genuinely hasn't happened yet. (Its redirect-verification stamp, when present,
+        // is shown as a "Verified" date rather than passed off as a migration date.)
+        key = row._isCompleted ? DONE_NO_DATE : NOT_MIGRATED;
+      }
       (acc[key]=acc[key]||[]).push({ ...row, _displayDate: raw });
       return acc;
     },{});
 
     const keys = Object.keys(groups).sort((a,b)=>{
-      if (a==='Unscheduled') return 1;
-      if (b==='Unscheduled') return -1;
+      const rank = (k) => k === DONE_NO_DATE ? 1 : k === NOT_MIGRATED ? 2 : 0;
+      if (rank(a) !== rank(b)) return rank(a) - rank(b);
+      if (rank(a) !== 0) return 0;
+      // Most recent month first, matching the day-level ordering inside each month.
       const da = new Date(groups[a][0]._displayDate);
       const db = new Date(groups[b][0]._displayDate);
-      return da - db;
+      return db - da;
     });
 
     const container = document.createElement('div');
     container.className = 'migration-agenda';
 
-    keys.forEach(k=>{
-      const section = sectionClone = document.createElement('div');
-      section.className = 'mb-3';
-      const h = document.createElement('h6'); h.textContent = k; section.appendChild(h);
-      const list = document.createElement('div'); list.className = 'list-group';
+    const rowItem = (r) => {
+      const url = r['View Website URL'] || r.viewUrl || r.viewWebsiteUrl || '';
+      let item;
+      if (url) {
+        item = document.createElement('a');
+        item.href = url;
+        item.target = '_blank';
+        item.className = 'list-group-item list-group-item-action d-flex justify-content-between align-items-start';
+      } else {
+        item = document.createElement('div');
+        item.className = 'list-group-item d-flex justify-content-between align-items-start';
+      }
+      const title = (r['Page Title'] && r['Site Title']) ? `${r['Page Title']} - ${r['Site Title']}` : (r['Page Title'] || r['Site Title'] || '(No Title)');
+      const left = document.createElement('div');
+      left.innerHTML = '<div class="fw-bold">' + escapeHtml(title) + '</div>' + (r['Division'] ? '<small class="text-muted">' + escapeHtml(r['Division']) + '</small>' : '');
+      const right = document.createElement('div');
+      right.className = 'text-end';
+      right.innerHTML = '<div>' + formatDateISO(r._displayDate) + '</div>' + (url ? '<div><small class="text-primary">Visit</small></div>' : '');
+      item.appendChild(left); item.appendChild(right);
+      return item;
+    };
 
-  groups[k].sort((a,b)=> new Date(a._displayDate||8640000000000000) - new Date(b._displayDate||8640000000000000)).forEach(r=>{
-        const url = r['View Website URL'] || r.viewUrl || r.viewWebsiteUrl || '';
-        let item;
-        if (url) {
-          item = document.createElement('a');
-          item.href = url;
-          item.target = '_blank';
-          item.className = 'list-group-item list-group-item-action d-flex justify-content-between align-items-start';
-        } else {
-          // Use a non-clickable container when there's no URL
-          item = document.createElement('div');
-          item.className = 'list-group-item d-flex justify-content-between align-items-start';
-        }
-        const title = (r['Page Title'] && r['Site Title']) ? `${r['Page Title']} - ${r['Site Title']}` : (r['Page Title'] || r['Site Title'] || '(No Title)');
-        const left = document.createElement('div'); left.innerHTML = '<div class="fw-bold">'+escapeHtml(title)+'</div>'+(r['Division']?'<small class="text-muted">'+escapeHtml(r['Division'])+'</small>':'');
-        const right = document.createElement('div'); right.className='text-end'; right.innerHTML = '<div>'+formatDateISO(r._displayDate)+'</div>'+(url?'<div><small class="text-primary">Visit</small></div>':'');
-        item.appendChild(left); item.appendChild(right); list.appendChild(item);
+    keys.forEach(k=>{
+      const section = document.createElement('div');
+      section.className = 'agenda-group';
+
+      // The dateless buckets can hold thousands of pages — collapse them into one
+      // accordion per site title instead of a flat wall of rows.
+      if (k === DONE_NO_DATE || k === NOT_MIGRATED) {
+        section.classList.add('agenda-group');
+        const bySite = {};
+        groups[k].forEach(r => {
+          const site = (r['Site Title'] || '(No Site Title)').toString().trim() || '(No Site Title)';
+          (bySite[site] = bySite[site] || []).push(r);
+        });
+        const siteNames = Object.keys(bySite).sort((a, b) => a.localeCompare(b));
+        const accId = `unscheduledAcc_${Math.random().toString(36).slice(2, 8)}`;
+
+        // Spell out what each dateless bucket actually is — "two groups of unscheduled"
+        // with no explanation isn't readable.
+        const explain = k === DONE_NO_DATE
+          ? 'These pages are already migrated or redirected, but the source list has no migration date recorded for them.'
+          : 'These pages have not been migrated yet. Do Not Migrate pages and pages never published in Symphony are excluded.';
+
+        const h = document.createElement('h6');
+        h.className = 'agenda-group-title';
+        h.innerHTML = `${escapeHtml(k)} <span class="badge bg-secondary ms-1">${groups[k].length}</span>`;
+        section.appendChild(h);
+
+        const explainEl = document.createElement('div');
+        explainEl.className = 'agenda-group-explain';
+        explainEl.textContent = `${explain} Grouped by site.`;
+        section.appendChild(explainEl);
+
+        const acc = document.createElement('div');
+        acc.className = 'accordion accordion-flush';
+        acc.id = accId;
+
+        siteNames.forEach((site, idx) => {
+          const safeId = `${accId}_${idx}`;
+          const item = document.createElement('div');
+          item.className = 'accordion-item';
+          item.innerHTML = `
+            <h2 class="accordion-header" id="heading_${safeId}">
+              <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse"
+                      data-bs-target="#collapse_${safeId}" aria-expanded="false" aria-controls="collapse_${safeId}">
+                ${escapeHtml(site)} <span class="badge bg-warning text-dark ms-2">${bySite[site].length}</span>
+              </button>
+            </h2>
+            <div id="collapse_${safeId}" class="accordion-collapse collapse" aria-labelledby="heading_${safeId}" data-bs-parent="#${accId}">
+              <div class="accordion-body p-0"><div class="list-group list-group-flush"></div></div>
+            </div>`;
+          const list = item.querySelector('.list-group');
+          bySite[site]
+            .sort((a, b) => (a['Page Title'] || '').localeCompare(b['Page Title'] || ''))
+            .forEach(r => list.appendChild(rowItem(r)));
+          acc.appendChild(item);
+        });
+
+        section.appendChild(acc);
+        container.appendChild(section);
+        return;
+      }
+
+      // Dated months: one collapsed accordion per migration day inside the month, so a
+      // month with hundreds of pages opens as a short list of days rather than a wall.
+      const h = document.createElement('h6');
+      h.className = 'agenda-group-title';
+      h.innerHTML = `${escapeHtml(k)} <span class="badge bg-secondary ms-1">${groups[k].length}</span>`;
+      section.appendChild(h);
+
+      const byDay = {};
+      groups[k].forEach(r => {
+        const pd = parseDateForDisplay(r._displayDate);
+        const dayKey = pd ? pd.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric', timeZone: E_TZ }) : 'Unknown date';
+        const sortKey = pd ? pd.getTime() : 0;
+        if (!byDay[dayKey]) byDay[dayKey] = { rows: [], sortKey };
+        byDay[dayKey].rows.push(r);
       });
 
-      section.appendChild(list); container.appendChild(section);
+      const dayKeys = Object.keys(byDay).sort((a, b) => byDay[b].sortKey - byDay[a].sortKey);
+      const accId = `dayAcc_${Math.random().toString(36).slice(2, 8)}`;
+      const acc = document.createElement('div');
+      acc.className = 'accordion accordion-flush';
+      acc.id = accId;
+
+      dayKeys.forEach((dayKey, idx) => {
+        const safeId = `${accId}_${idx}`;
+        const dayRows = byDay[dayKey].rows;
+        const siteCount = new Set(dayRows.map(r => r['Site Title'] || '')).size;
+        const item = document.createElement('div');
+        item.className = 'accordion-item';
+        item.innerHTML = `
+          <h2 class="accordion-header" id="heading_${safeId}">
+            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse"
+                    data-bs-target="#collapse_${safeId}" aria-expanded="false" aria-controls="collapse_${safeId}">
+              ${escapeHtml(dayKey)}
+              <span class="badge bg-warning text-dark ms-2">${dayRows.length} page${dayRows.length === 1 ? '' : 's'}</span>
+              <span class="badge bg-light text-dark border ms-2">${siteCount} site${siteCount === 1 ? '' : 's'}</span>
+            </button>
+          </h2>
+          <div id="collapse_${safeId}" class="accordion-collapse collapse" aria-labelledby="heading_${safeId}" data-bs-parent="#${accId}">
+            <div class="accordion-body p-0"><div class="list-group list-group-flush"></div></div>
+          </div>`;
+        const list = item.querySelector('.list-group');
+        dayRows
+          .sort((a, b) => (a['Site Title'] || '').localeCompare(b['Site Title'] || '') || (a['Page Title'] || '').localeCompare(b['Page Title'] || ''))
+          .forEach(r => list.appendChild(rowItem(r)));
+        acc.appendChild(item);
+      });
+
+      section.appendChild(acc);
+      container.appendChild(section);
     });
 
     return container;
   }
 
   function renderAgenda(filtered){
-    const el = document.getElementById('migrationAgenda'); if(!el) return; el.innerHTML=''; el.appendChild(buildAgendaHTML(filtered));
+    const el = document.getElementById('migrationAgenda'); if(!el) return;
+    const data = selectedDay ? filtered.filter(r => {
+      const dt = parseDateForDisplay(resolveDateStr(r));
+      return dt && localDayKey(dt) === selectedDay;
+    }) : filtered;
+    el.innerHTML=''; el.appendChild(buildAgendaHTML(data));
   }
 
-  // Table view removed — migration modal shows Calendar and Agenda only
+  // Fast activity heatmap (GitHub-style): one small colored cell per day, not one DOM
+  // event per page — renders instantly even with thousands of migrated pages, unlike the
+  // old FullCalendar month grid. Click a day to filter the agenda list below it.
+  function renderHeatmap(data){
+    const container = document.getElementById('migrationHeatmap');
+    if (!container) return;
 
-  // Refresh the FullCalendar instance using an optional data array (filteredResults).
-  // If no data is provided, fall back to migrationData or sample data.
-  function refreshFullCalendar(filteredResults){
-    const el = document.getElementById('migrationFullCalendar'); if(!el || typeof FullCalendar==='undefined') return;
-    // Use provided filteredResults if present, otherwise migrationData, otherwise sample data
-    const source = Array.isArray(filteredResults) ? filteredResults : ((Array.isArray(migrationData) && migrationData.length) ? migrationData : (typeof _migrationSampleData !== 'undefined' ? _migrationSampleData : []));
-    
-    // Extract events using primary + fallback logic
-    const events = (Array.isArray(source) ? source : []).filter(r => {
-      let d = r['Migration Date'] || r['Last Migrated'] || r['Last Migration'];
-      if (!d && r['Migration Notes']) {
-        const match = r['Migration Notes'].match(/(\d{1,2}\/\d{1,2}\/\d{2,4})|(\d{4}-\d{2}-\d{2})/);
-        if (match) d = match[0];
-      }
-      return d;
-    }).map(toEvent);
-    
-    if (!fullCalendar){
-      fullCalendar = new FullCalendar.Calendar(el,{
-        initialView: 'dayGridMonth',
-        headerToolbar: { left: 'prev,next today', center: 'title', right: 'dayGridMonth,timeGridWeek,timeGridDay,listWeek' },
-        timeZone: E_TZ,
-        navLinks: true,
-        events: events,
-        eventClick: function(info){ if(info.event.url){ info.jsEvent.preventDefault(); window.open(info.event.url,'_blank'); } },
-        height: 'auto',
-        themeSystem: 'bootstrap'
-      });
-      fullCalendar.render();
-    } else {
-      // Replace existing events with the filtered set
-      fullCalendar.removeAllEvents();
-      events.forEach(e=>fullCalendar.addEvent(e));
+    const counts = {};
+    let maxDate = null;
+    (data || []).forEach(r => {
+      const dt = parseDateForDisplay(resolveDateStr(r));
+      if (!dt) return;
+      const key = localDayKey(dt);
+      counts[key] = (counts[key] || 0) + 1;
+      if (!maxDate || dt > maxDate) maxDate = dt;
+    });
+
+    if (!maxDate) {
+      container.innerHTML = '<div class="text-muted small">No migration dates available for the current results.</div>';
+      return;
     }
-    // Remove any previously injected custom calendar buttons (cleanup)
-    try{
-      const oldPrev = document.getElementById('calendarPrevBtn'); if (oldPrev) oldPrev.remove();
-      const oldNext = document.getElementById('calendarNextBtn'); if (oldNext) oldNext.remove();
-    }catch(e){}
 
-    // Enhance the existing FullCalendar prev/next buttons: add icons, titles and ensure bootstrap button classes
-    try{
-      const calRoot = el;
-      const prev = calRoot.querySelector('.fc-prev-button');
-      const next = calRoot.querySelector('.fc-next-button');
-      if (prev){
-        prev.classList.add('btn','btn-primary','btn-sm');
-        prev.innerHTML = '&#x2190;'; // left arrow
-        prev.setAttribute('title','Previous month');
+    const WEEKS = 18;
+    const today = new Date();
+    const endRef = maxDate > today ? maxDate : today;
+    const endOfWeek = new Date(endRef); endOfWeek.setDate(endRef.getDate() + (6 - endRef.getDay()));
+    const startOfGrid = new Date(endOfWeek); startOfGrid.setDate(endOfWeek.getDate() - (WEEKS * 7 - 1));
+
+    const maxCount = Math.max(1, ...Object.values(counts));
+    const levelFor = (n) => { if (!n) return 0; const r = n / maxCount; return r > 0.75 ? 4 : r > 0.5 ? 3 : r > 0.25 ? 2 : 1; };
+
+    let colsHtml = '';
+    let monthLabelsHtml = '';
+    let lastMonthLabel = '';
+    const cursor = new Date(startOfGrid);
+    for (let w = 0; w < WEEKS; w++) {
+      const weekStartLabel = cursor.toLocaleDateString('en-US', { month: 'short' });
+      if (weekStartLabel !== lastMonthLabel) {
+        monthLabelsHtml += `<div class="heatmap-month-label">${weekStartLabel}</div>`;
+        lastMonthLabel = weekStartLabel;
+      } else {
+        monthLabelsHtml += `<div class="heatmap-month-label"></div>`;
       }
-      if (next){
-        next.classList.add('btn','btn-primary','btn-sm');
-        next.innerHTML = '&#x2192;'; // right arrow
-        next.setAttribute('title','Next month');
+
+      let colHtml = '';
+      for (let d = 0; d < 7; d++) {
+        const key = localDayKey(cursor);
+        const n = counts[key] || 0;
+        const isFuture = cursor > today;
+        const label = `${cursor.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}: ${n} page${n === 1 ? '' : 's'} migrated`;
+        colHtml += `<div class="heatmap-cell level-${isFuture ? 0 : levelFor(n)}${selectedDay === key ? ' selected' : ''}" data-day-key="${key}" data-rich-tooltip="${escapeHtml(buildRichTooltipTextHtml(label))}"></div>`;
+        cursor.setDate(cursor.getDate() + 1);
       }
-    }catch(e){}
+      colsHtml += `<div class="heatmap-col">${colHtml}</div>`;
+    }
+
+    container.innerHTML = `
+      <div class="d-flex justify-content-between align-items-center mb-1">
+        <div class="small text-muted">Migration activity — click a day to filter the list below</div>
+        ${selectedDay ? `<button type="button" id="heatmapClearDay" class="btn btn-sm btn-outline-secondary">Clear day filter</button>` : ''}
+      </div>
+      <div class="migration-heatmap-scroll">
+        <div class="migration-heatmap-months">${monthLabelsHtml}</div>
+        <div class="migration-heatmap">${colsHtml}</div>
+      </div>
+      <div class="d-flex align-items-center gap-1 mt-2 small text-muted">
+        <span>Less</span>
+        <span class="heatmap-cell level-0" style="display:inline-block;"></span>
+        <span class="heatmap-cell level-1" style="display:inline-block;"></span>
+        <span class="heatmap-cell level-2" style="display:inline-block;"></span>
+        <span class="heatmap-cell level-3" style="display:inline-block;"></span>
+        <span class="heatmap-cell level-4" style="display:inline-block;"></span>
+        <span>More</span>
+      </div>`;
+
+    container.querySelectorAll('.heatmap-cell[data-day-key]').forEach(cell => {
+      cell.addEventListener('click', () => {
+        const key = cell.getAttribute('data-day-key');
+        selectedDay = (selectedDay === key) ? null : key;
+        renderHeatmap(migrationData);
+        renderAgenda(migrationData);
+      });
+    });
+    const clearBtn = document.getElementById('heatmapClearDay');
+    if (clearBtn) clearBtn.addEventListener('click', () => {
+      selectedDay = null;
+      renderHeatmap(migrationData);
+      renderAgenda(migrationData);
+    });
   }
 
   function filterMigrationData(q){
-    // Use migrationData when populated; otherwise fall back to sample data so search works even without an external data source
-    const source = (Array.isArray(migrationData) && migrationData.length) ? migrationData : (typeof _migrationSampleData !== 'undefined' ? _migrationSampleData : []);
-    if(!q) return Array.isArray(source) ? source.slice() : [];
+    if(!q) return migrationData.slice();
     const s = q.toLowerCase();
-    return (Array.isArray(source) ? source : []).filter(r=> (r['Site Title']||'').toLowerCase().includes(s) || (r['Division']||'').toLowerCase().includes(s));
+    return migrationData.filter(r=> (r['Site Title']||'').toLowerCase().includes(s) || (r['Division']||'').toLowerCase().includes(s));
   }
 
-  document.addEventListener('DOMContentLoaded', ()=>{
-  const btnCal = document.getElementById('viewCalendarBtn');
-  const btnAgenda = document.getElementById('viewAgendaBtn');
-    const search = document.getElementById('migrationSearch');
-    const modal = document.getElementById('migrationDatesModal');
-    const exportBtn = document.getElementById('exportMigrationJson');
-
-  // Force a consistent height for the Modified From/To date inputs via inline style
-  // This guarantees the visual change even if a framework rule is stronger.
-  ['filterModifiedFrom','filterModifiedTo'].forEach(id=>{
-    try{
-      const el = document.getElementById(id);
-      if(el){
-        el.style.height = '38px';
-        el.style.minHeight = '38px';
-        el.style.padding = '6px 8px';
-        el.style.boxSizing = 'border-box';
-      }
-    }catch(e){}
-  });
-
-  // Toggle views: preserve original button classes (e.g. btn btn-outline-primary btn-sm)
-  // and only toggle an 'active' state and aria-pressed for accessibility.
-  function showCalendar(){
-    document.getElementById('migrationFullCalendar').style.display = '';
-    document.getElementById('migrationAgenda').style.display = 'none';
-    if (btnCal) {
-      btnCal.classList.add('active');
-      btnCal.setAttribute('aria-pressed', 'true');
-    }
-    if (btnAgenda) {
-      btnAgenda.classList.remove('active');
-      btnAgenda.setAttribute('aria-pressed', 'false');
-    }
-  }
-
-  function showAgenda(){
-    document.getElementById('migrationFullCalendar').style.display = 'none';
-    document.getElementById('migrationAgenda').style.display = '';
-    if (btnAgenda) {
-      btnAgenda.classList.add('active');
-      btnAgenda.setAttribute('aria-pressed', 'true');
-    }
-    if (btnCal) {
-      btnCal.classList.remove('active');
-      btnCal.setAttribute('aria-pressed', 'false');
-    }
-  }
-
-    if (btnCal) btnCal.addEventListener('click', ()=>{ showCalendar(); if(!fullCalendar) refreshFullCalendar(); else fullCalendar.changeView('dayGridMonth'); });
-    if (btnAgenda) btnAgenda.addEventListener('click', ()=>{ showAgenda(); });
-
-    // Initialize button pressed state and ensure original classes are preserved.
-    try{
-      if (btnCal){ btnCal.classList.remove('active'); btnCal.setAttribute('aria-pressed','false'); }
-      if (btnAgenda){ btnAgenda.classList.remove('active'); btnAgenda.setAttribute('aria-pressed','false'); }
-    }catch(e){}
-
-    if (search) search.addEventListener('input', ()=>{
-      const q = search.value.trim(); const filtered = filterMigrationData(q);
-      renderAgenda(filtered);
-      // update calendar with filtered dataset
-      refreshFullCalendar(filtered);
-    });
-
-  if (modal) modal.addEventListener('shown.bs.modal', ()=>{
-      const source = (Array.isArray(migrationData) && migrationData.length) ? migrationData : (typeof _migrationSampleData !== 'undefined' ? _migrationSampleData.slice() : []);
-      // apply any active search filter when opening
-      const q = search && search.value ? search.value.trim() : '';
-      const filtered = q ? filterMigrationData(q) : source;
-      renderAgenda(filtered);
-      refreshFullCalendar(filtered);
-      if (fullCalendar) fullCalendar.render();
-    });
-
-    if (exportBtn) exportBtn.addEventListener('click', function(e){ e.preventDefault(); const blob=new Blob([JSON.stringify(migrationData,null,2)],{type:'application/json'}); const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download='migration-dates.json'; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url); });
-
-  // Add event listener for the inline "View Calendar" in Migration Insights
-  window.addEventListener('openMigrationCalendar', () => {
-    // Collect specific migration data from the dashboard's current filtered set
-    const currentResults = getFilteredData();
-    const specificData = currentResults.filter(r => {
-      let d = r['Last Migrated'] || r['Last Migration'];
-      if (!d && r['Migration Notes']) {
-        const match = r['Migration Notes'].match(/(\d{1,2}\/\d{1,2}\/\d{2,4})|(\d{4}-\d{2}-\d{2})/);
-        if (match) d = match[0];
-      }
-      return d;
-    }).map(r => {
-      let d = r['Last Migrated'] || r['Last Migration'];
-      if (!d && r['Migration Notes']) {
-        const match = r['Migration Notes'].match(/(\d{1,2}\/\d{1,2}\/\d{2,4})|(\d{4}-\d{2}-\d{2})/);
-        if (match) d = match[0];
-      }
-      return {
-        'Site Title': r['Site Title'] || '',
-        'Page Title': r['Page Title'] || r.Title || '',
-        'Migration Date': d,
-        'View Website URL': r['Page URL'] || r.MigrationURL || '',
-        'Division': r['Division'] || ''
-      };
-    });
-
-    // Load this specific data into the modal context
+  // Single entry point for both "View Calendar" triggers: always builds fresh data from
+  // the dashboard's current filters (never stale/sample data) and opens the modal.
+  function openMigrationCalendarModal(){
+    const currentResults = (typeof getFilteredData === 'function') ? getFilteredData() : [];
+    const specificData = currentResults
+      // Pages marked Do Not Migrate, or that were never published in Symphony, are not
+      // pending work — they'd otherwise pad the "Not yet migrated" bucket with pages
+      // nobody intends to migrate.
+      .filter(r => {
+        if (getCanonicalStatus(r.Status) === 'Do Not Migrate') return false;
+        const pubSym = (r['Published Symphony'] || '').toString().trim().toLowerCase();
+        if (pubSym === 'false' || pubSym === 'no' || pubSym === '0') return false;
+        return true;
+      })
+      .map(r => {
+        const canon = getCanonicalStatus(r.Status);
+        return {
+          'Site Title': getSiteGroupTitle(r),
+          'Page Title': r['Page Title'] || r.Title || '',
+          'Migration Date': resolveDateStr(r),
+          'View Website URL': r['Page URL'] || r.MigrationURL || '',
+          'Division': r['Division'] || '',
+          _isCompleted: canon === 'Completed' || canon === 'THQ Redirect'
+        };
+      });
     window.setMigrationData(specificData);
-    
-    // Open the modal
     const modalEl = document.getElementById('migrationDatesModal');
     if (modalEl) {
-      const bsModal = bootstrap.Modal.getOrCreateInstance(modalEl);
-      bsModal.show();
-      // Ensure calendar is visible first
-      const btnCal = document.getElementById('viewCalendarBtn');
-      if (btnCal) btnCal.click();
+      bootstrap.Modal.getOrCreateInstance(modalEl).show();
     }
-  });
+  }
 
   window.setMigrationData = function(dataArray){
     if (!Array.isArray(dataArray)) return;
@@ -4856,17 +5470,57 @@ function updateDashboard(){
       'Page Title': r['Page Title'] || r.pageTitle || '',
       'Migration Date': r['Migration Date'] || r.migrationDate || r.MigrationDate || '',
       'View Website URL': r['View Website URL'] || r.viewUrl || r.viewWebsiteUrl || '',
-      'Division': r['Division'] || r.division || ''
+      'Division': r['Division'] || r.division || '',
+      _isCompleted: !!r._isCompleted
     }));
-
-    const modalEl = document.getElementById('migrationDatesModal');
-    if (modalEl && modalEl.classList.contains('show')){
-      renderAgenda(migrationData); refreshFullCalendar(migrationData);
-    }
+    selectedDay = null;
+    renderHeatmap(migrationData);
+    renderAgenda(migrationData);
   };
 
-  // default to Agenda view on open (will set 'active' on the Agenda button)
-  if (btnAgenda) btnAgenda.click();
+  document.addEventListener('DOMContentLoaded', ()=>{
+    const search = document.getElementById('migrationSearch');
+    const modal = document.getElementById('migrationDatesModal');
+    const exportBtn = document.getElementById('exportMigrationJson');
+    const topBtn = document.getElementById('migrationDatesLink');
+
+    // Force a consistent height for the Modified From/To date inputs via inline style
+    // This guarantees the visual change even if a framework rule is stronger.
+    ['filterModifiedFrom','filterModifiedTo'].forEach(id=>{
+      try{
+        const el = document.getElementById(id);
+        if(el){
+          el.style.height = '38px';
+          el.style.minHeight = '38px';
+          el.style.padding = '6px 8px';
+          el.style.boxSizing = 'border-box';
+        }
+      }catch(e){}
+    });
+
+    // Both "View Calendar" entry points (the one above Overall Progress, and the inline
+    // one in Migration Tool Insights) now share one code path — see openMigrationCalendarModal().
+    if (topBtn) topBtn.addEventListener('click', (e) => { e.preventDefault(); openMigrationCalendarModal(); });
+    window.addEventListener('openMigrationCalendar', openMigrationCalendarModal);
+
+    if (search) search.addEventListener('input', ()=>{
+      const q = search.value.trim();
+      const filtered = filterMigrationData(q);
+      selectedDay = null;
+      renderHeatmap(filtered);
+      renderAgenda(filtered);
+    });
+
+    // Safety net: if the modal is ever shown some other way, re-render with whatever
+    // data is currently loaded (respecting an active search) rather than doing nothing.
+    if (modal) modal.addEventListener('shown.bs.modal', ()=>{
+      const q = search && search.value ? search.value.trim() : '';
+      const filtered = q ? filterMigrationData(q) : migrationData;
+      renderHeatmap(filtered);
+      renderAgenda(filtered);
+    });
+
+    if (exportBtn) exportBtn.addEventListener('click', function(e){ e.preventDefault(); const blob=new Blob([JSON.stringify(migrationData,null,2)],{type:'application/json'}); const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download='migration-dates.json'; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url); });
   });
 })();
 

@@ -939,7 +939,6 @@ h3.mt-2 {
 #metricCards .card {
   border: 1px solid var(--dash-border);
   border-radius: var(--dash-radius);
-  background: linear-gradient(160deg, #ffffff 0%, #f7fbff 100%);
   box-shadow: var(--dash-shadow);
   transition: transform 180ms ease, box-shadow 180ms ease;
 }
@@ -983,18 +982,18 @@ h3.mt-2 {
   background-color: #e8f5e9 !important;
 }
 
-/* Site Management Modal Table Styling */
-#siteManagementModalBody .table-success-subtle {
+/* Site Migration Status table styling (now an inline page section, not a modal) */
+#siteManagementBody .table-success-subtle {
   background-color: rgba(25, 135, 84, 0.1) !important;
 }
 
-#siteManagementModalBody .table thead.sticky-top {
+#siteManagementBody .table thead.sticky-top {
   top: 0;
   z-index: 2;
   box-shadow: 0 2px 5px rgba(0,0,0,0.1);
 }
 
-#siteManagementModalBody .badge {
+#siteManagementBody .badge {
   min-width: 25px;
   font-weight: 500;
 }
@@ -1070,9 +1069,1027 @@ h3.mt-2 {
   font-weight: 600;
 }
 
-#refreshDate {
+.dashboard-footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px 28px;
+  padding: 16px 20px;
+  margin-bottom: 24px;
+  border-radius: var(--dash-radius, 16px);
+  border: 1px solid var(--dash-border, rgba(0, 32, 86, 0.12));
+  background: linear-gradient(120deg, #13233f 0%, #1e4a85 100%);
+  box-shadow: var(--dash-shadow, 0 14px 38px rgba(5, 28, 62, 0.08));
+  color: #ffffff;
+}
+
+.dashboard-footer .footer-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.dashboard-footer .footer-mark {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  flex: 0 0 38px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.14);
+  color: #ffcc00;
+  font-size: 1.1rem;
+}
+
+.dashboard-footer .footer-title {
+  display: block;
+  font-weight: 700;
+  font-size: 0.92rem;
+  color: #ffffff;
+}
+
+.dashboard-footer .footer-meta {
+  display: block;
+  font-size: 0.72rem;
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.dashboard-footer .footer-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 28px;
+  align-items: center;
+}
+
+.dashboard-footer .footer-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.dashboard-footer .footer-stat-value {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 1.15rem;
+  font-weight: 800;
+  line-height: 1.1;
+  color: #ffffff;
+}
+
+.dashboard-footer .footer-stat-of {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.dashboard-footer .footer-stat-label {
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: rgba(255, 255, 255, 0.68);
+}
+
+.dashboard-footer .footer-trend {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  font-size: 0.7rem;
+}
+
+.dashboard-footer .footer-trend.up { background: rgba(110, 231, 168, 0.22); color: #6ee7a8; }
+.dashboard-footer .footer-trend.down { background: rgba(255, 138, 128, 0.22); color: #ff8a80; }
+.dashboard-footer .footer-trend.flat { background: rgba(255, 255, 255, 0.16); color: rgba(255, 255, 255, 0.8); }
+
+/* Compact info cards: QA Issues, Redirect Verification Flags, Service Center.
+   Fixed height keeps every card in the grid the same size regardless of how much
+   text a given page has — detail lives in the icon badges' hover tooltips instead
+   of variable-length paragraph text. */
+.compact-info-card {
+  height: 172px;
+}
+
+.compact-info-card .card-body {
+  padding: 0.85rem 0.9rem;
+}
+
+.compact-info-card .card-title {
+  font-size: 0.9rem;
+}
+
+.compact-status-badge {
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: #fff;
+  padding: 3px 9px;
+  border-radius: 999px;
+}
+
+.compact-icon-row {
+  min-height: 30px;
+}
+
+.compact-icon-badge {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: rgba(0, 32, 86, 0.08);
+  color: #13233f;
+  font-size: 0.9rem;
+  cursor: default;
+}
+
+.compact-icon-badge.variant-danger { background: rgba(220, 53, 69, 0.14); color: #dc3545; }
+.compact-icon-badge.variant-warning { background: rgba(255, 193, 7, 0.2); color: #a17400; }
+.compact-icon-badge.variant-info { background: rgba(13, 110, 184, 0.14); color: #0d6fb8; }
+
+/* Metric cards: fixed height so every card in the grid matches, regardless of content */
+.site-metric-card {
+  height: 158px;
+}
+
+.site-metric-card .card-body {
+  padding: 0.9rem 1rem;
+}
+
+.site-metric-card .card-title {
+  font-size: 0.82rem;
+  color: rgba(255, 255, 255, 0.92);
+}
+
+.metric-hero {
+  font-size: 1.9rem;
+  font-weight: 800;
+  line-height: 1.1;
+  color: #ffffff;
+}
+
+.metric-detail {
+  font-size: 0.72rem;
+  color: rgba(255, 255, 255, 0.78);
+  margin-top: 2px;
+}
+
+.metric-icon-chip {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.05rem;
+  margin-bottom: 4px;
+  background: rgba(255, 255, 255, 0.16);
+  color: #ffffff;
+}
+
+.metric-icon-chip.variant-danger { background: rgba(255, 138, 128, 0.28); color: #ffb3b3; }
+.metric-icon-chip.variant-warning { background: rgba(255, 193, 7, 0.28); color: #ffe08a; }
+.metric-icon-chip.variant-info { background: rgba(23, 162, 184, 0.28); color: #9be3ee; }
+.metric-icon-chip.variant-success { background: rgba(40, 167, 69, 0.28); color: #a8f0c6; }
+
+.metric-bar-track {
+  width: 100%;
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.22);
+  overflow: hidden;
+  margin-top: 8px;
+}
+
+.metric-bar-fill {
+  height: 100%;
+  border-radius: 999px;
+}
+
+.metric-segment-bar {
+  width: 100%;
+  height: 6px; /* match .metric-bar-track so all metric-card bars read the same weight */
+  margin-top: 8px;
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+/* Icon + count row, used instead of a long text breakdown that would wrap to two lines
+   and push this card's bar out of line with its neighbours. */
+.metric-count-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 6px;
+  min-height: 22px;
+}
+
+.metric-count-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.9rem;
+  line-height: 1;
+  color: rgba(255, 255, 255, 0.95);
+  cursor: default;
+}
+
+.metric-count-value {
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.metric-segment-bar .status-mini-bar {
+  height: 100%;
+}
+
+.metric-compare-sub {
+  font-size: 0.68rem;
+  color: rgba(255, 255, 255, 0.65);
+  margin-top: 6px;
+}
+
+/* Rich hover tooltip: replaces the plain native title tooltip on status bars and
+   compact-card icon badges with a nicer floating panel. See initRichTooltip() in JS. */
+.rich-tooltip {
+  position: fixed;
+  z-index: 3000;
+  max-width: 300px;
+  background: #13233f;
+  color: #ffffff;
+  border: 1px solid #d4af37;
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 0.78rem;
+  line-height: 1.45;
+  box-shadow: 0 14px 38px rgba(5, 28, 62, 0.45), 0 0 0 1px rgba(212, 175, 55, 0.18);
+  pointer-events: none;
+}
+
+.rich-tooltip-title {
+  font-weight: 700;
+  margin-bottom: 6px;
+  font-size: 0.8rem;
+  color: #ffffff;
+}
+
+.rich-tooltip-text {
+  color: rgba(255, 255, 255, 0.92);
+  white-space: pre-line;
+}
+
+.rich-tooltip-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin-bottom: 3px;
+  color: rgba(255, 255, 255, 0.92);
+}
+
+.rich-tooltip-row .swatch {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  flex: 0 0 auto;
+  margin-top: 4px;
+}
+
+/* ── Rounded corners, consistently ───────────────────────────────────────────
+   Including the *fill* inside progress bars, not just the track. */
+.progress {
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.progress-bar {
+  border-radius: 999px;
+}
+
+/* The big overall status bar: one continuous bar. Only the outer ends are rounded —
+   the internal segment boundaries stay flush so it reads as a single 100% whole. */
+#progressBarContainer {
+  border-radius: 999px;
+  overflow: hidden;
+  gap: 0;
+  height: 34px;
+  background: #eef1f6;
+}
+
+#progressBarContainer .progress-bar {
+  border-radius: 0;
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  box-shadow: inset -1px 0 0 rgba(255, 255, 255, 0.35);
+}
+
+#progressBarContainer .progress-bar:last-child {
+  box-shadow: none;
+}
+
+#divisionGlance .progress,
+#divisionGlance .progress-bar,
+.metric-bar-track,
+.metric-bar-fill,
+.metric-segment-bar,
+.status-mini-bar {
+  border-radius: 999px;
+}
+
+.status-mini-bar > span:first-child { border-top-left-radius: 999px; border-bottom-left-radius: 999px; }
+.status-mini-bar > span:last-child { border-top-right-radius: 999px; border-bottom-right-radius: 999px; }
+
+.heatmap-cell,
+.table,
+.tabulator,
+.modal-content,
+.form-select,
+.form-control {
+  border-radius: 10px;
+}
+
+.tabulator,
+#tableContainer .tabulator {
+  overflow: hidden;
+}
+
+/* Reusable white panel/card used behind standalone page sections (Division at-a-glance,
+   the overall progress bar, the Page Details table) so they sit on a surface instead of
+   floating directly on the page background. */
+.dash-panel {
+  background: #ffffff;
+  border: 1px solid var(--dash-border, rgba(0, 32, 86, 0.12));
+  border-radius: var(--dash-radius, 16px);
+  box-shadow: var(--dash-shadow, 0 14px 38px rgba(5, 28, 62, 0.08));
+  padding: 16px 18px;
+}
+
+.dash-panel-table {
+  padding: 12px;
+  overflow: hidden;
+}
+
+/* Overall progress headline: the one number people want, stated plainly */
+.progress-headline {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 12px;
+}
+
+.progress-headline-figure {
+  font-size: 2.1rem;
+  font-weight: 800;
+  line-height: 1;
+  color: #13233f;
+}
+
+.progress-headline-main {
+  font-weight: 600;
+  color: #13233f;
+}
+
+.progress-headline-sub {
+  font-size: 0.76rem;
+  color: #5d6b80;
+}
+
+/* Division drill-down modal: outline stat cards with an icon for context */
+/* One row of equal-width outline cards on wide screens; wraps into a tidy grid on
+   narrow ones rather than overflowing and overlapping. */
+.division-modal-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 10px;
+  padding-bottom: 2px;
+}
+
+@media (min-width: 1200px) {
+  .division-modal-summary {
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(0, 1fr);
+    grid-template-columns: none;
+  }
+}
+
+.division-stat-card {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 132px;
+  padding: 10px 11px;
+  border: 1px solid var(--dash-border, rgba(0, 32, 86, 0.12));
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(5, 28, 62, 0.05);
+}
+
+.division-stat-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  flex: 0 0 32px;
+  border-radius: 50%;
+  font-size: 0.95rem;
+  background: rgba(0, 32, 86, 0.07);
+  color: #13233f;
+}
+
+.division-stat-card.variant-success .division-stat-icon { background: rgba(40, 167, 69, 0.14); color: #1c7a34; }
+.division-stat-card.variant-info .division-stat-icon { background: rgba(23, 162, 184, 0.16); color: #0f6674; }
+.division-stat-card.variant-danger .division-stat-icon { background: rgba(220, 53, 69, 0.14); color: #b02a37; }
+.division-stat-card.variant-warning .division-stat-icon { background: rgba(212, 175, 55, 0.2); color: #8a6a1c; }
+
+.division-stat {
+  font-size: 1.25rem;
+  font-weight: 800;
+  line-height: 1.1;
+  color: #13233f;
+}
+
+.division-stat-label {
+  font-size: 0.7rem;
+  color: #5d6b80;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.division-sites-scroll {
+  max-height: 62vh;
+  overflow: auto;
+}
+
+.division-sites-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: #f8f9fa;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: #5d6b80;
+}
+
+/* Division at-a-glance rows are clickable */
+.division-glance-row {
+  padding: 4px 8px;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background-color 160ms ease, transform 160ms ease;
+  align-items: center; /* keep the bar centred against the label and the % figure */
+}
+
+#divisionGlance .progress {
+  align-self: center;
+  margin: 0;
+}
+
+/* The overall status bar's inline labels don't fit once segments get narrow — from
+   large tablets down, drop them and rely on the legend + hover instead. */
+@media (max-width: 1199.98px) {
+  #progressBarContainer .progress-bar {
+    font-size: 0;
+    text-indent: -9999px;
+  }
+}
+
+.division-glance-row:hover,
+.division-glance-row:focus-visible {
+  background: rgba(34, 88, 161, 0.07);
+  transform: translateX(2px);
+  outline: none;
+}
+
+/* ── Motion ──────────────────────────────────────────────────────────────────
+   Smoother accordion open/close plus a staggered entrance so sections settle in
+   sequence rather than snapping into place all at once. */
+.accordion-collapse.collapsing {
+  transition: height 420ms cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+.accordion-button::after {
+  transition: transform 320ms cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+.accordion-item,
+.accordion-button {
+  transition: background-color 260ms ease, box-shadow 260ms ease, color 260ms ease;
+}
+
+/* Accordion contents cascade in when the panel opens, rather than appearing all at once.
+   Content is held invisible during Bootstrap's `.collapsing` height transition — without
+   this it renders fully, then animates, which reads as a flash. */
+.accordion-collapse.collapsing > *,
+.accordion-collapse.collapsing .accordion-body > * {
+  opacity: 0;
+}
+
+.accordion-collapse.collapse.show > * {
+  animation: dashFadeUp 420ms cubic-bezier(0.22, 0.61, 0.36, 1) both;
+}
+
+/* Only direct children and card columns animate. Table rows and list-group items are
+   deliberately excluded: the Site Status Report and the migration lists run to thousands
+   of nodes, and animating each one made the whole page sluggish to click. */
+.accordion-collapse.collapse.show .accordion-body > *,
+.accordion-collapse.collapse.show .row > [class*="col-"] {
+  animation: dashFadeUp 400ms cubic-bezier(0.22, 0.61, 0.36, 1) both;
+}
+
+/* Stagger the first couple of dozen children; anything past that arrives together
+   (a 6,000-row list shouldn't wait ten seconds to finish animating). */
+.accordion-collapse.collapse.show .accordion-body > *:nth-child(1),
+.accordion-collapse.collapse.show .row > [class*="col-"]:nth-child(1) { animation-delay: 30ms; }
+.accordion-collapse.collapse.show .accordion-body > *:nth-child(2),
+.accordion-collapse.collapse.show .row > [class*="col-"]:nth-child(2) { animation-delay: 70ms; }
+.accordion-collapse.collapse.show .accordion-body > *:nth-child(3),
+.accordion-collapse.collapse.show .row > [class*="col-"]:nth-child(3) { animation-delay: 110ms; }
+.accordion-collapse.collapse.show .accordion-body > *:nth-child(4),
+.accordion-collapse.collapse.show .row > [class*="col-"]:nth-child(4) { animation-delay: 150ms; }
+.accordion-collapse.collapse.show .accordion-body > *:nth-child(5),
+.accordion-collapse.collapse.show .row > [class*="col-"]:nth-child(5) { animation-delay: 190ms; }
+.accordion-collapse.collapse.show .accordion-body > *:nth-child(6),
+.accordion-collapse.collapse.show .row > [class*="col-"]:nth-child(6) { animation-delay: 230ms; }
+.accordion-collapse.collapse.show .accordion-body > *:nth-child(7),
+.accordion-collapse.collapse.show .row > [class*="col-"]:nth-child(7) { animation-delay: 270ms; }
+.accordion-collapse.collapse.show .accordion-body > *:nth-child(8),
+.accordion-collapse.collapse.show .row > [class*="col-"]:nth-child(8) { animation-delay: 310ms; }
+.accordion-collapse.collapse.show .accordion-body > *:nth-child(n+9),
+.accordion-collapse.collapse.show .row > [class*="col-"]:nth-child(n+9) { animation-delay: 350ms; }
+
+
+
+
+
+
+
+
+
+
+@keyframes dashFadeUp {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes dashFadeIn {
+  from { opacity: 0; transform: translateY(14px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Scroll-triggered reveal: sections start slightly down + transparent, then settle as
+   they come into view, so the whole page cascades in the same way the top does.
+   Applied by the IntersectionObserver in initScrollReveal(). */
+.dash-reveal {
+  opacity: 0;
+  transform: translateY(18px);
+  transition: opacity 620ms cubic-bezier(0.22, 0.61, 0.36, 1),
+              transform 620ms cubic-bezier(0.22, 0.61, 0.36, 1);
+  /* No `will-change` here on purpose — promoting every section to its own compositor
+     layer made the page noticeably heavier to interact with. */
+}
+
+.dash-reveal.is-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Once revealed, drop the transition entirely so these elements stop being animation
+   candidates during normal interaction. */
+.dash-reveal.reveal-done {
+  transition: none;
+}
+
+/* Metric cards cascade in one after another */
+#metricCards > [class*="col-"] {
+  animation: dashFadeUp 520ms cubic-bezier(0.22, 0.61, 0.36, 1) both;
+}
+
+#metricCards > [class*="col-"]:nth-child(1) { animation-delay: 60ms; }
+#metricCards > [class*="col-"]:nth-child(2) { animation-delay: 120ms; }
+#metricCards > [class*="col-"]:nth-child(3) { animation-delay: 180ms; }
+#metricCards > [class*="col-"]:nth-child(4) { animation-delay: 240ms; }
+#metricCards > [class*="col-"]:nth-child(5) { animation-delay: 300ms; }
+#metricCards > [class*="col-"]:nth-child(6) { animation-delay: 360ms; }
+#metricCards > [class*="col-"]:nth-child(7) { animation-delay: 420ms; }
+#metricCards > [class*="col-"]:nth-child(8) { animation-delay: 480ms; }
+
+/* Division at-a-glance rows sweep in, and their bars grow into place */
+#divisionGlance .division-glance-row {
+  animation: dashFadeUp 460ms cubic-bezier(0.22, 0.61, 0.36, 1) both;
+}
+
+#divisionGlance .progress-bar {
+  transition: width 900ms cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+#progressBarContainer .progress-bar {
+  transition: width 900ms cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+/* Cards lift a little more willingly */
+.compact-info-card {
+  transition: transform 200ms ease, box-shadow 200ms ease;
+}
+
+.compact-info-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 16px 30px rgba(8, 34, 74, 0.14);
+}
+
+/* Respect users who prefer reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  #metricCards > [class*="col-"],
+  #divisionGlance .division-glance-row,
+  .accordion-collapse.collapse.show > * {
+    animation: none !important;
+  }
+  .dash-reveal {
+    opacity: 1 !important;
+    transform: none !important;
+    transition: none !important;
+  }
+  .accordion-collapse.collapsing,
+  #divisionGlance .progress-bar,
+  #progressBarContainer .progress-bar,
+  .compact-info-card {
+    transition: none !important;
+  }
+}
+
+/* ── Section rhythm ──────────────────────────────────────────────────────────
+   One consistent spacing scale for every "heading + content" block on the page,
+   instead of the assorted mt-2/mb-3/<br> spacing that had built up. */
+.dash-section {
+  margin-bottom: 56px;
+}
+
+.dash-section:last-of-type {
+  margin-bottom: 40px;
+}
+
+.dash-section-title,
+.dash-section-head {
+  margin: 0 0 18px;
+}
+
+/* The Filters block sits directly under the navbar — give its heading (and the Clear
+   Filters button that sits inside it) room to breathe. */
+.dash-section:first-of-type .dash-section-title {
+  margin-top: 20px;
+}
+
+@media (max-width: 767.98px) {
+  .dash-section {
+    margin-bottom: 40px;
+  }
+}
+
+.dash-section > .accordion + .accordion {
+  margin-top: 12px;
+}
+
+/* Consistent accordion shell: one card-like surface per accordion, evenly spaced items,
+   and no assorted mt-2/mb-2 utilities fighting each other. */
+.dash-section > .accordion > .accordion-item,
+#progressAccordion > .accordion-item,
+#siteStatusAccordion > .accordion-item,
+#qaAccordion > .accordion-item,
+#serviceCenterAccordion > .accordion-item,
+#migrationInsightsAccordion > .accordion-item {
+  margin: 0;
+  border: 1px solid var(--dash-border, rgba(0, 32, 86, 0.12));
+  border-radius: var(--dash-radius, 16px);
+  background: #ffffff;
+  box-shadow: var(--dash-shadow, 0 14px 38px rgba(5, 28, 62, 0.08));
+  overflow: hidden;
+}
+
+.dash-section > .accordion > .accordion-item + .accordion-item {
+  margin-top: 12px;
+}
+
+.dash-section > .accordion > .accordion-item > .accordion-header .accordion-button {
+  border-radius: 0;
+  padding: 14px 18px;
+  background: #ffffff;
+  font-weight: 600;
+  box-shadow: none;
+}
+
+.dash-section > .accordion > .accordion-item > .accordion-header .accordion-button:not(.collapsed) {
+  background: #f5f8fc;
+  color: #13233f;
+}
+
+.dash-section > .accordion > .accordion-item .accordion-body {
+  padding: 16px 18px;
+}
+
+.dash-section > .accordion > .accordion-item .accordion-body.p-0 {
+  padding: 0;
+}
+
+/* Nested accordions (per-site groups) stay flush inside their parent */
+.accordion-flush > .accordion-item {
+  border-left: 0;
+  border-right: 0;
+  border-radius: 0;
+  box-shadow: none;
+  margin-top: 0;
+}
+
+.dash-section-note {
+  font-size: 0.76rem;
+  color: #5d6b80;
+}
+
+/* Clear Filters: give it real padding and a defined shape rather than the default
+   hairline outline button. */
+#clearFiltersBtn {
+  padding: 7px 16px;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  border: 1px solid rgba(19, 35, 63, 0.18);
+  background: #ffffff;
+  color: #13233f;
+  box-shadow: 0 1px 2px rgba(5, 28, 62, 0.06);
+  transition: background-color 160ms ease, border-color 160ms ease, transform 160ms ease;
+}
+
+#clearFiltersBtn:hover,
+#clearFiltersBtn:focus-visible {
+  background: #13233f;
+  border-color: #13233f;
+  color: #ffffff;
+  transform: translateY(-1px);
+}
+
+/* Page Title Cloud — size is page count, colour is how far migrated */
+.title-cloud {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 4px 14px;
+  padding: 10px 4px 16px;
+  line-height: 1.5;
+}
+
+.title-cloud-word {
+  border: 0;
+  background: none;
+  padding: 2px 4px;
+  border-radius: 8px;
+  font-weight: 700;
+  line-height: 1.15;
+  cursor: pointer;
+  transition: transform 140ms ease, background-color 140ms ease;
+}
+
+.title-cloud-word:hover,
+.title-cloud-word:focus-visible {
+  background: rgba(34, 88, 161, 0.09);
+  transform: translateY(-1px) scale(1.04);
+  outline: none;
+}
+
+.title-cloud-footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 18px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(0, 32, 86, 0.08);
+}
+
+.title-cloud-legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+
+.title-cloud-legend-label {
+  color: #5d6b80;
   font-weight: 500;
-  color: #415774 !important;
+}
+
+.title-cloud-meta {
+  font-size: 0.72rem;
+  color: #5d6b80;
+}
+
+/* Metric cards: real grid gaps so the set breathes and reflows cleanly at any width */
+#metricCards {
+  --bs-gutter-x: 1rem;
+  --bs-gutter-y: 1rem;
+  row-gap: 1rem;
+}
+
+#metricCards > [class*="col-"] {
+  display: flex;
+}
+
+#metricCards > [class*="col-"] > .card {
+  width: 100%;
+  margin-bottom: 0;
+}
+
+/* The horizontally-scrolling charts strip used to clip its first card against the
+   container edge — pad both ends and let each card keep its shadow. Height is sized to
+   the content so the strip scrolls sideways only, with no vertical scrollbar. */
+.charts-scroll-wrapper {
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 6px 4px 10px;
+  scroll-padding-left: 8px;
+}
+
+.charts-row {
+  gap: 16px;
+  padding-inline: 4px;
+  align-items: stretch;
+}
+
+/* Chart cards: square chart area, caption above, supporting text underneath. */
+.charts-row > .chart-container {
+  background: #ffffff;
+  border: 1px solid var(--dash-border, rgba(0, 32, 86, 0.12));
+  border-radius: var(--dash-radius, 16px);
+  box-shadow: var(--dash-shadow, 0 14px 38px rgba(5, 28, 62, 0.08));
+  padding: 16px 16px 14px;
+  margin: 0;
+  flex: 0 0 auto;
+  width: 288px;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  transition: transform 180ms ease, box-shadow 180ms ease;
+}
+
+.charts-row > .chart-container:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 18px 34px rgba(8, 34, 74, 0.14);
+}
+
+.charts-row > .chart-container > p:first-child {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #13233f;
+  margin-bottom: 10px;
+}
+
+/* Square plotting area, consistent across every card */
+.charts-row > .chart-container canvas {
+  width: 100% !important;
+  height: 256px !important;
+  aspect-ratio: 1 / 1;
+  flex: 0 0 auto;
+}
+
+/* Supporting caption under the chart (e.g. the velocity average) */
+#velocityChartStat {
+  font-size: 0.68rem;
+  line-height: 1.35;
+  color: #5d6b80;
+  margin-top: 10px;
+}
+
+/* Migration Dates modal: clear separation between month / bucket groups */
+.agenda-group {
+  margin-bottom: 22px;
+  padding-bottom: 18px;
+  border-bottom: 1px solid rgba(0, 32, 86, 0.09);
+}
+
+.agenda-group:last-child {
+  border-bottom: none;
+  margin-bottom: 0;
+}
+
+.agenda-group-title {
+  font-size: 0.95rem;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+
+.agenda-group-explain {
+  font-size: 0.74rem;
+  color: #5d6b80;
+  margin-bottom: 10px;
+}
+
+/* Mobile: Tabulator's collapsed rows read as label/value pairs — give the value its own
+   background and put a faint divider between rows so the pairs don't run together. */
+@media (max-width: 991.98px) {
+  #tableContainer .tabulator-responsive-collapse table tr {
+    border-bottom: 1px solid rgba(0, 32, 86, 0.08);
+  }
+
+  #tableContainer .tabulator-responsive-collapse table tr:last-child {
+    border-bottom: none;
+  }
+
+  #tableContainer .tabulator-responsive-collapse table td {
+    padding: 7px 9px;
+    vertical-align: top;
+  }
+
+  #tableContainer .tabulator-responsive-collapse table td:first-child {
+    background: #f2f5fa;
+    color: #5d6b80;
+    font-weight: 600;
+    white-space: nowrap;
+    width: 42%;
+    border-right: 1px solid rgba(0, 32, 86, 0.06);
+  }
+
+  #tableContainer .tabulator-responsive-collapse table td:last-child {
+    background: #ffffff;
+    color: #13233f;
+  }
+
+  #tableContainer .tabulator-row {
+    border-bottom: 1px solid rgba(0, 32, 86, 0.1);
+  }
+}
+
+/* Migration activity heatmap (Migration Dates modal): a fast day-cell grid replacing the
+   old FullCalendar month view, which rendered one DOM event per page and got slow once
+   locations (not just divisions) started migrating. */
+.migration-heatmap-scroll {
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+
+.migration-heatmap-months {
+  display: flex;
+  gap: 3px;
+  margin-bottom: 2px;
+  min-width: max-content;
+}
+
+.heatmap-month-label {
+  width: 12px;
+  font-size: 0.62rem;
+  color: #5d6b80;
+  white-space: nowrap;
+}
+
+.migration-heatmap {
+  display: flex;
+  gap: 3px;
+  min-width: max-content;
+}
+
+.heatmap-col {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.heatmap-cell {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  background: #e9ecef;
+  cursor: pointer;
+}
+
+.heatmap-cell.level-1 { background: #bcdcff; }
+.heatmap-cell.level-2 { background: #7bb6f5; }
+.heatmap-cell.level-3 { background: #3c85e0; }
+.heatmap-cell.level-4 { background: #16304d; }
+.heatmap-cell.selected { outline: 2px solid #ffb300; outline-offset: 1px; }
+.heatmap-cell:hover { outline: 1px solid #13233f; outline-offset: 1px; }
+
+.compact-icon-count {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  min-width: 15px;
+  height: 15px;
+  padding: 0 3px;
+  border-radius: 999px;
+  background: #dc3545;
+  color: #fff;
+  font-size: 0.6rem;
+  font-weight: 700;
+  line-height: 15px;
+  text-align: center;
 }
 
 @media (max-width: 991px) {
@@ -1197,8 +2214,10 @@ h3.mt-2 {
   color: #5f7390;
 }
 
-#metricCards .card-title,
-#metricCards .card-text,
+/* NOTE: #metricCards .card-title / .card-text are deliberately NOT in this list. The
+   metric cards sit on dark navy backgrounds, and this dark "on light surface" color
+   made their titles invisible (dark-on-dark). Their light text is set by
+   .site-metric-card .card-title / .metric-hero / .metric-detail instead. */
 .charts-row .chart-container p,
 #refreshDate,
 .accordion-button,

@@ -6,9 +6,10 @@
 <meta name="robots" content="noindex, nofollow">
 <title>Site Migration Dashboard</title>
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
 <link href="https://unpkg.com/tabulator-tables@5.5.0/dist/css/tabulator.min.css" rel="stylesheet">
 <!-- Add a cache-busting query param so browsers pick up CSS edits during development -->
-<link href="Site-Migration-Dashboard.css?v=20260420b" rel="stylesheet">
+<link href="Site-Migration-Dashboard.css?v=20260909a" rel="stylesheet">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Bona+Nova:ital,wght@0,400;0,700;1,400&family=East+Sea+Dokdo&family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&family=Montserrat&family=Rock+Salt&display=swap" rel="stylesheet">
@@ -23,9 +24,6 @@
 
 <script src="https://unpkg.com/tabulator-tables@5.5.0/dist/js/tabulator.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<!-- FullCalendar (grid + list views) -->
-<link href="https://cdn.jsdelivr.net/npm/fullcalendar@5.11.3/main.min.css" rel="stylesheet" />
-<script src="https://cdn.jsdelivr.net/npm/fullcalendar@5.11.3/main.min.js"></script>
 </head>
 <body>
 <div class="container-fluid my-3">
@@ -77,11 +75,13 @@
 
 
 <!-- Filters -->
- <h3 class="mt-3 mb-1 d-flex justify-content-between align-items-center">
+<section class="dash-section">
+ <h3 class="dash-section-title d-flex justify-content-between align-items-center">
   Filters
   <button id="clearFiltersBtn" class="btn btn-sm btn-outline-secondary">Clear Filters</button>
 </h3>
-<div class="row mt-3 mb-3 filters-row">
+<div class="dash-panel">
+<div class="row filters-row">
   <div class="col-lg-2 col-md-4 col-sm-6 mb-2">
     <label for="filterDivision">Division</label>
     <select id="filterDivision" class="form-select"></select>
@@ -131,36 +131,57 @@
     <select id="filterZestyUrl" class="form-select"></select>
   </div>
 </div>
+</div>
+</section>
 
 <!-- Metric Cards -->
- <h3 class="mt-2 mb-2">Metrics</h3>
-<div class="row" id="metricCards"></div>
+<section class="dash-section">
+ <h3 class="dash-section-title">Metrics</h3>
+ <div class="dash-panel dash-panel-metrics">
+   <div class="row" id="metricCards"></div>
+ </div>
+</section>
 
 <!-- Above Overall Progress -->
-<div class="row d-flex justify-content-between align-items-center mb-2 mt-3">
+<div class="row">
   <div class="col-12">
-    <div class="d-flex justify-content-between align-items-start mb-2">
-      <h3 class="mt-2 mb-2">Overall Progress</h3>
-      <a href="#" id="migrationDatesLink" class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#migrationDatesModal">View Calendar</a>
+    <section class="dash-section">
+    <div class="d-flex justify-content-between align-items-center dash-section-head">
+      <h3 class="dash-section-title mb-0">Overall Progress</h3>
+      <a href="#" id="migrationDatesLink" class="btn btn-sm btn-primary">View Calendar</a>
     </div>
 
-    <!-- Legend -->
-    <div id="progressLegend" class="d-flex gap-3 mb-1">
-      <!-- dynamically injected legend items -->
+    <!-- Overall status bar: headline figure, one continuous bar, then the legend -->
+    <div class="dash-panel mb-3">
+      <div id="progressHeadline" class="progress-headline">
+        <!-- dynamically injected headline -->
+      </div>
+
+      <div class="progress mb-2" id="progressBarContainer">
+        <!-- Segments will be injected here dynamically -->
+      </div>
+
+      <div id="progressLegend" class="d-flex gap-3 mb-0 flex-wrap">
+        <!-- dynamically injected legend items -->
+      </div>
     </div>
 
-    <div class="progress mb-2" id="progressBarContainer">
-      <!-- Segments will be injected here dynamically -->
+    <!-- Division at-a-glance: ranked % complete by Division -->
+    <div class="dash-panel">
+      <div id="divisionGlance">
+        <!-- dynamically injected division ranking -->
+      </div>
     </div>
+    </section>
 
-    <!-- Accordion for breakdown -->
-     <br>
-     <h3 class="mt-2 mb-2">Group Progress and QA</h3>
+    <!-- Reports & detail: one section, one stack of accordions -->
+    <section class="dash-section">
+     <h3 class="dash-section-title">Reports &amp; Detail</h3>
     <div class="accordion" id="progressAccordion">
       <div class="accordion-item">
         <h2 class="accordion-header" id="headingBreakdown">
           <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseBreakdown" aria-expanded="false" aria-controls="collapseBreakdown">
-            Show Detailed Progress&nbsp;<span id="breakdownBadge" class="badge bg-warning ms-2">0</span>
+            Group Progress and QA&nbsp;<span id="breakdownBadge" class="badge bg-warning ms-2">0</span>
           </button>
         </h2>
         <div id="collapseBreakdown" class="accordion-collapse collapse" aria-labelledby="headingBreakdown" data-bs-parent="#progressAccordion">
@@ -172,46 +193,21 @@
     </div>
 
 
-          <!-- Migration Dates Modal -->
-          <div class="modal fade" id="migrationDatesModal" tabindex="-1" aria-labelledby="migrationDatesModalLabel" aria-hidden="true">
-            <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
-              <div class="modal-content">
-                <div class="modal-header">
-                  <h5 class="modal-title" id="migrationDatesModalLabel">Migration Dates</h5>
-                  <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <div class="modal-body">
-                  <div class="d-flex justify-content-between align-items-center mb-3">
-                    <div class="btn-group" role="group" aria-label="View Toggle">
-                      <button type="button" id="viewCalendarBtn" class="btn btn-outline-primary btn-sm">Calendar</button>
-                      <button type="button" id="viewAgendaBtn" class="btn btn-outline-primary btn-sm">Agenda</button>
-                    </div>
-                    <div>
-                      <input id="migrationSearch" class="form-control form-control-sm" placeholder="Search site title or division" style="min-width:140px; width:160px;" />
-                    </div>
-                  </div>
-
-                  <!-- Full calendar grid -->
-                  <div id="migrationFullCalendar" class="mb-3" style="display:none;">
-                    <!-- FullCalendar will render here -->
-                  </div>
-
-                  <!-- Agenda (grouped list) container -->
-                  <div id="migrationAgenda" class="mb-3">
-                    <!-- agenda will be rendered here as a responsive grouped-by-month list -->
-                  </div>
-
-                  <!-- Table view removed per request -->
-                </div>
-                <div class="modal-footer">
-                  <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                  <a id="exportMigrationJson" class="btn btn-outline-secondary" href="#">Export JSON</a>
-                </div>
-              </div>
-            </div>
+    <!-- Site Migration Status (moved out of a modal so it's visible on the main page) -->
+    <div class="accordion" id="siteStatusAccordion">
+      <div class="accordion-item">
+        <h2 class="accordion-header" id="headingSiteStatus">
+          <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseSiteStatus" aria-expanded="false" aria-controls="collapseSiteStatus">
+            Site Migration Status
+          </button>
+        </h2>
+        <div id="collapseSiteStatus" class="accordion-collapse collapse" aria-labelledby="headingSiteStatus" data-bs-parent="#siteStatusAccordion">
+          <div class="accordion-body p-0" id="siteManagementBody">
+            <!-- injected by generateSiteSummaryTable() -->
           </div>
-  </div>
-</div>
+        </div>
+      </div>
+    </div>
 
 <!-- Accordion for QA Issues -->
 <div class="accordion" id="qaAccordion">
@@ -240,7 +236,7 @@
 </div>
 
 <!-- Accordion for Service Center Pages -->
-<div class="accordion mt-2" id="serviceCenterAccordion">
+<div class="accordion" id="serviceCenterAccordion">
   <div class="accordion-item">
     <h2 class="accordion-header" id="headingServiceCenter">
       <div class="d-flex align-items-center justify-content-between w-100">
@@ -262,7 +258,7 @@
 </div>
 
 <!-- Accordion for Migration Insights -->
-<div class="accordion mt-2" id="migrationInsightsAccordion">
+<div class="accordion" id="migrationInsightsAccordion">
   <div class="accordion-item shadow-sm border-0 mb-2">
     <h2 class="accordion-header" id="headingMigrationInsights">
         <button class="accordion-button collapsed flex-grow-1 text-start"
@@ -288,14 +284,20 @@
     </div>
   </div>
 </div>
-
-
+</section>
+  </div>
+</div>
 
 <!-- Charts -->
- <br>
- <h3 class="mt-2 mb-2">Charts</h3>
-<div class="charts-scroll-wrapper mt-4">
-  <div class="row charts-row d-flex flex-nowrap" style="min-width:900px;">
+<section class="dash-section">
+ <h3 class="dash-section-title">Charts</h3>
+<div class="charts-scroll-wrapper">
+  <div class="row charts-row d-flex flex-nowrap">
+  <div class="col-lg-3 col-md-6 col-sm-12 chart-container">
+    <p class="text-center mb-1"><strong>Migration Velocity</strong> <small class="d-block d-lg-none">Swipe →</small></p>
+    <canvas id="velocityChart"></canvas>
+    <p id="velocityChartStat" class="text-center text-muted small mt-1 mb-0"></p>
+  </div>
   <div class="col-lg-3 col-md-6 col-sm-12 chart-container">
     <p class="text-center mb-1"><strong>Status</strong> <small class="d-block d-lg-none">Swipe →</small></p>
     <canvas id="statusChart"></canvas>
@@ -318,7 +320,41 @@
   </div>
   </div>
 </div>
+</section>
 
+
+          <!-- Migration Dates Modal -->
+          <div class="modal fade" id="migrationDatesModal" tabindex="-1" aria-labelledby="migrationDatesModalLabel" aria-hidden="true">
+            <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+              <div class="modal-content">
+                <div class="modal-header">
+                  <h5 class="modal-title" id="migrationDatesModalLabel">Migration Dates</h5>
+                  <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                  <div class="d-flex justify-content-end align-items-center mb-3">
+                    <div>
+                      <input id="migrationSearch" class="form-control form-control-sm" placeholder="Search site title or division" style="min-width:140px; width:160px;" />
+                    </div>
+                  </div>
+
+                  <!-- Activity heatmap: fast day-by-day view, click a day to filter the list below -->
+                  <div id="migrationHeatmap" class="mb-3">
+                    <!-- heatmap will render here -->
+                  </div>
+
+                  <!-- Agenda (grouped list) container -->
+                  <div id="migrationAgenda" class="mb-3">
+                    <!-- agenda will be rendered here as a responsive grouped-by-month list -->
+                  </div>
+                </div>
+                <div class="modal-footer">
+                  <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                  <a id="exportMigrationJson" class="btn btn-outline-secondary" href="#">Export JSON</a>
+                </div>
+              </div>
+            </div>
+          </div>
 
 <!-- QA Issues Modal -->
 <!-- Modal structure remains the same -->
@@ -352,11 +388,33 @@
   </div>
 </div>
 
+<!-- Page Title Cloud: how often each page title repeats across sites -->
+<section class="dash-section">
+  <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 dash-section-head">
+    <h3 class="dash-section-title mb-0">Page Title Cloud</h3>
+    <div class="d-flex align-items-center gap-2 flex-wrap">
+      <span class="dash-section-note">Size = how many pages share the title · colour = how far along it is</span>
+      <label for="titleCloudScope" class="visually-hidden">Number of page titles to show</label>
+      <select id="titleCloudScope" class="form-select form-select-sm" style="width:auto;" title="Number of page titles to show">
+        <option value="60">Top 60 titles</option>
+        <option value="100">Top 100 titles</option>
+        <option value="150">Top 150 titles</option>
+      </select>
+    </div>
+  </div>
+  <div class="dash-panel">
+    <div id="titleCloudBody">
+      <!-- injected by renderTitleCloud() -->
+    </div>
+  </div>
+</section>
+
 <!-- Table -->
- <h3 class="mt-3 d-flex align-items-center">
-  <span class="me-3">Page Details <span id="pageDetailsBadge" class="badge bg-secondary text-light ms-1">0</span></span>
-  <div class="d-flex align-items-center ms-auto">
-    <label for="pageSizeSelect" class="form-label me-2 mb-0">Rows per page:</label>
+<section class="dash-section">
+ <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 dash-section-head">
+  <h3 class="dash-section-title mb-0">Page Details <span id="pageDetailsBadge" class="badge bg-secondary text-light ms-1">0</span></h3>
+  <div class="d-flex align-items-center gap-2">
+    <label for="pageSizeSelect" class="form-label mb-0 text-muted small">Rows per page</label>
     <select id="pageSizeSelect" class="form-select form-select-sm" style="width: auto;">
       <option value="10">10</option>
       <option value="20">20</option>
@@ -365,8 +423,9 @@
       <option value="100">100</option>
     </select>
   </div>
-</h3>
-<div id="tableContainer"></div>
+</div>
+<div class="dash-panel dash-panel-table"><div id="tableContainer"></div></div>
+</section>
 
 <!-- Table Modal -->
 <div class="modal fade" id="tableDetailModal" tabindex="-1" aria-hidden="true">
@@ -377,6 +436,36 @@
         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
       </div>
       <div class="modal-body" id="tableModalBody"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Page title drill-down modal -->
+<div class="modal fade" id="titleDetailModal" tabindex="-1" aria-labelledby="titleDetailModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="titleDetailModalLabel">Page Title</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body" id="titleDetailModalBody">
+        <!-- injected by showTitleDetailModal() -->
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Division Sites Modal (opened by clicking a row in Division progress at a glance) -->
+<div class="modal fade" id="divisionSitesModal" tabindex="-1" aria-labelledby="divisionSitesModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="divisionSitesModalLabel">Division Site Breakdown</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body" id="divisionSitesModalBody">
+        <!-- injected by showDivisionSitesModal() -->
+      </div>
     </div>
   </div>
 </div>
@@ -394,24 +483,9 @@
   </div>
 </div>
 
-<!-- Site Management Modal -->
-<div class="modal fade" id="siteManagementModal" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog modal-xl modal-dialog-scrollable">
-    <div class="modal-content">
-      <div class="modal-header bg-dark text-white">
-        <h5 class="modal-title">Site Status Management Report</h5>
-        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-      </div>
-      <div class="modal-body p-0" id="siteManagementModalBody">
-        <!-- Table injected here -->
-      </div>
-    </div>
-  </div>
-</div>
-
 
 <!-- Refresh Date -->
-<p id="refreshDate" class="text-muted mt-3 small"></p>
+<div id="refreshDate" class="dashboard-footer mt-3"></div>
 
 
 <script src="./Site-Migration-Dashboard.js" defer></script>
