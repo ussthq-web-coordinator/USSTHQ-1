@@ -25,7 +25,7 @@
        uses for this repo:
        <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/ussthq-web-coordinator/USSTHQ-1@main/an-army-for-others-c1.css" />
        The relative link below is for local preview of this file. -->
-  <link href="an-army-for-others-c1.css" rel="stylesheet" />
+  <link href="./an-army-for-others-d1.css" rel="stylesheet" />
   <meta http-equiv="Content-Type" content="text/html;charset=utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
@@ -39,8 +39,6 @@
 <div class="afo">
 
   <section class="afo-open afo-on-dark" id="tab-video" aria-labelledby="afo-openTitle">
-    <span class="afo-open__tri" aria-hidden="true"></span>
-
     <div class="afo-open__inner">
       <p class="afo-open__kicker">An Army For Others</p>
 
@@ -66,10 +64,9 @@
 
   <!-- ============ JUMP NAV ============
        The same thirteen stops as the old dropdown-plus-pills pair, now in one
-       bar that works the same way at every width: it scrolls sideways on a
-       phone and wraps on a wide screen. Sticky at z-index 5, below the theme
-       header's z-index 10, so it can never cover the site menu - which is what
-       the old `pointer-events: none` shell was fighting.
+      bar that works the same way at every width: it scrolls sideways on a
+      phone and wraps on a wide screen. It stays in normal page flow below the
+      theme header rather than sticking over the page during scroll.
        ============================================================ -->
   <nav class="afo-nav" aria-label="Jump to a section">
     <ul class="afo-nav__list">

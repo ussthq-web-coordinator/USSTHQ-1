@@ -32,9 +32,9 @@
    1. No element on this page uses the class `row`. The theme's services
       filter script hunts for a `.row` descendant of `.services-body` and will
       try to mount itself there.
-   2. The theme header is `position: fixed` with `z-index: 10`. The sticky jump
-      nav therefore sits at `z-index: 5` and offsets itself below the header
-      with `--afo-stick`. Tune that one value if the header height changes.
+  2. The theme header is `position: fixed` with `z-index: 10`. Anchor targets
+    use `--afo-header-offset` to land clear of it. Tune that value if the
+    header height changes.
 
    DROPPED ON PURPOSE (dead code, verified against the live page markup):
      .globalFooter, .globalFooter-input, .givingToolbar-toolbar, .flyoutNav,
@@ -84,15 +84,14 @@
   --afo-section: clamp(44px, 6vw, 88px);
   --afo-pad:     clamp(22px, 3.2vw, 44px);
 
-  /* How far the sticky jump nav sits below the fixed theme header, and how
-     far an anchor target clears both of them. One knob, two uses. */
-  --afo-stick: 4.9rem;
+    /* Anchor targets should land clear of the fixed CMS theme header. */
+    --afo-header-offset: 4.9rem;
 
   color: var(--afo-body);
 }
 
 @media (min-width: 992px) {
-  .afo { --afo-stick: 7.1rem; }
+  .afo { --afo-header-offset: 7.1rem; }
 }
 
 .afo *,
@@ -111,8 +110,8 @@
   text-wrap: balance;
 }
 
-/* Anchor landings clear the fixed header *and* the sticky nav. */
-.afo [id] { scroll-margin-top: calc(var(--afo-stick) + 4.25rem); }
+/* Anchor landings clear the fixed CMS header; the jump nav is not sticky. */
+.afo [id] { scroll-margin-top: var(--afo-header-offset); }
 
 .afo a:focus-visible,
 .afo button:focus-visible {
@@ -285,19 +284,6 @@
   box-shadow: var(--afo-shadow-lg);
 }
 
-/* The quiet red wedge the campaign uses as a mark. */
-.afo-open__tri {
-  position: absolute;
-  top: clamp(-80px, -6vw, -50px);
-  right: clamp(-80px, -6vw, -50px);
-  width: clamp(180px, 22vw, 300px);
-  height: clamp(180px, 22vw, 300px);
-  background: var(--afo-red);
-  opacity: .13;
-  transform: rotate(45deg);
-  pointer-events: none;
-}
-
 .afo-open__inner {
   position: relative;
   z-index: 1;
@@ -374,14 +360,10 @@
 }
 
 
-/* ---------- 7. Sticky jump navigation ------------------------------------- */
-/* The page is long by design: thirteen stops. This bar keeps all of them one
-   tap away. It scrolls horizontally on a phone and never covers the theme
-   header, which is fixed at z-index 10. */
+/* ---------- 7. Jump navigation -------------------------------------------- */
+/* The page is long by design: thirteen stops. Keep the nav in normal page
+  flow; it scrolls horizontally on a phone and wraps on wide screens. */
 .afo-nav {
-  position: sticky;
-  top: var(--afo-stick);
-  z-index: 5;
   margin: clamp(20px, 2.6vw, 30px) 0 var(--afo-section);
   padding: .55rem clamp(10px, 1.6vw, 16px);
   overflow: hidden;
