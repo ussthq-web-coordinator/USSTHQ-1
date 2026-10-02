@@ -1,0 +1,892 @@
+/* ==========================================================================
+   USA Southern Territory  ·  An Army For Others
+   an-army-for-others-c1.css
+   --------------------------------------------------------------------------
+   Replaces an-army-for-others-b1.css + an-army-for-others-nojs-2.css.
+
+   WHY A REWRITE
+   The b1/nojs pair grew out of a JavaScript tab interface that was later
+   expanded into plain stacked sections. What was left behind was a tab
+   stylesheet doing a long-page job: `.section:nth-child()` colour flipping,
+   `pointer-events: none` on the whole shell, `z-index: 3500` on the theme
+   header, and a pile of `!important` mobile overrides. All of that is gone.
+   Sections now declare their own surface, so nothing depends on sibling
+   order, and nothing reaches outside this page.
+
+   CONVENTIONS (same as our-priorities-k.css)
+   - Every class is namespaced `afo-`; everything lives inside `.afo`, so the
+     Zesty theme and Bootstrap are never touched.
+   - Card grids use explicit column counts at each breakpoint, so a row never
+     ends with a single orphan card.
+   - Photos are real <img> elements with object-fit, not CSS backgrounds, so
+     they can carry alt text and be lazy-loaded.
+
+   PAGE CONTEXT
+   The CMS drops this body inside
+     #generic-info.bg-light.rounded-5.py-8.px-md-12  >  .services-body
+   so the page already sits on a white rounded card with 3rem of side padding
+   on md and up. Sections here are cards within that column - no full-bleed
+   tricks, which is what keeps it stable inside the theme.
+
+   Two notes carried over deliberately:
+   1. No element on this page uses the class `row`. The theme's services
+      filter script hunts for a `.row` descendant of `.services-body` and will
+      try to mount itself there.
+   2. The theme header is `position: fixed` with `z-index: 10`. The sticky jump
+      nav therefore sits at `z-index: 5` and offsets itself below the header
+      with `--afo-stick`. Tune that one value if the header height changes.
+
+   DROPPED ON PURPOSE (dead code, verified against the live page markup):
+     .globalFooter, .globalFooter-input, .givingToolbar-toolbar, .flyoutNav,
+     .eventDetails, .eventTitle, .padding-top-xl, .mainImage, #navMenu and the
+     header z-index overrides. None of those classes exist in the current
+     theme any more, so these rules styled nothing.
+   ========================================================================== */
+
+
+/* ---------- 1. Design tokens ---------------------------------------------- */
+.afo {
+  /* Campaign palette, carried over from the page it replaces.
+     Deep navy + warm cream is what makes this page feel like itself; the
+     Salvation Army red is the accent that ties it to the rest of the site. */
+  --afo-navy:        #122231;   /* primary dark surface */
+  --afo-navy-soft:   #1B3245;   /* gradient partner, hairlines on dark */
+  --afo-navy-deep:   #0C1721;   /* deepest, for overlays */
+  --afo-cream:       #F7F1E7;   /* primary light surface */
+  --afo-cream-deep:  #F1E8DC;   /* the original cream, now the alt surface */
+  --afo-cream-line:  #E4D9C7;   /* hairlines on cream */
+
+  /* Red: theme primary-200 / primary-300. The bright red is legible on navy
+     only at large or bold sizes (4.2:1), so small red text on dark uses
+     --afo-rose instead (6.8:1) and small red text on light uses --afo-red-deep
+     (5.4:1 on cream). */
+  --afo-red:         #EF3E42;
+  --afo-red-deep:    #C5000E;
+  --afo-rose:        #FF838B;
+
+  /* Neutrals */
+  --afo-ink:         #15171A;
+  --afo-body:        #3C424A;
+  --afo-muted:       #5E6670;
+  --afo-on-dark:     #EEF2F6;
+  --afo-on-dark-dim: #BFCAD6;
+
+  /* Elevation */
+  --afo-shadow-sm: 0 1px 2px rgba(18,34,49,.06), 0 2px 8px rgba(18,34,49,.06);
+  --afo-shadow-md: 0 2px 6px rgba(18,34,49,.08), 0 14px 30px rgba(18,34,49,.10);
+  --afo-shadow-lg: 0 8px 20px rgba(18,34,49,.12), 0 30px 64px rgba(18,34,49,.18);
+
+  /* Geometry + rhythm */
+  --afo-r-sm: 10px;
+  --afo-r:    16px;
+  --afo-r-lg: 24px;
+  --afo-gap:     clamp(16px, 2vw, 26px);
+  --afo-section: clamp(44px, 6vw, 88px);
+  --afo-pad:     clamp(22px, 3.2vw, 44px);
+
+  /* How far the sticky jump nav sits below the fixed theme header, and how
+     far an anchor target clears both of them. One knob, two uses. */
+  --afo-stick: 4.9rem;
+
+  color: var(--afo-body);
+}
+
+@media (min-width: 992px) {
+  .afo { --afo-stick: 7.1rem; }
+}
+
+.afo *,
+.afo *::before,
+.afo *::after { box-sizing: border-box; }
+
+.afo img { max-width: 100%; height: auto; }
+
+.afo p { line-height: 1.72; }
+.afo p:last-child { margin-bottom: 0; }
+
+.afo h2, .afo h3, .afo h4 {
+  color: var(--afo-ink);
+  line-height: 1.18;
+  letter-spacing: -0.012em;
+  text-wrap: balance;
+}
+
+/* Anchor landings clear the fixed header *and* the sticky nav. */
+.afo [id] { scroll-margin-top: calc(var(--afo-stick) + 4.25rem); }
+
+.afo a:focus-visible,
+.afo button:focus-visible {
+  outline: 3px solid var(--afo-red-deep);
+  outline-offset: 3px;
+  border-radius: 6px;
+}
+.afo-on-dark a:focus-visible,
+.afo-on-dark button:focus-visible { outline-color: var(--afo-rose); }
+
+
+/* ---------- 2. Rhythm + balanced grids ------------------------------------ */
+.afo-section { margin: var(--afo-section) 0; }
+.afo-section:first-child { margin-top: 0; }
+
+.afo-g {
+  display: grid;
+  gap: var(--afo-gap);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  grid-template-columns: 1fr;
+}
+
+/* 8 items: 1 -> 2 -> 4 (never 3+2+3) */
+@media (min-width: 600px)  { .afo-g--8 { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (min-width: 1100px) { .afo-g--8 { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+
+
+/* ---------- 3. Section headings ------------------------------------------- */
+.afo-head { max-width: 62ch; margin-bottom: clamp(18px, 2.4vw, 30px); }
+.afo-head--center { margin-inline: auto; text-align: center; }
+
+.afo-eyebrow {
+  margin: 0;
+  font-size: .78rem;
+  font-weight: 700;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: var(--afo-red-deep);
+}
+
+.afo-rule {
+  width: 54px;
+  height: 3px;
+  margin: .7rem 0 .9rem;
+  border: 0;
+  border-radius: 3px;
+  background: var(--afo-red);
+  opacity: 1;
+}
+.afo-head--center .afo-rule { margin-inline: auto; }
+
+.afo-head h2 {
+  margin: 0;
+  font-size: clamp(1.6rem, 3.4vw, 2.4rem);
+  font-weight: 700;
+}
+
+.afo-head > p {
+  margin: .8rem 0 0;
+  font-size: clamp(1rem, 1.5vw, 1.1rem);
+  color: var(--afo-muted);
+}
+
+/* Heading + copy sitting on a dark surface. */
+.afo-on-dark,
+.afo-on-dark p { color: var(--afo-on-dark); }
+.afo-on-dark h2,
+.afo-on-dark h3,
+.afo-on-dark h4 { color: #fff; }
+.afo-on-dark .afo-eyebrow { color: var(--afo-rose); }
+.afo-on-dark .afo-head > p { color: var(--afo-on-dark-dim); }
+
+.afo-lead {
+  font-size: clamp(1.06rem, 1.8vw, 1.28rem);
+  line-height: 1.62;
+  color: var(--afo-ink);
+}
+.afo-on-dark .afo-lead { color: #fff; }
+
+/* The short italic line that introduces each group of people. */
+.afo-tag {
+  margin: 0 0 .9rem;
+  font-size: clamp(1rem, 1.5vw, 1.12rem);
+  font-style: italic;
+  font-weight: 600;
+  color: var(--afo-red-deep);
+}
+.afo-on-dark .afo-tag { color: var(--afo-rose); }
+
+
+/* ---------- 4. Buttons ---------------------------------------------------- */
+/* Self-contained so the theme's .btn rules (and their disabled-state
+   pointer-events trap) never apply to anything on this page. */
+.afo-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: .5rem;
+  padding: .72rem 1.3rem;
+  border: 2px solid var(--afo-ink);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--afo-ink);
+  font-size: .97rem;
+  font-weight: 600;
+  line-height: 1.25;
+  text-align: left;
+  text-decoration: none;
+  transition: background-color .18s ease, color .18s ease, border-color .18s ease, transform .18s ease;
+}
+.afo-btn:hover,
+.afo-btn:focus-visible {
+  background: var(--afo-ink);
+  color: #fff;
+  text-decoration: none;
+  transform: translateY(-1px);
+}
+.afo-btn .material-symbols-outlined {
+  font-size: 1.15rem;
+  line-height: 1;
+  flex: 0 0 auto;
+}
+
+/* Filled red: one per section at most - the action we actually want. */
+.afo-btn--solid {
+  border-color: var(--afo-red-deep);
+  background: var(--afo-red-deep);
+  color: #fff;
+}
+.afo-btn--solid:hover,
+.afo-btn--solid:focus-visible {
+  border-color: #9E121C;
+  background: #9E121C;
+  color: #fff;
+}
+
+/* On a dark surface. */
+.afo-btn--light {
+  border-color: rgba(255,255,255,.75);
+  color: #fff;
+}
+.afo-btn--light:hover,
+.afo-btn--light:focus-visible {
+  background: #fff;
+  border-color: #fff;
+  color: var(--afo-navy);
+}
+
+/* A row of buttons that wraps cleanly instead of overflowing on a phone. */
+.afo-btns {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .65rem;
+  margin-top: 1.4rem;
+}
+.afo-btns--tight { margin-top: 1rem; }
+
+
+/* ---------- 5. Opening band ----------------------------------------------- */
+/* Video first, exactly as before, but the invitation around it now reads as
+   the opening of the page rather than a tab panel. */
+.afo-open {
+  position: relative;
+  overflow: hidden;
+  padding: clamp(28px, 4vw, 56px) var(--afo-pad) clamp(32px, 4.5vw, 60px);
+  border-radius: var(--afo-r-lg);
+  background:
+    radial-gradient(120% 140% at 8% 0%, var(--afo-navy-soft) 0%, var(--afo-navy) 52%, var(--afo-navy-deep) 100%);
+  box-shadow: var(--afo-shadow-lg);
+}
+
+/* The quiet red wedge the campaign uses as a mark. */
+.afo-open__tri {
+  position: absolute;
+  top: clamp(-80px, -6vw, -50px);
+  right: clamp(-80px, -6vw, -50px);
+  width: clamp(180px, 22vw, 300px);
+  height: clamp(180px, 22vw, 300px);
+  background: var(--afo-red);
+  opacity: .13;
+  transform: rotate(45deg);
+  pointer-events: none;
+}
+
+.afo-open__inner {
+  position: relative;
+  z-index: 1;
+  max-width: 68ch;
+  margin-inline: auto;
+  text-align: center;
+}
+
+.afo-open__kicker {
+  margin: 0 0 .7rem;
+  font-size: .78rem;
+  font-weight: 700;
+  letter-spacing: .18em;
+  text-transform: uppercase;
+  color: var(--afo-rose);
+}
+
+.afo-open__title {
+  margin: 0;
+  font-size: clamp(1.9rem, 4.6vw, 3rem);
+  font-weight: 700;
+  color: #fff;
+}
+
+.afo-open__underline {
+  display: block;
+  width: 76px;
+  height: 4px;
+  margin: 1rem auto 1.3rem;
+  border-radius: 4px;
+  background: var(--afo-red);
+}
+
+.afo-open__sub {
+  font-size: clamp(1.04rem, 1.8vw, 1.22rem);
+  line-height: 1.62;
+  color: var(--afo-on-dark);
+}
+.afo-open__sub strong { color: #fff; }
+
+.afo-open .afo-btns { justify-content: center; }
+
+
+/* ---------- 6. Video ------------------------------------------------------ */
+.afo-video {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: 1100px;
+  margin: clamp(26px, 3.4vw, 42px) auto 0;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  border-radius: var(--afo-r);
+  background: #000;
+  animation: afo-glow 7s infinite alternate ease-in-out;
+}
+
+.afo-video iframe,
+.afo-video video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  display: block;
+}
+
+/* Carried over from the page this replaces: the frame breathes between navy
+   and red so the video reads as the live thing on the page. */
+@keyframes afo-glow {
+  0%   { box-shadow: 0 .75rem 2rem rgba(18,34,49,.55); }
+  50%  { box-shadow: 0 .75rem 2.25rem rgba(239,62,66,.55); }
+  100% { box-shadow: 0 .75rem 2rem rgba(18,34,49,.55); }
+}
+
+
+/* ---------- 7. Sticky jump navigation ------------------------------------- */
+/* The page is long by design: thirteen stops. This bar keeps all of them one
+   tap away. It scrolls horizontally on a phone and never covers the theme
+   header, which is fixed at z-index 10. */
+.afo-nav {
+  position: sticky;
+  top: var(--afo-stick);
+  z-index: 5;
+  margin: clamp(20px, 2.6vw, 30px) 0 var(--afo-section);
+  padding: .55rem clamp(10px, 1.6vw, 16px);
+  overflow: hidden;
+  border: 1px solid var(--afo-cream-line);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, .93);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  box-shadow: var(--afo-shadow-sm);
+}
+
+.afo-nav__list {
+  display: flex;
+  gap: .4rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  overflow-x: auto;
+  scrollbar-width: thin;
+  scroll-snap-type: x proximity;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
+}
+
+.afo-nav__list li { flex: 0 0 auto; scroll-snap-align: start; }
+
+.afo-nav__list a {
+  display: inline-flex;
+  align-items: center;
+  gap: .35rem;
+  padding: .45rem .85rem;
+  border-radius: 999px;
+  background: var(--afo-cream-deep);
+  color: var(--afo-navy);
+  font-size: .88rem;
+  font-weight: 600;
+  white-space: nowrap;
+  text-decoration: none;
+  transition: background-color .16s ease, color .16s ease;
+}
+
+.afo-nav__list a:hover,
+.afo-nav__list a:focus-visible {
+  background: var(--afo-navy);
+  color: #fff;
+  text-decoration: none;
+}
+
+.afo-nav__list .material-symbols-outlined {
+  font-size: 1.1rem;
+  line-height: 1;
+  font-variation-settings: 'wght' 500;
+}
+
+/* The scrolling row gets a fade on the right so it is obvious there is more. */
+.afo-nav::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 42px;
+  height: 100%;
+  pointer-events: none;
+  background: linear-gradient(to right, rgba(255,255,255,0), rgba(255,255,255,.95));
+  border-radius: 0 999px 999px 0;
+}
+
+@media (min-width: 1280px) {
+  /* Everything fits: let the chips wrap and drop the fade. */
+  .afo-nav { border-radius: var(--afo-r); }
+  .afo-nav__list { flex-wrap: wrap; overflow: visible; justify-content: center; }
+  .afo-nav::after { display: none; }
+}
+
+
+/* ---------- 8. Feature rows ----------------------------------------------- */
+/* Photo on one side, card on the other, alternating down the page. The card
+   tucks slightly over the photo - the overlap the previous design used, kept
+   because it is what gives the page its depth. */
+.afo-feature {
+  display: grid;
+  gap: 0;
+  grid-template-columns: 1fr;
+  align-items: center;
+}
+
+.afo-feature__media {
+  position: relative;
+  z-index: 1;
+  overflow: hidden;
+  border-radius: var(--afo-r-lg);
+  aspect-ratio: 4 / 3;
+  background: var(--afo-cream-deep);
+  box-shadow: var(--afo-shadow-md);
+}
+
+.afo-feature__media img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+  display: block;
+}
+
+.afo-feature__card {
+  position: relative;
+  z-index: 2;
+  width: calc(100% - 2rem);
+  margin: -2.5rem auto 0;
+  padding: clamp(22px, 3.4vw, 36px);
+  border-radius: var(--afo-r-lg);
+  box-shadow: var(--afo-shadow-md);
+}
+
+/* Each of these sections is a top-level part of the page, so the heading in
+   the card is an h2. Sized here rather than left to the theme's h2. */
+.afo-feature__card h2,
+.afo-feature__card h3 {
+  margin: 0 0 .25rem;
+  font-size: clamp(1.3rem, 2.5vw, 1.72rem);
+  font-weight: 700;
+}
+
+.afo-feature__card p { margin-bottom: 1rem; }
+
+@media (min-width: 900px) {
+  /* The photo stretches to the height of the card beside it rather than
+     sitting as a short landscape crop with dead space above and below. */
+  .afo-feature {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.04fr);
+    align-items: stretch;
+  }
+
+  .afo-feature__media {
+    aspect-ratio: auto;
+    min-height: 420px;
+  }
+
+  /* Taking the photo out of flow means the row's height comes from the card
+     alone, and the photo then fills whatever that height turns out to be.
+     Leave it in flow and a tall photo pushes empty space into the card. */
+  .afo-feature__media img { position: absolute; inset: 0; }
+
+  .afo-feature__card {
+    width: auto;
+    margin: 0 0 0 -3rem;
+    padding: clamp(28px, 2.6vw, 42px);
+  }
+
+  /* Flipped: photo right, card left. The wider track moves with the card. */
+  .afo-feature--flip { grid-template-columns: minmax(0, 1.04fr) minmax(0, 1fr); }
+  .afo-feature--flip .afo-feature__media { order: 2; }
+  .afo-feature--flip .afo-feature__card  { order: 1; margin: 0 -3rem 0 0; }
+}
+
+/* Surfaces. Declared per section, so re-ordering sections cannot scramble the
+   colours the way the old :nth-child() flipping did. */
+.afo-card--cream {
+  background: var(--afo-cream);
+  border: 1px solid var(--afo-cream-line);
+  color: var(--afo-body);
+}
+.afo-card--navy {
+  background: linear-gradient(165deg, var(--afo-navy-soft) 0%, var(--afo-navy) 68%);
+  border: 1px solid rgba(255,255,255,.1);
+  color: var(--afo-on-dark);
+}
+
+/* Per-photo framing, carried over from the original stylesheet so no face
+   gets cropped the way it used to before these were set. */
+.afo-pos--top    img { object-position: center top; }
+.afo-pos--bottom img { object-position: center bottom; }
+
+
+/* ---------- 9. Icon badge ------------------------------------------------- */
+.afo-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  margin-bottom: .9rem;
+  border-radius: 50%;
+  background: var(--afo-red);
+  color: #fff;
+  flex: 0 0 auto;
+}
+.afo-icon .material-symbols-outlined {
+  font-size: 1.45rem;
+  line-height: 1;
+  font-variation-settings: 'wght' 500;
+}
+.afo-card--navy .afo-icon { background: var(--afo-red); }
+.afo-card--cream .afo-icon { background: var(--afo-navy); }
+
+
+/* ---------- 10. The mission band ----------------------------------------- */
+/* The hinge of the page: the mission statement, then the question the rest of
+   the page answers. Given its own dark band so it reads as a turning point. */
+.afo-mission {
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--afo-r-lg);
+  background: linear-gradient(160deg, var(--afo-navy-soft) 0%, var(--afo-navy) 60%, var(--afo-navy-deep) 100%);
+  box-shadow: var(--afo-shadow-lg);
+}
+
+.afo-mission__grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  align-items: stretch;
+}
+
+.afo-mission__body { padding: clamp(26px, 4vw, 54px); }
+
+.afo-mission__body h2 {
+  margin: 0 0 1.1rem;
+  font-size: clamp(1.45rem, 3vw, 2.1rem);
+  font-weight: 700;
+}
+
+.afo-mission__media { position: relative; min-height: 260px; }
+.afo-mission__media img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+  display: block;
+}
+
+@media (min-width: 900px) {
+  .afo-mission__grid { grid-template-columns: minmax(0, 1.15fr) minmax(0, .85fr); }
+  .afo-mission__media { min-height: 100%; }
+}
+
+/* The mission statement itself. */
+.afo-quote {
+  margin: 0 0 1.5rem;
+  padding: 1.1rem 0 1.1rem 1.4rem;
+  border-left: 4px solid var(--afo-red);
+  font-size: clamp(1.14rem, 2.2vw, 1.46rem);
+  font-style: italic;
+  font-weight: 600;
+  line-height: 1.5;
+  color: #fff;
+}
+
+/* "cooks, counselors, preachers, mentors..." - the same words, set as a
+   wrapping field of chips so the breadth of it registers at a glance. */
+.afo-words {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .45rem;
+  margin: 1.3rem 0 1.5rem;
+  padding: 0;
+  list-style: none;
+}
+.afo-words li {
+  padding: .34rem .78rem;
+  border: 1px solid rgba(255,255,255,.28);
+  border-radius: 999px;
+  background: rgba(255,255,255,.07);
+  color: #fff;
+  font-size: .92rem;
+  font-weight: 600;
+}
+
+.afo-ask {
+  margin: 1.4rem 0 .4rem;
+  font-size: clamp(1.14rem, 2.2vw, 1.4rem);
+  font-weight: 700;
+  color: #fff;
+}
+
+
+/* ---------- 11. The roster ------------------------------------------------ */
+/* An index of the eight groups the sections below describe, so the answer to
+   "so who is the Army?" is visible in one screen before the long read. */
+.afo-roster__item { display: flex; }
+
+.afo-roster__link {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  padding: clamp(18px, 2vw, 24px);
+  border: 1px solid var(--afo-cream-line);
+  border-radius: var(--afo-r);
+  background: var(--afo-cream);
+  color: var(--afo-body);
+  text-decoration: none;
+  transition: transform .18s ease, box-shadow .18s ease, background-color .18s ease, border-color .18s ease;
+}
+
+.afo-roster__link:hover,
+.afo-roster__link:focus-visible {
+  transform: translateY(-3px);
+  border-color: var(--afo-navy);
+  background: #fff;
+  box-shadow: var(--afo-shadow-md);
+  text-decoration: none;
+  color: var(--afo-body);
+}
+
+.afo-roster__name {
+  margin: 0 0 .35rem;
+  font-size: 1.08rem;
+  font-weight: 700;
+  color: var(--afo-ink);
+}
+
+.afo-roster__note {
+  margin: 0 0 1rem;
+  font-size: .95rem;
+  font-style: italic;
+  color: var(--afo-muted);
+}
+
+.afo-roster__more {
+  margin-top: auto;
+  font-size: .88rem;
+  font-weight: 700;
+  letter-spacing: .02em;
+  color: var(--afo-red-deep);
+}
+.afo-roster__link:hover .afo-roster__more { text-decoration: underline; }
+
+.afo-roster__link .afo-icon { width: 40px; height: 40px; margin-bottom: .8rem; }
+.afo-roster__link .afo-icon .material-symbols-outlined { font-size: 1.3rem; }
+
+
+/* ---------- 12. Statement band (the uniform) ------------------------------ */
+/* A photo band with the copy over it. Used once, for the section that is a
+   statement rather than a description. */
+.afo-statement {
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  min-height: clamp(380px, 52vw, 560px);
+  border-radius: var(--afo-r-lg);
+  box-shadow: var(--afo-shadow-lg);
+}
+
+.afo-statement > img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+  display: block;
+}
+
+/* Navy rather than flat black, and dense enough to hold white text at AA.
+   Narrow screens get an even wash, because there the text runs the full
+   width and a sideways gradient would leave part of it over bare photo. */
+.afo-statement__scrim {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(12,23,33,.9) 0%, rgba(12,23,33,.94) 100%);
+}
+
+@media (min-width: 900px) {
+  .afo-statement__scrim {
+    background: linear-gradient(105deg, rgba(12,23,33,.93) 0%, rgba(12,23,33,.82) 48%, rgba(12,23,33,.52) 100%);
+  }
+}
+
+.afo-statement__inner {
+  position: relative;
+  z-index: 2;
+  max-width: 62ch;
+  padding: clamp(28px, 4.4vw, 60px);
+}
+
+.afo-statement__inner h2 {
+  margin: 0 0 .2rem;
+  font-size: clamp(1.6rem, 3.4vw, 2.3rem);
+  font-weight: 700;
+  color: #fff;
+}
+
+.afo-statement__pull {
+  margin: 1.2rem 0;
+  padding: .9rem 1.2rem;
+  border-radius: var(--afo-r-sm);
+  background: rgba(255,255,255,.1);
+  border: 1px solid rgba(255,255,255,.22);
+  font-size: clamp(1.02rem, 1.7vw, 1.16rem);
+  font-weight: 700;
+  color: #fff;
+}
+
+
+/* ---------- 13. Closing band --------------------------------------------- */
+/* The closing copy is long, so the photo sits above the panel rather than
+   behind it. Behind it, the scrim needed to hold white text at AA was dense
+   enough to throw the photo away - and the faces in it are the argument. */
+.afo-close {
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--afo-r-lg);
+  background: linear-gradient(170deg, var(--afo-navy-soft) 0%, var(--afo-navy) 55%, var(--afo-navy-deep) 100%);
+  box-shadow: var(--afo-shadow-lg);
+}
+
+.afo-close__photo {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  object-position: center 40%;
+}
+
+@media (min-width: 760px) {
+  .afo-close__photo { aspect-ratio: 24 / 9; }
+}
+
+.afo-close__inner {
+  position: relative;
+  z-index: 2;
+  max-width: 70ch;
+  margin-inline: auto;
+  padding: clamp(34px, 5vw, 72px) var(--afo-pad);
+  text-align: center;
+}
+
+.afo-close__inner h2 {
+  margin: 0;
+  font-size: clamp(1.7rem, 3.8vw, 2.6rem);
+  font-weight: 700;
+  color: #fff;
+}
+
+.afo-close__kicker {
+  margin: 0 0 .7rem;
+  font-size: .78rem;
+  font-weight: 700;
+  letter-spacing: .18em;
+  text-transform: uppercase;
+  color: var(--afo-rose);
+}
+
+/* "Jesus is still calling. The world still needs healing..." */
+.afo-close__beat {
+  margin: 1.5rem 0;
+  font-size: clamp(1.1rem, 2vw, 1.34rem);
+  font-weight: 600;
+  line-height: 1.6;
+  color: #fff;
+}
+
+.afo-close__ask {
+  margin: 1.6rem 0 0;
+  font-size: clamp(1.3rem, 2.8vw, 1.9rem);
+  font-weight: 700;
+  color: #fff;
+}
+
+.afo-close .afo-btns { justify-content: center; }
+
+
+/* ---------- 14. Motion, print, forced colours ---------------------------- */
+@media (prefers-reduced-motion: reduce) {
+  .afo * {
+    animation-duration: .001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .001ms !important;
+  }
+  .afo-video { animation: none; box-shadow: 0 .75rem 2rem rgba(18,34,49,.5); }
+  .afo-btn:hover,
+  .afo-roster__link:hover { transform: none; }
+}
+
+@media print {
+  .afo-nav { display: none; }
+  .afo-open,
+  .afo-mission,
+  .afo-statement,
+  .afo-close,
+  .afo-card--navy {
+    background: #fff !important;
+    box-shadow: none !important;
+  }
+  .afo-on-dark,
+  .afo-on-dark p,
+  .afo-on-dark h2,
+  .afo-on-dark h3,
+  .afo-quote,
+  .afo-ask,
+  .afo-close__inner h2,
+  .afo-close__ask,
+  .afo-close__beat,
+  .afo-statement__inner h2 { color: #000 !important; }
+  .afo-statement__scrim,
+  .afo-close__scrim { display: none; }
+  .afo-feature__card { box-shadow: none; }
+}
+
+@media (forced-colors: active) {
+  .afo-nav__list a,
+  .afo-btn,
+  .afo-roster__link { border: 1px solid currentColor; }
+  .afo-statement__scrim,
+  .afo-close__scrim { background: Canvas; }
+}
