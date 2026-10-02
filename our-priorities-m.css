@@ -127,15 +127,10 @@
 @media (min-width: 1000px) { .afj-g--6 { grid-template-columns: repeat(3, 1fr); } }
 
 /* ---------- 2b. Jump navigation ------------------------------------------- */
-/* The page is long by design. This lets people go straight to the part they
-   came for instead of scrolling past everything else. Sticks to the top on
-   scroll; the chips scroll horizontally on a phone. */
+/* The page is long by design. Keep the jump links in the page flow, below the
+  CMS navigation, while allowing the row to scroll at every viewport width. */
 .afj-nav {
-  position: sticky;
-  top: 0;
-  z-index: 20;
-  /* Clear of the hero above it, rather than flush against it. */
-  margin: clamp(24px, 3.2vw, 38px) 0 var(--afj-section);
+  margin: clamp(24px, 3.2vw, 38px) auto var(--afj-section);
   /* Real gutters, so a chip never sits hard against the edge, and
      overflow:hidden so the scrolling row is clipped to the bar instead of
      bleeding past the section. The row itself still scrolls inside. */
@@ -145,13 +140,14 @@
   background: rgba(255,255,255,.94);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
-  border-top: 1px solid var(--afj-line);
-  border-bottom: 1px solid var(--afj-line);
+  border: 1px solid var(--afj-line);
+  border-radius: var(--afj-r-lg);
+  box-shadow: var(--afj-shadow-sm);
 }
 .afj-nav__list {
   display: flex;
   flex-wrap: nowrap;
-  justify-content: safe center;
+  justify-content: flex-start;
   gap: .4rem;
   margin: 0;
   padding: 0 0 2px;
@@ -167,11 +163,11 @@
      fade has nothing to act on, so it is invisible. */
   -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 14px, #000 calc(100% - 18px), transparent 100%);
           mask-image: linear-gradient(90deg, transparent 0, #000 14px, #000 calc(100% - 18px), transparent 100%);
-  /* A slim but visible scrollbar, for mouse users who cannot swipe. */
-  scrollbar-width: thin;
+  /* Keep the scrollbar easy to find and drag on desktop. */
+  scrollbar-width: auto;
   scrollbar-color: rgba(23,23,27,.3) transparent;
 }
-.afj-nav__list::-webkit-scrollbar { height: 5px; }
+.afj-nav__list::-webkit-scrollbar { height: 8px; }
 .afj-nav__list::-webkit-scrollbar-track { background: transparent; }
 .afj-nav__list::-webkit-scrollbar-thumb {
   background: rgba(23,23,27,.25);
@@ -180,14 +176,6 @@
 .afj-nav__list::-webkit-scrollbar-thumb:hover { background: rgba(23,23,27,.45); }
 .afj-nav__list > li { scroll-snap-align: center; }
 
-/* No horizontal scroll is possible once the row fits, so drop the fade. */
-@media (min-width: 1400px) {
-  .afj-nav__list {
-    overflow-x: visible;
-    -webkit-mask-image: none;
-            mask-image: none;
-  }
-}
 .afj-nav__list a {
   display: inline-flex;
   align-items: center;
@@ -212,9 +200,6 @@
 .afj-nav__list .material-symbols-outlined { font-size: 18px; color: var(--afj-red); }
 .afj-nav__list a:hover .material-symbols-outlined,
 .afj-nav__list a:focus-visible .material-symbols-outlined { color: var(--afj-gold); }
-
-/* Sections land clear of the sticky bar when jumped to. */
-.afj [id^="afj-at-"] { scroll-margin-top: 72px; }
 
 @media (prefers-reduced-motion: no-preference) { html { scroll-behavior: smooth; } }
 
@@ -941,7 +926,6 @@
   padding: .7em 1.3em;
   font-size: .95rem;
   font-weight: 700;
-  font-family: inherit;
   color: var(--afj-ink);
   background: var(--afj-surface);
   border: 1px solid var(--afj-line);
