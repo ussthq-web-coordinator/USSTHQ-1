@@ -214,6 +214,10 @@
 	grid-column: span 5;
 }
 
+.c26-photo:nth-child(5) {
+	grid-column: span 12;
+}
+
 .c26-photo img {
 	width: 100%;
 	height: 100%;
