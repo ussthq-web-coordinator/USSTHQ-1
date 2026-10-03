@@ -377,3 +377,7 @@
 		transition: none;
 	}
 }
+
+#footer .contact-us-image-placeholder {
+	display: none !important;
+}
