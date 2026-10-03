@@ -749,11 +749,11 @@
   transition: transform .25s ease, box-shadow .25s ease;
 }
 .afj-journey > li:hover { transform: translateY(-3px); box-shadow: var(--afj-shadow-md); }
-/* The four steps map onto the logo: surrender, then Love / Serve / Disciple. */
-.afj-journey > li:nth-child(1) { --accent: var(--afj-red-darkest); }
+/* Be All In is complementary; Love / Serve / Disciple match their priority colors. */
+.afj-journey > li:nth-child(1) { --accent: #2F6B55; }
 .afj-journey > li:nth-child(2) { --accent: var(--afj-red); }
-.afj-journey > li:nth-child(3) { --accent: var(--afj-gold-deep); }
-.afj-journey > li:nth-child(4) { --accent: var(--afj-navy); }
+.afj-journey > li:nth-child(3) { --accent: var(--afj-navy); }
+.afj-journey > li:nth-child(4) { --accent: var(--afj-gold-deep); }
 
 .afj-journey > li::before {
   content: counter(afj-j);
@@ -1573,6 +1573,7 @@
 .afj-resItem--love     { --accent: var(--afj-logo-red);  --tint: #FDF2F2; }
 .afj-resItem--serve    { --accent: var(--afj-logo-blue); --tint: var(--afj-blue-pale); }
 .afj-resItem--disciple { --accent: var(--afj-logo-gold); --tint: var(--afj-gold-pale); }
+.afj-resItem--all      { --accent: var(--afj-muted); --tint: var(--afj-surface-alt); }
 
 .afj-resItem__thumb {
   display: grid;
