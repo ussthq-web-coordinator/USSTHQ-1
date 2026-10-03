@@ -6,8 +6,8 @@
    All custom classes are namespaced `afj-` so nothing collides with the
    Zesty theme or Bootstrap.
 
-   Palette follows the Territorial Priorities logo:
-     LOVE = red   ·   SERVE = gold   ·   DISCIPLE = blue
+   Priority colors:
+     LOVE = red   ·   SERVE = blue   ·   DISCIPLE = gold
    Those three run through the whole page as accents.
 
    Grid rule: every card grid uses explicit column counts at each breakpoint
@@ -19,7 +19,7 @@
   /* --------------------------------------------------------------------
      The three logo colours, sampled directly from
      Territorial-Priorities-Chart-02-USS.png:
-       LOVE #ED3A43  ·  SERVE #FECA32  ·  DISCIPLE #142081
+      LOVE #ED3A43  ·  SERVE #142081  ·  DISCIPLE #FECA32
      Use these wherever the page refers to the priorities themselves.
      -------------------------------------------------------------------- */
   --afj-logo-red:   #ED3A43;
@@ -33,7 +33,7 @@
   --afj-red-deep:     #9E1F28;
   --afj-red-darkest:  #7F1B24;
 
-  /* SERVE - golds */
+  /* DISCIPLE - golds */
   --afj-gold:         #FECA32;
   --afj-gold-light:   #FDE3A0;
   --afj-gold-pale:    #FFF8E6;
@@ -42,7 +42,7 @@
      version: 4.91:1 on #FFF, 4.51:1 on surface-alt, 4.60:1 on gold-pale. */
   --afj-gold-deep:    #8F6B12;
 
-  /* DISCIPLE - blues */
+  /* SERVE - blues */
   --afj-navy:         #142081;
   --afj-navy-deep:    #0D1557;
   --afj-blue:         #2B3BC4;
@@ -257,8 +257,8 @@
   opacity: 1;
   background: linear-gradient(90deg,
     var(--afj-logo-red) 0%, var(--afj-logo-red) 33.33%,
-    var(--afj-logo-gold) 33.33%, var(--afj-logo-gold) 66.66%,
-    var(--afj-logo-blue) 66.66%, var(--afj-logo-blue) 100%);
+    var(--afj-logo-blue) 33.33%, var(--afj-logo-blue) 66.66%,
+    var(--afj-logo-gold) 66.66%, var(--afj-logo-gold) 100%);
 }
 
 .afj-lead {
@@ -378,8 +378,8 @@
   height: 8px;
   background: linear-gradient(90deg,
     var(--afj-logo-red) 0%, var(--afj-logo-red) 33.33%,
-    var(--afj-logo-gold) 33.33%, var(--afj-logo-gold) 66.66%,
-    var(--afj-logo-blue) 66.66%, var(--afj-logo-blue) 100%);
+    var(--afj-logo-blue) 33.33%, var(--afj-logo-blue) 66.66%,
+    var(--afj-logo-gold) 66.66%, var(--afj-logo-gold) 100%);
 }
 
 /* Two columns from desktop: wordmark on the left, logo on the right. */
@@ -436,8 +436,8 @@
   border-radius: 999px;
   background: linear-gradient(90deg,
     var(--afj-logo-red) 0%, var(--afj-logo-red) 33.33%,
-    var(--afj-logo-gold) 33.33%, var(--afj-logo-gold) 66.66%,
-    var(--afj-logo-blue) 66.66%, var(--afj-logo-blue) 100%);
+    var(--afj-logo-blue) 33.33%, var(--afj-logo-blue) 66.66%,
+    var(--afj-logo-gold) 66.66%, var(--afj-logo-gold) 100%);
 }
 @media (min-width: 900px) { .afj-hero__underline { margin-left: 0; } }
 
@@ -507,8 +507,8 @@
 }
 .afj-arc__step:hover { transform: translateY(-3px); box-shadow: var(--afj-shadow-md); }
 .afj-arc__step--love     { --accent: var(--afj-red); background: linear-gradient(180deg, #FFF4F4 0%, #fff 55%); }
-.afj-arc__step--serve    { --accent: var(--afj-gold); background: linear-gradient(180deg, var(--afj-gold-pale) 0%, #fff 55%); }
-.afj-arc__step--disciple { --accent: var(--afj-navy); background: linear-gradient(180deg, var(--afj-blue-pale) 0%, #fff 55%); }
+.afj-arc__step--serve    { --accent: var(--afj-navy); background: linear-gradient(180deg, var(--afj-blue-pale) 0%, #fff 55%); }
+.afj-arc__step--disciple { --accent: var(--afj-gold); background: linear-gradient(180deg, var(--afj-gold-pale) 0%, #fff 55%); }
 
 .afj-arc__step--now {
   --accent: var(--afj-logo-gold);
@@ -540,7 +540,8 @@
   text-transform: uppercase;
   color: var(--accent);
 }
-.afj-arc__step--serve .afj-arc__word { color: var(--afj-gold-deep); }
+.afj-arc__step--serve .afj-arc__word { color: var(--afj-navy); }
+.afj-arc__step--disciple .afj-arc__word { color: var(--afj-gold-deep); }
 .afj-arc__note {
   margin: 0;
   font-size: .95rem;
@@ -563,8 +564,11 @@
   transition: transform .25s ease, box-shadow .25s ease;
 }
 .afj-verse:hover { transform: translateY(-3px); box-shadow: var(--afj-shadow-md); }
-.afj-verse:nth-child(3n+2) { --accent: var(--afj-gold); }
-.afj-verse:nth-child(3n+3) { --accent: var(--afj-navy); }
+/* Radical followers get a complementary green; the other cards match their priorities. */
+.afj-verse:nth-child(1) { --accent: #2F6B55; }
+.afj-verse:nth-child(2) { --accent: var(--afj-red); }
+.afj-verse:nth-child(3) { --accent: var(--afj-navy); }
+.afj-verse:nth-child(4) { --accent: var(--afj-gold); }
 
 .afj-verse__ref {
   align-self: flex-start;
@@ -578,7 +582,7 @@
   background: var(--accent);
   border-radius: 999px;
 }
-.afj-verse:nth-child(3n+2) .afj-verse__ref { background: var(--afj-gold-deep); }
+.afj-verse:nth-child(4) .afj-verse__ref { background: var(--afj-gold-deep); }
 
 .afj-verse blockquote {
   margin: 0 0 1rem;
@@ -631,8 +635,8 @@
 .afj-pillar:hover,
 .afj-pillar:focus-within { transform: translateY(-4px); box-shadow: var(--afj-shadow-md); }
 .afj-pillar--love     { --accent: var(--afj-red);  --wash: #FFF4F4; }
-.afj-pillar--serve    { --accent: var(--afj-gold); --wash: var(--afj-gold-pale); }
-.afj-pillar--disciple { --accent: var(--afj-navy); --wash: var(--afj-blue-pale); }
+.afj-pillar--serve    { --accent: var(--afj-navy); --wash: var(--afj-blue-pale); }
+.afj-pillar--disciple { --accent: var(--afj-gold); --wash: var(--afj-gold-pale); }
 
 /* These three are 16:9 title cards with centred wording, so the frame is
    locked to 16/9. Any other ratio would crop the words off the edges.
@@ -669,7 +673,8 @@
   background: var(--accent);
   box-shadow: var(--afj-shadow-sm);
 }
-.afj-pillar--serve .afj-pillar__icon { background: var(--afj-gold-deep); }
+.afj-pillar--serve .afj-pillar__icon { background: var(--afj-navy); }
+.afj-pillar--disciple .afj-pillar__icon { background: var(--afj-gold-deep); }
 .afj-pillar__icon .material-symbols-outlined { font-size: 31px; }
 
 .afj-pillar__name {
@@ -680,7 +685,8 @@
   color: var(--accent);
   text-transform: uppercase;
 }
-.afj-pillar--serve .afj-pillar__name { color: var(--afj-gold-deep); }
+.afj-pillar--serve .afj-pillar__name { color: var(--afj-navy); }
+.afj-pillar--disciple .afj-pillar__name { color: var(--afj-gold-deep); }
 
 .afj-pillar__areas {
   margin: 0 0 1rem;
@@ -707,7 +713,8 @@
   text-transform: uppercase;
   color: var(--accent);
 }
-.afj-pillar--serve .afj-pillar__verse cite { color: var(--afj-gold-deep); }
+.afj-pillar--serve .afj-pillar__verse cite { color: var(--afj-navy); }
+.afj-pillar--disciple .afj-pillar__verse cite { color: var(--afj-gold-deep); }
 
 .afj-pillar__quote {
   margin: auto 0 0;
@@ -897,8 +904,8 @@
   height: 6px;
   background: linear-gradient(90deg,
     var(--afj-logo-red) 0%, var(--afj-logo-red) 33.33%,
-    var(--afj-logo-gold) 33.33%, var(--afj-logo-gold) 66.66%,
-    var(--afj-logo-blue) 66.66%, var(--afj-logo-blue) 100%);
+    var(--afj-logo-blue) 33.33%, var(--afj-logo-blue) 66.66%,
+    var(--afj-logo-gold) 66.66%, var(--afj-logo-gold) 100%);
 }
 .afj-share > * { position: relative; z-index: 1; }
 
@@ -971,8 +978,8 @@
   height: 7px;
   background: linear-gradient(90deg,
     var(--afj-logo-red) 0%, var(--afj-logo-red) 33.33%,
-    var(--afj-logo-gold) 33.33%, var(--afj-logo-gold) 66.66%,
-    var(--afj-logo-blue) 66.66%, var(--afj-logo-blue) 100%);
+    var(--afj-logo-blue) 33.33%, var(--afj-logo-blue) 66.66%,
+    var(--afj-logo-gold) 66.66%, var(--afj-logo-gold) 100%);
 }
 
 .afj-set h2 {
@@ -1564,8 +1571,8 @@
 }
 .afj-resItem:hover { transform: translateY(-3px); box-shadow: var(--afj-shadow-md); }
 .afj-resItem--love     { --accent: var(--afj-logo-red);  --tint: #FDF2F2; }
-.afj-resItem--serve    { --accent: var(--afj-logo-gold); --tint: var(--afj-gold-pale); }
-.afj-resItem--disciple { --accent: var(--afj-logo-blue); --tint: var(--afj-blue-pale); }
+.afj-resItem--serve    { --accent: var(--afj-logo-blue); --tint: var(--afj-blue-pale); }
+.afj-resItem--disciple { --accent: var(--afj-logo-gold); --tint: var(--afj-gold-pale); }
 
 .afj-resItem__thumb {
   display: grid;
