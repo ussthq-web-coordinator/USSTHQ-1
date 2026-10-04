@@ -63,6 +63,7 @@
   --afo-red:         #EF3E42;
   --afo-red-deep:    #C5000E;
   --afo-rose:        #FF838B;
+  --afo-gold:        #FECA32;
 
   /* Neutrals */
   --afo-ink:         #15171A;
@@ -102,6 +103,18 @@
 
 .afo p { line-height: 1.72; }
 .afo p:last-child { margin-bottom: 0; }
+
+.afo-sr {
+  position: absolute !important;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
 
 .afo h2, .afo h3, .afo h4 {
   color: var(--afo-ink);
@@ -185,6 +198,8 @@
 .afo-on-dark h4 { color: #fff; }
 .afo-on-dark .afo-eyebrow { color: var(--afo-rose); }
 .afo-on-dark .afo-head > p { color: var(--afo-on-dark-dim); }
+.afo-on-dark .afo-open__kicker,
+.afo-on-dark .afo-close__kicker { color: var(--afo-gold); }
 
 .afo-lead {
   font-size: clamp(1.06rem, 1.8vw, 1.28rem);
@@ -298,7 +313,7 @@
   font-weight: 700;
   letter-spacing: .18em;
   text-transform: uppercase;
-  color: var(--afo-rose);
+  color: var(--afo-gold);
 }
 
 .afo-open__title {
@@ -596,6 +611,10 @@
   display: block;
 }
 
+@media (min-width: 494px) and (max-width: 872px) {
+  .afo-mission__media img { object-position: center top; }
+}
+
 @media (min-width: 900px) {
   .afo-mission__grid { grid-template-columns: minmax(0, 1.15fr) minmax(0, .85fr); }
   .afo-mission__media { min-height: 100%; }
@@ -651,6 +670,9 @@
   flex-direction: column;
   width: 100%;
   padding: clamp(18px, 2vw, 24px);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
   border: 1px solid var(--afo-cream-line);
   border-radius: var(--afo-r);
   background: var(--afo-cream);
@@ -667,6 +689,12 @@
   box-shadow: var(--afo-shadow-md);
   text-decoration: none;
   color: var(--afo-body);
+}
+
+.afo-roster__link[aria-current="location"] {
+  border-color: var(--afo-red-deep);
+  background: #fff;
+  box-shadow: var(--afo-shadow-md);
 }
 
 .afo-roster__name {
@@ -694,6 +722,50 @@
 
 .afo-roster__link .afo-icon { width: 40px; height: 40px; margin-bottom: .8rem; }
 .afo-roster__link .afo-icon .material-symbols-outlined { font-size: 1.3rem; }
+
+.afo-role-view {
+  display: none;
+  justify-content: center;
+  gap: .25rem;
+  width: fit-content;
+  max-width: 100%;
+  margin: 0 auto clamp(20px, 2.4vw, 28px);
+  padding: .25rem;
+  border: 1px solid var(--afo-cream-line);
+  border-radius: 999px;
+  background: var(--afo-cream-deep);
+}
+
+.afo-role-enhanced .afo-role-view { display: flex; }
+
+.afo-role-view button {
+  padding: .55rem .9rem;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--afo-navy);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.afo-role-view button[aria-pressed="true"] {
+  background: var(--afo-navy);
+  color: #fff;
+}
+
+.afo-role-panel--visually-hidden {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  padding: 0 !important;
+  margin: -1px !important;
+  overflow: hidden !important;
+  clip: rect(0, 0, 0, 0) !important;
+  clip-path: inset(50%) !important;
+  white-space: normal !important;
+  border: 0 !important;
+}
 
 
 /* ---------- 12. Statement band (the uniform) ------------------------------ */
@@ -806,7 +878,7 @@
   font-weight: 700;
   letter-spacing: .18em;
   text-transform: uppercase;
-  color: var(--afo-rose);
+  color: var(--afo-gold);
 }
 
 /* "Jesus is still calling. The world still needs healing..." */

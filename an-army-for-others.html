@@ -19,13 +19,12 @@
   <meta property="og:site_name" content="The Salvation Army" />
 
   <!-- Custom Head Tags -->
-  <!-- an-army-for-others-c1.css replaces BOTH of the old stylesheets:
-         an-army-for-others-b1.css  and  an-army-for-others-nojs-2.css
-       In the CMS custom head, use the jsDelivr path the live page already
-       uses for this repo:
-       <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/ussthq-web-coordinator/USSTHQ-1@main/an-army-for-others-c1.css" />
-       The relative link below is for local preview of this file. -->
-  <link href="./an-army-for-others-d1.css" rel="stylesheet" />
+    <!-- In the CMS custom head, host and link these page assets:
+      <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/ussthq-web-coordinator/USSTHQ-1@main/an-army-for-others-d1.css" />
+      <script src="https://cdn.jsdelivr.net/gh/ussthq-web-coordinator/USSTHQ-1@main/an-army-for-others-d1.js" defer></script>
+      The relative links below are for local preview. -->
+  <link href="./an-army-for-others-e.css" rel="stylesheet" />
+    <script src="./an-army-for-others.js" defer></script>
   <meta http-equiv="Content-Type" content="text/html;charset=utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
@@ -166,77 +165,84 @@
        is the Army?" is visible in one screen before the long read. Each card
        carries that group's own one-line description from its section.
        ============================================================ -->
-  <section class="afo-section" aria-labelledby="afo-rosterHead">
+  <section class="afo-section afo-role-roster" aria-labelledby="afo-rosterHead">
     <div class="afo-head afo-head--center">
       <p class="afo-eyebrow">Who is the Army?</p>
       <hr class="afo-rule">
       <h2 id="afo-rosterHead">The People Behind the Mission</h2>
-      <p>Every one of these is a way in. Choose the one that sounds like you.</p>
+      <p>Choose a role to read its profile, or show all profiles.</p>
     </div>
+
+    <div class="afo-role-view" role="group" aria-label="Profile display mode" aria-describedby="afo-role-view-help">
+      <button type="button" data-afo-role-view="single" aria-pressed="true" aria-controls="tab3 tab4 tab5 tab6 tab7 tab8 tab9 tab10">One at a time</button>
+      <button type="button" data-afo-role-view="all" aria-pressed="false" aria-controls="tab3 tab4 tab5 tab6 tab7 tab8 tab9 tab10">All profiles</button>
+    </div>
+    <p class="afo-sr" id="afo-role-view-help">One at a time shows a selected profile. All profiles makes every role profile available in page order. Without JavaScript, all profiles remain visible below.</p>
+    <p class="afo-sr" data-afo-role-status role="status" aria-live="polite" aria-atomic="true">All role profiles are available below.</p>
 
     <ul class="afo-g afo-g--8">
       <li class="afo-roster__item">
-        <a class="afo-roster__link" href="#tab3">
+        <a class="afo-roster__link" href="#tab3" data-afo-role-target="tab3">
           <span class="afo-icon" aria-hidden="true"><span class="material-symbols-outlined">favorite</span></span>
-          <p class="afo-roster__name">Friends Like You</p>
-          <p class="afo-roster__note">This Army begins with people who care.</p>
-          <span class="afo-roster__more">Read more <span aria-hidden="true">&rarr;</span></span>
+          <span class="afo-roster__name">Friends Like You</span>
+          <span class="afo-roster__note">This Army begins with people who care.</span>
+          <span class="afo-roster__more"><span class="afo-roster__action">Read profile</span> <span aria-hidden="true">&rarr;</span></span>
         </a>
       </li>
       <li class="afo-roster__item">
-        <a class="afo-roster__link" href="#tab4">
+        <a class="afo-roster__link" href="#tab4" data-afo-role-target="tab4">
           <span class="afo-icon" aria-hidden="true"><span class="material-symbols-outlined">handshake</span></span>
-          <p class="afo-roster__name">Partners</p>
-          <p class="afo-roster__note">Generosity in action. Hope multiplied.</p>
-          <span class="afo-roster__more">Read more <span aria-hidden="true">&rarr;</span></span>
+          <span class="afo-roster__name">Partners</span>
+          <span class="afo-roster__note">Generosity in action. Hope multiplied.</span>
+          <span class="afo-roster__more"><span class="afo-roster__action">Read profile</span> <span aria-hidden="true">&rarr;</span></span>
         </a>
       </li>
       <li class="afo-roster__item">
-        <a class="afo-roster__link" href="#tab5">
+        <a class="afo-roster__link" href="#tab5" data-afo-role-target="tab5">
           <span class="afo-icon" aria-hidden="true"><span class="material-symbols-outlined">diversity_3</span></span>
-          <p class="afo-roster__name">Program Participants</p>
-          <p class="afo-roster__note">Neighbors. Not numbers.</p>
-          <span class="afo-roster__more">Read more <span aria-hidden="true">&rarr;</span></span>
+          <span class="afo-roster__name">Program Participants</span>
+          <span class="afo-roster__note">Neighbors. Not numbers.</span>
+          <span class="afo-roster__more"><span class="afo-roster__action">Read profile</span> <span aria-hidden="true">&rarr;</span></span>
         </a>
       </li>
       <li class="afo-roster__item">
-        <a class="afo-roster__link" href="#tab6">
+        <a class="afo-roster__link" href="#tab6" data-afo-role-target="tab6">
           <span class="afo-icon" aria-hidden="true"><span class="material-symbols-outlined">volunteer_activism</span></span>
-          <p class="afo-roster__name">Volunteers</p>
-          <p class="afo-roster__note">Showing up when it matters most.</p>
-          <span class="afo-roster__more">Read more <span aria-hidden="true">&rarr;</span></span>
+          <span class="afo-roster__name">Volunteers</span>
+          <span class="afo-roster__note">Showing up when it matters most.</span>
+          <span class="afo-roster__more"><span class="afo-roster__action">Read profile</span> <span aria-hidden="true">&rarr;</span></span>
         </a>
       </li>
       <li class="afo-roster__item">
-        <a class="afo-roster__link" href="#tab7">
+        <a class="afo-roster__link" href="#tab7" data-afo-role-target="tab7">
           <span class="afo-icon" aria-hidden="true"><span class="material-symbols-outlined">church</span></span>
-          <p class="afo-roster__name">Members &amp; Adherents</p>
-          <p class="afo-roster__note">Faith lived out in community.</p>
-          <span class="afo-roster__more">Read more <span aria-hidden="true">&rarr;</span></span>
+          <span class="afo-roster__name">Members &amp; Adherents</span>
+          <span class="afo-roster__note">Faith lived out in community.</span>
+          <span class="afo-roster__more"><span class="afo-roster__action">Read profile</span> <span aria-hidden="true">&rarr;</span></span>
         </a>
       </li>
       <li class="afo-roster__item">
-        <a class="afo-roster__link" href="#tab8">
+        <a class="afo-roster__link" href="#tab8" data-afo-role-target="tab8">
           <span class="afo-icon" aria-hidden="true"><span class="material-symbols-outlined">military_tech</span></span>
-          <p class="afo-roster__name">Soldiers</p>
-          <p class="afo-roster__note">Everyday people. Lifelong commitment.</p>
-          <span class="afo-roster__more">Read more <span aria-hidden="true">&rarr;</span></span>
+          <span class="afo-roster__name">Soldiers</span>
+          <span class="afo-roster__note">Everyday people. Lifelong commitment.</span>
+          <span class="afo-roster__more"><span class="afo-roster__action">Read profile</span> <span aria-hidden="true">&rarr;</span></span>
         </a>
       </li>
       <li class="afo-roster__item">
-        <a class="afo-roster__link" href="#tab9">
+        <a class="afo-roster__link" href="#tab9" data-afo-role-target="tab9">
           <span class="afo-icon" aria-hidden="true"><span class="material-symbols-outlined">badge</span></span>
-          <p class="afo-roster__name">Employees</p>
-          <p class="afo-roster__note">Mission-minded. People-powered.</p>
-          <span class="afo-roster__more">Read more <span aria-hidden="true">&rarr;</span></span>
+          <span class="afo-roster__name">Employees</span>
+          <span class="afo-roster__note">Mission-minded. People-powered.</span>
+          <span class="afo-roster__more"><span class="afo-roster__action">Read profile</span> <span aria-hidden="true">&rarr;</span></span>
         </a>
       </li>
       <li class="afo-roster__item">
-        <a class="afo-roster__link" href="#tab10">
+        <a class="afo-roster__link" href="#tab10" data-afo-role-target="tab10">
           <span class="afo-icon" aria-hidden="true"><span class="material-symbols-outlined">record_voice_over</span></span>
-          <p class="afo-roster__name">Officers</p>
-          <p class="afo-roster__note">Shepherds. Servants. Leaders in Christ.</p>
-          <span class="afo-roster__more">Read more <span aria-hidden="true">&rarr;</span></span>
+          <span class="afo-roster__name">Officers</span>
+          <span class="afo-roster__note">Shepherds. Servants. Leaders in Christ.</span>
+          <span class="afo-roster__more"><span class="afo-roster__action">Read profile</span> <span aria-hidden="true">&rarr;</span></span>
         </a>
       </li>
     </ul>
@@ -244,7 +250,7 @@
 
 
   <!-- ============ FRIENDS  ·  #tab3 ============ -->
-  <section class="afo-section afo-feature afo-pos--top" id="tab3" aria-labelledby="afo-friendsHead">
+  <section class="afo-role-panel afo-section afo-feature afo-pos--top" data-afo-role-panel id="tab3" aria-labelledby="afo-friendsHead">
     <div class="afo-feature__media">
       <img src="https://s3.amazonaws.com/uss-cache.salvationarmy.org/525ed166-4c3f-4887-b81d-9221802052a1_Large-Studio+Session-391-Square.jpg" alt="A man smiles as he sits on a couch."  loading="lazy" decoding="async">
     </div>
@@ -269,7 +275,7 @@
 
 
   <!-- ============ PARTNERS  ·  #tab4 ============ -->
-  <section class="afo-section afo-feature afo-feature--flip" id="tab4" aria-labelledby="afo-partnersHead">
+  <section class="afo-role-panel afo-section afo-feature afo-feature--flip" data-afo-role-panel id="tab4" aria-labelledby="afo-partnersHead">
     <div class="afo-feature__media">
       <img src="https://s3.amazonaws.com/uss-cache.salvationarmy.org/86eda31e-bc20-4be4-ab41-197ad251fd58_Large-DSC07440.jpg" alt="A Salvation Army officer and a group of volunteers in red shirts stand behind a table of donated backpacks and school supplies."  loading="lazy" decoding="async">
     </div>
@@ -298,7 +304,7 @@
 
 
   <!-- ============ PROGRAM PARTICIPANTS  ·  #tab5 ============ -->
-  <section class="afo-section afo-feature" id="tab5" aria-labelledby="afo-participantsHead">
+  <section class="afo-role-panel afo-section afo-feature" data-afo-role-panel id="tab5" aria-labelledby="afo-participantsHead">
     <div class="afo-feature__media">
       <img src="https://s3.amazonaws.com/uss-cache.salvationarmy.org/da087bdb-c5cd-4027-8ed8-edd58f418bd2_Large-_SLV8155fs.jpg" alt="Adults help a young boy into a jacket while another child looks on."  loading="lazy" decoding="async">
     </div>
@@ -326,7 +332,7 @@
 
 
   <!-- ============ VOLUNTEERS  ·  #tab6 ============ -->
-  <section class="afo-section afo-feature afo-feature--flip" id="tab6" aria-labelledby="afo-volunteersHead">
+  <section class="afo-role-panel afo-section afo-feature afo-feature--flip" data-afo-role-panel id="tab6" aria-labelledby="afo-volunteersHead">
     <div class="afo-feature__media">
       <img src="https://s3.amazonaws.com/uss-cache.salvationarmy.org/9c54785f-1042-4123-b3cd-a530c2db959f_conway-volunteers-smiling-florence.jpg" alt="A large group of Salvation Army volunteers gathered outdoors in matching shirts." loading="lazy" decoding="async">
     </div>
@@ -354,7 +360,7 @@
 
 
   <!-- ============ MEMBERS & ADHERENTS  ·  #tab7 ============ -->
-  <section class="afo-section afo-feature afo-pos--bottom" id="tab7" aria-labelledby="afo-membersHead">
+  <section class="afo-role-panel afo-section afo-feature afo-pos--bottom" data-afo-role-panel id="tab7" aria-labelledby="afo-membersHead">
     <div class="afo-feature__media">
       <img src="https://s3.amazonaws.com/uss-cache.salvationarmy.org/4516d5fc-669f-4623-9112-4b5fc654414e_Church+members+discussing+the+bible+Square.jpg" alt="Church members sitting together discussing the Bible." loading="lazy" decoding="async">
     </div>
@@ -381,7 +387,7 @@
 
 
   <!-- ============ SOLDIERS  ·  #tab8 ============ -->
-  <section class="afo-section afo-feature afo-feature--flip afo-pos--top" id="tab8" aria-labelledby="afo-soldiersHead">
+  <section class="afo-role-panel afo-section afo-feature afo-feature--flip afo-pos--top" data-afo-role-panel id="tab8" aria-labelledby="afo-soldiersHead">
     <div class="afo-feature__media">
       <img src="https://s3.amazonaws.com/uss-cache.salvationarmy.org/45d52e9d-08e0-45e4-8a43-9a3fbb543721_Soldiers+and+Youth+Volunteers+in+Uniform.jpg" alt="Young people in Salvation Army uniform holding red Salvation Army bags." loading="lazy" decoding="async">
     </div>
@@ -408,7 +414,7 @@
 
 
   <!-- ============ EMPLOYEES  ·  #tab9 ============ -->
-  <section class="afo-section afo-feature afo-pos--top" id="tab9" aria-labelledby="afo-employeesHead">
+  <section class="afo-role-panel afo-section afo-feature afo-pos--top" data-afo-role-panel id="tab9" aria-labelledby="afo-employeesHead">
     <div class="afo-feature__media">
       <img src="https://s3.amazonaws.com/uss-cache.salvationarmy.org/38de5d77-4faf-4c14-92d8-77bdb5368890_Large-Caseworker.jpg" alt="A Salvation Army caseworker at his desk." loading="lazy" decoding="async">
     </div>
@@ -435,7 +441,7 @@
 
 
   <!-- ============ OFFICERS  ·  #tab10 ============ -->
-  <section class="afo-section afo-feature afo-feature--flip" id="tab10" aria-labelledby="afo-officersHead">
+  <section class="afo-role-panel afo-section afo-feature afo-feature--flip" data-afo-role-panel id="tab10" aria-labelledby="afo-officersHead">
     <div class="afo-feature__media">
       <img src="https://s3.amazonaws.com/uss-cache.salvationarmy.org/2898b1fc-8bbf-45ca-a4c3-580f3d32ee2b_Large-Officers_Corps.jpg" alt="Two Salvation Army officers in uniform, smiling." loading="lazy" decoding="async">
     </div>
