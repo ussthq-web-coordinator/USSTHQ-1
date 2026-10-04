@@ -126,87 +126,213 @@
 @media (min-width: 620px)  { .afj-g--6 { grid-template-columns: repeat(2, 1fr); } }
 @media (min-width: 1000px) { .afj-g--6 { grid-template-columns: repeat(3, 1fr); } }
 
-/* ---------- 2b. Jump navigation ------------------------------------------- */
-/* The page is long by design. Keep the jump links in the page flow, below the
-  CMS navigation, while allowing the row to scroll at every viewport width. */
-.afj-nav {
-  margin: clamp(24px, 3.2vw, 38px) auto var(--afj-section);
-  /* Real gutters, so a chip never sits hard against the edge, and
-     overflow:hidden so the scrolling row is clipped to the bar instead of
-     bleeding past the section. The row itself still scrolls inside. */
-  padding: .6rem clamp(12px, 2vw, 18px);
-  max-width: 100%;
-  overflow: hidden;
-  background: rgba(255,255,255,.94);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  border: 1px solid var(--afj-line);
-  border-radius: var(--afj-r-lg);
-  box-shadow: var(--afj-shadow-sm);
-}
-.afj-nav__list {
-  display: flex;
-  flex-wrap: nowrap;
-  justify-content: flex-start;
-  gap: .4rem;
-  margin: 0;
-  padding: 0 0 2px;
-  list-style: none;
-  overflow-x: auto;
-  overscroll-behavior-x: contain;
-  -webkit-overflow-scrolling: touch;
-  scroll-snap-type: x proximity;
-  /* The chips need ~1230px for one row, so they overflow on most laptops and
-     every phone. Fading the two edges is what signals there is more to reach:
-     the scrollbar alone is easy to miss and a hidden one gives no clue at all.
-     Where the row does fit, the chips are centred clear of the edges and the
-     fade has nothing to act on, so it is invisible. */
-  -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 14px, #000 calc(100% - 18px), transparent 100%);
-          mask-image: linear-gradient(90deg, transparent 0, #000 14px, #000 calc(100% - 18px), transparent 100%);
-  /* Keep the scrollbar easy to find and drag on desktop. */
-  scrollbar-width: auto;
-  scrollbar-color: rgba(23,23,27,.3) transparent;
-}
-.afj-nav__list::-webkit-scrollbar { height: 8px; }
-.afj-nav__list::-webkit-scrollbar-track { background: transparent; }
-.afj-nav__list::-webkit-scrollbar-thumb {
-  background: rgba(23,23,27,.25);
-  border-radius: 999px;
-}
-.afj-nav__list::-webkit-scrollbar-thumb:hover { background: rgba(23,23,27,.45); }
-.afj-nav__list > li { scroll-snap-align: center; }
+/* ---------- 2b. Section tiles + panels ------------------------------------
+   The tiles are plain anchors in the markup, so with no JavaScript every
+   section stays on the page and a tile simply jumps to it. our-priorities.js
+   adds .afj-tabs--on and the ARIA, and only then does anything get hidden.
+   --------------------------------------------------------------------------- */
+.afj-tabs { margin: clamp(24px, 3.2vw, 38px) 0 0; }
 
-.afj-nav__list a {
+/* Row above the strip: holds the all-vs-one toggle (built by the script). */
+.afj-tabs__bar {
+  display: none;
+  align-items: center;
+  justify-content: flex-end;
+  gap: .75rem;
+  margin: 0 0 .6rem;
+}
+.afj-tabs--on .afj-tabs__bar { display: flex; }
+
+.afj-tabs__all {
   display: inline-flex;
   align-items: center;
-  gap: .3rem;
-  white-space: nowrap;
-  padding: .45em .85em;
-  font-size: .84rem;
+  gap: .4rem;
+  padding: .5em 1em;
+  font-family: inherit;
+  font-size: .86rem;
   font-weight: 700;
-  color: var(--afj-body);
-  text-decoration: none;
-  background: var(--afj-surface-alt);
+  color: var(--afj-ink);
+  background: var(--afj-surface);
   border: 1px solid var(--afj-line);
   border-radius: 999px;
+  cursor: pointer;
   transition: background-color .2s ease, color .2s ease, border-color .2s ease;
 }
-.afj-nav__list a:hover,
-.afj-nav__list a:focus-visible {
+.afj-tabs__all .material-symbols-outlined { font-size: 19px; color: var(--afj-red); }
+.afj-tabs__all:hover { background: var(--afj-surface-alt); }
+.afj-tabs__all[aria-pressed="true"] {
   background: var(--afj-ink);
   border-color: var(--afj-ink);
   color: #fff;
 }
-.afj-nav__list .material-symbols-outlined { font-size: 18px; color: var(--afj-red); }
-.afj-nav__list a:hover .material-symbols-outlined,
-.afj-nav__list a:focus-visible .material-symbols-outlined { color: var(--afj-gold); }
+.afj-tabs__all[aria-pressed="true"] .material-symbols-outlined { color: var(--afj-logo-gold); }
 
-@media (prefers-reduced-motion: no-preference) { html { scroll-behavior: smooth; } }
+/* The strip itself. Horizontal scroll keeps it one row deep, so the selected
+   section is always immediately under it rather than pushed down a page. */
+.afj-tabs__strip {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  gap: 10px;
+  padding: 10px clamp(12px, 2vw, 18px) 12px;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+  scroll-snap-type: x proximity;
+  background: rgba(255,255,255,.95);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border-top: 1px solid var(--afj-line);
+  border-bottom: 1px solid var(--afj-line);
+  scrollbar-width: thin;
+  scrollbar-color: rgba(23,23,27,.3) transparent;
+  /* fade the two ends so it is obvious the row keeps going */
+  -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 16px, #000 calc(100% - 20px), transparent 100%);
+          mask-image: linear-gradient(90deg, transparent 0, #000 16px, #000 calc(100% - 20px), transparent 100%);
+}
+.afj-tabs__strip::-webkit-scrollbar { height: 5px; }
+.afj-tabs__strip::-webkit-scrollbar-track { background: transparent; }
+.afj-tabs__strip::-webkit-scrollbar-thumb { background: rgba(23,23,27,.25); border-radius: 999px; }
 
-/* Section banner: a wide band above a section heading. Deliberately letterboxed
-   to 5:2 rather than the photo's native 3:2 - a full-height photo at the top of
-   three separate sections would add a lot of scrolling to an already long page.
-   object-position is set per image so faces are not cropped out. */
+/* ---- a tile ---- */
+.afj-tab {
+  position: relative;
+  flex: 0 0 auto;
+  display: block;
+  width: clamp(128px, 29vw, 184px);
+  aspect-ratio: 4 / 3;
+  padding: 0;
+  overflow: hidden;
+  background: var(--afj-surface-alt);
+  border: 0;
+  border-radius: 12px;
+  cursor: pointer;
+  text-decoration: none;
+  text-align: left;
+  scroll-snap-align: center;
+  font-family: inherit;
+  transition: transform .2s ease, box-shadow .2s ease;
+  box-shadow: var(--afj-shadow-sm);
+}
+.afj-tab__img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform .35s ease, filter .25s ease;
+  filter: saturate(.9) brightness(.92);
+}
+/* Scrim: guarantees the label clears 4.5:1 over any photograph underneath. */
+.afj-tab::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to top,
+    rgba(0,0,0,.86) 0%, rgba(0,0,0,.55) 38%, rgba(0,0,0,.12) 72%, rgba(0,0,0,0) 100%);
+}
+.afj-tab__label {
+  position: absolute;
+  z-index: 1;
+  left: 10px;
+  right: 10px;
+  bottom: 9px;
+  font-size: clamp(.78rem, 1.5vw, .88rem);
+  font-weight: 800;
+  line-height: 1.25;
+  color: #fff;
+  text-shadow: 0 1px 3px rgba(0,0,0,.65);
+}
+.afj-tab:hover { transform: translateY(-2px); box-shadow: var(--afj-shadow-md); }
+.afj-tab:hover .afj-tab__img { filter: none; transform: scale(1.05); }
+.afj-tab:focus-visible { outline: 3px solid var(--afj-gold-deep); outline-offset: 2px; }
+
+/* selected */
+.afj-tab[aria-selected="true"] {
+  box-shadow: 0 0 0 3px var(--afj-logo-red), var(--afj-shadow-md);
+}
+.afj-tab[aria-selected="true"] .afj-tab__img { filter: none; transform: scale(1.04); }
+.afj-tab[aria-selected="true"] .afj-tab__label { font-size: clamp(.82rem, 1.6vw, .92rem); }
+.afj-tab[aria-selected="true"]::before {
+  content: "";
+  position: absolute;
+  z-index: 2;
+  left: 0; right: 0; bottom: 0;
+  height: 4px;
+  background: linear-gradient(90deg,
+    var(--afj-logo-red) 0%, var(--afj-logo-red) 33.33%,
+    var(--afj-logo-gold) 33.33%, var(--afj-logo-gold) 66.66%,
+    var(--afj-logo-blue) 66.66%, var(--afj-logo-blue) 100%);
+}
+
+/* ---- panels ---- */
+.afj-tabs--on .afj-tabs__panels > section[hidden] { display: none; }
+.afj-tabs--on .afj-tabs__panels > section:focus { outline: none; }
+.afj-tabs--on .afj-tabs__panels > section:focus-visible {
+  outline: 3px solid var(--afj-gold-deep);
+  outline-offset: 6px;
+  border-radius: var(--afj-r);
+}
+/* showing everything at once: no hiding, and the pagers are meaningless */
+.afj-tabs--all .afj-tabs__panels > section[hidden] { display: block; }
+.afj-tabs--all .afj-pager { display: none; }
+
+/* ---- previous / next, under each panel ---- */
+.afj-pager {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: space-between;
+  margin: clamp(26px, 3.4vw, 40px) 0 0;
+  padding-top: clamp(18px, 2.4vw, 24px);
+  border-top: 1px solid var(--afj-line);
+}
+.afj-pager__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: .6rem;
+  flex: 1 1 240px;
+  max-width: 100%;
+  padding: .8rem 1.1rem;
+  font-family: inherit;
+  text-align: left;
+  color: var(--afj-ink);
+  background: var(--afj-surface);
+  border: 1px solid var(--afj-line);
+  border-radius: var(--afj-r);
+  box-shadow: var(--afj-shadow-sm);
+  cursor: pointer;
+  transition: transform .2s ease, box-shadow .2s ease, border-color .2s ease;
+}
+.afj-pager__btn:hover { transform: translateY(-2px); box-shadow: var(--afj-shadow-md); border-color: #CFCFD8; }
+.afj-pager__btn--next { justify-content: flex-end; text-align: right; }
+.afj-pager__btn .material-symbols-outlined { color: var(--afj-red); flex: 0 0 auto; }
+.afj-pager__txt { display: flex; flex-direction: column; min-width: 0; }
+.afj-pager__txt small {
+  font-size: .72rem;
+  font-weight: 800;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: var(--afj-muted);
+}
+.afj-pager__txt strong { font-size: 1rem; font-weight: 800; line-height: 1.3; }
+.afj-pager__btn[hidden] { display: none; }
+
+@media (max-width: 575.98px) {
+  .afj-pager__btn { flex-basis: 100%; }
+  .afj-pager__btn--next { justify-content: flex-start; text-align: left; flex-direction: row-reverse; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .afj-tab, .afj-tab__img, .afj-pager__btn { transition: none; }
+  .afj-tab:hover .afj-tab__img,
+  .afj-tab[aria-selected="true"] .afj-tab__img { transform: none; }
+}
+
+/* Section banner: a wide band above a section heading. Letterboxed to 5:2
+   rather than the photo's native 3:2 so three of them do not add a screenful
+   of height. object-position is set per image so faces are not cropped out. */
 .afj-banner {
   display: block;
   width: 100%;
@@ -1177,6 +1303,9 @@
   border: 1px solid var(--afj-gold-light);
   box-shadow: var(--afj-shadow-md);
 }
+.afj-cent--compact {
+  padding: clamp(22px, 3vw, 38px) clamp(18px, 3vw, 36px);
+}
 .afj-cent::before {
   content: "";
   position: absolute;
@@ -1198,7 +1327,22 @@
   max-width: min(560px, 86%);
   margin: 0 auto clamp(14px, 1.8vw, 20px);
 }
+.afj-cent--compact .afj-centLogo {
+  max-width: min(560px, 86%);
+  margin-bottom: 12px;
+}
 .afj-centLogo img { display: block; width: 100%; height: auto; }
+
+/* The date line used to be the figure's caption; it now sits in the collapse. */
+.afj-cent__dates {
+  margin: 0 0 1rem;
+  text-align: center;
+  font-size: .8rem;
+  font-weight: 700;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: var(--afj-gold-deep);
+}
 .afj-centLogo figcaption {
   margin-top: .25rem;
   text-align: center;
@@ -1287,6 +1431,16 @@
 .afj-cent__list .material-symbols-outlined { color: var(--accent); font-size: 23px; flex: 0 0 auto; }
 .afj-cent__list li:nth-child(3n+2) .material-symbols-outlined { color: var(--afj-gold-deep); }
 
+.afj-cent__disclose {
+  max-width: 860px;
+  margin: 1rem auto 0;
+}
+
+.afj-cent--compact .afj-btnRow,
+.afj-prayer--compact .afj-btnRow {
+  margin-top: 1rem;
+}
+
 /* ---------- 13b. Article links -------------------------------------------- */
 .afj-reads {
   display: grid;
@@ -1366,6 +1520,9 @@
   box-shadow: var(--afj-shadow-lg);
   text-align: center;
 }
+.afj-prayer--compact {
+  padding: clamp(22px, 3vw, 38px) clamp(18px, 3vw, 36px);
+}
 .afj-prayer::before {
   content: "";
   position: absolute;
@@ -1392,7 +1549,22 @@
   border-radius: var(--afj-r);
   box-shadow: var(--afj-shadow-md);
 }
+.afj-prayer--compact .afj-prayerLogo {
+  max-width: min(560px, 86%);
+  margin-bottom: 12px;
+  padding: 12px 16px;
+}
 .afj-prayerLogo img { display: block; width: 100%; height: auto; }
+
+.afj-prayer__details {
+  max-width: 860px;
+  margin: 1rem auto 0;
+}
+
+/* centred inside the left-aligned on-dark collapse */
+.afj-prayer__details .afj-disclose__body > h2 { text-align: center; }
+.afj-prayer__slogan,
+.afj-prayer__tag { text-align: center; }
 
 .afj-prayer__slogan {
   margin: 1.3rem 0 .3rem;
@@ -1492,6 +1664,8 @@
 .afj-embed--portal {
   display: block;
   width: 100%;
+  /* clear of the three resource rows that sit directly above it */
+  margin-top: clamp(26px, 3.4vw, 40px);
   height: min(80vh, 900px);
   min-height: 540px;
   border: 0;

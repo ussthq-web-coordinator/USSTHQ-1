@@ -21,7 +21,7 @@
   <meta property="og:site_name" content="The Salvation Army" />
 
   <!-- Custom Head Tags -->
-  <link href="./our-priorities-o.css" rel="stylesheet" />
+  <link href="./our-priorities-p.css" rel="stylesheet" />
   <script src="./our-priorities.js" defer></script>
   <meta http-equiv="Content-Type" content="text/html;charset=utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -80,22 +80,77 @@
   </section>
 
   <!-- ============ JUMP NAV ============ -->
-  <nav class="afj-nav" aria-label="Jump to a section">
-    <ul class="afj-nav__list">
-      <li><a href="#afj-at-priorities"><span class="material-symbols-outlined" aria-hidden="true">category</span>Three Priorities</a></li>
-      <li><a href="#afj-at-scripture"><span class="material-symbols-outlined" aria-hidden="true">menu_book</span>God’s Call</a></li>
-      <li><a href="#afj-at-all"><span class="material-symbols-outlined" aria-hidden="true">pie_chart</span>How Much Is All?</a></li>
-      <li><a href="#afj-at-three"><span class="material-symbols-outlined" aria-hidden="true">favorite</span>All For Jesus</a></li>
-      <li><a href="#afj-at-practice"><span class="material-symbols-outlined" aria-hidden="true">photo_library</span>In Practice</a></li>
-      <li><a href="#afj-at-reflect"><span class="material-symbols-outlined" aria-hidden="true">self_improvement</span>Four Passages</a></li>
-      <li><a href="#afj-at-require"><span class="material-symbols-outlined" aria-hidden="true">balance</span>What God Requires</a></li>
-      <li><a href="#afj-at-centennial"><span class="material-symbols-outlined" aria-hidden="true">celebration</span>Centennial</a></li>
-      <li><a href="#afj-at-prayer"><span class="material-symbols-outlined" aria-hidden="true">volunteer_activism</span>24/7 Prayer</a></li>
-      <li><a href="#afj-at-connect"><span class="material-symbols-outlined" aria-hidden="true">church</span>Everyone Is Welcome</a></li>
-      <li><a href="#afj-at-listen"><span class="material-symbols-outlined" aria-hidden="true">headphones</span>Listen</a></li>
-      <li><a href="#afj-at-resources"><span class="material-symbols-outlined" aria-hidden="true">folder_open</span>Resources</a></li>
-    </ul>
-  </nav>
+  <!-- ============ SECTION TILES ============
+       Plain anchor links by default, so with no JavaScript every section
+       stays on the page and these simply jump to it. our-priorities.js
+       upgrades them to an ARIA tablist and shows one panel at a time.
+       ===================================================== -->
+  <div class="afj-tabs" id="afj-tabs">
+    <p class="afj-sr">Choose a section to show it below. Every section also remains reachable as a link.</p>
+    <div class="afj-tabs__strip">
+      <a class="afj-tab" href="#afj-at-priorities">
+        <img class="afj-tab__img" src="https://salvationarmysouth.widen.net/content/swepmkcyvh/jpeg/HOUSTON_Hill-Drive-Canteen-26.jpeg?w=480&amp;h=320&amp;position=c&amp;color=ffffffff&amp;quality=55&amp;u=ukifzm" alt="" width="480" height="320" loading="lazy" decoding="async">
+        <span class="afj-tab__label">Three Priorities</span>
+      </a>
+      <a class="afj-tab" href="#afj-at-scripture">
+        <img class="afj-tab__img" src="https://salvationarmysouth.widen.net/content/ob2k4mqiro/jpeg/AugustaAreaCommand2022-6404.jpeg?w=480&amp;h=320&amp;position=c&amp;color=ffffffff&amp;quality=55&amp;u=ukifzm" alt="" width="480" height="320" loading="lazy" decoding="async">
+        <span class="afj-tab__label">God’s Call</span>
+      </a>
+      <a class="afj-tab" href="#afj-at-all">
+        <img class="afj-tab__img" src="https://salvationarmysouth.widen.net/content/okpwwq98tx/jpeg/_TSA2746.jpeg?w=480&amp;h=320&amp;position=c&amp;color=ffffffff&amp;quality=55&amp;u=ukifzm" alt="" width="480" height="320" loading="lazy" decoding="async">
+        <span class="afj-tab__label">How Much Is All?</span>
+      </a>
+      <a class="afj-tab" href="#afj-at-three">
+        <img class="afj-tab__img" src="https://salvationarmysouth.widen.net/content/cczlgjidr0/jpeg/Greenville%20Kroc%20Center-9476.jpeg?w=480&amp;h=320&amp;position=c&amp;color=ffffffff&amp;quality=55&amp;u=ukifzm" alt="" width="480" height="320" loading="lazy" decoding="async">
+        <span class="afj-tab__label">All For Jesus</span>
+      </a>
+      <a class="afj-tab" href="#afj-at-practice">
+        <img class="afj-tab__img" src="https://salvationarmysouth.widen.net/content/hcxf7jpx0y/jpeg/20220719-Camp%20Grandview-170.jpeg?w=480&amp;h=320&amp;position=c&amp;color=ffffffff&amp;quality=55&amp;u=ukifzm" alt="" width="480" height="320" loading="lazy" decoding="async">
+        <span class="afj-tab__label">In Practice</span>
+      </a>
+      <a class="afj-tab" href="#afj-at-reflect">
+        <img class="afj-tab__img" src="https://salvationarmysouth.widen.net/content/kawnybwf1n/jpeg/Womens%20Ministries%20Photo-022.jpeg?w=480&amp;h=320&amp;position=c&amp;color=ffffffff&amp;quality=55&amp;u=ukifzm" alt="" width="480" height="320" loading="lazy" decoding="async">
+        <span class="afj-tab__label">Four Passages</span>
+      </a>
+      <a class="afj-tab" href="#afj-at-require">
+        <img class="afj-tab__img" src="https://salvationarmysouth.widen.net/content/rxyags9tqo/jpeg/_TSA9111-1-DeNoiseAI-clear%20copy.jpeg?w=480&amp;h=320&amp;position=c&amp;color=ffffffff&amp;quality=55&amp;u=ukifzm" alt="" width="480" height="320" loading="lazy" decoding="async">
+        <span class="afj-tab__label">What God Requires</span>
+      </a>
+      <a class="afj-tab" href="#afj-at-share">
+        <img class="afj-tab__img" src="https://salvationarmysouth.widen.net/content/bhcs1b6txo/jpeg/_TSA1236.jpeg?w=480&amp;h=320&amp;position=c&amp;color=ffffffff&amp;quality=55&amp;u=ukifzm" alt="" width="480" height="320" loading="lazy" decoding="async">
+        <span class="afj-tab__label">Share</span>
+      </a>
+      <a class="afj-tab" href="#afj-at-centennial">
+        <img class="afj-tab__img" src="https://salvationarmysouth.widen.net/content/v9td8i9rjx/jpeg/20230711%20-%202023-049_Camp%20Heart%20O%27Hills%20-%200476.jpeg?w=480&amp;h=320&amp;position=c&amp;color=ffffffff&amp;quality=55&amp;u=ukifzm" alt="" width="480" height="320" loading="lazy" decoding="async">
+        <span class="afj-tab__label">Centennial</span>
+      </a>
+      <a class="afj-tab" href="#afj-at-prayer">
+        <img class="afj-tab__img" src="https://salvationarmysouth.widen.net/content/kv0kuztlmg/jpeg/Charleston_SC_Hurricane_Matthew_120.jpeg?w=480&amp;h=320&amp;position=c&amp;color=ffffffff&amp;quality=55&amp;u=ukifzm" alt="" width="480" height="320" loading="lazy" decoding="async">
+        <span class="afj-tab__label">24/7 Prayer</span>
+      </a>
+      <a class="afj-tab" href="#afj-at-connect">
+        <img class="afj-tab__img" src="https://salvationarmysouth.widen.net/content/kawnybwf1n/jpeg/Womens%20Ministries%20Photo-022.jpeg?w=480&amp;h=320&amp;position=c&amp;color=ffffffff&amp;quality=55&amp;u=ukifzm" alt="" width="480" height="320" loading="lazy" decoding="async">
+        <span class="afj-tab__label">Everyone Is Welcome</span>
+      </a>
+      <a class="afj-tab" href="#afj-at-listen">
+        <img class="afj-tab__img" src="https://salvationarmysouth.widen.net/content/py4vczs0xm/jpeg/CampRappahannock2023-02404.jpeg?w=480&amp;h=320&amp;position=c&amp;color=ffffffff&amp;quality=55&amp;u=ukifzm" alt="" width="480" height="320" loading="lazy" decoding="async">
+        <span class="afj-tab__label">Listen</span>
+      </a>
+      <a class="afj-tab" href="#afj-at-social">
+        <img class="afj-tab__img" src="https://salvationarmysouth.widen.net/content/v9td8i9rjx/jpeg/20230711%20-%202023-049_Camp%20Heart%20O%27Hills%20-%200476.jpeg?w=480&amp;h=320&amp;position=c&amp;color=ffffffff&amp;quality=55&amp;u=ukifzm" alt="" width="480" height="320" loading="lazy" decoding="async">
+        <span class="afj-tab__label">Follow Us</span>
+      </a>
+      <a class="afj-tab" href="#afj-at-brochure">
+        <img class="afj-tab__img" src="https://salvationarmysouth.widen.net/content/apfye5dgld/jpeg/Employee%20male%20at%20desk%20computer-5.jpeg?w=480&amp;h=320&amp;position=c&amp;color=ffffffff&amp;quality=55&amp;u=ukifzm" alt="" width="480" height="320" loading="lazy" decoding="async">
+        <span class="afj-tab__label">Brochure</span>
+      </a>
+      <a class="afj-tab" href="#afj-at-resources">
+        <img class="afj-tab__img" src="https://salvationarmysouth.widen.net/content/wqstogaykh/jpeg/20230713%20-%202023-050_Camp%20Hidden%20Lake%20-%201818.jpeg?w=480&amp;h=320&amp;position=c&amp;color=ffffffff&amp;quality=55&amp;u=ukifzm" alt="" width="480" height="320" loading="lazy" decoding="async">
+        <span class="afj-tab__label">Resources</span>
+      </a>
+    </div>
+
+    <div class="afj-tabs__panels">
 
 
   <!-- ============ 2. ONE PRIORITY ============ -->
@@ -473,7 +528,7 @@
     <p><span class="afj-hashtag">#tsaALLFORJESUS</span></p>
   </section>
   <!-- ============ 7. SHARE THIS PAGE ============ -->
-  <section class="afj-share afj-section" aria-labelledby="afj-shareHead">
+  <section class="afj-share afj-section" id="afj-at-share" aria-labelledby="afj-shareHead">
     <p class="afj-eyebrow">Pass it on</p>
     <h2 id="afj-shareHead">Invite Someone to Be All In</h2>
     <p>Know someone who would be encouraged by this? Send it to them and invite them to be All For Jesus with us.</p>
@@ -498,21 +553,30 @@
   </section>
 
   <!-- ============ 8. CENTENNIAL CELEBRATION ============ -->
-  <section class="afj-cent afj-section" id="afj-at-centennial" aria-labelledby="afj-centHead">
-    <div class="afj-head">
-      <p class="afj-eyebrow">Save the date</p>
-      <hr class="afj-rule">
-      <h2 id="afj-centHead">Centennial Celebration: <br>All For Jesus</h2>
-    </div>
-
+  <section class="afj-cent afj-cent--compact afj-section" id="afj-at-centennial" aria-label="Centennial Celebration: All For Jesus">
     <figure class="afj-centLogo">
       <img src="https://8hxvw8tw.media.zestyio.com/Red_All-For-Jesus_Centennial-Celebration_Graphic.png?width=760"
            alt="100 — All For Jesus — Centennial Celebration"
            width="2175" height="1575" loading="lazy" decoding="async">
-      <figcaption>USA Southern Territory &middot; 1927&ndash;2027</figcaption>
     </figure>
 
-    <p class="afj-cent__intro">The USA Southern Territory was officially inaugurated in Atlanta in April 1927. A hundred years later, the territory gathers in the same city for a celebration that carries this year&rsquo;s priority as its name.</p>
+    <details class="afj-disclose afj-cent__disclose">
+      <summary>
+        <span class="material-symbols-outlined afj-disclose__chev" aria-hidden="true">expand_more</span>
+        About the Centennial Celebration
+        <span class="afj-disclose__hint">June 4&ndash;6, 2027</span>
+      </summary>
+      <div class="afj-disclose__body">
+    <div class="afj-head">
+      <p class="afj-eyebrow">Save the date</p>
+      <hr class="afj-rule">
+      <h2 id="afj-centHead">Centennial Celebration:</h2>
+      <h2>ALL FOR JESUS</h2>
+    </div>
+
+    <p class="afj-cent__dates">USA Southern Territory &middot; 1927&ndash;2027</p>
+
+    <p class="afj-cent__intro">The USA Southern Territory was officially inaugurated in Atlanta in 1927. Serving, discipling, and proclaiming the Gospel and sharing God's love across the Southeastern United States. A hundred years later, the territory gathers in the same city for a call to recommitment – to our covenant, to mission, to relationship with Christ – so that everyone who gathers leaves reinvigorated for the Kingdom work ahead.</p>
 
     <blockquote class="afj-cent__quote">
       &ldquo;It&rsquo;s the celebration of 100 years of God&rsquo;s faithfulness to Salvationists and the mission of the USA Southern Territory.&rdquo;
@@ -556,7 +620,8 @@
         <li><a href="https://www.salvationarmyusa.org/stories/centennial-celebration-all-for-jesus/" target="_blank" rel="noopener">
           <span class="material-symbols-outlined afj-reads__icon" aria-hidden="true">article</span>
           <span class="afj-reads__text">
-            <span class="afj-reads__title">Centennial Celebration: &ldquo;All For Jesus&rdquo;</span>
+            <span class="afj-reads__title">Centennial Celebration:</span>
+            <span class="afj-reads__title">All For Jesus&rdquo;</span>
             <span class="afj-reads__meta">The Southern Spirit</span>
           </span>
           <span class="material-symbols-outlined afj-reads__go" aria-hidden="true">arrow_outward</span>
@@ -579,6 +644,9 @@
         </a></li>
     </ul>
 
+      </div>
+    </details>
+
     <div class="afj-btnRow">
       <a class="afj-btn afj-btn--red" href="https://www.usscentennial.org/" target="_blank" rel="noopener">
         <span class="material-symbols-outlined" aria-hidden="true">celebration</span> Centennial details
@@ -590,13 +658,20 @@
   </section>
 
   <!-- ============ 9. 24/7 PRAYER INITIATIVE ============ -->
-  <section class="afj-prayer afj-section" id="afj-at-prayer" aria-labelledby="afj-prayerHead">
+  <section class="afj-prayer afj-prayer--compact afj-section" id="afj-at-prayer" aria-label="The 24/7 Prayer Initiative">
     <p class="afj-eyebrow afj-eyebrow--onDark">A call to prayer</p>
     <div class="afj-prayerLogo">
       <img src="https://8hxvw8tw.media.zestyio.com/247-prayer-logo_blue.png?width=900"
            alt="24/7 Prayer"
            width="8000" height="2160" loading="lazy" decoding="async">
     </div>
+    <details class="afj-disclose afj-disclose--onDark afj-prayer__details">
+      <summary>
+        <span class="material-symbols-outlined afj-disclose__chev" aria-hidden="true">expand_more</span>
+        About the 24/7 Prayer Initiative
+        <span class="afj-disclose__hint">One year &middot; Every second &middot; Together</span>
+      </summary>
+      <div class="afj-disclose__body">
     <h2 id="afj-prayerHead">The 24/7 Prayer Initiative</h2>
 
     <p>Every Salvationist across the Southern Territory is invited to join a year-long movement of continuous intercession. From Commissioning 2026 through the Centennial Celebration in June 2027 &mdash; 365 days, 24 hours of prayer a day. Take an hour, and be all in.</p>
@@ -658,9 +733,12 @@
         </a></li>
     </ul>
 
+      </div>
+    </details>
+
     <div class="afj-btnRow">
       <a class="afj-btn afj-btn--gold" href="https://www.usscentennial.org/prayer-initiative/prayer-focus/" target="_blank" rel="noopener">
-        <span class="material-symbols-outlined" aria-hidden="true">menu_book</span> This week&rsquo;s prayer focus
+        <span class="material-symbols-outlined" aria-hidden="true">menu_book</span> Latest prayer focus
       </a>
       <a class="afj-btn afj-btn--ghost" href="https://soldier.sauss.net/PrayerRequests" target="_blank" rel="noopener">
         <span class="material-symbols-outlined" aria-hidden="true">volunteer_activism</span> Visit the Prayer Wall
@@ -783,7 +861,7 @@
   </section>
 
   <!-- ============ 13. SOCIAL ============ -->
-  <section class="afj-panel afj-panel--navy afj-section" aria-labelledby="afj-socialHead">
+  <section class="afj-panel afj-panel--navy afj-section" id="afj-at-social" aria-labelledby="afj-socialHead">
     <p class="afj-eyebrow afj-eyebrow--onDark">Latest posts</p>
     <h2 id="afj-socialHead">Follow Along &mdash; and Tag Us</h2>
     <p>Show us how your community is living this out with <strong>#tsaALLFORJESUS</strong>.</p>
@@ -817,7 +895,7 @@
   </section>
 
   <!-- ============ 14. BROCHURE ============ -->
-  <section class="afj-section" aria-labelledby="afj-brochureHead">
+  <section class="afj-section" id="afj-at-brochure" aria-labelledby="afj-brochureHead">
     <div class="afj-head">
       <hr class="afj-rule">
       <h2 id="afj-brochureHead">Brochure</h2>
@@ -909,6 +987,9 @@
   </section>
 
   <!-- Lightbox, shared by every .afj-rail on the page -->
+    </div><!-- /.afj-tabs__panels -->
+  </div><!-- /.afj-tabs -->
+
   <div class="afj-lightbox" id="afj-lightbox" role="dialog" aria-modal="true" aria-label="Enlarged image viewer">
     <button type="button" class="afj-lightbox__btn afj-lightbox__close" id="afj-lbClose" aria-label="Close image viewer">&#10006;</button>
     <button type="button" class="afj-lightbox__btn afj-lightbox__prev" id="afj-lbPrev" aria-label="Previous image">&#9664;</button>
