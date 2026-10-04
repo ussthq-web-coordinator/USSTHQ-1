@@ -21,13 +21,12 @@
   <meta property="og:site_name" content="The Salvation Army" />
 
   <!-- Custom Head Tags -->
-  <link href="./our-priorities-p.css" rel="stylesheet" />
+  <link href="./our-priorities-q.css" rel="stylesheet" />
   <script src="./our-priorities.js" defer></script>
   <meta http-equiv="Content-Type" content="text/html;charset=utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-  <!-- Material Symbols: safety net so every icon ligature resolves even if the
-       theme ships only a subset. Harmless if the theme already loads it. -->
+  <!-- Material Symbols: safety net so every icon ligature resolves -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap" />
@@ -35,14 +34,7 @@
 
 <body>
 
-<!-- ============================================================
-     All For Jesus  ·  Our priority for October 2026 - September 2027
-     Everything lives inside .afj so the design tokens in
-     our-priorities-l.css stay scoped and never leak into the theme.
-
-     Card grids use .afj-g + .afj-g--3 / --4 / --6 so the item count
-     always divides evenly at every breakpoint (no orphan cards).
-     ============================================================ -->
+<!--  -->
 <div class="afj">
 
   <!-- ============ 1. HERO ============ -->
@@ -80,75 +72,9 @@
   </section>
 
   <!-- ============ JUMP NAV ============ -->
-  <!-- ============ SECTION TILES ============
-       Plain anchor links by default, so with no JavaScript every section
-       stays on the page and these simply jump to it. our-priorities.js
-       upgrades them to an ARIA tablist and shows one panel at a time.
-       ===================================================== -->
+  <!-- SECTION TILES -->
   <div class="afj-tabs" id="afj-tabs">
     <p class="afj-sr">Choose a section to show it below. Every section also remains reachable as a link.</p>
-    <div class="afj-tabs__strip">
-      <a class="afj-tab" href="#afj-at-priorities">
-        <img class="afj-tab__img" src="https://salvationarmysouth.widen.net/content/swepmkcyvh/jpeg/HOUSTON_Hill-Drive-Canteen-26.jpeg?w=480&amp;h=320&amp;position=c&amp;color=ffffffff&amp;quality=55&amp;u=ukifzm" alt="" width="480" height="320" loading="lazy" decoding="async">
-        <span class="afj-tab__label">Three Priorities</span>
-      </a>
-      <a class="afj-tab" href="#afj-at-scripture">
-        <img class="afj-tab__img" src="https://salvationarmysouth.widen.net/content/ob2k4mqiro/jpeg/AugustaAreaCommand2022-6404.jpeg?w=480&amp;h=320&amp;position=c&amp;color=ffffffff&amp;quality=55&amp;u=ukifzm" alt="" width="480" height="320" loading="lazy" decoding="async">
-        <span class="afj-tab__label">God’s Call</span>
-      </a>
-      <a class="afj-tab" href="#afj-at-all">
-        <img class="afj-tab__img" src="https://salvationarmysouth.widen.net/content/okpwwq98tx/jpeg/_TSA2746.jpeg?w=480&amp;h=320&amp;position=c&amp;color=ffffffff&amp;quality=55&amp;u=ukifzm" alt="" width="480" height="320" loading="lazy" decoding="async">
-        <span class="afj-tab__label">How Much Is All?</span>
-      </a>
-      <a class="afj-tab" href="#afj-at-three">
-        <img class="afj-tab__img" src="https://salvationarmysouth.widen.net/content/cczlgjidr0/jpeg/Greenville%20Kroc%20Center-9476.jpeg?w=480&amp;h=320&amp;position=c&amp;color=ffffffff&amp;quality=55&amp;u=ukifzm" alt="" width="480" height="320" loading="lazy" decoding="async">
-        <span class="afj-tab__label">All For Jesus</span>
-      </a>
-      <a class="afj-tab" href="#afj-at-practice">
-        <img class="afj-tab__img" src="https://salvationarmysouth.widen.net/content/hcxf7jpx0y/jpeg/20220719-Camp%20Grandview-170.jpeg?w=480&amp;h=320&amp;position=c&amp;color=ffffffff&amp;quality=55&amp;u=ukifzm" alt="" width="480" height="320" loading="lazy" decoding="async">
-        <span class="afj-tab__label">In Practice</span>
-      </a>
-      <a class="afj-tab" href="#afj-at-reflect">
-        <img class="afj-tab__img" src="https://salvationarmysouth.widen.net/content/kawnybwf1n/jpeg/Womens%20Ministries%20Photo-022.jpeg?w=480&amp;h=320&amp;position=c&amp;color=ffffffff&amp;quality=55&amp;u=ukifzm" alt="" width="480" height="320" loading="lazy" decoding="async">
-        <span class="afj-tab__label">Four Passages</span>
-      </a>
-      <a class="afj-tab" href="#afj-at-require">
-        <img class="afj-tab__img" src="https://salvationarmysouth.widen.net/content/rxyags9tqo/jpeg/_TSA9111-1-DeNoiseAI-clear%20copy.jpeg?w=480&amp;h=320&amp;position=c&amp;color=ffffffff&amp;quality=55&amp;u=ukifzm" alt="" width="480" height="320" loading="lazy" decoding="async">
-        <span class="afj-tab__label">What God Requires</span>
-      </a>
-      <a class="afj-tab" href="#afj-at-share">
-        <img class="afj-tab__img" src="https://salvationarmysouth.widen.net/content/bhcs1b6txo/jpeg/_TSA1236.jpeg?w=480&amp;h=320&amp;position=c&amp;color=ffffffff&amp;quality=55&amp;u=ukifzm" alt="" width="480" height="320" loading="lazy" decoding="async">
-        <span class="afj-tab__label">Share</span>
-      </a>
-      <a class="afj-tab" href="#afj-at-centennial">
-        <img class="afj-tab__img" src="https://salvationarmysouth.widen.net/content/v9td8i9rjx/jpeg/20230711%20-%202023-049_Camp%20Heart%20O%27Hills%20-%200476.jpeg?w=480&amp;h=320&amp;position=c&amp;color=ffffffff&amp;quality=55&amp;u=ukifzm" alt="" width="480" height="320" loading="lazy" decoding="async">
-        <span class="afj-tab__label">Centennial</span>
-      </a>
-      <a class="afj-tab" href="#afj-at-prayer">
-        <img class="afj-tab__img" src="https://salvationarmysouth.widen.net/content/kv0kuztlmg/jpeg/Charleston_SC_Hurricane_Matthew_120.jpeg?w=480&amp;h=320&amp;position=c&amp;color=ffffffff&amp;quality=55&amp;u=ukifzm" alt="" width="480" height="320" loading="lazy" decoding="async">
-        <span class="afj-tab__label">24/7 Prayer</span>
-      </a>
-      <a class="afj-tab" href="#afj-at-connect">
-        <img class="afj-tab__img" src="https://salvationarmysouth.widen.net/content/kawnybwf1n/jpeg/Womens%20Ministries%20Photo-022.jpeg?w=480&amp;h=320&amp;position=c&amp;color=ffffffff&amp;quality=55&amp;u=ukifzm" alt="" width="480" height="320" loading="lazy" decoding="async">
-        <span class="afj-tab__label">Everyone Is Welcome</span>
-      </a>
-      <a class="afj-tab" href="#afj-at-listen">
-        <img class="afj-tab__img" src="https://salvationarmysouth.widen.net/content/py4vczs0xm/jpeg/CampRappahannock2023-02404.jpeg?w=480&amp;h=320&amp;position=c&amp;color=ffffffff&amp;quality=55&amp;u=ukifzm" alt="" width="480" height="320" loading="lazy" decoding="async">
-        <span class="afj-tab__label">Listen</span>
-      </a>
-      <a class="afj-tab" href="#afj-at-social">
-        <img class="afj-tab__img" src="https://salvationarmysouth.widen.net/content/v9td8i9rjx/jpeg/20230711%20-%202023-049_Camp%20Heart%20O%27Hills%20-%200476.jpeg?w=480&amp;h=320&amp;position=c&amp;color=ffffffff&amp;quality=55&amp;u=ukifzm" alt="" width="480" height="320" loading="lazy" decoding="async">
-        <span class="afj-tab__label">Follow Us</span>
-      </a>
-      <a class="afj-tab" href="#afj-at-brochure">
-        <img class="afj-tab__img" src="https://salvationarmysouth.widen.net/content/apfye5dgld/jpeg/Employee%20male%20at%20desk%20computer-5.jpeg?w=480&amp;h=320&amp;position=c&amp;color=ffffffff&amp;quality=55&amp;u=ukifzm" alt="" width="480" height="320" loading="lazy" decoding="async">
-        <span class="afj-tab__label">Brochure</span>
-      </a>
-      <a class="afj-tab" href="#afj-at-resources">
-        <img class="afj-tab__img" src="https://salvationarmysouth.widen.net/content/wqstogaykh/jpeg/20230713%20-%202023-050_Camp%20Hidden%20Lake%20-%201818.jpeg?w=480&amp;h=320&amp;position=c&amp;color=ffffffff&amp;quality=55&amp;u=ukifzm" alt="" width="480" height="320" loading="lazy" decoding="async">
-        <span class="afj-tab__label">Resources</span>
-      </a>
-    </div>
 
     <div class="afj-tabs__panels">
 
@@ -192,11 +118,7 @@
 
   </section>
 
-  <!-- ============ 3. GOD’S CALL ============
-       Framed on the territory’s own published statement of the call. Each
-       card pairs one phrase from that statement with a passage of Scripture;
-       no interpretation is added beyond the pairing itself.
-       ======================================================== -->
+  <!-- 3. GOD’S CALL -->
   <section class="afj-section" id="afj-at-scripture" aria-labelledby="afj-scriptureHead">
     <img class="afj-banner" src="https://salvationarmysouth.widen.net/content/ob2k4mqiro/jpeg/AugustaAreaCommand2022-6404.jpeg?w=1200&amp;h=800&amp;position=c&amp;color=ffffffff&amp;quality=48&amp;u=ukifzm" alt="A Salvation Army officer takes an older man by the hand and helps him up from his chair." width="1200" height="800" loading="lazy" decoding="async" style="object-position: center 42%;">
 
@@ -235,9 +157,7 @@
     </ul>
   </section>
 
-  <!-- ============ HOW MUCH IS ALL? (Matthew 22:37) ============
-       Copy on this panel is taken from the slides themselves.
-       ======================================================== -->
+  <!-- HOW MUCH IS ALL? (Matthew 22:37) -->
   <section class="afj-set afj-set--amber afj-section" id="afj-at-all" aria-labelledby="afj-allHead">
     <span class="afj-set__tri" aria-hidden="true"></span>
     <p class="afj-set__tag">Matthew 22:37</p>
@@ -491,9 +411,7 @@
   </section>
 
 
-  <!-- ============ WHAT DOES GOD REQUIRE? (Micah 6:8) ============
-       Copy on this panel is taken from the slides themselves.
-       ========================================================= -->
+  <!-- WHAT DOES GOD REQUIRE? (Micah 6:8) -->
   <section class="afj-set afj-set--graphite afj-section" id="afj-at-require" aria-labelledby="afj-requireHead">
     <span class="afj-set__tri" aria-hidden="true"></span>
     <p class="afj-set__tag">Micah 6:8 &middot; One act. Three priorities. Zero walls.</p>
@@ -533,6 +451,35 @@
     <h2 id="afj-shareHead">Invite Someone to Be All In</h2>
     <p>Know someone who would be encouraged by this? Send it to them and invite them to be All For Jesus with us.</p>
 
+    <ul class="afj-g afj-g--6 afj-msgs">
+      <li class="afj-msg">
+        <p class="afj-msg__kind">For anyone</p>
+        <blockquote class="afj-msg__text">This year my church has one priority: be All For Jesus. Be All In! To be All For Jesus is to believe in Jesus and in the salvation He gives, to depend on His power at work within us, and to give Him all of ourselves — our whole lives and our whole ministry. What would being all in look like for you this year?</blockquote>
+      </li>
+      <li class="afj-msg">
+        <p class="afj-msg__kind">For a neighbor or friend</p>
+        <blockquote class="afj-msg__text">Would you come to church with me this Sunday? Service starts around 11:00 AM, and there is Sunday school at 9:45 AM first if you are up for it. Expect music, a short message of hope, and a genuine welcome — please come as you are. Want me to save you a seat?</blockquote>
+      </li>
+      <li class="afj-msg">
+        <p class="afj-msg__kind">For someone having a hard week</p>
+        <blockquote class="afj-msg__text">I would like to pray for you this week. My church has people praying every hour of every day for a whole year, and I would be glad to add whatever you are carrying. What can I pray for?</blockquote>
+      </li>
+      <li class="afj-msg">
+        <p class="afj-msg__kind">For someone who wants to help</p>
+        <blockquote class="afj-msg__text">If you have ever wanted to do something that genuinely helps someone this week, come serve with me. You do not need a title to belong in our church groups — just a willingness to show up and help spread God’s Love. You can find an opportunity near you at salvationarmyvolunteer.org — shall we go together?</blockquote>
+      </li>
+      <li class="afj-msg">
+        <p class="afj-msg__kind">For someone who feels alone</p>
+        <blockquote class="afj-msg__text">If you are feeling alone right now, please know that you are not. My church is praying every hour of every day this year, and you would not be a name on a list — you would be someone we carry. Can I pray for you by name?</blockquote>
+      </li>
+      <li class="afj-msg">
+        <p class="afj-msg__kind">For your wider circle</p>
+        <blockquote class="afj-msg__text">Mark your calendar: the Centennial Celebration — All For Jesus — is June 4–6, 2027 at the Georgia World Congress Center in Atlanta. One hundred years of God’s faithfulness to Salvationists and the mission of the USA Southern Territory, with guests joining from Salvation Army territories around the world. Will you be there with us?</blockquote>
+      </li>
+    </ul>
+    <p class="afj-msg__note">Pick one, change it to sound like you, and send it on.</p>
+
+    <p class="afj-share__or">Or share the page itself</p>
     <ul class="afj-shareBtns" id="afj-share">
       <li>
         <a href="https://www.facebook.com/sharer/sharer.php?u=https%3A%2F%2Fwww.salvationarmyusa.org%2Fusa-southern-territory%2Four-priorities%2F" target="_blank" rel="noopener">
@@ -860,39 +807,6 @@
     </div>
   </section>
 
-  <!-- ============ 13. SOCIAL ============ -->
-  <section class="afj-panel afj-panel--navy afj-section" id="afj-at-social" aria-labelledby="afj-socialHead">
-    <p class="afj-eyebrow afj-eyebrow--onDark">Latest posts</p>
-    <h2 id="afj-socialHead">Follow Along &mdash; and Tag Us</h2>
-    <p>Show us how your community is living this out with <strong>#tsaALLFORJESUS</strong>.</p>
-
-    <ul class="afj-social">
-      <li>
-        <a class="tLB--socialSection__link" data-test-id="social-link-list-item" href="https://facebook.com/SalArmySouth?utm_campaign=social_link_list&amp;utm_medium=referral&amp;utm_source=USSWebsite-OurPriorities" rel="follow noopener noreferrer" target="_blank" title="Facebook">
-          <span class="afj-sr">The Salvation Army South on Facebook</span>
-          <svg data-test-id="lib-facebook" viewBox="0 0 28 28" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false"><path d="M16.662 1.75c-1.742 0-3.246.531-4.303 1.58-1.056 1.05-1.63 2.587-1.63 4.474v2.468H7.532a.533.533 0 00-.533.532v4.261a.533.533 0 00.533.533h3.195v10.12a.533.533 0 00.533.532h4.26a.532.532 0 00.533-.533v-10.12h3.729a.533.533 0 00.528-.465l.533-4.261a.532.532 0 00-.529-.6h-4.26v-2.13c0-.594.47-1.065 1.065-1.065h3.195a.533.533 0 00.533-.533V2.467a.533.533 0 00-.463-.528c-.47-.062-2.17-.189-3.723-.189zm0 1.065c1.298 0 2.553.104 3.12.157v3.039H17.12c-1.17 0-2.13.96-2.13 2.13v2.663a.533.533 0 00.532.533h4.19l-.4 3.196h-3.79a.533.533 0 00-.533.532v10.12h-3.196v-10.12a.533.533 0 00-.532-.532H8.065v-3.196h3.196a.533.533 0 00.533-.533v-3c0-1.675.49-2.897 1.316-3.719.827-.821 2.023-1.27 3.552-1.27z"></path></svg>
-        </a>
-      </li>
-      <li>
-        <a class="tLB--socialSection__link" data-test-id="social-link-list-item" href="https://instagram.com/salvationarmysouth?utm_campaign=social_link_list&amp;utm_medium=referral&amp;utm_source=USSWebsite-OurPriorities" rel="follow noopener noreferrer" target="_blank" title="Instagram">
-          <span class="afj-sr">The Salvation Army South on Instagram</span>
-          <svg data-test-id="lib-instagram" viewBox="0 0 28 28" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false"><path d="M8.989 1.75c-3.991 0-7.239 3.248-7.239 7.239V19.01c0 3.991 3.248 7.239 7.239 7.239H19.01c3.991 0 7.239-3.248 7.239-7.239V8.99c0-3.991-3.248-7.239-7.239-7.239H8.99zm0 1.114H19.01a6.117 6.117 0 016.125 6.125V19.01a6.117 6.117 0 01-6.125 6.125H8.99a6.117 6.117 0 01-6.125-6.125V8.99A6.117 6.117 0 018.99 2.865zm11.693 3.34a1.114 1.114 0 100 2.228 1.114 1.114 0 000-2.227zM14 7.876A6.134 6.134 0 007.875 14 6.134 6.134 0 0014 20.125 6.134 6.134 0 0020.125 14 6.134 6.134 0 0014 7.875zm0 1.114A5.003 5.003 0 0119.011 14 5.003 5.003 0 0114 19.011 5.003 5.003 0 018.989 14 5.003 5.003 0 0114 8.989z"></path></svg>
-        </a>
-      </li>
-      <li>
-        <a class="tLB--socialSection__link" data-test-id="social-link-list-item" href="https://linkedin.com/company/the-salvation-army-usa-southern-territory-headquarters?utm_campaign=social_link_list&amp;utm_medium=referral&amp;utm_source=USSWebsite-OurPriorities" rel="follow noopener noreferrer" target="_blank" title="LinkedIn">
-          <span class="afj-sr">The Salvation Army USA Southern Territory on LinkedIn</span>
-          <svg data-test-id="lib-linkedin" viewBox="0 0 28 28" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false"><path d="M4.946 1.75c-.9 0-1.686.256-2.262.72a2.45 2.45 0 00-.928 1.909c0 1.461 1.309 2.592 3.039 2.66.049.015.1.024.15.025.935 0 1.73-.274 2.298-.759a2.525 2.525 0 00.891-1.955c-.082-1.47-1.39-2.6-3.188-2.6zm0 1.053c1.39 0 2.075.682 2.133 1.59a1.42 1.42 0 01-.519 1.112c-.347.297-.884.506-1.614.506-1.386 0-2.137-.752-2.137-1.632 0-.44.18-.802.537-1.09.356-.287.9-.486 1.6-.486zM2.283 8.135a.533.533 0 00-.533.533v15.445a.533.533 0 00.533.533h5.326a.532.532 0 00.532-.533V8.668a.533.533 0 00-.532-.533H2.283zm7.989 0a.533.533 0 00-.533.533v15.445a.533.533 0 00.533.533h5.326a.532.532 0 00.532-.533v-8.788c0-1.035.829-1.864 1.865-1.864 1.035 0 1.864.829 1.864 1.864v8.788a.532.532 0 00.532.533h5.326a.533.533 0 00.533-.533V15.06c0-2.198-.646-3.939-1.734-5.126-1.089-1.188-2.607-1.798-4.238-1.798-2.08 0-3.337.76-4.148 1.386v-.853a.532.532 0 00-.532-.533h-5.326zM2.815 9.2h4.261v14.38h-4.26V9.2zm7.99 0h4.26v1.406a.533.533 0 00.93.355s1.579-1.76 4.283-1.76c1.37 0 2.572.49 3.453 1.451.88.962 1.454 2.416 1.454 4.407v8.522h-4.261v-8.256a.533.533 0 00-.045-.218c-.118-1.505-1.35-2.711-2.884-2.711a2.938 2.938 0 00-2.93 2.93v8.254h-4.26V9.2z"></path></svg>
-        </a>
-      </li>
-      <li>
-        <a class="tLB--socialSection__link" data-test-id="social-link-list-item" href="https://youtube.com/salarmysouth?utm_campaign=social_link_list&amp;utm_medium=referral&amp;utm_source=USSWebsite-OurPriorities" rel="follow noopener noreferrer" target="_blank" title="YouTube">
-          <span class="afj-sr">The Salvation Army South on YouTube</span>
-          <svg data-test-id="lib-youtube" viewBox="0 0 28 28" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false"><path d="M13.917 5.25c-3.753 0-7.277.284-9.154.682-1.25.284-2.331 1.137-2.558 2.445-.226 1.363-.455 3.41-.455 5.969 0 2.558.226 4.547.51 5.969.23 1.25 1.309 2.16 2.559 2.444 1.992.398 5.4.682 9.153.682s7.162-.284 9.151-.681c1.253-.285 2.332-1.137 2.558-2.445.23-1.422.514-3.467.569-6.025 0-2.558-.284-4.605-.569-6.027-.226-1.25-1.305-2.16-2.558-2.445-1.99-.284-5.456-.568-9.206-.568zm0 1.137c4.092 0 7.388.34 8.98.624.853.229 1.534.797 1.648 1.537.341 1.818.568 3.752.568 5.742-.055 2.443-.34 4.432-.568 5.854-.17 1.079-1.306 1.42-1.648 1.536-2.047.398-5.458.68-8.87.68-3.41 0-6.876-.227-8.866-.68-.853-.228-1.535-.797-1.648-1.536-.455-1.592-.626-3.695-.626-5.798 0-2.616.229-4.548.455-5.74.171-1.082 1.364-1.424 1.648-1.537 1.876-.398 5.345-.682 8.927-.682zm-3.071 3.41v9.096l7.958-4.547-7.958-4.548zm1.137 1.935l4.547 2.614-4.547 2.613v-5.227z"></path></svg>
-        </a>
-      </li>
-    </ul>
-  </section>
 
   <!-- ============ 14. BROCHURE ============ -->
   <section class="afj-section" id="afj-at-brochure" aria-labelledby="afj-brochureHead">
@@ -971,12 +885,7 @@
           </li>
         </ul>
 
-        <!-- scrolling="no" suppresses the IFRAME DOCUMENT scrollbar. The Widen
-             Portals app renders its own inner scroll region (the thin rounded
-             bar), so the native one stacked beside it was redundant. There is no
-             CSS route to this: the iframe is cross-origin, so its document
-             cannot be styled from here. The attribute is obsolete in HTML5 but
-             still honoured by every current browser. -->
+        <!-- scrolling"no" suppresses the IFRAME DOCUMENT scrollbar. The  -->
         <iframe class="afj-embed--portal"
                 src="https://www.ministrytoolkit.org/portals/258ufm6i/USSTerritorialPriorities?embedded=true"
                 allow="clipboard-read self https://www.ministrytoolkit.org/portals/258ufm6i/USSTerritorialPriorities; clipboard-write self https://www.ministrytoolkit.org/portals/258ufm6i/USSTerritorialPriorities"
@@ -987,16 +896,38 @@
   </section>
 
   <!-- Lightbox, shared by every .afj-rail on the page -->
+  <!-- ============ 13. SOCIAL ============ -->
+  <section class="afj-panel afj-panel--navy afj-section" id="afj-at-social" aria-labelledby="afj-socialHead">
+    <p class="afj-eyebrow afj-eyebrow--onDark">Latest posts</p>
+    <h2 id="afj-socialHead">Follow Along &mdash; and Tag Us</h2>
+    <p>Show us how your community is living this out with <strong>#tsaALLFORJESUS</strong>.</p>
+
+    <ul class="afj-social">
+      <li>
+        <a class="tLB--socialSection__link" data-afj-icon="facebook" href="https://facebook.com/SalArmySouth?utm_campaign=social_link_list&amp;utm_medium=referral&amp;utm_source=USSWebsite-OurPriorities" rel="follow noopener noreferrer" target="_blank" title="Facebook">
+          <span class="afj-sr">The Salvation Army South on Facebook</span>
+        </a>
+      </li>
+      <li>
+        <a class="tLB--socialSection__link" data-afj-icon="instagram" href="https://instagram.com/salvationarmysouth?utm_campaign=social_link_list&amp;utm_medium=referral&amp;utm_source=USSWebsite-OurPriorities" rel="follow noopener noreferrer" target="_blank" title="Instagram">
+          <span class="afj-sr">The Salvation Army South on Instagram</span>
+        </a>
+      </li>
+      <li>
+        <a class="tLB--socialSection__link" data-afj-icon="linkedin" href="https://linkedin.com/company/the-salvation-army-usa-southern-territory-headquarters?utm_campaign=social_link_list&amp;utm_medium=referral&amp;utm_source=USSWebsite-OurPriorities" rel="follow noopener noreferrer" target="_blank" title="LinkedIn">
+          <span class="afj-sr">The Salvation Army USA Southern Territory on LinkedIn</span>
+        </a>
+      </li>
+      <li>
+        <a class="tLB--socialSection__link" data-afj-icon="youtube" href="https://youtube.com/salarmysouth?utm_campaign=social_link_list&amp;utm_medium=referral&amp;utm_source=USSWebsite-OurPriorities" rel="follow noopener noreferrer" target="_blank" title="YouTube">
+          <span class="afj-sr">The Salvation Army South on YouTube</span>
+        </a>
+      </li>
+    </ul>
+  </section>
+
     </div><!-- /.afj-tabs__panels -->
   </div><!-- /.afj-tabs -->
-
-  <div class="afj-lightbox" id="afj-lightbox" role="dialog" aria-modal="true" aria-label="Enlarged image viewer">
-    <button type="button" class="afj-lightbox__btn afj-lightbox__close" id="afj-lbClose" aria-label="Close image viewer">&#10006;</button>
-    <button type="button" class="afj-lightbox__btn afj-lightbox__prev" id="afj-lbPrev" aria-label="Previous image">&#9664;</button>
-    <img id="afj-lbImg" alt="">
-    <button type="button" class="afj-lightbox__btn afj-lightbox__next" id="afj-lbNext" aria-label="Next image">&#9654;</button>
-    <p class="afj-lightbox__count" id="afj-lbCount" aria-live="polite"></p>
-  </div>
 </div>
 <!-- /.afj -->
 
