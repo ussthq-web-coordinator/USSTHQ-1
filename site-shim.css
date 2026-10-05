@@ -1,0 +1,54 @@
+/* ==========================================================================
+   Dev-only shim: the slice of the live theme's site.css that this page
+   depends on.
+
+   Production loads, in this order: the theme's bootstrap.css, then the page
+   stylesheet, then /site.css last. Locally we only had bootstrap, and
+   bootstrap's Reboot sets nothing but `img,svg{vertical-align:middle}` - it
+   has no max-width. Every containment rule the page was leaning on actually
+   came from site.css, which is why the images broke here and not in prod.
+
+   These rules are copied verbatim from the live site.css so dev matches prod.
+   This file is NOT needed in production - site.css already provides it there.
+   It loads last here for the same reason site.css loads last there.
+   ========================================================================== */
+
+/* the one that matters: without it every unclassed image renders at its
+   intrinsic width and spills straight out of its column */
+img,
+picture {
+  max-width: 100%;
+  display: block;
+}
+
+/* the page uses .btn-solid five times; bootstrap has no such class, so the
+   buttons fall back to bare links locally */
+.btn-solid {
+  display: inline-block;
+  font-family: "Creato Display", sans-serif;
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 21px;
+  text-align: center;
+  text-decoration: none;
+  vertical-align: middle;
+  cursor: pointer;
+  user-select: none;
+  border: 1px solid transparent;
+  padding: 12px 20px;
+  border-radius: 8px;
+  transition: color .15s ease-in-out, background-color .15s ease-in-out, border-color .15s ease-in-out;
+  color: #fff;
+  background-color: #002056;
+  border-color: #002056;
+}
+.btn-solid:hover {
+  background-color: #61769c;
+  border-color: #61769c;
+  text-decoration: none;
+}
+.btn-solid:focus {
+  outline: 0;
+  box-shadow: none;
+  text-decoration: none;
+}
