@@ -17,21 +17,22 @@
   var IMG_Q = '?w=480&h=320&position=c&color=ffffffff&quality=55&u=ukifzm';
 
   var TILES = [
-    ['afj-at-priorities', 'Three Priorities', 'swepmkcyvh/jpeg/HOUSTON_Hill-Drive-Canteen-26.jpeg'],
-    ['afj-at-scripture', 'God’s Call', 'ob2k4mqiro/jpeg/AugustaAreaCommand2022-6404.jpeg'],
-    ['afj-at-all', 'How Much Is All?', 'okpwwq98tx/jpeg/_TSA2746.jpeg'],
-    ['afj-at-three', 'All For Jesus', 'cczlgjidr0/jpeg/Greenville%20Kroc%20Center-9476.jpeg'],
-    ['afj-at-practice', 'In Practice', 'hcxf7jpx0y/jpeg/20220719-Camp%20Grandview-170.jpeg'],
-    ['afj-at-reflect', 'Four Passages', 'kawnybwf1n/jpeg/Womens%20Ministries%20Photo-022.jpeg'],
-    ['afj-at-require', 'What God Requires', 'rxyags9tqo/jpeg/_TSA9111-1-DeNoiseAI-clear%20copy.jpeg'],
-    ['afj-at-share', 'Invite Someone', 'bhcs1b6txo/jpeg/_TSA1236.jpeg'],
-    ['afj-at-centennial', 'Centennial Celebration', 'v9td8i9rjx/jpeg/20230711%20-%202023-049_Camp%20Heart%20O%27Hills%20-%200476.jpeg'],
-    ['afj-at-prayer', '24/7 Prayer', 'kv0kuztlmg/jpeg/Charleston_SC_Hurricane_Matthew_120.jpeg'],
-    ['afj-at-connect', 'Everyone Is Welcome', 'kawnybwf1n/jpeg/Womens%20Ministries%20Photo-022.jpeg'],
-    ['afj-at-listen', 'Listen to Soundcast', 'py4vczs0xm/jpeg/CampRappahannock2023-02404.jpeg'],
-    ['afj-at-brochure', 'Brochure', 'apfye5dgld/jpeg/Employee%20male%20at%20desk%20computer-5.jpeg'],
-    ['afj-at-resources', 'Resources', 'wqstogaykh/jpeg/20230713%20-%202023-050_Camp%20Hidden%20Lake%20-%201818.jpeg'],
-    ['afj-at-social', 'Follow Us', 'v9td8i9rjx/jpeg/20230711%20-%202023-049_Camp%20Heart%20O%27Hills%20-%200476.jpeg'],
+    ['hero', 'Start Here', '0pyuzx1xij/jpeg/AS8A2090.jpeg'],
+    ['priorities', 'Three Priorities', 'swepmkcyvh/jpeg/HOUSTON_Hill-Drive-Canteen-26.jpeg'],
+    ['call', 'God’s Call', 'ob2k4mqiro/jpeg/AugustaAreaCommand2022-6404.jpeg'],
+    ['all', 'How Much Is All?', 'okpwwq98tx/jpeg/_TSA2746.jpeg'],
+    ['umbrella', 'All For Jesus', 'cczlgjidr0/jpeg/Greenville%20Kroc%20Center-9476.jpeg'],
+    ['practice', 'In Practice', 'hcxf7jpx0y/jpeg/20220719-Camp%20Grandview-170.jpeg'],
+    ['reflect', 'Four Passages', 'kawnybwf1n/jpeg/Womens%20Ministries%20Photo-022.jpeg'],
+    ['require', 'What God Requires', 'rxyags9tqo/jpeg/_TSA9111-1-DeNoiseAI-clear%20copy.jpeg'],
+    ['share', 'Invite Someone', 'bhcs1b6txo/jpeg/_TSA1236.jpeg'],
+    ['centennial', 'Centennial Celebration', 'v9td8i9rjx/jpeg/20230711%20-%202023-049_Camp%20Heart%20O%27Hills%20-%200476.jpeg'],
+    ['prayer', '24/7 Prayer', 'kv0kuztlmg/jpeg/Charleston_SC_Hurricane_Matthew_120.jpeg'],
+    ['connect', 'Everyone Is Welcome', 'kawnybwf1n/jpeg/Womens%20Ministries%20Photo-022.jpeg'],
+    ['listen', 'Listen to Soundcast', 'py4vczs0xm/jpeg/CampRappahannock2023-02404.jpeg'],
+    ['brochure', 'Brochure', 'apfye5dgld/jpeg/Employee%20male%20at%20desk%20computer-5.jpeg'],
+    ['resources', 'Resources', 'wqstogaykh/jpeg/20230713%20-%202023-050_Camp%20Hidden%20Lake%20-%201818.jpeg'],
+    ['social', 'Follow Us', 'v9td8i9rjx/jpeg/20230711%20-%202023-049_Camp%20Heart%20O%27Hills%20-%200476.jpeg'],
   ];
 
   var ICONS = {
@@ -407,7 +408,16 @@
         root.scrollIntoView({ block: 'start', behavior: 'smooth' });
       }
       if (window.history && history.replaceState) {
-        history.replaceState(null, '', '#' + panels[i].id);
+        /* The first panel is what the page opens on, so a bare URL already
+           describes it. Writing a hash would mean an ordinary visit silently
+           rewrote the address bar. Every other section keeps its anchor so it
+           stays linkable. pathname + search rather than '#', which some
+           browsers leave behind as a dangling hash. */
+        if (i === 0) {
+          history.replaceState(null, '', location.pathname + location.search);
+        } else {
+          history.replaceState(null, '', '#' + panels[i].id);
+        }
       }
     }
 
