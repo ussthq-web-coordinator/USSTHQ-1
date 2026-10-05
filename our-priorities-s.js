@@ -20,7 +20,7 @@
     ['hero', 'Start Here', '0pyuzx1xij/jpeg/AS8A2090.jpeg'],
     ['priorities', 'Three Priorities', 'swepmkcyvh/jpeg/HOUSTON_Hill-Drive-Canteen-26.jpeg'],
     ['call', 'God’s Call', 'ob2k4mqiro/jpeg/AugustaAreaCommand2022-6404.jpeg'],
-    ['all', 'How Much Is All?', 'okpwwq98tx/jpeg/_TSA2746.jpeg'],
+    ['how-much', 'How Much Is All?', 'okpwwq98tx/jpeg/_TSA2746.jpeg'],
     ['umbrella', 'All For Jesus', 'cczlgjidr0/jpeg/Greenville%20Kroc%20Center-9476.jpeg'],
     ['practice', 'In Practice', 'hcxf7jpx0y/jpeg/20220719-Camp%20Grandview-170.jpeg'],
     ['reflect', 'Four Passages', 'kawnybwf1n/jpeg/Womens%20Ministries%20Photo-022.jpeg'],
@@ -85,12 +85,31 @@
     var strip = document.createElement('div');
     strip.className = 'afj-tabs__strip';
     var tabs = [], panels = [];
-    TILES.forEach(function (t) {
-      var panel = document.getElementById(t[0]);
-      if (!panel) return;
+
+    /* Pair tiles to panels by POSITION, not by id. The CMS sanitises ids on
+       paste - it has already removed one - and an id-based lookup turns that
+       into a section belonging to no panel, which therefore never receives
+       `hidden` and shows underneath every tab. Document order is the one
+       thing the CMS does preserve, so pair on that instead. */
+    var sections = [];
+    for (var k = 0; k < panelsWrap.children.length; k++) {
+      if (panelsWrap.children[k].tagName === 'SECTION') sections.push(panelsWrap.children[k]);
+    }
+
+    if (sections.length !== TILES.length && window.console && console.warn) {
+      console.warn('[priorities] ' + sections.length + ' sections vs ' + TILES.length +
+        ' tiles - these must correspond one to one, in page order.');
+    }
+
+    var pairs = Math.min(sections.length, TILES.length);
+    for (var i = 0; i < pairs; i++) {
+      var t = TILES[i];
+      var panel = sections[i];
+      /* put the id back if the CMS stripped it, so anchors keep working */
+      if (!panel.id) panel.id = t[0];
       var a = document.createElement('a');
       a.className = 'afj-tab';
-      a.href = '#' + t[0];
+      a.href = '#' + panel.id;
       var img = document.createElement('img');
       img.className = 'afj-tab__img';
       img.src = IMG_BASE + t[2] + IMG_Q;
@@ -103,7 +122,11 @@
       a.appendChild(img); a.appendChild(label);
       strip.appendChild(a);
       tabs.push(a); panels.push(panel);
-    });
+    }
+
+    /* A section with no tile would otherwise sit visible on top of every tab.
+       Hide it here; the show-all view un-hides it, so it stays reachable. */
+    for (var x = pairs; x < sections.length; x++) sections[x].hidden = true;
     if (!tabs.length) return null;
     root.insertBefore(strip, panelsWrap);
     return { strip: strip, tabs: tabs, panels: panels };
