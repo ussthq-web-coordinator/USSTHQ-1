@@ -476,7 +476,11 @@
 .afj-hero {
   position: relative;
   overflow: hidden;
-  padding: clamp(34px, 4.6vw, 58px) clamp(20px, 4vw, 54px) clamp(30px, 4vw, 48px);
+  /* matches .afj-section so the first panel spaces like every other one */
+  margin: var(--afj-section) 0;
+  /* top and bottom equal: overflow:hidden traps the last child's margin, so
+     this padding is the whole of the gap above and below the content */
+  padding: clamp(34px, 4.6vw, 58px) clamp(20px, 4vw, 54px);
   border: 1px solid #E6DCC8;
   border-radius: var(--afj-r-lg);
   color: var(--afj-body);
