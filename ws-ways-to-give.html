@@ -1,0 +1,426 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Ways to Give | The Salvation Army</title>
+  <meta name="description" content="Give hope in the way that fits you best: give online, give monthly, donate goods, volunteer, give smart with stock or IRA gifts, or leave a legacy.">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous">
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+
+  <!-- Scoped to .wtg so nothing leaks into the rest of the site -->
+  <style>
+    .wtg { --wtg-red: #b3262d; --wtg-red-dark: #8f1d23; --wtg-navy: #002056; --wtg-soft: #f5f7fa; --wtg-line: #e2e6eb; }
+    .wtg .material-icons { vertical-align: middle; }
+
+    /* Buttons */
+    .wtg .btn-give { background: var(--wtg-red); border-color: var(--wtg-red); color: #fff; font-weight: 600; }
+    .wtg .btn-give:hover, .wtg .btn-give:focus-visible { background: var(--wtg-red-dark); border-color: var(--wtg-red-dark); color: #fff; }
+    .wtg .btn-navy-outline { border: 2px solid var(--wtg-navy); color: var(--wtg-navy); font-weight: 600; }
+    .wtg .btn-navy-outline:hover, .wtg .btn-navy-outline:focus-visible { background: var(--wtg-navy); color: #fff; }
+
+    /* Hero */
+    .wtg-hero { background: linear-gradient(135deg, var(--wtg-navy) 0%, #0b3a7a 100%); color: #fff; }
+    .wtg-hero .lead { opacity: .9; }
+    .wtg-trust { font-size: .9rem; opacity: .85; }
+
+    /* Gift selector */
+    .wtg-amounts .btn { border: 2px solid var(--wtg-line); background: #fff; color: var(--wtg-navy); font-weight: 700; }
+    .wtg-amounts .btn[aria-pressed="true"] { border-color: var(--wtg-red); background: var(--wtg-red); color: #fff; }
+    .wtg-freq .btn { font-weight: 600; }
+    .wtg-freq .btn[aria-pressed="true"] { background: var(--wtg-navy); color: #fff; border-color: var(--wtg-navy); }
+    .wtg-impact { background: var(--wtg-soft); border-left: 4px solid var(--wtg-red); }
+
+    /* Option cards */
+    .wtg-card { border: 1px solid var(--wtg-line); transition: transform .15s ease, box-shadow .15s ease; }
+    .wtg-card:hover { transform: translateY(-3px); box-shadow: 0 .75rem 1.5rem rgba(0, 32, 86, .08); }
+    .wtg-icon { width: 48px; height: 48px; border-radius: 50%; background: rgba(179, 38, 45, .1); color: var(--wtg-red); display: inline-flex; align-items: center; justify-content: center; }
+    .wtg .nav-pills .nav-link { color: var(--wtg-navy); font-weight: 600; }
+    .wtg .nav-pills .nav-link.active { background: var(--wtg-navy); color: #fff; }
+
+    /* Monthly band, trust, FAQ */
+    .wtg-monthly { background: var(--wtg-soft); border: 1px solid var(--wtg-line); }
+    .wtg-stat { color: var(--wtg-red); font-weight: 700; font-size: 2.25rem; line-height: 1; }
+    .wtg .accordion-button:not(.collapsed) { background: var(--wtg-soft); color: var(--wtg-navy); }
+
+    /* Sticky mobile give bar */
+    .wtg-sticky { position: fixed; left: 0; right: 0; bottom: 0; z-index: 1030; background: #fff; border-top: 1px solid var(--wtg-line); box-shadow: 0 -.25rem 1rem rgba(0, 0, 0, .06); }
+    @media (min-width: 992px) { .wtg-sticky { display: none; } }
+    @media (max-width: 991.98px) { .wtg { padding-bottom: 72px; } }
+    @media (prefers-reduced-motion: reduce) { .wtg-card { transition: none; } .wtg-card:hover { transform: none; } }
+  </style>
+</head>
+<body>
+
+<div class="wtg">
+
+  <!-- ============ HERO ============ -->
+  <section class="wtg-hero py-5">
+    <div class="container py-md-4" style="max-width: 1100px;">
+      <div class="row align-items-center g-4">
+        <div class="col-lg-7">
+          <p class="text-uppercase fw-semibold small mb-2" style="letter-spacing: 2px;">Ways to Give</p>
+          <h4 class="display-6 fw-bold mb-3">Your generosity brings hope home.</h4>
+          <p class="lead mb-4">
+            Every gift to The Salvation Army stays focused on people in your community: a warm meal, a safe night's sleep, help with a bill, and a reminder that someone cares. Choose the way of giving that fits you best.
+          </p>
+          <div class="d-flex flex-wrap gap-2 mb-3">
+            <a href="#give-now" class="btn btn-lg btn-give">Give Now</a>
+            <a href="#ways" class="btn btn-lg btn-outline-light fw-semibold">Explore All Ways to Give</a>
+          </div>
+          <p class="wtg-trust mb-0">
+            <span class="material-icons" aria-hidden="true" style="font-size: 1.1rem;">lock</span>
+            Secure giving &nbsp;·&nbsp; Tax-deductible to the extent allowed by law
+          </p>
+        </div>
+
+        <!-- GIFT SELECTOR -->
+        <div class="col-lg-5" id="give-now">
+          <div class="card border-0 shadow-lg rounded-4 text-body">
+            <div class="card-body p-4">
+              <h5 class="fw-bold mb-3" style="color: var(--wtg-navy);">Make a gift today</h5>
+
+              <div class="btn-group w-100 mb-3 wtg-freq" role="group" aria-label="Gift frequency">
+                <button type="button" class="btn btn-outline-secondary" data-freq="once" aria-pressed="false">One time</button>
+                <button type="button" class="btn btn-outline-secondary" data-freq="monthly" aria-pressed="true">Monthly</button>
+              </div>
+
+              <div class="row row-cols-3 g-2 mb-3 wtg-amounts" role="group" aria-label="Gift amount">
+                <div class="col"><button type="button" class="btn w-100 py-2" data-amount="25" aria-pressed="false">$25</button></div>
+                <div class="col"><button type="button" class="btn w-100 py-2" data-amount="50" aria-pressed="true">$50</button></div>
+                <div class="col"><button type="button" class="btn w-100 py-2" data-amount="100" aria-pressed="false">$100</button></div>
+                <div class="col"><button type="button" class="btn w-100 py-2" data-amount="250" aria-pressed="false">$250</button></div>
+                <div class="col"><button type="button" class="btn w-100 py-2" data-amount="500" aria-pressed="false">$500</button></div>
+                <div class="col">
+                  <label for="wtg-other" class="visually-hidden">Other amount</label>
+                  <input id="wtg-other" type="number" min="1" step="1" inputmode="numeric" class="form-control h-100 text-center fw-bold" placeholder="Other">
+                </div>
+              </div>
+
+              <!-- EDIT: confirm each impact statement with your finance team before launch -->
+              <div class="wtg-impact rounded-3 p-3 mb-3" aria-live="polite">
+                <p class="small text-uppercase fw-semibold mb-1" style="color: var(--wtg-red);">Your impact</p>
+                <p class="mb-0" id="wtg-impact-text">Helps provide hot meals for families every month.</p>
+              </div>
+
+              <a href="#" id="wtg-donate" class="btn btn-give btn-lg w-100">Give $50 Monthly</a>
+              <p class="small text-body-secondary text-center mt-2 mb-0">Cancel or change a monthly gift anytime.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ WAYS TO GIVE ============ -->
+  <section class="container py-5" style="max-width: 1100px;" id="ways">
+    <div class="text-center mx-auto mb-4" style="max-width: 720px;">
+      <h5 class="fw-bold" style="color: var(--wtg-navy);">Find the right way to give</h5>
+      <p class="text-body-secondary mb-0">From a quick gift today to a lasting legacy, there's a way for everyone to help.</p>
+    </div>
+
+    <ul class="nav nav-pills justify-content-center flex-wrap gap-2 mb-4" id="wtg-tabs" role="tablist">
+      <li class="nav-item" role="presentation"><button class="nav-link active" data-bs-toggle="pill" data-bs-target="#wtg-money" type="button" role="tab" aria-controls="wtg-money" aria-selected="true">Give Money</button></li>
+      <li class="nav-item" role="presentation"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#wtg-smart" type="button" role="tab" aria-controls="wtg-smart" aria-selected="false">Give Smart</button></li>
+      <li class="nav-item" role="presentation"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#wtg-goods" type="button" role="tab" aria-controls="wtg-goods" aria-selected="false">Give Goods</button></li>
+      <li class="nav-item" role="presentation"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#wtg-time" type="button" role="tab" aria-controls="wtg-time" aria-selected="false">Give Time</button></li>
+      <li class="nav-item" role="presentation"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#wtg-legacy" type="button" role="tab" aria-controls="wtg-legacy" aria-selected="false">Leave a Legacy</button></li>
+    </ul>
+
+    <div class="tab-content">
+
+      <!-- GIVE MONEY -->
+      <div class="tab-pane fade show active" id="wtg-money" role="tabpanel" tabindex="0">
+        <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-3">
+          <div class="col"><div class="card wtg-card h-100 rounded-4"><div class="card-body p-4">
+            <span class="wtg-icon mb-3"><span class="material-icons" aria-hidden="true">favorite</span></span>
+            <h6 class="fw-bold" style="color: var(--wtg-navy);">Give Online</h6>
+            <p class="small text-body-secondary">Make a secure one-time gift in under a minute.</p>
+            <a href="#give-now" class="stretched-link fw-semibold text-decoration-none" style="color: var(--wtg-red);">Give now →</a>
+          </div></div></div>
+          <div class="col"><div class="card wtg-card h-100 rounded-4"><div class="card-body p-4">
+            <span class="wtg-icon mb-3"><span class="material-icons" aria-hidden="true">autorenew</span></span>
+            <h6 class="fw-bold" style="color: var(--wtg-navy);">Give Monthly</h6>
+            <p class="small text-body-secondary">Join our monthly giving family and provide steady help all year long.</p>
+            <a href="#monthly" class="stretched-link fw-semibold text-decoration-none" style="color: var(--wtg-red);">Become a monthly donor →</a>
+          </div></div></div>
+          <div class="col"><div class="card wtg-card h-100 rounded-4"><div class="card-body p-4">
+            <span class="wtg-icon mb-3"><span class="material-icons" aria-hidden="true">local_florist</span></span>
+            <h6 class="fw-bold" style="color: var(--wtg-navy);">Tribute &amp; Memorial Gifts</h6>
+            <p class="small text-body-secondary">Honor someone special or remember a loved one with a gift in their name.</p>
+            <a href="#" class="stretched-link fw-semibold text-decoration-none" style="color: var(--wtg-red);">Give in honor →</a>
+          </div></div></div>
+          <div class="col"><div class="card wtg-card h-100 rounded-4"><div class="card-body p-4">
+            <span class="wtg-icon mb-3"><span class="material-icons" aria-hidden="true">notifications_active</span></span>
+            <h6 class="fw-bold" style="color: var(--wtg-navy);">Online Red Kettle</h6>
+            <p class="small text-body-secondary">Start your own kettle and invite friends and family to give with you.</p>
+            <a href="#" class="stretched-link fw-semibold text-decoration-none" style="color: var(--wtg-red);">Start a kettle →</a>
+          </div></div></div>
+          <div class="col"><div class="card wtg-card h-100 rounded-4"><div class="card-body p-4">
+            <span class="wtg-icon mb-3"><span class="material-icons" aria-hidden="true">mail</span></span>
+            <h6 class="fw-bold" style="color: var(--wtg-navy);">Give by Mail or Phone</h6>
+            <p class="small text-body-secondary">Prefer a check or a conversation? We're glad to help you give.</p>
+            <a href="#contact" class="stretched-link fw-semibold text-decoration-none" style="color: var(--wtg-red);">See details →</a>
+          </div></div></div>
+          <div class="col"><div class="card wtg-card h-100 rounded-4"><div class="card-body p-4">
+            <span class="wtg-icon mb-3"><span class="material-icons" aria-hidden="true">business</span></span>
+            <h6 class="fw-bold" style="color: var(--wtg-navy);">Corporate &amp; Matching Gifts</h6>
+            <p class="small text-body-secondary">Many employers match gifts. Double your impact or partner with us as a business.</p>
+            <a href="#" class="stretched-link fw-semibold text-decoration-none" style="color: var(--wtg-red);">Check your match →</a>
+          </div></div></div>
+        </div>
+      </div>
+
+      <!-- GIVE SMART -->
+      <div class="tab-pane fade" id="wtg-smart" role="tabpanel" tabindex="0">
+        <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-3">
+          <div class="col"><div class="card wtg-card h-100 rounded-4"><div class="card-body p-4">
+            <span class="wtg-icon mb-3"><span class="material-icons" aria-hidden="true">trending_up</span></span>
+            <h6 class="fw-bold" style="color: var(--wtg-navy);">Gifts of Stock</h6>
+            <p class="small text-body-secondary">Giving appreciated stock may help you avoid capital gains tax while making a bigger impact.</p>
+            <a href="#" class="stretched-link fw-semibold text-decoration-none" style="color: var(--wtg-red);">Transfer stock →</a>
+          </div></div></div>
+          <div class="col"><div class="card wtg-card h-100 rounded-4"><div class="card-body p-4">
+            <span class="wtg-icon mb-3"><span class="material-icons" aria-hidden="true">savings</span></span>
+            <h6 class="fw-bold" style="color: var(--wtg-navy);">IRA Charitable Rollover</h6>
+            <p class="small text-body-secondary">If you're 70½ or older, you may give directly from your IRA and count it toward your required minimum distribution.</p>
+            <a href="#" class="stretched-link fw-semibold text-decoration-none" style="color: var(--wtg-red);">Learn how →</a>
+          </div></div></div>
+          <div class="col"><div class="card wtg-card h-100 rounded-4"><div class="card-body p-4">
+            <span class="wtg-icon mb-3"><span class="material-icons" aria-hidden="true">account_balance</span></span>
+            <h6 class="fw-bold" style="color: var(--wtg-navy);">Donor-Advised Funds</h6>
+            <p class="small text-body-secondary">Recommend a grant from your donor-advised fund to support your community.</p>
+            <a href="#" class="stretched-link fw-semibold text-decoration-none" style="color: var(--wtg-red);">Recommend a grant →</a>
+          </div></div></div>
+        </div>
+        <p class="small text-body-secondary text-center mt-3 mb-0">Please consult your tax or financial advisor about your specific situation.</p>
+      </div>
+
+      <!-- GIVE GOODS -->
+      <div class="tab-pane fade" id="wtg-goods" role="tabpanel" tabindex="0">
+        <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-3">
+          <div class="col"><div class="card wtg-card h-100 rounded-4"><div class="card-body p-4">
+            <span class="wtg-icon mb-3"><span class="material-icons" aria-hidden="true">checkroom</span></span>
+            <h6 class="fw-bold" style="color: var(--wtg-navy);">Donate Clothing &amp; Household Items</h6>
+            <p class="small text-body-secondary">Drop off gently used items or schedule a pickup.</p>
+            <a href="#" class="stretched-link fw-semibold text-decoration-none" style="color: var(--wtg-red);">Schedule a pickup →</a>
+          </div></div></div>
+          <div class="col"><div class="card wtg-card h-100 rounded-4"><div class="card-body p-4">
+            <span class="wtg-icon mb-3"><span class="material-icons" aria-hidden="true">directions_car</span></span>
+            <h6 class="fw-bold" style="color: var(--wtg-navy);">Donate a Vehicle</h6>
+            <p class="small text-body-secondary">Turn a car, truck, or boat you no longer need into help for your neighbors.</p>
+            <a href="#" class="stretched-link fw-semibold text-decoration-none" style="color: var(--wtg-red);">Donate a vehicle →</a>
+          </div></div></div>
+          <div class="col"><div class="card wtg-card h-100 rounded-4"><div class="card-body p-4">
+            <span class="wtg-icon mb-3"><span class="material-icons" aria-hidden="true">redeem</span></span>
+            <h6 class="fw-bold" style="color: var(--wtg-navy);">Angel Tree</h6>
+            <p class="small text-body-secondary">Adopt an Angel and give a child new clothes and toys for Christmas.</p>
+            <a href="#" class="stretched-link fw-semibold text-decoration-none" style="color: var(--wtg-red);">Adopt an Angel →</a>
+          </div></div></div>
+        </div>
+      </div>
+
+      <!-- GIVE TIME -->
+      <div class="tab-pane fade" id="wtg-time" role="tabpanel" tabindex="0">
+        <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-3">
+          <div class="col"><div class="card wtg-card h-100 rounded-4"><div class="card-body p-4">
+            <span class="wtg-icon mb-3"><span class="material-icons" aria-hidden="true">notifications</span></span>
+            <h6 class="fw-bold" style="color: var(--wtg-navy);">Ring a Bell</h6>
+            <p class="small text-body-secondary">Spend a couple of hours at a red kettle, alone or with family, friends, or coworkers.</p>
+            <a href="#" class="stretched-link fw-semibold text-decoration-none" style="color: var(--wtg-red);">Sign up to ring →</a>
+          </div></div></div>
+          <div class="col"><div class="card wtg-card h-100 rounded-4"><div class="card-body p-4">
+            <span class="wtg-icon mb-3"><span class="material-icons" aria-hidden="true">groups</span></span>
+            <h6 class="fw-bold" style="color: var(--wtg-navy);">Volunteer Locally</h6>
+            <p class="small text-body-secondary">Serve meals, sort donations, mentor youth, or help at special events.</p>
+            <a href="#" class="stretched-link fw-semibold text-decoration-none" style="color: var(--wtg-red);">Find an opportunity →</a>
+          </div></div></div>
+          <div class="col"><div class="card wtg-card h-100 rounded-4"><div class="card-body p-4">
+            <span class="wtg-icon mb-3"><span class="material-icons" aria-hidden="true">campaign</span></span>
+            <h6 class="fw-bold" style="color: var(--wtg-navy);">Host a Drive or Fundraiser</h6>
+            <p class="small text-body-secondary">Rally your school, church, or business around a food, coat, or toy drive.</p>
+            <a href="#" class="stretched-link fw-semibold text-decoration-none" style="color: var(--wtg-red);">Get started →</a>
+          </div></div></div>
+        </div>
+      </div>
+
+      <!-- LEAVE A LEGACY -->
+      <div class="tab-pane fade" id="wtg-legacy" role="tabpanel" tabindex="0">
+        <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-3">
+          <div class="col"><div class="card wtg-card h-100 rounded-4"><div class="card-body p-4">
+            <span class="wtg-icon mb-3"><span class="material-icons" aria-hidden="true">history_edu</span></span>
+            <h6 class="fw-bold" style="color: var(--wtg-navy);">Gifts in Your Will</h6>
+            <p class="small text-body-secondary">Include The Salvation Army in your will or trust and share hope for generations.</p>
+            <a href="#" class="stretched-link fw-semibold text-decoration-none" style="color: var(--wtg-red);">Plan your gift →</a>
+          </div></div></div>
+          <div class="col"><div class="card wtg-card h-100 rounded-4"><div class="card-body p-4">
+            <span class="wtg-icon mb-3"><span class="material-icons" aria-hidden="true">shield</span></span>
+            <h6 class="fw-bold" style="color: var(--wtg-navy);">Beneficiary Designations</h6>
+            <p class="small text-body-secondary">Name us as a beneficiary of a retirement account or life insurance policy.</p>
+            <a href="#" class="stretched-link fw-semibold text-decoration-none" style="color: var(--wtg-red);">Learn more →</a>
+          </div></div></div>
+          <div class="col"><div class="card wtg-card h-100 rounded-4"><div class="card-body p-4">
+            <span class="wtg-icon mb-3"><span class="material-icons" aria-hidden="true">payments</span></span>
+            <h6 class="fw-bold" style="color: var(--wtg-navy);">Gifts That Pay You Income</h6>
+            <p class="small text-body-secondary">Charitable gift annuities and trusts can provide you income while supporting our mission.</p>
+            <a href="#" class="stretched-link fw-semibold text-decoration-none" style="color: var(--wtg-red);">Explore options →</a>
+          </div></div></div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ============ MONTHLY GIVING BAND ============ -->
+  <section class="container pb-5" style="max-width: 1100px;" id="monthly">
+    <div class="wtg-monthly rounded-4 p-4 p-md-5">
+      <div class="row align-items-center g-4">
+        <div class="col-lg-8">
+          <p class="small text-uppercase fw-semibold mb-1" style="color: var(--wtg-red); letter-spacing: 1px;">Monthly Giving</p>
+          <h5 class="fw-bold mb-2" style="color: var(--wtg-navy);">Be there every month, not just at Christmas.</h5>
+          <p class="mb-0 text-body-secondary">Need doesn't take a season off. Monthly gifts give your neighbors dependable help all year and let us plan ahead to serve more people. You can change or cancel anytime.</p>
+        </div>
+        <div class="col-lg-4 text-lg-end">
+          <a href="#give-now" class="btn btn-lg btn-give" data-set-freq="monthly">Start Monthly Giving</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ TRUST / IMPACT ============ -->
+  <!-- EDIT: replace bracketed numbers with your verified figures -->
+  <section class="container pb-5" style="max-width: 1100px;">
+    <div class="text-center mx-auto mb-4" style="max-width: 720px;">
+      <h5 class="fw-bold" style="color: var(--wtg-navy);">Your gift is in good hands</h5>
+      <p class="text-body-secondary mb-0">We take our responsibility to donors seriously and work to make every dollar count.</p>
+    </div>
+    <div class="row row-cols-1 row-cols-md-3 g-3 text-center">
+      <div class="col"><div class="p-4 h-100 rounded-4 border">
+        <p class="wtg-stat mb-2">[XX]¢</p>
+        <p class="small text-body-secondary mb-0">of every dollar goes directly to programs and services</p>
+      </div></div>
+      <div class="col"><div class="p-4 h-100 rounded-4 border">
+        <p class="wtg-stat mb-2">[X,XXX]</p>
+        <p class="small text-body-secondary mb-0">people served in our community last year</p>
+      </div></div>
+      <div class="col"><div class="p-4 h-100 rounded-4 border">
+        <p class="wtg-stat mb-2">[XX]+</p>
+        <p class="small text-body-secondary mb-0">years serving our neighbors in need</p>
+      </div></div>
+    </div>
+  </section>
+
+  <!-- ============ FAQ ============ -->
+  <section class="container pb-5" style="max-width: 820px;" id="contact">
+    <h5 class="fw-bold text-center mb-4" style="color: var(--wtg-navy);">Questions about giving</h5>
+    <div class="accordion" id="wtg-faq">
+      <div class="accordion-item">
+        <h6 class="accordion-header"><button class="accordion-button collapsed fw-semibold" type="button" data-bs-toggle="collapse" data-bs-target="#faq1" aria-expanded="false" aria-controls="faq1">Is my gift tax-deductible?</button></h6>
+        <div id="faq1" class="accordion-collapse collapse" data-bs-parent="#wtg-faq"><div class="accordion-body">
+          The Salvation Army is a 501(c)(3) nonprofit organization, and gifts are tax-deductible to the extent allowed by law. You'll receive a receipt for your records. Our tax ID (EIN) is [XX-XXXXXXX].
+        </div></div>
+      </div>
+      <div class="accordion-item">
+        <h6 class="accordion-header"><button class="accordion-button collapsed fw-semibold" type="button" data-bs-toggle="collapse" data-bs-target="#faq2" aria-expanded="false" aria-controls="faq2">Does my gift stay in my community?</button></h6>
+        <div id="faq2" class="accordion-collapse collapse" data-bs-parent="#wtg-faq"><div class="accordion-body">
+          [EDIT: Describe how local gifts are used in your area.]
+        </div></div>
+      </div>
+      <div class="accordion-item">
+        <h6 class="accordion-header"><button class="accordion-button collapsed fw-semibold" type="button" data-bs-toggle="collapse" data-bs-target="#faq3" aria-expanded="false" aria-controls="faq3">How do I give by mail or phone?</button></h6>
+        <div id="faq3" class="accordion-collapse collapse" data-bs-parent="#wtg-faq"><div class="accordion-body">
+          Make checks payable to The Salvation Army and mail to [Mailing address]. To give by phone, call [Phone number].
+        </div></div>
+      </div>
+      <div class="accordion-item">
+        <h6 class="accordion-header"><button class="accordion-button collapsed fw-semibold" type="button" data-bs-toggle="collapse" data-bs-target="#faq4" aria-expanded="false" aria-controls="faq4">How do I change or cancel my monthly gift?</button></h6>
+        <div id="faq4" class="accordion-collapse collapse" data-bs-parent="#wtg-faq"><div class="accordion-body">
+          You can update your monthly gift anytime by contacting [Email or phone]. We're happy to help.
+        </div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ FINAL CTA ============ -->
+  <section class="wtg-hero py-5">
+    <div class="container text-center" style="max-width: 760px;">
+      <h5 class="fw-bold fs-3 mb-3">Hope starts with you.</h5>
+      <p class="lead mb-4">Your gift today helps a neighbor in need take the next step forward.</p>
+      <a href="#give-now" class="btn btn-lg btn-give">Give Now</a>
+    </div>
+  </section>
+
+  <!-- STICKY MOBILE GIVE BAR -->
+  <div class="wtg-sticky p-2">
+    <a href="#give-now" class="btn btn-give w-100">Give Now</a>
+  </div>
+
+</div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossorigin="anonymous"></script>
+  <script>
+    (function () {
+      // EDIT: set your donation form URL. Amount and frequency are appended as query parameters.
+      var DONATE_URL = '#';
+
+      // EDIT: confirm each impact statement before launch.
+      var IMPACT = {
+        25: 'Helps provide a warm meal for a neighbor in need.',
+        50: 'Helps provide hot meals for families every month.',
+        100: 'Helps provide a safe night of shelter for a family.',
+        250: 'Helps a family keep the lights on with utility assistance.',
+        500: 'Helps provide Christmas for children through Angel Tree.'
+      };
+
+      var amount = 50, freq = 'monthly';
+      var amountBtns = document.querySelectorAll('.wtg-amounts [data-amount]');
+      var freqBtns = document.querySelectorAll('.wtg-freq [data-freq]');
+      var other = document.getElementById('wtg-other');
+      var impact = document.getElementById('wtg-impact-text');
+      var donate = document.getElementById('wtg-donate');
+
+      function impactFor(a) {
+        var tiers = [500, 250, 100, 50, 25];
+        for (var i = 0; i < tiers.length; i++) if (a >= tiers[i]) return IMPACT[tiers[i]];
+        return 'Every gift, no matter the size, brings hope to someone in need.';
+      }
+
+      function render() {
+        impact.textContent = impactFor(amount);
+        donate.textContent = 'Give $' + amount.toLocaleString() + (freq === 'monthly' ? ' Monthly' : '');
+        donate.href = DONATE_URL === '#' ? '#' : DONATE_URL + (DONATE_URL.indexOf('?') > -1 ? '&' : '?') + 'amount=' + amount + '&frequency=' + freq;
+      }
+
+      function press(list, btn) {
+        list.forEach(function (b) { b.setAttribute('aria-pressed', b === btn ? 'true' : 'false'); });
+      }
+
+      amountBtns.forEach(function (b) {
+        b.addEventListener('click', function () {
+          amount = parseInt(b.dataset.amount, 10);
+          other.value = '';
+          press(amountBtns, b);
+          render();
+        });
+      });
+
+      other.addEventListener('input', function () {
+        var v = parseInt(other.value, 10);
+        if (v > 0) { amount = v; press(amountBtns, null); render(); }
+      });
+
+      function setFreq(f) {
+        freq = f;
+        freqBtns.forEach(function (b) { b.setAttribute('aria-pressed', b.dataset.freq === f ? 'true' : 'false'); });
+        render();
+      }
+      freqBtns.forEach(function (b) { b.addEventListener('click', function () { setFreq(b.dataset.freq); }); });
+      document.querySelectorAll('[data-set-freq]').forEach(function (a) {
+        a.addEventListener('click', function () { setFreq(a.dataset.setFreq); });
+      });
+
+      render();
+    })();
+  </script>
+</body>
+</html>
